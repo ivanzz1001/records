@@ -48,7 +48,7 @@ language: zh-CN   ## blog site languages: en, zh-CN, zh-TW, de
 #### Menu
 menu:
   Home: 
-  Archive: archives
+  Archive: /archives
   About: about
 ## you can create `tags` and `categories` folders (I had created them already).
 ## And create a `index.md` file in each of them.
