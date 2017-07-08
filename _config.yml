@@ -40,14 +40,14 @@ paginate: 20
 title : Jekyll Jacman
 tagline: A fresh looking and responsive theme for Jekyll
 assets: assets
-baseurl: records
+baseurl: 
 
 #### Language
 language: zh-CN   ## blog site languages: en, zh-CN, zh-TW, de
 
 #### Menu
 menu:
-  Home: 
+  Home: records
   Archive: archives
   About: about
 ## you can create `tags` and `categories` folders (I had created them already).
