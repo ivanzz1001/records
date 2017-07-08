@@ -10,7 +10,7 @@ highlighter: rouge
 
 #### Permalink
 # For more see: http://jekyllrb.com/docs/permalinks/
-permalink: post/:categories/:year/:month/:day/:title
+permalink: /post/:categories/:year/:month/:day/:title
 
 #### Markdown Processors
 # 'redcarpet' is unsupported on GitHub Pages now.
@@ -49,7 +49,7 @@ language: zh-CN   ## blog site languages: en, zh-CN, zh-TW, de
 menu:
   Home: 
   Archive: /archives
-  About: about
+  About: /about
 ## you can create `tags` and `categories` folders (I had created them already).
 ## And create a `index.md` file in each of them.
 ## set `front-matter`as
