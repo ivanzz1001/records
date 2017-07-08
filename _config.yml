@@ -10,7 +10,7 @@ highlighter: rouge
 
 #### Permalink
 # For more see: http://jekyllrb.com/docs/permalinks/
-permalink: /records/post/:categories/:year/:month/:day/:title
+permalink: post/:categories/:year/:month/:day/:title
 
 #### Markdown Processors
 # 'redcarpet' is unsupported on GitHub Pages now.
@@ -40,14 +40,14 @@ paginate: 20
 title : Jekyll Jacman
 tagline: A fresh looking and responsive theme for Jekyll
 assets: assets
-baseurl: 
+baseurl: records
 
 #### Language
 language: zh-CN   ## blog site languages: en, zh-CN, zh-TW, de
 
 #### Menu
 menu:
-  Home: /records
+  Home: 
   Archive: archives
   About: about
 ## you can create `tags` and `categories` folders (I had created them already).
