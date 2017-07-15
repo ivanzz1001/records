@@ -1,6 +1,5 @@
----
-title: 归档目录
-tags: 
+layout: ceph
+title: ceph 归档
 ---
 
 This is an emoji test. :smile:
