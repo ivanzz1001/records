@@ -7,7 +7,4 @@ tags:
 
 layout: ceph
 title: ceph
-
-
-fsdjfldsfkdskl
 ---
