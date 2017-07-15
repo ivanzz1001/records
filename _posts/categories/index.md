@@ -1,5 +1,5 @@
-layout: ceph
-title: ceph 归档
+layout: categories
+title: categories
 ---
 
 This is an emoji test. :smile:
