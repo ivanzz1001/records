@@ -1,19 +1,13 @@
+---
+title: Categories
+date: 2013-12-24 23:30:09
+categories:
+- Foo
+- Bar
+- Baz
+---
+
 
 layout: ceph
 title: ceph
 ---
-
-
-
-fsdfjsdkfjsd
-
-
-
-
-
-layout: ceph2
-title: ceph2
----
-
-
-fsdljfldsjf
