@@ -14,16 +14,16 @@ description: librados相关介绍及使用范例
 
 
 
-## step1: 安装librados开发环境
+## 安装librados开发环境 (step1)
 
 
-## step2: 配置一个cluster handler
+## 配置一个cluster handler (step2)
 
 
 
-## step3: 创建一个IO context
+## 创建一个IO context (step3)
 
 
-## step4: 关闭sessions
+## 关闭sessions (step4)
 
 
