@@ -2392,7 +2392,8 @@ footer {
 }
 
 .article-content pre, .article-content .highlight, .article-content .highlight pre {
-  background: #2d2d2d;
+  /*background: #2d2d2d;*/
+  background: #f2dede;   //modified by ivanzz
   margin: .5em 0;
   padding: .5em 2%;
   color: #050505;
@@ -2404,9 +2405,6 @@ footer {
   word-wrap: break-word;
 }
 
-.article-content .highlight pre .language{
-	background: #f8f1f1;
-}
 
 @media only screen and (min-width:568px) {
   .article-content pre, .article-content .highlight, .article-content .highlight pre {
