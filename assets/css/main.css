@@ -2404,6 +2404,10 @@ footer {
   word-wrap: break-word;
 }
 
+.article-content .highlight .string{
+	background: #f8f1f1;
+}
+
 @media only screen and (min-width:568px) {
   .article-content pre, .article-content .highlight, .article-content .highlight pre {
     font-size: .9em
