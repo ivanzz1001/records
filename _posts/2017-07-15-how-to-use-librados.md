@@ -9,7 +9,6 @@ description: librados相关介绍及使用范例
 ---
 
 
-## librados简介
 Jekyll-Jacman 是为 Jekyll 设计的一款清新且具有响应式的主题，拥有更丰富的特性并支持了很多的国内服务。Jacman 始于 Jacman 移植而来
 
 
