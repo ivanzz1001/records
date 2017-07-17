@@ -2404,7 +2404,7 @@ footer {
   word-wrap: break-word;
 }
 
-.article-content .highlight .string{
+.article-content .highlight pre .language{
 	background: #f8f1f1;
 }
 
