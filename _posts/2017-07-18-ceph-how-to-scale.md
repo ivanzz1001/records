@@ -52,6 +52,7 @@ mon_osd_nearfull_ratio = 0.03
 
 重启RGW:
 {% highlight string %}
+kill -9 {radosgw-pid}
 radosgw -c /etc/ceph/ceph.conf -n client.radosgw.{radosgw-name}
 {% endhighlight %}
 
