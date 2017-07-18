@@ -164,10 +164,20 @@ sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
 3）修改主机名
 
 在上述所有节点上分别修改/etc/sysconfig/network文件，指定其主机名分别为`ceph001-admin、ceph001-node1、ceph001-node2、ceph001-node3`。例如：
+<pre>
+[root@ceph001-node1 ~]# cat /etc/sysconfig/network
+# Created by anaconda
+NOZEROCONF=yes
+HOSTNAME=ceph001-node1
+</pre>
 
-![manual-inst-hostchg](https://ivanzz1001.github.io/records/assets/img/ceph/manual-inst/manual-inst-hostchg.jpg)
 
+上述修改需要在系统下次重启时才生效。
 
+此外，我们需要分别在每一个节点上执行hostname命令来立即更改主机名称。例如：
+<pre>
+# sudo hostname ceph001-node1
+</pre>
 
 
 ## 建立集群
