@@ -27,7 +27,8 @@ ol, ul {
 table {
   border-collapse: separate;
   border-spacing: 0;
-  vertical-align: middle
+  vertical-align: middle;
+  color:#ca4b81
 }
 
 caption, th, td {
