@@ -47,6 +47,7 @@ Linux ceph001-node1 3.10.0-229.el7.x86_64 #1 SMP Fri Mar 6 11:36:42 UTC 2015 x86
 sudo rpm --import './release.asc'
 </pre>
 
+
 ### 1.2 DOWNLOAD PACKAGES
 
 假如你是需要在无网络访问的防火墙后安装ceph集群，在安装之前你必须要获得相应的安装包。注意，你的连接外网的下载ceph安装包的机器环境与``你实际安装ceph集群的环境最好一致，否则可能出现安装包版本不一致的情况而出现错误。``。
@@ -106,7 +107,9 @@ su -c 'rpm -Uvh https://download.ceph.com/rpm-jewel/el7/noarch/ceph-release-1-0.
 
 修改/etc/yum.repos.d/ceph.repo文件，添加priority项：
 
-![manual-inst-priority.png](![ceph_auth_export](https://ivanzz1001.github.io/records/assets/img/ceph/manual-inst/manual-inst-priority.png)
+![manual-inst-priority](https://ivanzz1001.github.io/records/assets/img/ceph/manual-inst/manual-inst-priority.png)
+
+
 
 下载ceph安装包：
 <pre>
