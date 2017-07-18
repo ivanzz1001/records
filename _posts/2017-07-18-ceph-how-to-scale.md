@@ -25,16 +25,9 @@ description: ceph 扩容
 
 如下是整个故障的模拟步骤：
 
-**(1) 新建新建用于故障演练的pool**
-{% highlight string %}
-sudo ceph osd pool create benchmark 256 256
-rados -p benchmark df                      # 查看该池占用的资源
-{% endhighlight %}
+**(1) 调整阈值**
 
-
-**(2) 调整mon中相应阀值的设置**
-
-这里我们调小阀值的原因是为了后面可以通过相应的工具填充数据以尽快达到该阀值(在磁盘容量较小的情况下，也可以不必调整)。这里我们主要调整```mon_osd_nearfull_ratio``` 和 ```mon_osd_full_ratio```两个参数。修改ceph.conf文件[global]段中的这两个字段：
+这里我们调小阀值的原因是为了后面可以通过相应的工具填充数据以尽快达到该阀值(在磁盘容量较小的情况下，也可以不必调整)。这里我们主要调整```mon_osd_nearfull_ratio``` 和 ```mon_osd_full_ratio```两个参数。添加或修改ceph.conf文件[global]段中的这两个字段：
 <pre>
 mon_osd_full_ratio = 0.05
 mon_osd_nearfull_ratio = 0.03
@@ -62,6 +55,14 @@ radosgw -c /etc/ceph/ceph.conf -n client.radosgw.{radosgw-name}
 ceph daemon mon.{mon-name} config show | grep ratio
 ceph daemon osd.{num} config show | grep ratio
 </pre>
+
+**(2) 新建新建用于故障演练的pool**
+{% highlight string %}
+sudo ceph osd pool create benchmark 256 256
+rados -p benchmark df                      # 查看该池占用的资源
+{% endhighlight %}
+
+
 
 **(3) 向benchmark池写入数据**
 
