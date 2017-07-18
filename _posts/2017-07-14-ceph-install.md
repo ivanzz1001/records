@@ -108,7 +108,7 @@ su -c 'rpm -Uvh https://download.ceph.com/rpm-jewel/el7/noarch/ceph-release-1-0.
 
 修改/etc/yum.repos.d/ceph.repo文件，添加priority项：
 
-![manual-inst-priority](https://ivanzz1001.github.io/records/assets/img/ceph/manual-inst/manual-inst-priority.png)
+![manual-inst-priority](https://ivanzz1001.github.io/records/assets/img/ceph/manual-inst/manual-inst-priority.jpg)
 
 
 下载ceph安装包：
