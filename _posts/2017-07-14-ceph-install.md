@@ -246,6 +246,7 @@ ntpstat                 #查看当前的同步状态
 sudo yum localinstall *.rpm
 </pre>
 
+<br />
 
 *安装ceph包*
 
@@ -258,4 +259,24 @@ sudo yum localinstall *.rpm
 
 
 ## 建立集群
+
+### 建立monitor
+
+我们会在ceph001-node1，ceph001-node2,ceph001-node3上分别部署monitor.请在/ceph-cluster/build目录下完成构建。
+
+
+**在ceph001-node1上建立monitor**
+
+
+1) 生成monitor keyring及client.admin keyring
+
+执行如下命令生成monitor生成monitor keyring及client.admin keyring:
+<pre>
+ceph-authtool --create-keyring ceph.mon.keyring --gen-key -n mon. --cap mon 'allow *'
+ceph-authtool --create-keyring ceph.client.admin.keyring --gen-key -n  client.admin --set-uid=0 --cap mon 'allow *' --cap osd 'allow *' --cap mds 'allow'
+ceph-authtool ./ceph.mon.keyring --import-keyring  /etc/ceph/ceph.client.admin.keyring
+</pre>
+
+
+
 
