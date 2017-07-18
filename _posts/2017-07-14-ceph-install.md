@@ -271,11 +271,13 @@ sudo yum localinstall *.rpm
 1) 生成monitor keyring及client.admin keyring
 
 执行如下命令生成monitor生成monitor keyring及client.admin keyring:
-<pre>
+
+{% highlight string %}
 ceph-authtool --create-keyring ceph.mon.keyring --gen-key -n mon. --cap mon 'allow *'
 ceph-authtool --create-keyring ceph.client.admin.keyring --gen-key -n  client.admin --set-uid=0 --cap mon 'allow *' --cap osd 'allow *' --cap mds 'allow'
-ceph-authtool ./ceph.mon.keyring --import-keyring  /etc/ceph/ceph.client.admin.keyring
-</pre>
+ceph-authtool ./ceph.mon.keyring --import-keyring  ./ceph.client.admin.keyring
+cp ./ceph.client.admin.keyring /etc/ceph/ceph.client.admin.keyring
+{% endhighlight %}
 
 
 
