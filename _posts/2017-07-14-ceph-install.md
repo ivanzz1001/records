@@ -150,7 +150,7 @@ mkdir -p /ceph-cluster/test
 chmod 777 /ceph-cluster -R
 </pre>
 
-2） 关闭iptables
+2） 关闭iptables及SELinux
 
 可以将如下shell命令写成脚本来执行(disable-iptable-selinux.sh)：
 
@@ -161,7 +161,7 @@ setenforce 0
 sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config 
 </pre>
 
-3）修改主机名
+3） 修改主机名
 
 在上述所有节点上分别修改/etc/sysconfig/network文件，指定其主机名分别为`ceph001-admin、ceph001-node1、ceph001-node2、ceph001-node3`。例如：
 <pre>
@@ -176,8 +176,58 @@ HOSTNAME=ceph001-node1
 
 此外，我们需要分别在每一个节点上执行hostname命令来立即更改主机名称。例如：
 <pre>
-# sudo hostname ceph001-node1
+[root@ceph001-node1 ~]# sudo hostname ceph001-node1
+[root@ceph001-node1 ~]# hostname -s
+ceph001-node1
 </pre>
+
+4) 修改/etc/hosts文件
+
+分别修改3台宿主机节点上的/etc/hosts文件
+<pre>
+# For Ceph Cluster
+10.133.134.211	ceph001-node1
+10.133.134.212	ceph001-node2
+10.133.134.213	ceph001-node3
+</pre>
+
+5) 通过主机名测试各节点之间是否联通
+
+分别测试各个主机节点是否通过主机名ping通。例如：
+<pre>
+[root@ceph001-node1 ~]# ping ceph001-node2
+PING ceph001-node2 (10.133.134.212) 56(84) bytes of data.
+64 bytes from ceph001-node2 (10.133.134.212): icmp_seq=1 ttl=64 time=0.869 ms
+64 bytes from ceph001-node2 (10.133.134.212): icmp_seq=2 ttl=64 time=0.524 ms
+64 bytes from ceph001-node2 (10.133.134.212): icmp_seq=3 ttl=64 time=0.363 ms
+64 bytes from ceph001-node2 (10.133.134.212): icmp_seq=4 ttl=64 time=0.416 ms
+</pre>
+
+6) 检查当前CentOS内核版本是否支持rbd，并装载rbd模块
+<pre>
+modinfo rbd
+modprobe rbd       #装载rbd模块
+lsmod | grep rbd   #查看模块是否已经装载
+</pre>
+
+7) 安装ntp，并配置ceph集群节点之间的时间同步
+
+在各节点执行如下命令：
+<pre>
+rpm –qa | grep ntp     #查看当前是否已经安装ntp
+ps –ef | grep ntp      # 查看ntp服务器是否启动
+ntpstat                 #查看当前的同步状态
+</pre>
+
+在/etc/ntp.conf配置文件中配置时间同步服务器地址
+
+``参看：http://www.centoscn.com/CentosServer/test/2016/0129/6709.html``
+
+8) TTY
+
+在CentOS及RHEL上，当你尝试执行ceph-deploy时，你也许会收到一个错误。假如requiretty在你的Ceph节点上默认被设置了的话，可以执行``sudo visudo``然后定位到Defaults requiretty的设置部分，将其改变为Defaults:ceph !requiretty或者直接将其注释掉
+
+**``NOTE:假如直接修改/etc/sudoers，确保使用sudo visudo，而不要用其他的文本编辑器``**
 
 
 ## 建立集群
