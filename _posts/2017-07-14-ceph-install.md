@@ -51,7 +51,9 @@ sudo rpm --import './release.asc'
 
 ### DOWNLOAD PACKAGES
 
-假如你是需要在无网络访问的防火墙后安装ceph集群，在安装之前你必须要获得相应的安装包。注意，你的连接外网的下载ceph安装包的机器环境与``你实际安装ceph集群的环境最好一致，否则可能出现安装包版本不一致的情况而出现错误。``。
+假如你是需要在无网络访问的防火墙后安装ceph集群，在安装之前你必须要获得相应的安装包。
+
+``注意，你的连接外网的下载ceph安装包的机器环境与你实际安装ceph集群的环境最好一致，否则可能出现安装包版本不一致的情况而出现错误。``。
 
 **RPM PACKAGES**
 
@@ -96,9 +98,7 @@ enabled = 1
 su -c 'rpm -Uvh https://download.ceph.com/rpm-{release-name}/{distro}/noarch/ceph-{version}.{distro}.noarch.rpm'
 </pre>
 
-也可以直接到官方对应的网站去下载：
-
-`https://download.ceph.com/`
+也可以直接到官方对应的网站去下载：`https://download.ceph.com/`
 
 
 这里我们在CentOS7.1上配置如下：
@@ -119,3 +119,7 @@ yum repolist
 yum makecache
 sudo yum install --downloadonly --downloaddir=/ceph-cluster/packages/ceph ceph ceph-radosgw
 </pre>
+
+**``NOTE1：这里我们目前就下载ceph,ceph-radosgw两个包，其依赖的一些包会自动下载下来。如果在实际安装中，仍缺少一些依赖包，我们可以通过yum search ${package-name} 查找到该包，然后再下载下来.``**
+
+**``NOTE2: 上面这是下载最新版本的ceph安装包，如果下载其他版本，请携带上版本号``**
