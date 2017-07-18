@@ -47,7 +47,7 @@ Linux ceph001-node1 3.10.0-229.el7.x86_64 #1 SMP Fri Mar 6 11:36:42 UTC 2015 x86
 <pre>
 sudo rpm --import './release.asc'
 </pre>
-<br />
+
 
 ### DOWNLOAD PACKAGES
 
@@ -120,12 +120,12 @@ yum makecache
 sudo yum install --downloadonly --downloaddir=/ceph-cluster/packages/ceph ceph ceph-radosgw
 </pre>
 
-**``NOTE1：这里我们目前就下载ceph,ceph-radosgw两个包，其依赖的一些包会自动下载下来。如果在实际安装中，仍缺少一些依赖包，我们可以通过yum search ${package-name} 查找到该包，然后再下载下来.``**
+``NOTE1：这里我们目前就下载ceph,ceph-radosgw两个包，其依赖的一些包会自动下载下来。如果在实际安装中，仍缺少一些依赖包，我们可以通过yum search ${package-name} 查找到该包，然后再下载下来.``
 
-**``NOTE2: 上面这是下载最新版本的ceph安装包，如果下载其他版本，请携带上版本号``**
+``NOTE2: 上面这是下载最新版本的ceph安装包，如果下载其他版本，请携带上版本号``
 
 
-4）下载ceph-deploy安装包
+4） 下载ceph-deploy安装包
 
 这里我们是手动安装，可以不用下载。
 <pre>
