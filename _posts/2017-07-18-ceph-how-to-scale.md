@@ -21,11 +21,11 @@ description: ceph 扩容
 
 
 ## 故障模拟
-在故障模拟之前，我们仔细分析故障产生的本质原因是：ceph存储集群中数据达到或超过了mon_osd_full_ratio。 与ceph存储集群的大小，磁盘的绝对容量是没有关系的。后面我们会看到，故障的解决虽然与mon_osd_full_ratio值的大小有一定关系，但是与绝对容量是不相关的，因此这里模拟故障时，可以不用考虑集群的大小。
+在故障模拟之前，我们仔细分析故障产生的本质原因是：ceph存储集群中数据达到或超过了mon_osd_full_ratio。 而与ceph存储集群的大小，磁盘的绝对容量是没有关系的。后面我们会看到，故障的解决虽然与mon_osd_full_ratio值的大小有一定关系，但是与绝对容量是不相关的，因此这里模拟故障时，可以不用考虑集群的大小。
 
 如下是整个故障的模拟步骤：
 
-（1） 调整mon中相应阀值的设置
+**(1) 调整mon中相应阀值的设置**
 
 这里我们调小阀值的原因是为了后面可以通过相应的工具填充数据以尽快达到该阀值(在磁盘容量较小的情况下，也可以不必调整)。这里我们主要调整```mon_osd_nearfull_ratio``` 和 ```mon_osd_full_ratio```两个参数。在所有monitor上执行如下命令：
 {% highlight string %}
@@ -38,7 +38,8 @@ sudo ceph daemon mon.{mon-name} config set mon_osd_full_ratio 0.05
 ceph daemon mon.{mon-name} config show | grep ratio
 </pre>
 
-（2） 新建新建用于故障演练的pool
+**(2) 新建新建用于故障演练的pool**
+
 
 
 
