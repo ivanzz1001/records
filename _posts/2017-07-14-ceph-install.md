@@ -230,5 +230,32 @@ ntpstat                 #查看当前的同步状态
 **``NOTE:假如直接修改/etc/sudoers，确保使用sudo visudo，而不要用其他的文本编辑器``**
 
 
+9) 安装ceph软件包
+
+*安装pre-requisite 包*
+
+在所有节点上安装如下包:
+* snappy
+* leveldb
+* gdisk
+* python-argparse
+* gperftools-libs
+
+执行如下命令进行安装：
+<pre>
+sudo yum localinstall *.rpm
+</pre>
+
+
+*安装ceph包*
+
+在所有节点上执行如下命令安装ceph包：
+<pre>
+sudo yum localinstall *.rpm
+</pre>
+
+<br />
+
+
 ## 建立集群
 
