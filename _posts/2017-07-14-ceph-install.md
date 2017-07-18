@@ -26,7 +26,7 @@ Linux ceph001-node1 3.10.0-229.el7.x86_64 #1 SMP Fri Mar 6 11:36:42 UTC 2015 x86
 
 |        主机IP          |         部署组件             |     主机名      |
 |:----------------------:|:--------------------------:|:---------------:|
-| 10.133,134,211         |         node1              |  ceph001-node1 |
+| 10.133.134.211         |         node1              |  ceph001-node1 |
 | 10.133.134.212         |         node2              |  ceph001-node2 |
 | 10.133.134.213         |         node3              |  ceph001-node3 |
 
@@ -47,7 +47,7 @@ Linux ceph001-node1 3.10.0-229.el7.x86_64 #1 SMP Fri Mar 6 11:36:42 UTC 2015 x86
 <pre>
 sudo rpm --import './release.asc'
 </pre>
-
+<br />
 
 ### DOWNLOAD PACKAGES
 
@@ -133,3 +133,40 @@ sudo yum install --downloadonly --downloaddir=/ceph-cluster/packages/ceph-deploy
 </pre>
 
 5)	将上述的依赖包分别打包压缩称dependencies.tar.gz、ceph.tar.gz、ceph-deploy.tar.gz，并上传到集群的各个节点上来进行安装
+
+<br />
+
+
+
+## 安装软件包
+
+1） 建立相应的构建目录
+
+这里我们统一采用如下目录来完成整个集群的安装：
+<pre>
+mkdir -p /ceph-cluster/build/script
+mkdir -p /ceph-cluster/packages
+mkdir -p /ceph-cluster/test
+chmod 777 /ceph-cluster -R
+</pre>
+
+2） 关闭iptables
+
+可以将如下shell命令写成脚本来执行(disable-iptable-selinux.sh)：
+
+<pre>
+systemctl stop firewalld.service 
+systemctl disable firewalld.service 
+setenforce 0 
+sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config 
+</pre>
+
+3）修改主机名
+
+在上述所有节点上分别修改/etc/sysconfig/network文件，指定其主机名分别为`ceph001-admin、ceph001-node1、ceph001-node2、ceph001-node3`。例如：
+
+
+
+
+## 建立集群
+
