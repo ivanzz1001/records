@@ -123,3 +123,13 @@ sudo yum install --downloadonly --downloaddir=/ceph-cluster/packages/ceph ceph c
 **``NOTE1：这里我们目前就下载ceph,ceph-radosgw两个包，其依赖的一些包会自动下载下来。如果在实际安装中，仍缺少一些依赖包，我们可以通过yum search ${package-name} 查找到该包，然后再下载下来.``**
 
 **``NOTE2: 上面这是下载最新版本的ceph安装包，如果下载其他版本，请携带上版本号``**
+
+
+4）下载ceph-deploy安装包
+
+这里我们是手动安装，可以不用下载。
+<pre>
+sudo yum install --downloadonly --downloaddir=/ceph-cluster/packages/ceph-deploy ceph-deploy
+</pre>
+
+5)	将上述的依赖包分别打包压缩称dependencies.tar.gz、ceph.tar.gz、ceph-deploy.tar.gz，并上传到集群的各个节点上来进行安装
