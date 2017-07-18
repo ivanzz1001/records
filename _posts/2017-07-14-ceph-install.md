@@ -165,6 +165,8 @@ sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
 
 在上述所有节点上分别修改/etc/sysconfig/network文件，指定其主机名分别为`ceph001-admin、ceph001-node1、ceph001-node2、ceph001-node3`。例如：
 
+![manual-inst-hostchg](https://ivanzz1001.github.io/records/assets/img/ceph/manual-inst/manual-inst-hostchg.jpg)
+
 
 
 
