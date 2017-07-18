@@ -34,15 +34,32 @@ rados -p benchmark df                      # 查看该池占用的资源
 
 **(2) 调整mon中相应阀值的设置**
 
-这里我们调小阀值的原因是为了后面可以通过相应的工具填充数据以尽快达到该阀值(在磁盘容量较小的情况下，也可以不必调整)。这里我们主要调整```mon_osd_nearfull_ratio``` 和 ```mon_osd_full_ratio```两个参数。在所有monitor上执行如下命令：
+这里我们调小阀值的原因是为了后面可以通过相应的工具填充数据以尽快达到该阀值(在磁盘容量较小的情况下，也可以不必调整)。这里我们主要调整```mon_osd_nearfull_ratio``` 和 ```mon_osd_full_ratio```两个参数。修改ceph.conf文件[global]段中的这两个字段：
+<pre>
+mon_osd_full_ratio = 0.05
+mon_osd_nearfull_ratio = 0.03
+</pre>
+
+重启整个集群，重启MON:
 {% highlight string %}
-sudo ceph daemon mon.{mon-name} config set mon_osd_nearfull_ratio 0.03
-sudo ceph daemon mon.{mon-name} config set mon_osd_full_ratio 0.05
+/etc/init.d/ceph restart mon.{mon-name}        #{mon-name}为具体monitor名字
 {% endhighlight %}
 
-这里{mon-name}是具体monitor的名字。注意这里我们可以先用如下命令获取到原来的值并保存，以便我们在故障演练完成之后可以进行恢复。
+重启OSD:
+{% highlight string %}
+/etc/init.d/ceph  restart osd.{num}			   #{num}为拘泥osd编号
+{% endhighlight %}
+
+重启RGW:
+{% highlight string %}
+radosgw -c /etc/ceph/ceph.conf -n client.radosgw.{radosgw-name}
+{% endhighlight %}
+
+
+*重启完之后，我们可以通过如下命令来查看是否修改成功*
 <pre>
 ceph daemon mon.{mon-name} config show | grep ratio
+ceph daemon osd.{num} config show | grep ratio
 </pre>
 
 **(3) 向benchmark池写入数据**
