@@ -256,7 +256,6 @@ sudo yum localinstall *.rpm
 sudo yum localinstall *.rpm
 </pre>
 
-<br />
 
 
 ## 3. 建立集群
@@ -272,17 +271,56 @@ sudo yum localinstall *.rpm
 1) 生成monitor keyring
 <pre>
 # ceph-authtool --create-keyring ./ceph.mon.keyring --gen-key -n mon. --cap mon 'allow *'
-# cat ./ceph.mon.keyring
+</pre>
+查看生成的monitor keyring:
+<pre>
+[root@ceph001-node1 build]# cat ./ceph.mon.keyring 
 [mon.]
         key = AQCG0m5Z9AifFxAAreLxG7PXYPXRNyNlRzrGhQ==
         caps mon = "allow *"
 </pre>
 
 
+2) 生成client.admin keyring
+<pre>
+ceph-authtool --create-keyring /etc/ceph/ceph.client.admin.keyring --gen-key -n  client.admin --set-uid=0 --cap mon 'allow *' --cap osd 'allow *' --cap mds 'allow'
+</pre>
+查看生成的client.admin keyring：
+<pre>
+[root@ceph001-node1 build]# cat /etc/ceph/ceph.client.admin.keyring 
+[client.admin]
+        key = AQC61W5ZQlCOJRAAkXEE7xZtNiZwudgVqRtvuQ==
+        auid = 0
+        caps mds = "allow"
+        caps mon = "allow *"
+        caps osd = "allow *"
+</pre>
 
 
-1) 生成monitor keyring及client.admin keyring
+3) 生成用于集群初始化初始化的cluster.bootstrap keyring
+<pre>
+cp ./ceph.mon.keyring ./cluster.bootstrap.keyring
+ceph-authtool ./cluster.bootstrap.keyring --import-keyring  /etc/ceph/ceph.client.admin.keyring
+</pre>
+查看生成的集群初始化keyring:
+<pre>
+[root@ceph001-node1 build]# cat ./cluster.bootstrap.keyring 
+[mon.]
+        key = AQCG0m5Z9AifFxAAreLxG7PXYPXRNyNlRzrGhQ==
+        caps mon = "allow *"
+[client.admin]
+        key = AQC61W5ZQlCOJRAAkXEE7xZtNiZwudgVqRtvuQ==
+        auid = 0
+        caps mds = "allow"
+        caps mon = "allow *"
+        caps osd = "allow *"
+</pre>
 
+
+4) 生成monmap
+<pre>
+
+</pre>
 
 
 
