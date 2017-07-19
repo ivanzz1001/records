@@ -768,6 +768,28 @@ ID WEIGHT TYPE NAME    UP/DOWN REWEIGHT PRIMARY-AFFINITY
 </pre>
 
 2) 修改crush rule规则内容
+{% highlight string %}
+ceph osd getcrushmap -o ./old_crushmap.bin
+crushtool -d ./old_crushmap.bin -o ./old_crushmap.txt
+cp old_crushmap.txt new_crushmap.txt
+{% endhighlight %}
+
+下面修改new_crushmap.txt:
+<pre>
+# 在type 10 root下面添加逻辑拓扑中的bucket类型, 其中数值越大, 表示在crush map中的层级越大
+type 11 osd-domain
+type 12 host-domain
+type 13 replica-domain
+type 14 failure-domain
+# 将crush map中所有的 alg straw2 修改为 alg starw
+</pre>
+
+修改后重新设置到ceph集群中：
+{% highlight string %}
+crushtool -c new_crushmap.txt -o new_crushmap.bin
+ceph osd setcrushmap -i new_crushmap.bin
+{% endhighlight %}
+
 
 
 
