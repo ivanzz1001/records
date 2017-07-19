@@ -945,9 +945,63 @@ rbd rm rbd-01/test-image
 ceph osd dump
 {% endhighlight %}
 
-创建存储池后，执行结果如下：
+创建存储池后，执行结果如下(部分打印信息)：
 <pre>
+[root@ceph001-node1 build]# ceph osd dump
+epoch 91
+fsid ba47fcbc-b2f7-4071-9c37-be859d8c7e6e
+created 2017-07-19 14:47:13.802418
+modified 2017-07-19 17:11:50.806402
+flags 
+pool 1 'rbd-01' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 128 pgp_num 128 last_change 61 flags hashpspool stripe_width 0
+        removed_snaps [1~3]
+pool 2 '.rgw' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 76 flags hashpspool stripe_width 0
+pool 3 '.rgw.root' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 77 flags hashpspool stripe_width 0
+pool 4 '.rgw.control' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 78 flags hashpspool stripe_width 0
+pool 5 '.rgw.gc' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 79 flags hashpspool stripe_width 0
+pool 6 '.log' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 80 flags hashpspool stripe_width 0
+pool 7 '.intent-log' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 81 flags hashpspool stripe_width 0
+pool 8 '.usage' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 82 flags hashpspool stripe_width 0
+pool 9 '.users' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 83 flags hashpspool stripe_width 0
+pool 10 '.users.email' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 84 flags hashpspool stripe_width 0
+pool 11 '.users.swift' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 85 flags hashpspool stripe_width 0
+pool 12 '.users.uid' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 86 flags hashpspool stripe_width 0
+pool 13 '.rgw.buckets' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 256 pgp_num 256 last_change 87 flags hashpspool stripe_width 0
+pool 14 '.rgw.buckets.index' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 88 flags hashpspool stripe_width 0
+pool 15 '.rgw.buckets.extra' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 89 flags hashpspool stripe_width 0
+max_osd 9
+</pre>
 
+2） 创建RGW秘钥并加入集群
+{% highlight string %}
+ceph-authtool --create-keyring /etc/ceph/ceph.client.radosgw.keyring --gen-key -n client.radosgw.ceph001-node1 --cap mon 'allow rwx' --cap osd 'allow rwx'
+
+ceph -k /etc/ceph/ceph.client.admin.keyring auth add client.radosgw.ceph001-node1 -i /etc/ceph/ceph.client.radosgw.keyring
+
+ceph auth list
+{% endhighlight %}
+
+3) 修改ceph配置文件
+
+修改/etc/ceph/ceph.conf配置文件，在其中添加：
+<pre>
+[client.radosgw.ceph001-node1]
+host = ceph001-node1
+log_file = /var/log/ceph/radosgw-ceph001-node1.log
+rgw_s3_auth_use_keystone = False
+rgw_frontends = civetweb port=7480
+rgw_socket_path = /var/run/ceph/ceph.radosgw.ceph001-node1.sock
+user = root
+keyring = /etc/ceph/ceph.client.radosgw.keyring
+rgw_override_bucket_index_max_shards = 0
+rgw_swift_token_expiration = 86400
+rgw_enable_usage_log = True
+rgw_cache_lru_size = 10000
+rgw_print_continue = False
+rgw_cache_enabled = True
+admin_socket = /var/run/ceph/radosgw-ceph001-node1.asok
+rgw_thread_pool_size=512
+rgw_num_rados_handles=512
 </pre>
 
 
