@@ -426,11 +426,136 @@ scp /ceph-cluster/build/ceph.mon.keyring root@10.133.134.213:/ceph-cluster/build
 
 
 
+**在ceph001-node2上建立monitor**
+
+在上面我们已经完成了第一个monitor的初始化，建立第二个monitor就会简单很多了。并且我们已经有了用于初始化的bootstrap-monmap.bin以及ceph.mon.keyring。在/ceph-cluster/build目录下进行如下步骤：
+
+1） 初始化monitor
+{% highlight string %}
+ceph-mon -i ceph001-node2 --mkfs --monmap ./bootstrap-monmap.bin --keyring ./ceph.mon.keyring
+{% endhighlight %}
+
+2) 初始化数据目录
+{% highlight string %}
+ceph-mon --inject-monmap ./bootstrap-monmap.bin --mon-data /var/lib/ceph/mon/ceph-ceph001-node2/
+touch /var/lib/ceph/mon/ceph-ceph001-node2/{done,sysvinit} 
+{% endhighlight %}
+
+初始化后，查看monitor默认的数据目录:
+<pre>
+[root@ceph001-node2 build]# ls -al /var/lib/ceph/mon/ceph-ceph001-node2/
+total 4
+drwxr-xr-x 3 root root  61 Jul 19 14:42 .
+drwxr-xr-x 3 root root  31 Jul 19 14:41 ..
+-rw-r--r-- 1 root root   0 Jul 19 14:42 done
+-rw------- 1 root root  77 Jul 19 14:41 keyring
+drwxr-xr-x 2 root root 111 Jul 19 14:42 store.db
+-rw-r--r-- 1 root root   0 Jul 19 14:42 sysvinit
+</pre>
+
+3) 修改ceph配置文件
+
+可以从ceph001-node1节点将/etc/ceph/ceph.conf文件拷贝到ceph001-node2节点对应的目录，然后对[mon] section进行修改：
+<pre>
+[global] 
+fsid = ba47fcbc-b2f7-4071-9c37-be859d8c7e6e
+mon_initial_members = ceph001-node1,ceph001-node2,ceph001-node3
+mon_host = 10.133.134.211,10.133.134.212,10.133.134.213
+auth_supported = cephx
+auth_cluster_required = cephx
+auth_client_required = cephx
+auth_service_required = cephx
+osd_pool_default_crush_rule = 2
+osd_pool_default_size = 3
+osd_pool_default_pg_num = 8
+osd_pool_default_pgp_num = 8
+osd_crush_chooseleaf_type = 0
+mon_osd_full_ratio = 0.95
+mon_osd_nearfull_ratio = 0.85
+
+[mon.ceph001-node2] 
+host = ceph001-node2
+mon_data = /var/lib/ceph/mon/ceph-ceph001-node2
+mon_addr = 10.133.134.212:6789 
+</pre>
+
+注意上面对[mon]段的修改。
+
+3) 启动monitor
+{% highlight string %}
+sudo /etc/init.d/ceph start mon.ceph001-node2
+{% endhighlight %}
+
+输出信息如下：
+<pre>
+[root@ceph001-node2 build]# sudo /etc/init.d/ceph start mon.ceph001-node2
+=== mon.ceph001-node2 === 
+Starting Ceph mon.ceph001-node2 on ceph001-node2...
+Running as unit ceph-mon.ceph001-node2.1500446828.301474392.service.
+Starting ceph-create-keys on ceph001-node2...
+</pre>
+
+4) 查看monitor状态
+<pre>
+[root@ceph001-node2 build]# ceph -s
+2017-07-19 14:47:11.705625 7f4f60124700  0 -- :/749124637 >> 10.133.134.213:6789/0 pipe(0x7f4f5c068550 sd=3 :0 s=1 pgs=0 cs=0 l=1 c=0x7f4f5c05bb80).fault
+    cluster ba47fcbc-b2f7-4071-9c37-be859d8c7e6e
+     health HEALTH_ERR
+            no osds
+            1 mons down, quorum 0,1 ceph001-node1,ceph001-node2
+     monmap e1: 3 mons at {ceph001-node1=10.133.134.211:6789/0,ceph001-node2=10.133.134.212:6789/0,ceph001-node3=10.133.134.213:6789/0}
+            election epoch 2, quorum 0,1 ceph001-node1,ceph001-node2
+     osdmap e1: 0 osds: 0 up, 0 in
+      pgmap v2: 0 pgs, 0 pools, 0 bytes data, 0 objects
+            0 kB used, 0 kB / 0 kB avail 
+<pre>
+
+上面我们可以看到，尽管我们的mon_initial_members中设置了3个monitor，但是只要启动两个就达到了PAXOS协议的法定人数，monitor集群这时已经可以工作了。但是因为我们还没有建立OSD，因此当前集群状态为HEALTH_ERR
 
 
+**在ceph001-node3上建立monitor**
 
+与ceph001-node2节点建立monitor类似，这里直接简要列出：
 
+1）初始化monitor及数据目录
+{% highlight string %}
+ceph-mon -i ceph001-node3 --mkfs --monmap ./bootstrap-monmap.bin --keyring ./ceph.mon.keyring
+ceph-mon --inject-monmap ./bootstrap-monmap.bin --mon-data /var/lib/ceph/mon/ceph-ceph001-node3/
+touch /var/lib/ceph/mon/ceph-ceph001-node3/{done,sysvinit} 
+ls -al /var/lib/ceph/mon/ceph-ceph001-node3/
+{% endhighlight %}
 
+2) 修改ceph配置文件
+<pre>
+[global] 
+fsid = ba47fcbc-b2f7-4071-9c37-be859d8c7e6e
+mon_initial_members = ceph001-node1,ceph001-node2,ceph001-node3
+mon_host = 10.133.134.211,10.133.134.212,10.133.134.213
+auth_supported = cephx
+auth_cluster_required = cephx
+auth_client_required = cephx
+auth_service_required = cephx
+osd_pool_default_crush_rule = 2
+osd_pool_default_size = 3
+osd_pool_default_pg_num = 8
+osd_pool_default_pgp_num = 8
+osd_crush_chooseleaf_type = 0
+mon_osd_full_ratio = 0.95
+mon_osd_nearfull_ratio = 0.85
+
+[mon.ceph001-node3] 
+host = ceph001-node3
+mon_data = /var/lib/ceph/mon/ceph-ceph001-node3
+mon_addr = 10.133.134.213:6789 
+</pre>
+
+3) 启动及查看相应状态
+{% highlight string %}
+sudo /etc/init.d/ceph start mon.ceph001-node3
+ceph -s
+{% endhighlight %}
+
+查看状态信息如下：
 
 
 
