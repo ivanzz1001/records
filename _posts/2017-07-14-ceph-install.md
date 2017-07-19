@@ -357,6 +357,8 @@ drwxr-xr-x 2 root root 80 Jul 19 13:54 store.db
 </pre>
 
 6） 创建monitor进程配置文件
+
+创建/etc/ceph/ceph.conf文件：
 <pre>
 [global] 
 fsid = ba47fcbc-b2f7-4071-9c37-be859d8c7e6e
@@ -380,7 +382,53 @@ mon_data = /var/lib/ceph/mon/ceph-ceph001-node1
 mon_addr = 10.133.134.211:6789 
 </pre>
 
-这里fsid为我们初始化monitor时所用的fsid，请参看第4步；mon_initial_members及mon_host为当前需要部署monitor的节点；[mon.ceph001-node1]节点为设置ceph001-node1节点的monitor的相关参数,使用时请注意对应
+这里fsid为我们初始化monitor时所用的fsid，请参看第4步；mon_initial_members及mon_host为当前需要部署monitor的节点；[mon.ceph001-node1]节点为设置ceph001-node1节点的monitor的相关参数,使用时请注意对应.
+
+7） 启动monitor
+{% highlight string %}
+sudo /etc/init.d/ceph start mon.ceph001-node1
+{% endhighlight %}
+
+输出信息如下：
+<pre>
+[root@ceph001-node1 build]# sudo /etc/init.d/ceph start mon.ceph001-node1
+=== mon.ceph001-node1 === 
+Starting Ceph mon.ceph001-node1 on ceph001-node1...
+Running as unit ceph-mon.ceph001-node1.1500444774.538123924.service.
+Starting ceph-create-keys on ceph001-node1...
+</pre>
+
+8) 查看monitor状态
+
+此时，因为我们配置文件中同时指定了3个initial monitors，但是目前我们只启动了1个，因此monitor会出现如下状况：
+<pre>
+[root@ceph001-node1 build]# ceph -s
+2017-07-19 14:14:11.167910 7f7a10217700  0 -- :/1124433248 >> 10.133.134.213:6789/0 pipe(0x7f7a0c068550 sd=3 :0 s=1 pgs=0 cs=0 l=1 c=0x7f7a0c05bb80).fault
+2017-07-19 14:14:14.151613 7f7a10116700  0 -- :/1124433248 >> 10.133.134.212:6789/0 pipe(0x7f7a00000c00 sd=4 :0 s=1 pgs=0 cs=0 l=1 c=0x7f7a00004ef0).fault
+2017-07-19 14:14:17.152012 7f7a10217700  0 -- :/1124433248 >> 10.133.134.213:6789/0 pipe(0x7f7a000081b0 sd=3 :0 s=1 pgs=0 cs=0 l=1 c=0x7f7a0000c450).fault
+</pre>
+
+9）分发mon keyring,mon map及admin keyring
+
+这里我们在后续建立其他monitor/osd节点时，都会用到上述生成的/ceph-cluster/build/bootstrap-monmap.bin , /ceph-cluster/build/ceph.mon.keyring 以及 /etc/ceph/ceph.client.admin.keyring 三个文件，因此这里先把这三个文件分别推送到ceph001-node2,ceph001-node3节点的对应目录里。
+
+采用如下命令拷贝文件：
+{% highlight string %}
+scp /etc/ceph/ceph.client.admin.keyring root@10.133.134.212:/etc/ceph/
+scp /ceph-cluster/build/bootstrap-monmap.bin root@10.133.134.212:/ceph-cluster/build/
+scp /ceph-cluster/build/ceph.mon.keyring root@10.133.134.212:/ceph-cluster/build/
+
+
+scp /etc/ceph/ceph.client.admin.keyring root@10.133.134.213:/etc/ceph/
+scp /ceph-cluster/build/bootstrap-monmap.bin root@10.133.134.213:/ceph-cluster/build/
+scp /ceph-cluster/build/ceph.mon.keyring root@10.133.134.213:/ceph-cluster/build/
+{% endhighlight %}
+
+
+
+
+
+
 
 
 
