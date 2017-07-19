@@ -50,7 +50,7 @@
       title: 'Table Of Content',
       minimumHeaders: 3,
       headers: 'h1, h2, h3, h4, h5, h6',
-      listType: 'ul', //'ol', // values: [ol|ul]   //modified by ivan1001
+      listType: 'ol', //'ol', // values: [ol|ul]   //modified by ivan1001
       showEffect: 'show', // values: [show|slideDown|fadeIn|none]
       showSpeed: 0 // set to 0 to deactivate effect
     },
@@ -108,7 +108,7 @@
         stack.inc_number();
         html += "<li class=\"toc-item toc-level-" + this_level + "\">";
         html += "<a class=\"toc-link\" href='#" + fixedEncodeURIComponent(header.id) + "'>";
-        html += "<span class='toc-number'>" + stack.toc_number() + "</span>"
+       // html += "<span class='toc-number'>" + stack.toc_number() + "</span>"      //modified by ivan1001
         html += "<span class='toc-text'>" + header.innerHTML + "</span>";
         html += "</a>";
         
@@ -119,7 +119,7 @@
         }
         stack.inc_number();
         html += "<li class='toc-item toc-level-" + this_level + "'><a href='#" + fixedEncodeURIComponent(header.id) + "'>";
-        html += "<span class='toc-number'>" + stack.toc_number() + "</span>"
+       // html += "<span class='toc-number'>" + stack.toc_number() + "</span>"     //modified by ivan1001
         html += "<span class='toc-text'>" + header.innerHTML + "</span>";
         html += "</a>";
       }
@@ -133,7 +133,7 @@
         }
         stack.inc_number();
         html += "<a href='#" + fixedEncodeURIComponent(header.id) + "'>";
-        html += "<span class='toc-number'>" + stack.toc_number() + "</span>"
+       // html += "<span class='toc-number'>" + stack.toc_number() + "</span>"      //modified by ivan1001
         html += "<span class='toc-text'>" + header.innerHTML + "</span>";
         html += "</a>";
       }
