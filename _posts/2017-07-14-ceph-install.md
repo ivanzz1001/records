@@ -932,7 +932,23 @@ rbd rm rbd-01/test-image
 到此为止，crush map就已经构建完毕。
 
 
+## 4. 构建RGW
 
+### 4.1 在ceph001-node1上部署RGW
+
+1) 创建存储池
+
+这里直接执行创建存储池的脚本：
+{% highlight string %}
+./script/create_pool.sh
+
+ceph osd dump
+{% endhighlight %}
+
+创建存储池后，执行结果如下：
+<pre>
+
+</pre>
 
 
 
