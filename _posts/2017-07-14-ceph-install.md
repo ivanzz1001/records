@@ -625,8 +625,25 @@ vdd    253:48   0   15G  0 disk
 
 **在ceph001-node1上建立3个OSD节点**
 
-使用脚本在ceph001-node1上建立OSD：
+1) 初始化OSD
+
+使用脚本在ceph001-node1上建立OSD(请分步执行如下命令，减少可能的出错机会）：
 {% highlight string %}
+chmod 777 ./script/ -R
 
+./script/init_osd.sh vdb1 vdd1
+cat /tmp/init_osd-{OSD_ID}.log
 
+./script/init_osd.sh vdb2 vdd2
+cat /etc/init_osd-{OSD_ID}.log
+
+./script/init_osd.sh vdc1 vdd3
+cat /etc/init_osd-{OSD_ID}.log
 {% endhighlight %}
+
+上面请用对应的具体的OSD_ID值代替。
+
+2) 修改ceph配置文件
+
+
+
