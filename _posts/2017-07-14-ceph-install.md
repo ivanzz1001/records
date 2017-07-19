@@ -86,7 +86,7 @@ sudo yumdownloader gperftools-libs
 <pre>
 sudo yum install yum-plugin-priorities
 </pre>
->
+
 修改/etc/yum/pluginconf.d/priorities.conf文件：
 <pre>
 [main]
@@ -113,13 +113,13 @@ su -c 'rpm -Uvh https://download.ceph.com/rpm-jewel/el7/noarch/ceph-release-1-0.
 
 
 下载ceph安装包：
-<pre>
+{% highlight string %}
 yum clean packages            #先清除本地可能缓存的一些包
 yum clean
 yum repolist
 yum makecache
 sudo yum install --downloadonly --downloaddir=/ceph-cluster/packages/ceph ceph ceph-radosgw
-</pre>
+{% endhighlight %}
 
 ``NOTE1：``这里我们目前就下载ceph,ceph-radosgw两个包，其依赖的一些包会自动下载下来。如果在实际安装中，仍缺少一些依赖包，我们可以通过yum search ${package-name} 查找到该包，然后再下载下来.
 
@@ -129,9 +129,9 @@ sudo yum install --downloadonly --downloaddir=/ceph-cluster/packages/ceph ceph c
 4） 下载ceph-deploy安装包
 
 这里我们是手动安装，可以不用下载。
-<pre>
+{% highlight string %}
 sudo yum install --downloadonly --downloaddir=/ceph-cluster/packages/ceph-deploy ceph-deploy
-</pre>
+{% endhighlight %}
 
 5)	将上述的依赖包分别打包压缩称dependencies.tar.gz、ceph.tar.gz、ceph-deploy.tar.gz，并上传到集群的各个节点上来进行安装
 
@@ -144,23 +144,22 @@ sudo yum install --downloadonly --downloaddir=/ceph-cluster/packages/ceph-deploy
 1） 建立相应的构建目录
 
 这里我们统一采用如下目录来完成整个集群的安装：
-<pre>
+{% highlight string %}
 mkdir -p /ceph-cluster/build/script
 mkdir -p /ceph-cluster/packages
 mkdir -p /ceph-cluster/test
 chmod 777 /ceph-cluster -R
-</pre>
+{% endhighlight %}
 
 2） 关闭iptables及SELinux
 
 可以将如下shell命令写成脚本来执行(disable-iptable-selinux.sh)：
-
-<pre>
+{% highlight string %}
 systemctl stop firewalld.service 
 systemctl disable firewalld.service 
 setenforce 0 
 sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config 
-</pre>
+{% endhighlight %}
 
 3） 修改主机名
 
@@ -205,20 +204,20 @@ PING ceph001-node2 (10.133.134.212) 56(84) bytes of data.
 </pre>
 
 6) 检查当前CentOS内核版本是否支持rbd，并装载rbd模块
-<pre>
+{% highlight string %}
 modinfo rbd
 modprobe rbd       #装载rbd模块
 lsmod | grep rbd   #查看模块是否已经装载
-</pre>
+{% endhighlight %}
 
 7) 安装ntp，并配置ceph集群节点之间的时间同步
 
 在各节点执行如下命令：
-<pre>
+{% highlight string %}
 rpm –qa | grep ntp     #查看当前是否已经安装ntp
 ps –ef | grep ntp      # 查看ntp服务器是否启动
 ntpstat                 #查看当前的同步状态
-</pre>
+{% endhighlight %}
 
 在/etc/ntp.conf配置文件中配置时间同步服务器地址
 
@@ -243,18 +242,18 @@ ntpstat                 #查看当前的同步状态
 * gperftools-libs
 
 执行如下命令进行安装：
-<pre>
+{% highlight string %}
 sudo yum localinstall *.rpm
-</pre>
+{% endhighlight %}
 
 <br />
 
 *安装ceph包*
 
 在所有节点上执行如下命令安装ceph包：
-<pre>
+{% highlight string %}
 sudo yum localinstall *.rpm
-</pre>
+{% endhighlight %}
 
 
 
@@ -269,9 +268,9 @@ sudo yum localinstall *.rpm
 
 
 1) 生成monitor keyring
-<pre>
+{% highlight string %}
 ceph-authtool --create-keyring ./ceph.mon.keyring --gen-key -n mon. --cap mon 'allow *'
-</pre>
+{% endhighlight %}
 查看生成的monitor keyring:
 <pre>
 [root@ceph001-node1 build]# cat ./ceph.mon.keyring 
@@ -282,9 +281,9 @@ ceph-authtool --create-keyring ./ceph.mon.keyring --gen-key -n mon. --cap mon 'a
 
 
 2) 生成client.admin keyring
-<pre>
+{% highlight string %}
 ceph-authtool --create-keyring /etc/ceph/ceph.client.admin.keyring --gen-key -n  client.admin --set-uid=0 --cap mon 'allow *' --cap osd 'allow *' --cap mds 'allow'
-</pre>
+{% endhighlight %}
 查看生成的client.admin keyring：
 <pre>
 [root@ceph001-node1 build]# cat /etc/ceph/ceph.client.admin.keyring 
@@ -298,10 +297,10 @@ ceph-authtool --create-keyring /etc/ceph/ceph.client.admin.keyring --gen-key -n 
 
 
 3) 生成用于集群初始化初始化的cluster.bootstrap keyring
-<pre>
+{% highlight string %}
 cp ./ceph.mon.keyring ./cluster.bootstrap.keyring
 ceph-authtool ./cluster.bootstrap.keyring --import-keyring  /etc/ceph/ceph.client.admin.keyring
-</pre>
+{% endhighlight %}
 查看生成的集群初始化keyring:
 <pre>
 [root@ceph001-node1 build]# cat ./cluster.bootstrap.keyring 
@@ -320,11 +319,11 @@ ceph-authtool ./cluster.bootstrap.keyring --import-keyring  /etc/ceph/ceph.clien
 4) 生成初始化monmap
 
 这里我们为了方便，一开始就将ceph001-node1,ceph001-node2,ceph001-node3同时作为初始化monitor。这可以减少操作步骤，但是必须要等到3个monitor同时建立完成之后monitor集群才能正常工作。
-<pre>
+{% highlight string %}
 UUID=`uuidgen`
 echo $UUID
 monmaptool --create --add ceph001-node1 10.133.134.211 --add ceph001-node2 10.133.134.212 --add ceph001-node3 10.133.134.213 --fsid $UUID ./bootstrap-monmap.bin
-</pre>
+{% endhighlight %}
 
 查看生成的bootstrap-monmap.bin文件：
 <pre>
