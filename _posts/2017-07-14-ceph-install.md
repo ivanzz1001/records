@@ -508,7 +508,7 @@ Starting ceph-create-keys on ceph001-node2...
      osdmap e1: 0 osds: 0 up, 0 in
       pgmap v2: 0 pgs, 0 pools, 0 bytes data, 0 objects
             0 kB used, 0 kB / 0 kB avail 
-<pre>
+</pre>
 
 上面我们可以看到，尽管我们的mon_initial_members中设置了3个monitor，但是只要启动两个就达到了PAXOS协议的法定人数，monitor集群这时已经可以工作了。但是因为我们还没有建立OSD，因此当前集群状态为HEALTH_ERR
 
