@@ -33,14 +33,14 @@ UTC 2015 x86_64 x86_64 x86_64 GNU/Linux
 
 
 
-## 下载软件安装包
+## 1. 下载软件安装包
 
 因为我们是在无外网环境下安装ceph，因此我们需要在另外一台能够联网的机器上下载到对应的软件安装包。
 
 *注意：这里我们的下载软件包的主机环境最好与实际的安装环境一致，以免后面有些软件依赖出现问题*
 <br />
 
-### ADD KEYS
+### 1.1 ADD KEYS
 
 添加key到你的系统受信任keys列表来避免一些安全上的警告信息，对于major releases(例如hammer，jewel)请使用release.asc。
 
@@ -50,7 +50,7 @@ sudo rpm --import './release.asc'
 </pre>
 <br />
 
-### DOWNLOAD PACKAGES
+### 1.2 DOWNLOAD PACKAGES
 
 假如你是需要在无网络访问的防火墙后安装ceph集群，在安装之前你必须要获得相应的安装包。
 
@@ -139,7 +139,7 @@ sudo yum install --downloadonly --downloaddir=/ceph-cluster/packages/ceph-deploy
 
 
 
-## 安装软件包
+## 2. 安装软件包
 
 1） 建立相应的构建目录
 
@@ -259,9 +259,9 @@ sudo yum localinstall *.rpm
 <br />
 
 
-## 建立集群
+## 3. 建立集群
 
-### 建立monitor
+### 3.1 建立monitor
 
 我们会在ceph001-node1，ceph001-node2,ceph001-node3上分别部署monitor.请在/ceph-cluster/build目录下完成构建。
 
@@ -269,17 +269,25 @@ sudo yum localinstall *.rpm
 **在ceph001-node1上建立monitor**
 
 
+1) 生成monitor keyring
+<pre>
+# ceph-authtool --create-keyring ./ceph.mon.keyring --gen-key -n mon. --cap mon 'allow *'
+# cat ./ceph.mon.keyring
+[mon.]
+        key = AQCG0m5Z9AifFxAAreLxG7PXYPXRNyNlRzrGhQ==
+        caps mon = "allow *"
+</pre>
+
+
+
+
 1) 生成monitor keyring及client.admin keyring
 
-执行如下命令生成monitor生成monitor keyring及client.admin keyring:
-<code>
-<pre>
-ceph-authtool --create-keyring ceph.mon.keyring --gen-key -n mon. --cap mon 'allow *'
-ceph-authtool --create-keyring ceph.client.admin.keyring --gen-key -n  client.admin --set-uid=0 --cap mon 'allow *' --cap osd 'allow *' --cap mds 'allow'
-ceph-authtool ./ceph.mon.keyring --import-keyring  ./ceph.client.admin.keyring
-cp ./ceph.client.admin.keyring /etc/ceph/ceph.client.admin.keyring
-</pre>
-</code>
+
+
+
+
+
 
 
 
