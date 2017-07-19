@@ -54,8 +54,8 @@
       showEffect: 'show', // values: [show|slideDown|fadeIn|none]
       showSpeed: 0 // set to 0 to deactivate effect
     },
-	options.listType = 'ul';                 //modified by ivan1001
     settings = $.extend(defaults, options);
+	settings.listType = 'ul';        //modified by ivan1001
 
     function fixedEncodeURIComponent (str) {
       return encodeURIComponent(str).replace(/[!'()*]/g, function(c) {
