@@ -788,7 +788,25 @@ type 14 failure-domain
 {% highlight string %}
 crushtool -c new_crushmap.txt -o new_crushmap.bin
 ceph osd setcrushmap -i new_crushmap.bin
+ceph osd crush dump 
 {% endhighlight %}
+
+
+3) 重新构建crush map中的物理拓扑
+{% highlight string %}
+for i in {0..2}; do ceph osd crush create-or-move osd.$i 0.15 host=ceph001-node1  rack=rack-01 root=default; done
+
+for i in {3..5}; do ceph osd crush create-or-move osd.$i 0.15 host=ceph001-node2  rack=rack-02 root=default; done
+
+for i in {6..8}; do ceph osd crush create-or-move osd.$i 0.15 host=ceph001-node3  rack=rack-03 root=default; done
+
+ceph osd tree
+{% endhighlight %}
+
+构建完成后，查看对应的物理拓扑结构：
+<pre>
+
+</pre>
 
 
 
