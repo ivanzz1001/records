@@ -842,8 +842,98 @@ ceph osd tree
 
 构建完成后，查看对应的逻辑拓扑结构：
 <pre>
-
+[root@ceph001-node1 build]# ceph osd tree
+ID  WEIGHT  TYPE NAME                                UP/DOWN REWEIGHT PRIMARY-AFFINITY 
+-10 1.34995 failure-domain sata-00                                                     
+ -9 1.34995     replica-domain replica-0                                               
+ -8 0.44998         host-domain host-group-0-rack-01                                   
+ -6 0.44998             host ceph001-node1                                             
+  0 0.14999                 osd.0                         up  1.00000          1.00000 
+  1 0.14999                 osd.1                         up  1.00000          1.00000 
+  2 0.14999                 osd.2                         up  1.00000          1.00000 
+-11 0.44998         host-domain host-group-0-rack-02                                   
+ -2 0.44998             host ceph001-node2                                             
+  3 0.14999                 osd.3                         up  1.00000          1.00000 
+  4 0.14999                 osd.4                         up  1.00000          1.00000 
+  5 0.14999                 osd.5                         up  1.00000          1.00000 
+-12 0.44998         host-domain host-group-0-rack-03                                   
+ -4 0.44998             host ceph001-node3                                             
+  6 0.14999                 osd.6                         up  1.00000          1.00000 
+  7 0.14999                 osd.7                         up  1.00000          1.00000 
+  8 0.14999                 osd.8                         up  1.00000          1.00000 
+ -1 1.34995 root default                                                               
+ -3 0.44998     rack rack-02                                                           
+ -2 0.44998         host ceph001-node2                                                 
+  3 0.14999             osd.3                             up  1.00000          1.00000 
+  4 0.14999             osd.4                             up  1.00000          1.00000 
+  5 0.14999             osd.5                             up  1.00000          1.00000 
+ -5 0.44998     rack rack-03                                                           
+ -4 0.44998         host ceph001-node3                                                 
+  6 0.14999             osd.6                             up  1.00000          1.00000 
+  7 0.14999             osd.7                             up  1.00000          1.00000 
+  8 0.14999             osd.8                             up  1.00000          1.00000 
+ -7 0.44998     rack rack-01                                                           
+ -6 0.44998         host ceph001-node1                                                 
+  0 0.14999             osd.0                             up  1.00000          1.00000 
+  1 0.14999             osd.1                             up  1.00000          1.00000 
+  2 0.14999             osd.2                             up  1.00000          1.00000 
 </pre>
+
+5） 构建crush rule规则
+{% highlight string %}
+ceph osd getcrushmap -o origin_crushmap.bin
+crushtool -d origin_crushmap.bin -o origin_crushmap.txt
+cp origin_crushmap.txt tobuild_crushmap.txt
+{% endhighlight %}
+
+修改tobuild_crushmap.txt文件,手动添加如下内容：
+<pre>
+rule replicated_rule-5 {
+     ruleset 5
+     type replicated
+     min_size 1
+     max_size 10
+     step take sata-00
+     step choose firstn 1 type replica-domain
+     step chooseleaf firstn 0 type host-domain 
+     step emit
+}
+</pre>
+
+修改完成后，重新设置到ceph集群中。
+{% highlight string %}
+crushtool -c tobuild_crushmap.txt -o tobuild_crushmap.bin
+
+ceph osd setcrushmap -i tobuild_crushmap.bin
+
+ceph osd crush dump 
+{% endhighlight %}
+
+6) 创建pool, 并将pool绑定之指定crush_ruleset
+{% highlight string %}
+ceph osd pool delete rbd rbd --yes-i-really-really-mean-it 
+
+ceph osd pool create rbd-01 128 128
+
+ceph osd pool set rbd-01 size 3
+
+ceph osd pool set rbd-01 crush_ruleset 5
+{% endhighlight %}
+
+7) 使用rbd命令简单测试创建的pool是否能够正常使用
+{% highlight string %}
+rbd create rbd-01/test-image --size 4096
+
+rbd info rbd-01/test-image
+
+rbd rm rbd-01/test-image
+{% endhighlight %}
+
+到此为止，crush map就已经构建完毕。
+
+
+
+
 
 
 
