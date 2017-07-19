@@ -2404,6 +2404,7 @@ footer {
   -webkit-border-radius: .35em;
   border-radius: .35em;
   word-wrap: break-word;
+  overflow: auto
 }
 
 
