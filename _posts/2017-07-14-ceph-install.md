@@ -270,7 +270,7 @@ sudo yum localinstall *.rpm
 
 1) 生成monitor keyring
 <pre>
-# ceph-authtool --create-keyring ./ceph.mon.keyring --gen-key -n mon. --cap mon 'allow *'
+ceph-authtool --create-keyring ./ceph.mon.keyring --gen-key -n mon. --cap mon 'allow *'
 </pre>
 查看生成的monitor keyring:
 <pre>
@@ -317,11 +317,29 @@ ceph-authtool ./cluster.bootstrap.keyring --import-keyring  /etc/ceph/ceph.clien
 </pre>
 
 
-4) 生成monmap
-<pre>
+4) 生成初始化monmap
 
+这里我们为了方便，一开始就将ceph001-node1,ceph001-node2,ceph001-node3同时作为初始化monitor。这可以减少操作步骤，但是必须要等到3个monitor同时建立完成之后monitor集群才能正常工作。
+<pre>
+UUID=`uuidgen`
+echo $UUID
+monmaptool --create --add ceph001-node1 10.133.134.211 --add ceph001-node2 10.133.134.212 --add ceph001-node3 10.133.134.213 --fsid $UUID ./bootstrap-monmap.bin
 </pre>
 
+查看生成的bootstrap-monmap.bin文件：
+<pre>
+[root@ceph001-node1 build]# monmaptool --print ./bootstrap-monmap.bin 
+monmaptool: monmap file ./bootstrap-monmap.bin
+epoch 0
+fsid ba47fcbc-b2f7-4071-9c37-be859d8c7e6e
+last_changed 2017-07-19 12:27:17.374031
+created 2017-07-19 12:27:17.374031
+0: 10.133.134.211:6789/0 mon.ceph001-node1
+1: 10.133.134.212:6789/0 mon.ceph001-node2
+2: 10.133.134.213:6789/0 mon.ceph001-node3
+</pre>
+
+5) 
 
 
 
