@@ -1069,12 +1069,14 @@ rgw_num_rados_handles=512
 
 3) 启动RGW
 {% highlight string %}
-radosgw -c /etc/ceph/ceph.conf -n client.radosgw.ceph002-node1
+radosgw -c /etc/ceph/ceph.conf -n client.radosgw.ceph001-node2
 {% endhighlight %}
 
 查看是否启动成功：
 <pre>
-
+[root@ceph001-node2 build]# netstat -lpn | grep radosgw
+tcp        0      0 0.0.0.0:7480            0.0.0.0:*               LISTEN      9756/radosgw        
+unix  2      [ ACC ]     STREAM     LISTENING     312548   9756/radosgw         /var/run/ceph/radosgw-ceph001-node2.asok
 </pre>
 
 因为节点ceph001-node1已经创建好了admin账号以及初始化权限，所以之后的节点都不需要再进行创建了。
@@ -1120,7 +1122,7 @@ rgw_num_rados_handles=512
 
 3) 启动RGW
 {% highlight string %}
-radosgw -c /etc/ceph/ceph.conf -n client.radosgw.ceph003-node1
+radosgw -c /etc/ceph/ceph.conf -n client.radosgw.ceph001-node3
 {% endhighlight %}
 
 查看是否启动成功：
@@ -1132,7 +1134,10 @@ radosgw -c /etc/ceph/ceph.conf -n client.radosgw.ceph003-node1
 
 至此，节点ceph001-node3部署rgw完毕。
 <br />
+<br />
 
 
 最后，到此为止整个集群已经部署完毕.
+<br />
+<br />
 <br />
