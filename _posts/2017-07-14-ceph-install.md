@@ -623,9 +623,10 @@ vdd    253:48   0   15G  0 disk
 </pre>
 
 
-**在ceph001-node1上建立3个OSD节点**
+**在ceph001-node1,ceph001-node2,ceph001-node3上建立OSD节点**
 
-1) 初始化OSD
+
+1) 在ceph001-node1上建立3个OSD
 
 使用脚本在ceph001-node1上建立OSD(请分步执行如下命令，减少可能的出错机会）：
 {% highlight string %}
@@ -633,17 +634,56 @@ chmod 777 ./script/ -R
 
 ./script/init_osd.sh vdb1 vdd1
 cat /tmp/init_osd-{OSD_ID}.log
+sudo /etc/init.d/ceph start osd.{OSD_ID}
+ceph -s
 
 ./script/init_osd.sh vdb2 vdd2
 cat /etc/init_osd-{OSD_ID}.log
+sudo /etc/init.d/ceph start osd.{OSD_ID}
+ceph -s
 
 ./script/init_osd.sh vdc1 vdd3
 cat /etc/init_osd-{OSD_ID}.log
+sudo /etc/init.d/ceph start osd.{OSD_ID}
+ceph -s
 {% endhighlight %}
 
 上面请用对应的具体的OSD_ID值代替。
+输出信息类似于：
+<pre>
+[root@ceph001-node1 build]# cat /tmp/init_osd-0.log
+meta-data=/dev/vdb1              isize=2048   agcount=4, agsize=3276736 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=0        finobt=0
+data     =                       bsize=4096   blocks=13106944, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0 ftype=0
+log      =internal log           bsize=4096   blocks=6399, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =none                   extsz=4096   blocks=0, rtextents=0
+mkdir: created directory ‘/var/lib/ceph/osd/ceph-0’
+########WWN#######
+########WWN#######
+ HDIO_DRIVE_CMD(identify) failed: Inappropriate ioctl for device
+2017-07-19 15:41:43.124127 7ff5ec9d3880 -1 journal check: ondisk fsid 00000000-0000-0000-0000-000000000000 doesn't match expected 26383e0b-ea75-4ac2-b2e3-227560101a62, invalid (someone else's?) journal
+ HDIO_DRIVE_CMD(identify) failed: Inappropriate ioctl for device
+ HDIO_DRIVE_CMD(identify) failed: Inappropriate ioctl for device
+ HDIO_DRIVE_CMD(identify) failed: Inappropriate ioctl for device
+2017-07-19 15:41:43.245550 7ff5ec9d3880 -1 filestore(/var/lib/ceph/osd/ceph-0) could not find -1/23c2fcde/osd_superblock/0 in index: (2) No such file or directory
+2017-07-19 15:41:43.358726 7ff5ec9d3880 -1 created object store /var/lib/ceph/osd/ceph-0 journal /dev/disk/by-id/virtio-06ef4ac3-ecec-45b5-8-part1 for osd.0 fsid ba47fcbc-b2f7-4071-9c37-be859d8c7e6e
+2017-07-19 15:41:43.358784 7ff5ec9d3880 -1 auth: error reading file: /var/lib/ceph/osd/ceph-0/keyring: can't open /var/lib/ceph/osd/ceph-0/keyring: (2) No such file or directory
+2017-07-19 15:41:43.359121 7ff5ec9d3880 -1 created new key in keyring /var/lib/ceph/osd/ceph-0/keyring
+added key for osd.0
+</pre>
 
-2) 修改ceph配置文件
+2） 查看OSD的启动状况
+{% highlight string %}
+ps -ef | grep osd
+ceph -s
+{% endhighlight %}
+
+
+
 
 
 
