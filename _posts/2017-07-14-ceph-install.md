@@ -338,8 +338,49 @@ created 2017-07-19 12:27:17.374031
 2: 10.133.134.213:6789/0 mon.ceph001-node3
 </pre>
 
-5) 
+5) 对ceph001-node1节点monitor初始化
+{% highlight string %}
+sudo ceph-mon --mkfs -i ceph001-node1 --monmap ./bootstrap-monmap.bin --keyring ./cluster.bootstrap.keyring
+touch /var/lib/ceph/mon/ceph-ceph001-node1/{done,sysvinit}  #在数据目录建立done及sysvinit两个文件
+{% endhighlight %}
 
+初始化完成后，查看数据目录：
+<pre>
+[root@ceph001-node1 build]# ls -al /var/lib/ceph/mon/ceph-ceph001-node1/
+total 4
+drwxr-xr-x 3 root root 61 Jul 19 13:54 .
+drwxr-xr-x 3 root root 31 Jul 19 13:54 ..
+-rw-r--r-- 1 root root  0 Jul 19 13:54 done
+-rw------- 1 root root 77 Jul 19 13:54 keyring
+drwxr-xr-x 2 root root 80 Jul 19 13:54 store.db
+-rw-r--r-- 1 root root  0 Jul 19 13:54 sysvinit
+</pre>
+
+6） 创建monitor进程配置文件
+<pre>
+[global] 
+fsid = ba47fcbc-b2f7-4071-9c37-be859d8c7e6e
+mon_initial_members = ceph001-node1,ceph001-node2,ceph001-node3
+mon_host = 10.133.134.211,10.133.134.212,10.133.134.213
+auth_supported = cephx
+auth_cluster_required = cephx
+auth_client_required = cephx
+auth_service_required = cephx
+osd_pool_default_crush_rule = 2
+osd_pool_default_size = 3
+osd_pool_default_pg_num = 8
+osd_pool_default_pgp_num = 8
+osd_crush_chooseleaf_type = 0
+mon_osd_full_ratio = 0.95
+mon_osd_nearfull_ratio = 0.85
+
+[mon.ceph001-node1] 
+host = ceph001-node1
+mon_data = /var/lib/ceph/mon/ceph-ceph001-node1
+mon_addr = 10.133.134.211:6789 
+</pre>
+
+这里fsid为我们初始化monitor时所用的fsid，请参看第4步；mon_initial_members及mon_host为当前需要部署monitor的节点；[mon.ceph001-node1]节点为设置ceph001-node1节点的monitor的相关参数,使用时请注意对应
 
 
 
