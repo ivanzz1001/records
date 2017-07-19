@@ -556,6 +556,47 @@ ceph -s
 {% endhighlight %}
 
 查看状态信息如下：
+<pre>
+[root@ceph001-node3 build]# ceph -s
+    cluster ba47fcbc-b2f7-4071-9c37-be859d8c7e6e
+     health HEALTH_ERR
+            no osds
+     monmap e1: 3 mons at {ceph001-node1=10.133.134.211:6789/0,ceph001-node2=10.133.134.212:6789/0,ceph001-node3=10.133.134.213:6789/0}
+            election epoch 4, quorum 0,1,2 ceph001-node1,ceph001-node2,ceph001-node3
+     osdmap e1: 0 osds: 0 up, 0 in
+      pgmap v2: 0 pgs, 0 pools, 0 bytes data, 0 objects
+            0 kB used, 0 kB / 0 kB avail
+</pre>
+如上所示，3个monitor已经正常启动，只是因为我们还未添加任何OSD，导致当前集群处于HEALTH_ERR状态。
+
+
+
+### 3.2 建立OSD
+
+我们目前会在每一个节点上部署3个OSD，总共3个节点则一共会部署9个OSD。首先查看我们当前的硬盘信息：
+<pre>
+[root@ceph001-node1 build]# lsblk -a
+NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sr0     11:0    1  436K  0 rom  
+vda    253:0    0   20G  0 disk 
+└─vda1 253:1    0   20G  0 part /
+vdb    253:16   0  100G  0 disk 
+vdc    253:32   0  100G  0 disk 
+vdd    253:48   0   15G  0 disk 
+</pre>
+
+如上所示，我们有两个100G的硬盘vdb、vdc；另外还有一个15G的硬盘vdd。我们做如下规划：将vdb、vdc各分成两个50G分区，总共4个分区，其中前3个区用作当前OSD的数据目录；另外将vdd作为该节点上所有OSD的日志目录。因此，这里我们首先对ceph001-node1,ceph001-node2,ceph001-node3三个节点进行分区：
+<pre>
+parted -s /dev/vdb mklabel gpt
+parted -s /dev/vdb mkpart primary 0% 50%
+parted -s /dev/vdb mkpart primary 50% 100%
+
+parted -s /dev/vdc mklabel gpt
+parted -s /dev/vdc mkpart primary 0% 50% 
+parted -s /dev/vdc mkpart primary 50% 100%
+</pre>
+
+查看分区后的状态：
 
 
 
