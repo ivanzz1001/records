@@ -623,7 +623,7 @@ vdd    253:48   0   15G  0 disk
 </pre>
 
 
-**在ceph001-node1,ceph001-node2,ceph001-node3上建立OSD节点**
+**在ceph001-node1上建立3个OSD节点**
 
 
 1) 在ceph001-node1上建立3个OSD
@@ -681,7 +681,43 @@ added key for osd.0
 ps -ef | grep osd
 ceph -s
 {% endhighlight %}
+查看信息如下：
+<pre>
+[root@ceph001-node1 build]# ceph -s
+    cluster ba47fcbc-b2f7-4071-9c37-be859d8c7e6e
+     health HEALTH_WARN
+            too few PGs per OSD (0 < min 30)
+     monmap e1: 3 mons at {ceph001-node1=10.133.134.211:6789/0,ceph001-node2=10.133.134.212:6789/0,ceph001-node3=10.133.134.213:6789/0}
+            election epoch 4, quorum 0,1,2 ceph001-node1,ceph001-node2,ceph001-node3
+     osdmap e10: 3 osds: 3 up, 3 in
+      pgmap v14: 0 pgs, 0 pools, 0 bytes data, 0 objects
+            101136 kB used, 149 GB / 149 GB avail
+[root@ceph001-node1 build]# ps -ef | grep osd
+root     17392     1  0 15:52 ?        00:00:00 /bin/bash -c ulimit -n 32768;  /usr/bin/ceph-osd -i 0 --pid-file /var/run/ceph/osd.0.pid -c /etc/ceph/ceph.conf --cluster ceph -f
+root     17393 17392  0 15:52 ?        00:00:00 /usr/bin/ceph-osd -i 0 --pid-file /var/run/ceph/osd.0.pid -c /etc/ceph/ceph.conf --cluster ceph -f
+root     17809     1  0 15:52 ?        00:00:00 /bin/bash -c ulimit -n 32768;  /usr/bin/ceph-osd -i 1 --pid-file /var/run/ceph/osd.1.pid -c /etc/ceph/ceph.conf --cluster ceph -f
+root     17810 17809  0 15:52 ?        00:00:00 /usr/bin/ceph-osd -i 1 --pid-file /var/run/ceph/osd.1.pid -c /etc/ceph/ceph.conf --cluster ceph -f
+root     18213     1  0 15:53 ?        00:00:00 /bin/bash -c ulimit -n 32768;  /usr/bin/ceph-osd -i 2 --pid-file /var/run/ceph/osd.2.pid -c /etc/ceph/ceph.conf --cluster ceph -f
+root     18215 18213  0 15:53 ?        00:00:00 /usr/bin/ceph-osd -i 2 --pid-file /var/run/ceph/osd.2.pid -c /etc/ceph/ceph.conf --cluster ceph -f
+root     18370 16930  0 15:53 pts/0    00:00:00 grep --color=auto osd
+[root@ceph001-node1 build]# ceph -s
+    cluster ba47fcbc-b2f7-4071-9c37-be859d8c7e6e
+     health HEALTH_WARN
+            too few PGs per OSD (0 < min 30)
+     monmap e1: 3 mons at {ceph001-node1=10.133.134.211:6789/0,ceph001-node2=10.133.134.212:6789/0,ceph001-node3=10.133.134.213:6789/0}
+            election epoch 4, quorum 0,1,2 ceph001-node1,ceph001-node2,ceph001-node3
+     osdmap e10: 3 osds: 3 up, 3 in
+      pgmap v14: 0 pgs, 0 pools, 0 bytes data, 0 objects
+            101136 kB used, 149 GB / 149 GB avail
+</pre>
 
+**在ceph001-node2上建立3个OSD节点**
+
+与ceph001-node1类似，只需要注意少许参数的修改，这里不在赘述。
+
+**在ceph001-node3上建立3个OSD节点**
+
+与ceph001-node1类似，只需要注意少许参数的修改，这里不再赘述。
 
 
 
