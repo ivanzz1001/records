@@ -721,5 +721,55 @@ root     18370 16930  0 15:53 pts/0    00:00:00 grep --color=auto osd
 
 
 
+### 3.2 构建crush map
+
+在上面3.1节建立好OSD之后，默认的crush map如下图所示：
+<pre>
+[root@ceph001-node1 build]# ceph osd tree
+ID WEIGHT  TYPE NAME              UP/DOWN REWEIGHT PRIMARY-AFFINITY 
+-1 0.44989 root default                                             
+-2 0.14996     host ceph001-node1                                   
+ 0 0.04999         osd.0               up  1.00000          1.00000 
+ 1 0.04999         osd.1               up  1.00000          1.00000 
+ 2 0.04999         osd.2               up  1.00000          1.00000 
+-3 0.14996     host ceph001-node2                                   
+ 3 0.04999         osd.3               up  1.00000          1.00000 
+ 4 0.04999         osd.4               up  1.00000          1.00000 
+ 5 0.04999         osd.5               up  1.00000          1.00000 
+-4 0.14996     host ceph001-node3                                   
+ 6 0.04999         osd.6               up  1.00000          1.00000 
+ 7 0.04999         osd.7               up  1.00000          1.00000 
+ 8 0.04999         osd.8               up  1.00000          1.00000
+</pre>
+
+这不适用与我们的生产环境。下面我们就来构建我们自己的crush map.
+
+1) 删除默认的crush map结构
+{% highlight string %}
+for i in {0..8}; do ceph osd crush rm osd.$i; done
+for i in {1..3}; do ceph osd crush rm ceph001-node$i; done
+ceph osd tree
+{% endhighlight %}
+
+执行完后，当前的ceph集群视图如下：
+<pre>
+[root@ceph001-node1 build]# ceph osd tree
+ID WEIGHT TYPE NAME    UP/DOWN REWEIGHT PRIMARY-AFFINITY 
+-1      0 root default                                   
+ 0      0 osd.0             up  1.00000          1.00000 
+ 1      0 osd.1             up  1.00000          1.00000 
+ 2      0 osd.2             up  1.00000          1.00000 
+ 3      0 osd.3             up  1.00000          1.00000 
+ 4      0 osd.4             up  1.00000          1.00000 
+ 5      0 osd.5             up  1.00000          1.00000 
+ 6      0 osd.6             up  1.00000          1.00000 
+ 7      0 osd.7             up  1.00000          1.00000 
+ 8      0 osd.8             up  1.00000          1.00000 
+</pre>
+
+2) 修改crush rule规则内容
+
+
+
 
 
