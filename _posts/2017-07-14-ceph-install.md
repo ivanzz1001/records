@@ -1127,7 +1127,9 @@ radosgw -c /etc/ceph/ceph.conf -n client.radosgw.ceph001-node3
 
 查看是否启动成功：
 <pre>
-
+[root@ceph001-node3 build]# netstat -lpn | grep radosgw
+tcp        0      0 0.0.0.0:7480            0.0.0.0:*               LISTEN      15626/radosgw       
+unix  2      [ ACC ]     STREAM     LISTENING     326358   15626/radosgw        /var/run/ceph/radosgw-ceph001-node3.asok
 </pre>
 
 因为节点ceph001-node1已经创建好了admin账号以及初始化权限，所以之后的节点都不需要再进行创建了。
