@@ -585,8 +585,8 @@ vdc    253:32   0  100G  0 disk
 vdd    253:48   0   15G  0 disk 
 </pre>
 
-如上所示，我们有两个100G的硬盘vdb、vdc；另外还有一个15G的硬盘vdd。我们做如下规划：将vdb、vdc各分成两个50G分区，总共4个分区，其中前3个区用作当前OSD的数据目录；另外将vdd作为该节点上所有OSD的日志目录。因此，这里我们首先对ceph001-node1,ceph001-node2,ceph001-node3三个节点进行分区：
-<pre>
+如上所示，我们有两个100G的硬盘vdb、vdc；另外还有一个15G的硬盘vdd。我们做如下规划：将vdb、vdc各分成两个50G分区，总共4个分区，其中前3个区用作当前OSD的数据目录,第4个分区保留；另外将vdd作为该节点上所有OSD的日志目录，分成4个分区。因此，这里我们首先对ceph001-node1,ceph001-node2,ceph001-node3三个节点进行分区：
+{% highlight string %}
 parted -s /dev/vdb mklabel gpt
 parted -s /dev/vdb mkpart primary 0% 50%
 parted -s /dev/vdb mkpart primary 50% 100%
@@ -594,11 +594,39 @@ parted -s /dev/vdb mkpart primary 50% 100%
 parted -s /dev/vdc mklabel gpt
 parted -s /dev/vdc mkpart primary 0% 50% 
 parted -s /dev/vdc mkpart primary 50% 100%
-</pre>
+
+parted -s /dev/vdd mklabel gpt
+parted -s /dev/vdd mkpart primary 0% 25% 
+parted -s /dev/vdd mkpart primary 25% 50%
+parted -s /dev/vdd mkpart primary 50% 75% 
+parted -s /dev/vdd mkpart primary 75% 100%
+{% endhighlight %}
 
 查看分区后的状态：
+<pre>
+[root@ceph001-node1 build]# lsblk -a 
+NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sr0     11:0    1  436K  0 rom  
+vda    253:0    0   20G  0 disk 
+└─vda1 253:1    0   20G  0 part /
+vdb    253:16   0  100G  0 disk 
+├─vdb1 253:17   0   50G  0 part 
+└─vdb2 253:18   0   50G  0 part 
+vdc    253:32   0  100G  0 disk 
+├─vdc1 253:33   0   50G  0 part 
+└─vdc2 253:34   0   50G  0 part 
+vdd    253:48   0   15G  0 disk 
+├─vdd1 253:49   0  3.8G  0 part 
+├─vdd2 253:50   0  3.8G  0 part 
+├─vdd3 253:51   0  3.8G  0 part 
+└─vdd4 253:52   0  3.8G  0 part 
+</pre>
 
 
+**在ceph001-node1上建立3个OSD节点**
+
+使用脚本在ceph001-node1上建立OSD：
+{% highlight string %}
 
 
-
+{% endhighlight %}
