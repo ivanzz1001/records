@@ -793,6 +793,8 @@ ceph osd crush dump
 
 
 3) 重新构建crush map中的物理拓扑
+
+请分步执行如下命令：
 {% highlight string %}
 for i in {0..2}; do ceph osd crush create-or-move osd.$i 0.15 host=ceph001-node1  rack=rack-01 root=default; done
 
@@ -804,6 +806,41 @@ ceph osd tree
 {% endhighlight %}
 
 构建完成后，查看对应的物理拓扑结构：
+<pre>
+[root@ceph001-node1 build]# ceph osd tree
+ID WEIGHT  TYPE NAME                  UP/DOWN REWEIGHT PRIMARY-AFFINITY 
+-1 1.34995 root default                                                 
+-3 0.44998     rack rack-02                                             
+-2 0.44998         host ceph001-node2                                   
+ 3 0.14999             osd.3               up  1.00000          1.00000 
+ 4 0.14999             osd.4               up  1.00000          1.00000 
+ 5 0.14999             osd.5               up  1.00000          1.00000 
+-5 0.44998     rack rack-03                                             
+-4 0.44998         host ceph001-node3                                   
+ 6 0.14999             osd.6               up  1.00000          1.00000 
+ 7 0.14999             osd.7               up  1.00000          1.00000 
+ 8 0.14999             osd.8               up  1.00000          1.00000 
+-7 0.44998     rack rack-01                                             
+-6 0.44998         host ceph001-node1                                   
+ 0 0.14999             osd.0               up  1.00000          1.00000 
+ 1 0.14999             osd.1               up  1.00000          1.00000 
+ 2 0.14999             osd.2               up  1.00000          1.00000 
+</pre>
+
+4） 重新构建crush map中的逻辑拓扑
+
+请分步执行如下命令：
+{% highlight string %}
+ceph osd crush link ceph001-node1 host-domain=host-group-0-rack-01  replica-domain=replica-0 failure-domain=sata-00
+
+ceph osd crush link ceph001-node2 host-domain=host-group-0-rack-02  replica-domain=replica-0 failure-domain=sata-00
+
+ceph osd crush link ceph001-node3 host-domain=host-group-0-rack-03  replica-domain=replica-0 failure-domain=sata-00
+
+ceph osd tree
+{% endhighlight %}
+
+构建完成后，查看对应的逻辑拓扑结构：
 <pre>
 
 </pre>
