@@ -1004,9 +1004,135 @@ rgw_thread_pool_size=512
 rgw_num_rados_handles=512
 </pre>
 
+4) 启动RGW
+{% highlight string %}
+radosgw -c /etc/ceph/ceph.conf -n client.radosgw.ceph001-node1
+{% endhighlight %}
+
+查看是否启动成功：
+<pre>
+[root@ceph001-node1 build]# netstat -lpn | grep radosgw
+tcp        0      0 0.0.0.0:7480            0.0.0.0:*               LISTEN      21229/radosgw       
+unix  2      [ ACC ]     STREAM     LISTENING     403819   21229/radosgw        /var/run/ceph/radosgw-ceph001-node1.asok
+</pre>
+
+5） 创建RADOS RGW admin用户并为其分配权限
+{% highlight string %}
+radosgw-admin user create --uid=admin --display-name="admin"
+
+radosgw-admin caps add --uid=admin --caps="buckets=*"
+radosgw-admin caps add --uid=admin --caps="data=*"
+radosgw-admin caps add --uid=admin --caps="metadata=*"
+radosgw-admin caps add --uid=admin --caps="usage=*"
+radosgw-admin caps add --uid=admin --caps="users=*"
+radosgw-admin caps add --uid=admin --caps="zone=*"
+{% endhighlight %}
+
+至此，ceph001-node1节点的radosgw已经部署完成
 
 
+### 4.2 在ceph001-node2上部署RGW
+
+此处只需要创建相应的rgw用户并加入集群，然后配置ceph.conf文件，再启动rgw即可。下面是详细步骤：
+
+1） 创建RGW秘钥并加入集群
+{% highlight string %}
+ceph-authtool --create-keyring /etc/ceph/ceph.client.radosgw.keyring --gen-key -n client.radosgw.ceph001-node2 --cap mon 'allow rwx' --cap osd 'allow rwx'
+
+ceph -k /etc/ceph/ceph.client.admin.keyring auth add client.radosgw.ceph001-node2 -i /etc/ceph/ceph.client.radosgw.keyring
+
+ceph auth list
+{% endhighlight %}
+
+2) 修改ceph配置文件
+
+修改/etc/ceph/ceph.conf配置文件，在其中添加：
+<pre>
+[client.radosgw.ceph001-node2]
+host = ceph001-node2
+log_file = /var/log/ceph/radosgw-ceph001-node2.log
+rgw_s3_auth_use_keystone = False
+rgw_frontends = civetweb port=7480
+rgw_socket_path = /var/run/ceph/ceph.radosgw.ceph001-node2.sock
+user = root
+keyring = /etc/ceph/ceph.client.radosgw.keyring
+rgw_override_bucket_index_max_shards = 0
+rgw_swift_token_expiration = 86400
+rgw_enable_usage_log = True
+rgw_cache_lru_size = 10000
+rgw_print_continue = False
+rgw_cache_enabled = True
+admin_socket = /var/run/ceph/radosgw-ceph001-node2.asok
+rgw_thread_pool_size=512
+rgw_num_rados_handles=512
+</pre>
+
+3) 启动RGW
+{% highlight string %}
+radosgw -c /etc/ceph/ceph.conf -n client.radosgw.ceph002-node1
+{% endhighlight %}
+
+查看是否启动成功：
+<pre>
+
+</pre>
+
+因为节点ceph001-node1已经创建好了admin账号以及初始化权限，所以之后的节点都不需要再进行创建了。
+
+至此，节点ceph001-node2部署rgw完毕。
 
 
+### 4.3 在ceph001-node2上部署RGW
+
+此处只需要创建相应的rgw用户并加入集群，然后配置ceph.conf文件，再启动rgw即可。下面是详细步骤：
+
+1） 创建RGW秘钥并加入集群
+{% highlight string %}
+ceph-authtool --create-keyring /etc/ceph/ceph.client.radosgw.keyring --gen-key -n client.radosgw.ceph001-node3 --cap mon 'allow rwx' --cap osd 'allow rwx'
+
+ceph -k /etc/ceph/ceph.client.admin.keyring auth add client.radosgw.ceph001-node3 -i /etc/ceph/ceph.client.radosgw.keyring
+
+ceph auth list
+{% endhighlight %}
+
+2) 修改ceph配置文件
+
+修改/etc/ceph/ceph.conf配置文件，在其中添加：
+<pre>
+[client.radosgw.ceph001-node3]
+host = ceph001-node3
+log_file = /var/log/ceph/radosgw-ceph001-node3.log
+rgw_s3_auth_use_keystone = False
+rgw_frontends = civetweb port=7480
+rgw_socket_path = /var/run/ceph/ceph.radosgw.ceph001-node3.sock
+user = root
+keyring = /etc/ceph/ceph.client.radosgw.keyring
+rgw_override_bucket_index_max_shards = 0
+rgw_swift_token_expiration = 86400
+rgw_enable_usage_log = True
+rgw_cache_lru_size = 10000
+rgw_print_continue = False
+rgw_cache_enabled = True
+admin_socket = /var/run/ceph/radosgw-ceph001-node3.asok
+rgw_thread_pool_size=512
+rgw_num_rados_handles=512
+</pre>
+
+3) 启动RGW
+{% highlight string %}
+radosgw -c /etc/ceph/ceph.conf -n client.radosgw.ceph003-node1
+{% endhighlight %}
+
+查看是否启动成功：
+<pre>
+
+</pre>
+
+因为节点ceph001-node1已经创建好了admin账号以及初始化权限，所以之后的节点都不需要再进行创建了。
+
+至此，节点ceph001-node3部署rgw完毕。
+<br />
 
 
+最后，到此为止整个集群已经部署完毕.
+<br />
