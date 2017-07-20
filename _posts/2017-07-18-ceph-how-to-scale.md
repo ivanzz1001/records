@@ -111,7 +111,9 @@ ceph daemon client.radosgw.{rgw-name} config show | grep ratio
 
 **修改方式2**
 
-1） 修改pg.mon,osd的阈值
+此种方式不需要进行重启，但一定要注意命令的正确执行，不能遗漏。
+
+1） 修改pg，mon,osd的阈值
 {% highlight string %}
 ceph pg set_nearfull_ratio 0.1
 ceph pg set_full_ratio 0.2
@@ -125,12 +127,68 @@ ceph tell mon.* injectargs '--mon-osd-full-ratio 0.2'
 
 或通过如下命令修改：
 {% highlight string %}
+ceph pg set_nearfull_ratio 0.1
+ceph pg set_full_ratio 0.2
 
+sudo ceph daemon mon.{mon-id} config set mon_osd_nearfull_ratio 0.1
+sudo ceph daemon mon.{mon-id} config set mon_osd_full_ratio 0.2
+
+sudo ceph daemon osd.{num} config set mon_osd_nearfull_ratio 0.1
+sudo ceph daemon osd.{num} config set mon_osd_full_ratio 0.2
 {% endhighlight %}
+此处请根据集群的实际情况替换{mon-id}、{num}。这里需要调整所有节点上的OSD，MON的这两个阈值。
 
 
+实际上，这里最重要的是```ceph pg``这两个命令的执行，其他的设置并不会作为最终的受控变量参看如下:
+
+```代码片段1：```
+
+![set_ratio_code1](https://ivanzz1001.github.io/records/assets/img/ceph/scale/set_ratio_code1.jpg)
+
+```代码片段2：```
+
+![set_ratio_code1](https://ivanzz1001.github.io/records/assets/img/ceph/scale/mon_ratio_code2.jpg)
+从上面我们可以看到，pending_inc是作为最终的受控变量。
 
 
+2） 修改rgw的阈值
+{% highlight string %}
+sudo ceph daemon client.radosgw.{rgw-name} config set mon_osd_nearfull_ratio 0.1
+sudo ceph daemon client.radosgw.{rgw-name} config set mon_osd_full_ratio 0.2
+{% endhighlight %}
+此处请根据集群的实际情况替换{rgw-name}。这里需要调整所有节点上的RGW的这两个阈值。
+
+
+3) 查看阈值是否修改成功
+{% highlight string %}
+ceph daemon mon.{mon-id} config show | grep ratio
+ceph daemon osd.{num} config show | grep ratio
+ceph daemon client.radosgw.{rgw-name} config show | grep ratio
+{% endhighlight %}
+此处请根据集群的实际情况替换{mon-id}、{num}、{rgw-name}:
+<pre>
+[root@ceph001-node1 ~]# ceph daemon mon.ceph001-node1 config show | grep ratio
+    "mon_osd_min_up_ratio": "0.3",
+    "mon_osd_min_in_ratio": "0.3",
+    "mon_cache_target_full_warn_ratio": "0.66",
+    "mon_osd_full_ratio": "0.2",
+    "mon_osd_nearfull_ratio": "0.1",
+    "mds_op_history_duration": "600",
+    "osd_backfill_full_ratio": "0.85",
+    "osd_pool_default_cache_target_dirty_ratio": "0.4",
+    "osd_pool_default_cache_target_full_ratio": "0.8",
+    "osd_heartbeat_min_healthy_ratio": "0.33",
+    "osd_scrub_interval_randomize_ratio": "0.5",
+    "osd_debug_drop_ping_duration": "0",
+    "osd_debug_drop_pg_create_duration": "1",
+    "osd_op_history_duration": "600",
+    "osd_failsafe_full_ratio": "0.97",
+    "osd_failsafe_nearfull_ratio": "0.9",
+    "osd_bench_duration": "30",
+    "rgw_swift_token_expiration": "86400",
+</pre>
+
+### 2.2 
 
 
 
