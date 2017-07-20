@@ -15,62 +15,118 @@ description: ceph 扩容
 * 故障解决
 
 
-## 环境介绍
+## 1. 环境介绍
+当前我们共有9个OSD，每一个OSD有50G的硬盘空间。
+<pre>
+[root@ceph001-node1 build]# ceph osd tree
+ID  WEIGHT  TYPE NAME                                UP/DOWN REWEIGHT PRIMARY-AFFINITY 
+-10 1.34999 failure-domain sata-00                                                     
+ -9 1.34999     replica-domain replica-0                                               
+ -8 0.45000         host-domain host-group-0-rack-01                                   
+ -6 0.45000             host ceph001-node1                                             
+  0 0.14999                 osd.0                         up  1.00000          1.00000 
+  1 0.14999                 osd.1                         up  1.00000          1.00000 
+  2 0.14999                 osd.2                         up  1.00000          1.00000 
+-11 0.45000         host-domain host-group-0-rack-02                                   
+ -2 0.45000             host ceph001-node2                                             
+  3 0.14999                 osd.3                         up  1.00000          1.00000 
+  4 0.14999                 osd.4                         up  1.00000          1.00000 
+  5 0.14999                 osd.5                         up  1.00000          1.00000 
+-12 0.45000         host-domain host-group-0-rack-03                                   
+ -4 0.45000             host ceph001-node3                                             
+  6 0.14999                 osd.6                         up  1.00000          1.00000 
+  7 0.14999                 osd.7                         up  1.00000          1.00000 
+  8 0.14999                 osd.8                         up  1.00000          1.00000 
+ -1 1.34999 root default                                                               
+ -3 0.45000     rack rack-02                                                           
+ -2 0.45000         host ceph001-node2                                                 
+  3 0.14999             osd.3                             up  1.00000          1.00000 
+  4 0.14999             osd.4                             up  1.00000          1.00000 
+  5 0.14999             osd.5                             up  1.00000          1.00000 
+ -5 0.45000     rack rack-03                                                           
+ -4 0.45000         host ceph001-node3                                                 
+  6 0.14999             osd.6                             up  1.00000          1.00000 
+  7 0.14999             osd.7                             up  1.00000          1.00000 
+  8 0.14999             osd.8                             up  1.00000          1.00000 
+ -7 0.45000     rack rack-01                                                           
+ -6 0.45000         host ceph001-node1                                                 
+  0 0.14999             osd.0                             up  1.00000          1.00000 
+  1 0.14999             osd.1                             up  1.00000          1.00000 
+  2 0.14999             osd.2                             up  1.00000          1.00000 
+</pre>
 
 
 
 
-## 故障模拟
+## 2. 故障模拟
 在故障模拟之前，我们仔细分析故障产生的本质原因是：ceph存储集群中数据达到或超过了mon_osd_full_ratio。 而与ceph存储集群的大小，磁盘的绝对容量是没有关系的。后面我们会看到，故障的解决虽然与mon_osd_full_ratio值的大小有一定关系，但是与绝对容量是不相关的，因此这里模拟故障时，可以不用考虑集群的大小。
 
 如下是整个故障的模拟步骤：
 
-**(1) 调整阈值**
+### 2.1 调整阈值
 
-这里我们调小阀值的原因是为了后面可以通过相应的工具填充数据以尽快达到该阀值(在磁盘容量较小的情况下，也可以不必调整)。这里我们主要调整```mon_osd_nearfull_ratio``` 和 ```mon_osd_full_ratio```两个参数。添加或修改ceph.conf文件[global]段中的这两个字段：
+这里我们调小阀值的原因是为了后面可以通过相应的工具填充数据以尽快达到该阀值(在磁盘容量较小的情况下，也可以不必调整)。我们主要调整```mon_osd_nearfull_ratio``` 和 ```mon_osd_full_ratio```两个参数。结合我们的实际环境，将mon_osd_nearfull_ratio调整为0.1(50*9*0.1=45G时产生警告），mon_osd_full_ratio调整为0.2(50*9*0.2=90G时集群为HEALTH_ERR)。
+
+有两种方式两种不同的方式来调整这两个值，下面分别介绍：
+
+**修改方式1**
+
+修改/etc/ceph/ceph.conf配置文件，在[global] section下添加或修改这两个参数：
 <pre>
-mon_osd_full_ratio = 0.05
-mon_osd_nearfull_ratio = 0.03
+mon_osd_nearfull_ratio = 0.1
+mon_osd_full_ratio = 0.2
 </pre>
 
-重启整个集群，重启MON:
+修改完成后，重启所有节点上的OSD,Monitor,RGW。重启完成之后，采用如下命令查看是否更改过来：
 {% highlight string %}
-/etc/init.d/ceph restart mon.{mon-name}        #{mon-name}为具体monitor名字
-{% endhighlight %}
-
-重启OSD:
-{% highlight string %}
-/etc/init.d/ceph  restart osd.{num}			   #{num}为拘泥osd编号
-{% endhighlight %}
-
-重启RGW:
-{% highlight string %}
-kill -9 {radosgw-pid}
-radosgw -c /etc/ceph/ceph.conf -n client.radosgw.{radosgw-name}
-{% endhighlight %}
-
-
-*重启完之后，我们可以通过如下命令来查看是否修改成功*
-<pre>
-ceph daemon mon.{mon-name} config show | grep ratio
+ceph daemon mon.{mon-id} config show | grep ratio
 ceph daemon osd.{num} config show | grep ratio
+ceph daemon client.radosgw.{rgw-name} config show | grep ratio
+{% endhighlight %}
+
+此处请根据集群的实际情况替换{mon-id}、{num}、{rgw-name}.
+例如：
+<pre>
+[root@ceph001-node1 ~]# ceph daemon mon.ceph001-node1 config show | grep ratio
+    "mon_osd_min_up_ratio": "0.3",
+    "mon_osd_min_in_ratio": "0.3",
+    "mon_cache_target_full_warn_ratio": "0.66",
+    "mon_osd_full_ratio": "0.2",
+    "mon_osd_nearfull_ratio": "0.1",
+    "mds_op_history_duration": "600",
+    "osd_backfill_full_ratio": "0.85",
+    "osd_pool_default_cache_target_dirty_ratio": "0.4",
+    "osd_pool_default_cache_target_full_ratio": "0.8",
+    "osd_heartbeat_min_healthy_ratio": "0.33",
+    "osd_scrub_interval_randomize_ratio": "0.5",
+    "osd_debug_drop_ping_duration": "0",
+    "osd_debug_drop_pg_create_duration": "1",
+    "osd_op_history_duration": "600",
+    "osd_failsafe_full_ratio": "0.97",
+    "osd_failsafe_nearfull_ratio": "0.9",
+    "osd_bench_duration": "30",
+    "rgw_swift_token_expiration": "86400",
 </pre>
 
-**(2) 新建新建用于故障演练的pool**
+
+**修改方式2**
+
+1） 修改pg.mon,osd的阈值
 {% highlight string %}
-sudo ceph osd pool create benchmark 256 256
-rados -p benchmark df                      # 查看该池占用的资源
+ceph pg set_nearfull_ratio 0.1
+ceph pg set_full_ratio 0.2
+
+ceph tell osd.* injectargs '--mon-osd-nearfull-ratio 0.1'
+ceph tell osd.* injectargs '--mon-osd-full-ratio 0.2'
+
+ceph tell mon.* injectargs '--mon-osd-nearfull-ratio 0.1'
+ceph tell mon.* injectargs '--mon-osd-full-ratio 0.2'
 {% endhighlight %}
 
-
-
-**(3) 向benchmark池写入数据**
-
-重复执行如下命令向benchmark池中写入数据，直到触发mon_osd_full_ratio条件，数据不能写入为止：
+或通过如下命令修改：
 {% highlight string %}
-sudo rados bench -p benchmark 60  write --no-cleanup
-{% endhighlight %}
 
+{% endhighlight %}
 
 
 
