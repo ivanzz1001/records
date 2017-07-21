@@ -65,7 +65,7 @@ ID  WEIGHT  TYPE NAME                                UP/DOWN REWEIGHT PRIMARY-AF
 
 ### 2.1 调整阈值
 
-这里我们调小阀值的原因是为了后面可以通过相应的工具填充数据以尽快达到该阀值(在磁盘容量较小的情况下，也可以不必调整)。我们主要调整```mon_osd_nearfull_ratio``` 和 ```mon_osd_full_ratio```两个参数。结合我们的实际环境，将mon_osd_nearfull_ratio调整为0.1(50*9*0.1=45G时产生警告），mon_osd_full_ratio调整为0.2(50*9*0.2=90G时集群为HEALTH_ERR)。
+这里我们调小阀值的原因是为了后面可以通过相应的工具填充数据以尽快达到该阀值(在磁盘容量较小的情况下，也可以不必调整)。我们主要调整```mon_osd_nearfull_ratio``` 和 ```mon_osd_full_ratio```两个参数。结合我们的实际环境，将mon_osd_nearfull_ratio调整为0.1(50 x 9 x 0.1=45G时产生警告），mon_osd_full_ratio调整为0.2(50 x 9 x 0.2=90G时集群为HEALTH_ERR)。
 
 有两种方式两种不同的方式来调整这两个值，下面分别介绍：
 
