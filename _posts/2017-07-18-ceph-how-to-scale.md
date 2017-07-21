@@ -963,6 +963,38 @@ pg_stat up_primary
 
 *方式三*
 
+采用如下命令手动触发PG repair操作(注意这里我们移除了20.be和20.c0这两个文件夹，在执行如下命令之前需先手动建立这两个空文件夹)：
+{%s highlight string %}
+ceph pg repair <pgid>
+{% endhighlight %}
+
+例如：
+<pre>
+[root@ceph001-node1 test]# ceph pg repair 20.be
+instructing pg 20.be on osd.11 to repair
+[root@ceph001-node1 test]# ceph pg repair 20.c0
+instructing pg 20.c0 on osd.10 to repair
+</pre>
+
+触发后，我们可以看到集群会修复丢失的PG副本：
+<pre>
+[root@ceph001-node2 build]# ceph -w
+    cluster ba47fcbc-b2f7-4071-9c37-be859d8c7e6e
+     health HEALTH_ERR
+            2 pgs inconsistent
+            79 scrub errors
+     monmap e1: 3 mons at {ceph001-node1=10.133.134.211:6789/0,ceph001-node2=10.133.134.212:6789/0,ceph001-node3=10.133.134.213:6789/0}
+            election epoch 10, quorum 0,1,2 ceph001-node1,ceph001-node2,ceph001-node3
+     osdmap e288: 12 osds: 12 up, 12 in
+      pgmap v7203: 744 pgs, 16 pools, 35056 MB data, 8811 objects
+            103 GB used, 496 GB / 599 GB avail
+                 742 active+clean
+                   2 active+clean+inconsistent
+2017-07-21 15:44:38.044153 osd.10 [ERR] 20.c0 repair 41 errors, 41 fixed
+2017-07-21 15:44:46.895304 mon.0 [INF] pgmap v7207: 744 pgs: 744 active+clean; 35056 MB data, 103 GB used, 496 GB / 599 GB avail; 12470 kB/s, 3 objects/s recovering
+2017-07-21 15:45:02.464895 mon.0 [INF] HEALTH_OK
+</pre>
+
 
 
 
