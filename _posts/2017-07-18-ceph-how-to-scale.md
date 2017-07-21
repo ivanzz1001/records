@@ -527,7 +527,7 @@ MIN/MAX VAR: 0.87/1.10  STDDEV: 1.60
 </pre>
 从上面我们可以看到，当前OSD.1的磁盘使用量为20%，达到了我们的阈值。我们这里尝试从OSD.1中读取数据:
 
-*查看落到OSD.1上PG:*
+```*查看落到OSD.1上PG:*```
 <pre>
 [root@ceph001-node3 test]# ceph pg ls-by-osd 1 | awk '{print $1,$15}'
 pg_stat up_primary
@@ -554,7 +554,7 @@ pg_stat up_primary
 
 上面我们看到有很多PG被映射到osd.1上，我们选择稍微靠后，即PG值较大的PG（根据经验PG值较小的PG里面可能数据较少或没有数据）。再选择osd.1是作为PG中的master的一个PG。这里我们选择20.dd这个pg [1,6,5].
 
-*查看osd.1上20.dd这个pg的对象*
+```*查看osd.1上20.dd这个pg的对象*```
 <pre>
 [root@ceph001-node1 ~]# ls /var/lib/ceph/osd/ceph-1/current/20.dd_head/
 benchmark\udata\uceph001-node1\u10650\uobject137__head_7A03E2DD__14   benchmark\udata\uceph001-node1\u10885\uobject1336__head_180E08DD__14
@@ -574,7 +574,7 @@ benchmark\udata\uceph001-node1\u10724\uobject504__head_775BFFDD__14   __head_000
 benchmark\udata\uceph001-node1\u10885\uobject1205__head_2F5C1DDD__14
 </pre>
 
-*将pg副本数据移除*
+```*将pg副本数据移除*```
 
 这里我们为了确保是从当前为FULL状态的osd.1上读取数据，因此我们先将osd.6与osd.5上的20.dd这个pg数据移除：
 <pre>
@@ -595,7 +595,7 @@ ceph001-node3
 20.dd_head
 </pre>
 
-*读取对象数据*
+```*读取对象数据*```
 
 此时我们再从osd.1这个FULL OSD上读取20.dd中的一个对象：
 <pre>
@@ -637,7 +637,7 @@ drwxrwxrwx 5 root root      44 Jul 18 17:21 ..
 
 如上所示，我们仍然可以从osd.1中读取数据。即FULL OSD也仍然可以读取数据。
 
-*恢复移除的副本pg*
+```*恢复移除的副本pg*```
 
 上面我们将osd.6及osd.5上的20.dd这两个PG副本移到了另外的地方，这里将这两个副本先进行恢复：
 <pre>
@@ -645,7 +645,7 @@ drwxrwxrwx 5 root root      44 Jul 18 17:21 ..
 [root@ceph001-node3 test]# mv 20.dd_head/ /var/lib/ceph/osd/ceph-6/current/
 </pre>
 
-*结论*
+```*结论*```
 
 在整个集群因为某些FULL OSD导致处于HEALTH_ERR状态下，仍然可以从集群中正常的读取数据。
 
