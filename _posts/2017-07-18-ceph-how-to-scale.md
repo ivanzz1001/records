@@ -359,7 +359,7 @@ rados -p benchmark get {object-name} {output-file}
 [root@ceph001-node2 test]# rados -p benchmark get benchmark_data_ceph001-node1_10724_object742 output.bin
 [root@ceph001-node2 test]# ls
 output.bin
-<pre>
+</pre>
 
 
 3） 集群reblance
