@@ -710,7 +710,7 @@ drwxrwxrwx 5 root root      44 Jul 18 17:21 ..
                  744 active+clean
 </pre>
 
-由此可见，当我们从那些FULL OSD移除一些数据之后，集群是可以从HEALTH_ERR状态变回HEALTH_WARN状态。进一步联想，我们如果再删除更多的数据，在集群为进行scrub之前，集群会变为HEALTH_OK状况。这就为我们后续解决这以HEALTH_ERR故障提供一种思路： 我们可以将full OSD中的非master PG删除，让你变回HEALTH_WARN状态，通过后续的扩容自动的将数据迁移走，然后通过PG的迁移状况再手动恢复删除的PG或者通过手动触发pg scrub来进行删除数据的恢复。 ```当然,这是在极端情况不能通过其他手段进行集群恢复的情况下，可以采用此方法```
+由此可见，当我们从那些FULL OSD移除一些数据之后，集群是可以从HEALTH_ERR状态变回HEALTH_WARN状态。进一步联想，我们如果再删除更多的数据，在集群进行scrub之前，集群会变为HEALTH_OK状况。这就为我们后续解决这以HEALTH_ERR故障提供一种思路： 我们可以将full OSD中的非master PG删除，让集群变回HEALTH_WARN状态，通过后续的扩容自动的将数据迁移走，然后通过PG的迁移状况再手动恢复删除的PG或者通过手动触发pg scrub来进行删除数据的恢复。 ```当然,这是在极端情况不能通过其他手段进行集群恢复的情况下，可以采用此方法```
 
 
 ### 2.7 小结
