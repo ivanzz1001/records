@@ -171,6 +171,15 @@ NOZEROCONF=yes
 HOSTNAME=ceph001-node1
 </pre>
 
+再调用如下命令修改：
+{% highlight string %}
+hostnamectl --static --transient --pretty set-hostname {host-name}
+{% endhighlight %}
+例如修改node1节点：
+<pre>
+hostnamectl --static --transient --pretty set-hostname ceph001-node1
+</pre>
+
 
 上述修改需要在系统下次重启时才生效。
 
