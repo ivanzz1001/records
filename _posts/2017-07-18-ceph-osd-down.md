@@ -239,6 +239,7 @@ ceph定义了很多变量来平衡当前的当前的服务请求与数据恢复�
 ceph使用心跳来确保host与daemons正处于运行状态，然而ceph-osd daemon并不能实时报告数据的话，其仍然会被置为stuck状态。默认情况下，OSD daemon会每隔0.5秒报告一次PG、up thru、boot、failure数据，其频率一般高于心跳频率。假如PG acting set中的primary OSD向monitor报告运行状况数据失败，又或者是其他的OSD报告该primary OSD处于down状态之后，该monitor会将该PG置为stale状态。
 
 当你重启ceph集群的时候，在peering状态完成之前都通常会看到stale状态。而当集群运行一会之后，如果PG仍处于stale状态，则该PG的primary OSD处于down状态或者并没有将PG的相应数据报告给monitor。
+<br />
 
 
 **标识troubled PG**
