@@ -1032,7 +1032,41 @@ recovery io 12470 kB/s, 3 objects/s
 </pre>
 
 
-## 4. 总结
+## 4. 环境恢复
+
+上面我们在模拟故障的过程中，创建了benchmark池，更改了monitor、osd、rgw的``mon-osd-nearfull-ratio``和``mon-osd-full-ratio``等变量，这里我们需要进行恢复。
+
+1) 恢复ratio值
+
+恢复Monitor,OSD的ratio值：
+{% highlight string %}
+ceph pg set_nearfull_ratio {old-nearfull-value}
+ceph pg set_full_ratio {od-full-value}
+
+ceph tell osd.* injectargs '--mon-osd-nearfull-ratio {old-nearfull-value}'
+ceph tell osd.* injectargs '--mon-osd-full-ratio {olsd-full-value}'
+
+ceph tell mon.* injectargs '--mon-osd-nearfull-ratio {old-nearfull-value}'
+ceph tell mon.* injectargs '--mon-osd-full-ratio {old-full-value}'
+{% endhighlight %}
+
+恢复RGW的ratio值：
+{% highlight string %}
+sudo ceph daemon client.radosgw.{rgw-name} config set mon_osd_nearfull_ratio {old-nearfull-value}
+sudo ceph daemon client.radosgw.{rgw-name} config set mon_osd_full_ratio {old-full-value}
+{% endhighlight %}
+
+请用适当的值替换{rgw-name}、{old-nearfull-value}、{old-full-value}
+
+2） 删除benchmark测试池
+
+分别删除池中的数据和池本身：
+{% highlight string %}
+rados -p benchmark cleanup      
+ceph osd pool delete benchmark benchmark --yes-i-really-really-mean-it     
+{% endhighlight %}
+
+## 5. 总结
 
 在此，我们模拟了因OSD FULL导致ceph集群出现HEALTH_ERR的情况，并给出了在此情况下的集群读写、删除等特性。并提供了普通情况与极限情况下集群的修复方法。可以较为彻底的解决此方面的问题。
 
