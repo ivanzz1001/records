@@ -186,4 +186,23 @@ rados bench -p .simulator.down 60  write --no-cleanup
 
 **```CREATING```**
 
+当你在创建一个pool的时候就会创建指定数量的PG。当集群正在创建PG的时候就处于``creating``状态。一旦一个PG创建成功，处于PG Acting Set中的OSD就会进行peer。而一旦peering完成之后，PG的状态就会变为active + clean，这就代表着ceph客户端可以对PG执行写操作了。
+
+![pg-state](https://ivanzz1001.github.io/records/assets/img/ceph/osd-down/pg-state.jpg)
+
+
+**```PEERING```**
+
+当ceph正在peering一个PG的时候，目的是要让存储该PG各个副本的OSD之间相互了解到当前PG中所存储的对象和元数据的相应状态。当peering完成之后，各OSD就会针对该PG得出一个一致同意的状态。然而，peering的完成并不代表PG的各个副本之间都有了数据的最新版本。
+<pre>
+权威历史：
+在PG Acting Set所映射的所有OSD均同意写之前，ceph会拒绝对对该PG进行写操作。这就可以确保自上一次peering成功完成之后,
+PG acting set中的至少一个有一个成员保存有每次写操作的一份记录。
+
+拥有一份精确的写记录之后，ceph就可以构建出该PG的一份详尽的历史。这样通过这份完整的、有序的操作记录，ceph就能确保将该PG
+的OSD副本更新到最新。
+</pre>
+
+**```ACTIVE```**
+
 
