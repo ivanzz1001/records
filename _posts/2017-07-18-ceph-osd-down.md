@@ -205,4 +205,53 @@ PG acting set中的至少一个有一个成员保存有每次写操作的一份�
 
 **```ACTIVE```**
 
+一旦ceph完成了peering进程之后，该PG就会变成 active 状态。active状态意味着该PG(primary和replicas)内的数据可以进行读写操作。
+
+**```CLEAN```**
+
+当PG处于clean状态时，意味着该PG的master OSD和replica OSDs之间已经成功完成了peer，并且master与replicas之间数据完全一致。ceph对PG内的所有对象都复制到正确的副本数。
+
+
+**```DEGRADED```**
+
+当client将对象数据写到主OSD上时，该主OSD负责将对象数据副本写到副本OSD上。在主OSD将对象数据写到硬盘之后，在副本数据未成功写入副OSD之前整个PG都将处于DEGRADED状态。
+
+一个PG之所有会存在active + degraded状态，是因为一个OSD即使在未保存有所有对象的情况下其仍可以处于active状态。假如一个OSD变成down状态之后，ceph就会将映射到该OSD的PG标志为degraded状态。在该down OSD回来时，其必须要进行重新的peering动作。然而只要该PG仍是active的，即使其处于degraded状态，其仍然可以进行写操作。
+
+假如OSD down之后并且degraded状态一直持续，Ceph可以将该down状态的OSD out出集群，然后将处于该down OSD上的数据remap到其他的OSD上。在一个OSD被标记为down之后，经过```mon osd down out interval```时间之后就会被标记为out(默认值为600).
+
+当ceph认为应当处于某PG中的对象却并未发现时，PG也会被认为是degraded状态。即使处于degraded状态的PG中有些对象并不能读写，但是你仍可以对其他对象进行正常读写操作。
+
+**```RECOVERING```**
+
+ceph的设计使得其在软硬件出现故障时具有很好的容灾作用。当一个OSD down之后，其数据版本也许会落后与该PG的其他副本。而当该OSD重新回来变成up状态后，该PG的数据就必须要更新到当前状态。在这一过程中，该OSD就会处于recovering状态.
+
+恢复操作很可能会经常发生，因为一个物理故障通常都会导致多个OSD同时down掉。比如，一个机架路由器故障就会导致该机架上的所有宿主机上的OSD 数据版本落后与集群的最新版本。这样当故障解决的时候，这些OSD就必须进行数据恢复。
+
+ceph定义了很多变量来平衡当前的当前的服务请求与数据恢复时所造成的系统压力。```osd recovery delay start```允许该OSD在数据进行recovering之前,进行restart,re-peer,replay等操作。```osd recovery thread timeout```设置线程超时时间。``` osd recovery max active ```设置一个OSD同时处理的recovering请求数。```osd recovery max chunk```设置恢复时每一个chunk的数据大小，以避免网络拥塞。
+
+**```REMAPPED```**
+
+当PG的acting set发生改变的时候，数据就要从旧的acting set迁移到新acting set中。这在新的primary OSD接收请求之前会耗费一定时间。因此其仍会用旧的primary OSD来接收请求，直到数据迁移完成。一旦数据迁移完成之后，就会使用新acting set的primary OSD。
+
+**```STALE```**
+
+ceph使用心跳来确保host与daemons正处于运行状态，然而ceph-osd daemon并不能实时报告数据的话，其仍然会被置为stuck状态。默认情况下，OSD daemon会每隔0.5秒报告一次PG、up thru、boot、failure数据，其频率一般高于心跳频率。假如PG acting set中的primary OSD向monitor报告运行状况数据失败，又或者是其他的OSD报告该primary OSD处于down状态之后，该monitor会将该PG置为stale状态。
+
+当你重启ceph集群的时候，在peering状态完成之前都通常会看到stale状态。而当集群运行一会之后，如果PG仍处于stale状态，则该PG的primary OSD处于down状态或者并没有将PG的相应数据报告给monitor。
+
+
+**标识troubled PG**
+
+如上所述，当一个PG的状态不是active + clean时不表示其一定有问题。通常，当PG变成stuck状态之后并不能通过自修复功能恢复。stuck状态包括：
+
+*Unclean : PG中的一些对象数据并没有复制到所期望的副本数。它们应该正处于恢复中.
+*Inactive: PG并不能进行读写操作，因为其正在等待拥有最新版本数据的OSD重新归来
+*Stale   : PG当前处于未知状态，因为OSD并未在规定的时间内向monitor报告相应的信息（由```mon osd report timeout```配置)
+
+执行如下命令可以查看stuck状态的PG：
+{% highlight string %}
+ceph pg dump_stuck [unclean|inactive|stale|undersized|degraded]
+{% endhighlight %}
+
 
