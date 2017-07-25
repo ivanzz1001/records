@@ -246,9 +246,9 @@ ceph使用心跳来确保host与daemons正处于运行状态，然而ceph-osd da
 
 如上所述，当一个PG的状态不是active + clean时不表示其一定有问题。通常，当PG变成stuck状态之后并不能通过自修复功能恢复。stuck状态包括：
 
-*Unclean : PG中的一些对象数据并没有复制到所期望的副本数。它们应该正处于恢复中.
-*Inactive: PG并不能进行读写操作，因为其正在等待拥有最新版本数据的OSD重新归来
-*Stale   : PG当前处于未知状态，因为OSD并未在规定的时间内向monitor报告相应的信息（由```mon osd report timeout```配置)
+* Unclean : PG中的一些对象数据并没有复制到所期望的副本数。它们应该正处于恢复中.
+* Inactive: PG并不能进行读写操作，因为其正在等待拥有最新版本数据的OSD重新归来
+* Stale   : PG当前处于未知状态，因为OSD并未在规定的时间内向monitor报告相应的信息（由```mon osd report timeout```配置)
 
 执行如下命令可以查看stuck状态的PG：
 {% highlight string %}
