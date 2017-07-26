@@ -218,7 +218,14 @@ PG acting set中的至少一个有一个成员保存有每次写操作的一份�
 
 一个PG之所有会存在active + degraded状态，是因为一个OSD即使在未保存有所有对象的情况下其仍可以处于active状态。假如一个OSD变成down状态之后，ceph就会将映射到该OSD的PG标志为degraded状态。在该down OSD回来时，其必须要进行重新的peering动作。然而只要该PG仍是active的，即使其处于degraded状态，其仍然可以进行写操作。
 
-假如OSD down之后并且degraded状态一直持续，Ceph可以将该down状态的OSD out出集群，然后将处于该down OSD上的数据remap到其他的OSD上。在一个OSD被标记为down之后，经过```mon osd down out interval```时间之后就会被标记为out(默认值为600).
+假如OSD down之后并且degraded状态一直持续，Ceph可以将该down状态的OSD out出集群，然后将处于该down OSD上的数据remap到其他的OSD上。在一个OSD被标记为down之后，经过```mon osd down out interval```时间之后就会被标记为out(默认值为300).
+
+注：
+{% highlight string %}
+#通过如下命令查看默认值
+ceph --show-config --conf /dev/null 
+{% endhighlight %}
+
 
 当ceph认为应当处于某PG中的对象却并未发现时，PG也会被认为是degraded状态。即使处于degraded状态的PG中有些对象并不能读写，但是你仍可以对其他对象进行正常读写操作。
 
@@ -254,5 +261,36 @@ ceph使用心跳来确保host与daemons正处于运行状态，然而ceph-osd da
 {% highlight string %}
 ceph pg dump_stuck [unclean|inactive|stale|undersized|degraded]
 {% endhighlight %}
+
+
+<br />
+<br />
+**集群PG状态分析**
+
+接下来，我们结合上面的介绍来分析PG状态的变化。
+<pre>
+2017-07-25 14:56:43.288638 mon.1 [INF] osd.1 10.133.134.211:6804/3306 failed (3 reports from 3 peers after 20.014342 >= grace 20.000000)
+2017-07-25 14:56:43.395532 mon.1 [INF] osdmap e379: 12 osds: 11 up, 12 in
+2017-07-25 14:56:43.482454 mon.1 [INF] pgmap v18227: 744 pgs: 25 stale+active+clean, 719 active+clean; 1532 MB data, 5192 MB used, 594 GB / 599 GB avail
+2017-07-25 14:56:44.539657 mon.1 [INF] osdmap e380: 12 osds: 11 up, 12 in
+2017-07-25 14:56:44.698687 mon.1 [INF] pgmap v18229: 744 pgs: 21 stale+active+clean, 11 peering, 712 active+clean; 1532 MB data, 5192 MB used, 594 GB / 599 GB avail
+2017-07-25 14:56:48.641278 mon.1 [INF] pgmap v18230: 744 pgs: 9 active+undersized+degraded, 17 stale+active+clean, 11 peering, 707 active+clean; 1532 MB data, 5192 MB used, 594 GB / 599 GB avail; 3/1290 objects degraded (0.233%)
+2017-07-25 14:56:49.731555 mon.1 [INF] pgmap v18231: 744 pgs: 75 active+undersized+degraded, 669 active+clean; 1532 MB data, 5193 MB used, 594 GB / 599 GB avail; 42/1290 objects degraded (3.256%)
+2017-07-25 14:56:58.637901 mon.1 [INF] pgmap v18232: 744 pgs: 75 active+undersized+degraded, 669 active+clean; 1532 MB data, 5193 MB used, 594 GB / 599 GB avail; 42/1290 objects degraded (3.256%)
+2017-07-25 14:56:59.739817 mon.1 [INF] pgmap v18233: 744 pgs: 75 active+undersized+degraded, 669 active+clean; 1532 MB data, 5193 MB used, 594 GB / 599 GB avail; 42/1290 objects degraded (3.256%)
+</pre>
+
+首先monitor与osd.1之间通过peers发现其已经failed，我们查看```/var/lib/ceph/osd/ceph-1/current```目录发现PG数为75,因为我们设置的pool默认副本数是3，则这75个PG中以osd.1作为primary OSD的PG个数约为25个，正好符合osd.1 down掉时最先报告有25个PG处于stale + active + clean状态。
+
+再接着由于PG之间的peering操作，会发现映射到osd.1上的所有75个PG都变成active + undersized + degraded状态。而由于目前我们crush map的设置，这些被降级的PG均不能向其他机架的OSD进行迁移，而其最小副本为2，因此只在ceph001-node1节点down掉的情况下这些PG一定会保持active + undersized + degraded状态。
+
+后续osd.0,osd.2,osd.9均会报告类似信息，最后整个集群744个PG均处于active + undersized + degraded状态。
+<pre>
+2017-07-26 10:33:39.390934 mon.1 [INF] pgmap v19417: 744 pgs: 744 active+undersized+degraded; 1532 MB data, 5191 MB used, 594 GB / 599 GB avail; 430/1290 objects degraded (33.333%)
+</pre>
+
+
+
+
 
 
