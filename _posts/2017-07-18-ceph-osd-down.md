@@ -300,6 +300,11 @@ ceph pg dump_stuck [unclean|inactive|stale|undersized|degraded]
 </pre>
 
 
+## 故障解决
+
+一般情况下，针对宿主机故障导致该宿主机上所有OSD down掉的情况下，我们只需要将这些down掉的OSD逐个重新启动并加入集群即可。在进行集群恢复时请用```ceph -w```命令监控集群的恢复状态，一般等一个OSD恢复完成，再恢复下一个。
+
+在OSD处于down状态但仍为out出集群时，恢复一般只涉及到数据的recovering；而如果已经out出集群，一般会涉及到PG的remap，数据会新型backfill + recovering.
 
 
 
