@@ -180,7 +180,18 @@ rados bench -p .simulator.down 60  write --no-cleanup
 
 如上，mon.ceph001-node1被选举作为leader.
 
-2）pg状态
+2） OSD状态
+
+在monitor接收不到OSD的报告信息，或收到其相邻OSD对其的故障报告时，monitor就会将该OSD置为down状态。接着经过一段时间```mon osd down out interval```,ceph集群就会将该down状态的OSD out出整个集群。然后会导致整个PG的重新映射，触发数据的迁移。
+
+事实上，在我们上面的测试环境中重启ceph001-node1宿主机，却观察不到osd.0,osd.1,osd.2,osd.9被out出整个集群的状况。这是因为这里osd out还受到```mon_osd_down_out_subtree_limit```的影响。
+<pre>
+[root@ceph001-node1 ~]# ceph --show-config | grep mon_osd_down_out_subtree_limit
+mon_osd_down_out_subtree_limit = rack
+</pre>
+如上所示，默认情况下ceph最大可以把rack大小的crush单元置为out。而这里我们关闭ceph001-node1宿主机已经达到了该最大单元，因此这里会限制将这些OSD置为out。
+
+3）pg状态
 
 这里我们首先来介绍pg整个生命周期中可能的状态，然后再来分析在一台宿主机down掉时PG的表现：
 
@@ -218,14 +229,13 @@ PG acting set中的至少一个有一个成员保存有每次写操作的一份�
 
 一个PG之所有会存在active + degraded状态，是因为一个OSD即使在未保存有所有对象的情况下其仍可以处于active状态。假如一个OSD变成down状态之后，ceph就会将映射到该OSD的PG标志为degraded状态。在该down OSD回来时，其必须要进行重新的peering动作。然而只要该PG仍是active的，即使其处于degraded状态，其仍然可以进行写操作。
 
-假如OSD down之后并且degraded状态一直持续，Ceph可以将该down状态的OSD out出集群，然后将处于该down OSD上的数据remap到其他的OSD上。在一个OSD被标记为down之后，经过```mon osd down out interval```时间之后就会被标记为out(默认值为300).
+假如OSD down之后并且degraded状态一直持续，Ceph可以将该down状态的OSD out出集群，然后将处于该down OSD上的数据remap到其他的OSD上。在一个OSD被标记为down之后，经过```mon osd down out interval```时间之后就会被标记为out(默认值为300)。
 
 注：
 {% highlight string %}
 #通过如下命令查看默认值
 ceph --show-config --conf /dev/null 
 {% endhighlight %}
-
 
 当ceph认为应当处于某PG中的对象却并未发现时，PG也会被认为是degraded状态。即使处于degraded状态的PG中有些对象并不能读写，但是你仍可以对其他对象进行正常读写操作。
 
@@ -288,6 +298,7 @@ ceph pg dump_stuck [unclean|inactive|stale|undersized|degraded]
 <pre>
 2017-07-26 10:33:39.390934 mon.1 [INF] pgmap v19417: 744 pgs: 744 active+undersized+degraded; 1532 MB data, 5191 MB used, 594 GB / 599 GB avail; 430/1290 objects degraded (33.333%)
 </pre>
+
 
 
 
