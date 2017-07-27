@@ -443,3 +443,7 @@ int main (int argc, const char **argv)
 rados_ioctx_destroy(io);
 rados_shutdown(cluster);
 {% endhighlight %}
+
+<br />
+<br />
+<br />
