@@ -34,6 +34,7 @@
 }
 .highlight .c, .highlight .cd {
   color: #75715e;
+  background: #000000;   
 }
 .highlight .err {
   color: #960050;
