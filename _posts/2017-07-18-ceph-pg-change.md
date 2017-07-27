@@ -370,4 +370,65 @@ ceph pg dump | awk '{print $1,$15,$16,$17,$18}' > pg_osd0_outdown.txt
 
 .....
 </pre>
+通过上述比较发现，所有的PG中存在映射到OSD.0的PG，都是active + undersized + degraded状态。并且，PG的映射关系也是直接将osd.0剔除了。然后进行计数统计：
+<pre>
+[root@ceph001-node1 test]# diff pg_origin.txt pg_osd0_indown.txt -y --suppress-common-lines |grep -v '^\s' |  wc -l
+184
+</pre>
+结果刚好等于ceph -w 显示的不正常的PG数，也就是osd.0下面包含的PG总数。
+
+然后我们将osd.0目录下的PG全部导入pg_osd0_data.txt文件：
+<pre>
+ls /var/lib/ceph/osd/ceph-0/current/ | grep head | sort -n | awk -F '_' '{print $1}' | sort -n > pg_osd0_data.txt
+</pre>
+
+然后对比pg_origin.txt与pg_osd0_outdown.txt:
+<pre>
+[root@ceph001-node1 test]# diff pg_origin.txt pg_osd0_outdown.txt -y --suppress-common-lines | grep -v '^\s' | grep -v '@@' | grep -v 'txt'
+13.e3 [0,8,3] 0 [0,8,3] 0                                     | 13.e3 [9,8,3] 9 [9,8,3] 9
+25.f5 [5,0,11] 5 [5,0,11] 5                                   | 25.f5 [5,1,11] 5 [5,1,11] 5
+13.e1 [9,4,7] 9 [9,4,7] 9                                     | 13.e1 [3,9,7] 3 [3,9,7] 3
+25.f3 [6,4,0] 6 [6,4,0] 6                                     | 25.f3 [6,4,2] 6 [6,4,2] 6
+13.e7 [1,10,6] 1 [1,10,6] 1                                   | 13.e7 [1,8,3] 1 [1,8,3] 1
+13.e4 [5,6,0] 5 [5,6,0] 5                                     | 13.e4 [5,6,2] 5 [5,6,2] 5
+13.e5 [10,0,8] 10 [10,0,8] 10                                 | 13.e5 [10,1,8] 10 [10,1,8] 10
+25.fe [0,3,8] 0 [0,3,8] 0                                     | 25.fe [1,3,8] 1 [1,3,8] 1
+13.ea [2,8,10] 2 [2,8,10] 2                                   | 13.ea [3,8,2] 3 [3,8,2] 3
+25.fc [2,7,10] 2 [2,7,10] 2                                   | 25.fc [3,7,2] 3 [3,7,2] 3
+25.fd [7,2,3] 7 [7,2,3] 7                                     | 25.fd [7,5,2] 7 [7,5,2] 7
+13.ee [8,3,0] 8 [8,3,0] 8                                     | 13.ee [8,3,9] 8 [8,3,9] 8
+25.f8 [10,0,7] 10 [10,0,7] 10                                 | 25.f8 [10,6,9] 10 [10,6,9] 10
+13.ec [3,8,0] 3 [3,8,0] 3                                     | 13.ec [3,8,1] 3 [3,8,1] 3
+25.f9 [1,3,8] 1 [1,3,8] 1                                     | 25.f9 [5,7,2] 5 [5,7,2] 5
+</pre>
+通过上面我们发现，不管有没有涉及到OSD.0的PG，其最后映射关系都可能发生了改变。
+
+然后我们将pg_origin.txt与pg_osd0_outdown.txt中改变了的PG与osd.0下的PG做比较：
+<pre>
+[root@ceph001-node1 test]# diff pg_origin.txt pg_osd0_outdown.txt -y --suppress-common-lines | grep -v '^\s' | grep -v '@@' | grep -v 'txt'| awk '{print $1}' | sort -n | diff - pg_osd0_data.txt -y 
+1.f                                                             1.f
+1.1b                                                            1.1b
+1.1c                                                            1.1c
+1.1d                                                            1.1d
+1.1f                                                            1.1f
+1.11                                                            1.11
+1.12                                                            1.12
+1.13                                                          <
+1.14                                                          <
+1.15                                                          <
+1.17                                                            1.17
+1.2                                                             1.2
+1.2b                                                            1.2b
+....
+</pre>
+可以看到，这里确实是不管有没有涉及到osd.0的PG，其最后均发生了改变。
+
+值得指出的是，由于我们这里在上面是通过了```ceph osd crush reweight```方式来解除PG一直处于stuck状态。如果osd.0可以直接out出去并且集群可以自动的完成数据迁移的话，则结果会完全不同。此种情况下，PG的迁移只会发生在与osd.0相关的PG上。
+
+这里顺便解释一下backfill和recovering的区别：
+* backfill: 需要进行全量恢复操作
+* recovering: 需要增量恢复的操作
+
+
+
 
