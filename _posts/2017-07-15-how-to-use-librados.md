@@ -78,7 +78,7 @@ keyring = /etc/ceph/ceph.client.admin.keyring
 
 
 如下给出一个C版本的例子：
-{% highlight c %}
+{% highlight string %}
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
