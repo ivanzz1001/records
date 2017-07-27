@@ -2393,23 +2393,8 @@ footer {
 }
 
 .article-content pre, .article-content .highlight, .article-content .highlight pre {
-  background: #2d2d2d;
-  /*background: #f2dede;*/  
-  margin: .5em 0;
-  padding: .5em 2%;
-  color: #050505;
-  line-height: 1.5;
-  font-size: .8em;
-  -webkit-border-radius: .35em;
-  -webkit-border-radius: .35em;
-  border-radius: .35em;
-  word-wrap: break-word;
-  overflow: auto
-}
-
-.article-content .highlight pre  .language-string{
   /*background: #2d2d2d;*/
-  background: #f2dede; 
+  background: #f2dede;
   margin: .5em 0;
   padding: .5em 2%;
   color: #050505;
