@@ -7,7 +7,22 @@ tags:
 categories: ceph
 description: librados相关介绍及使用范例
 ---
-Jekyll-Jacman 是为 Jekyll 设计的一款清新且具有响应式的主题，拥有更丰富的特性并支持了很多的国内服务。Jacman 始于 Jacman 移植而来
+
+本文简单介绍librados，并给出相应的使用范例。参看：http://docs.ceph.com/docs/master/rados/api/librados-intro/
+
+<!-- more -->
+
+
+
+## 1. librados介绍
+ceph存储集群提供的基本存储服务，使ceph能够在一个联合文件系统中独一无二的实现对象存储(object storage)、块存储(block storage)以及文件存储(file storage)。然而，你并不一定需要通过RESTful API、block API或者POSIX文件系统接口才能访问ceph存储集群。依赖于RADOS，你可以直接通过librados API来访问ceph存储集群。
+
+librados API可以访问ceph存储集群的两类守护进程：
+* Ceph Monitor: 维持cluster map的一份主拷贝
+* Ceph OSD Daemon: 在存储节点上存储对象数据
+
+![librados](https://ivanzz1001.github.io/records/assets/img/ceph/rados/librados.jpg)
+
 
 
 
