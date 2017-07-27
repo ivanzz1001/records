@@ -10,7 +10,7 @@ description: ceph pg
 本文主要讲述ceph OSD从 (in + up)状态到(in + down)状态，再到(out + down)状态这一整个过程中PG的变化情况。
 <!-- more --> 
 
-## 集群环境介绍
+## 1. 集群环境介绍
 
 当前我们有如下12个OSD组成的ceph集群，每个OSD拥有50G的数据硬盘，拥有的总PG数为744个：
 <pre>
@@ -58,7 +58,7 @@ ID  WEIGHT  TYPE NAME                                UP/DOWN REWEIGHT PRIMARY-AF
 </pre>
 下面我们以osd.0为例来观察其从(in + up)到(out + down)状态这一整个过程PG的变化情况。
 
-## 初始状态
+## 2. 初始状态
 
 在整个集群处于HEALTH_OK状态并且达到稳定时，我们此时导出集群的PG(这里我们导出pg_stat,up,up_primary,acting,acting_primary这几列)：
 {% highlight string %}
@@ -87,7 +87,7 @@ pg_stat up_primary acting acting_primary last_scrub
 ...
 </pre>
 
-## osd.0处于(in + down)状态
+## 3. osd.0处于(in + down)状态
 
 这里手动管理osd.0:
 {% highlight string %}
@@ -162,7 +162,7 @@ ceph pg dump | awk '{print $1,$15,$16,$17,$18}' > pg_osd0_indown.txt
 
 可以发现，处于降级状态的PG总数就是osd.0数据目录下的PG数。
 
-## osd.0处于(out+down)状态
+## 4. osd.0处于(out+down)状态
 在等待5分钟后，monitor会将osd.0标记为out状态：
 <pre>
 [root@ceph001-node1 current]# ceph -s
@@ -335,7 +335,7 @@ ceph pg dump | awk '{print $1,$15,$16,$17,$18}' > pg_osd0_outdown.txt
 {% endhighlight %}
 
 
-## 集群PG变化情况分析
+## 5. 集群PG变化情况分析
 此时我们有了3个pg dump文件,分别是：
 * pg_origin.txt                      
 * pg_osd0_indown.txt                
@@ -429,6 +429,8 @@ ls /var/lib/ceph/osd/ceph-0/current/ | grep head | sort -n | awk -F '_' '{print 
 * backfill: 需要进行全量恢复操作
 * recovering: 需要增量恢复的操作
 
-
+<br />
+<br />
+<br />
 
 
