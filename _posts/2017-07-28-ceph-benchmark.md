@@ -186,4 +186,7 @@ rados -p benchmark cleanup
 {% highlight string %}
 ceph osd pool delete benchmark benchmark --yes-i-really-really-mean-it
 {% endhighlight %}
-    
+
+<br />
+<br />
+<br />
