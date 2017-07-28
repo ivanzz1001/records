@@ -2238,9 +2238,9 @@ footer {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /*font-size: 150%;*/
-  font-size: 120%;
+  font-size: 100%;
   /*line-height: 1.3em;*/
-  line-height: 1.6em;
+  line-height: 1.8em;
   width: 90%;
   margin: 0 auto;
   color: #fff;
