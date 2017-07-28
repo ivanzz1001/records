@@ -2200,10 +2200,6 @@ footer {
   }
 }
 
-#footer .info{
-	font-size: x-small;
-}
-
 .author {
   width: 6.875em;
   height: 6.875em;
@@ -2241,8 +2237,10 @@ footer {
   font-family: "covered_by_your_graceregular";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-size: 150%;
-  line-height: 1.3em;
+  /*font-size: 150%;*/
+  font-size: 120%;
+  /*line-height: 1.3em;*/
+  line-height: 1.6em;
   width: 90%;
   margin: 0 auto;
   color: #fff;
