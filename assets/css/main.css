@@ -2172,7 +2172,9 @@ footer {
 
 #footer .line {
   width: 100%;
-  height: 14em;
+  /*height: 14em;*/
+  height: 16em;
+  font-size: x-small;
   margin: 0 auto;
 }
 
