@@ -92,8 +92,8 @@ share_to: true #enable share-to buttons if true
 #### Author information
 author:
   name: ivan.L      ## e.g. wuchong Author name
-  intro_line1:  "Hello ,I'm Larry Page in Google."    ## your introduction on the bottom of the page
-  intro_line2:  "This is my blog,believe it or not."  ## the 2nd line
+  intro_line1:  "天下事有难易乎？"    ## your introduction on the bottom of the page
+  intro_line2:  "为之，则难者亦易矣；不为，则易者亦难矣"  ## the 2nd line
   weibo:      ## e.g. wuchong1014 or 2176287895 for http://weibo.com/2176287895
   weibo_verifier:  ## e.g. b3593ceb Your weibo-show widget verifier ,if you use weibo-show it is needed.
   tsina:      ## e.g. 2176287895  Your weibo ID,It will be used in share button.
@@ -118,7 +118,7 @@ toc:
 #### Links
 links:
   码农圈: https://coderq.com
-  Jark's Blog: http://wuchong.me
+  我的博客: https://ivanzz1001.github.io/records/
 
 #### Comment
 disqus_shortname:     ## e.g. wuchong      your disqus short name.        website: http://disqus.com
