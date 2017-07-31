@@ -1,6 +1,6 @@
 ---
 layout: post
-title: linux运维
+title: linux运维(1)
 tags:
 - linux oper
 categories: linux运维
@@ -109,6 +109,10 @@ L3 cache:              25600K
 NUMA node0 CPU(s):     0-9,20-29
 NUMA node1 CPU(s):     10-19,30-39
 </pre>
+
+<br />
+<br />
+<br />
 
 
 
