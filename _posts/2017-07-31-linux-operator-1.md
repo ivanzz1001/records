@@ -65,7 +65,7 @@ cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c
 
 总逻辑cpu数 = 物理cpu个数 x 每颗物理cpu的核数 x 超线程数
 
-<pre>
+{% highlight string %}
 # 查看物理cpu个数
 [root@ceph001-node1 ~ ]$ cat /proc/cpuinfo| grep "physical id"| sort| uniq| wc -l
 2
@@ -79,7 +79,7 @@ cpu cores       : 10
 # 查看逻辑cpu的个数
 [root@ceph001-node1 ~ ]$ cat /proc/cpuinfo| grep "processor"| wc -l
 40
-</pre>
+{% endhighlight %}
 由上图可知：主机ceph001-node1有2颗物理cpu，10核40线程
 
 如果不想自己算，也可以通过lscpu命令：
