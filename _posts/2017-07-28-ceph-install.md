@@ -83,7 +83,9 @@ yum install gcc
 yum install gcc-c++
 {% endhighlight %}
 
-4) 执行```./configure --without-tcmalloc```
+4) 执行./configure
+
+如果不想要依赖于google-perftools，请使用```./configure --without-tcmalloc```
 
 在执行过程中提示需要安装对应的依赖库：
 {% highlight string %}
