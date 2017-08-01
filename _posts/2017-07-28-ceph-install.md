@@ -74,7 +74,7 @@ or similar to avoid the default (-g -O2), which includes optimizations
 ./install-deps.sh
 {% endhighlight %}
 
-3） 执行./autogen.sh
+3） 执行```./autogen.sh```
 
 在执行过程中提示没有libtoolize,及gcc,g++等工具，这里执行安装：
 {% highlight string %}
@@ -83,7 +83,7 @@ yum install gcc
 yum install gcc-c++
 {% endhighlight %}
 
-4) 执行./configure
+4) 执行```./configure```
 
 如果不想要依赖于google-perftools，请使用```./configure --without-tcmalloc```
 
@@ -105,7 +105,7 @@ yum install libedit-devel
 yum install expat-devel
 {% endhighlight %}
 
-5) 执行make进行编译
+5) 执行```make```进行编译
 
 
 
