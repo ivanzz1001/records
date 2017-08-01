@@ -7,7 +7,7 @@ categories: ceph
 description: ceph源代码编译
 ---
 
-本文我们注意介绍一些ceph hammer版本的编译。具体安装环境如下：
+本文我们注意介绍一些ceph hammer版本的编译。具体安装环境如下(ceph编译时需要耗费极大量内存，建议内存至少4G以上)：
 
 <!-- more -->
 <pre>
@@ -109,4 +109,9 @@ yum install expat-devel
 
 
 
+
+
+<br />
+<br />
+<br />
 
