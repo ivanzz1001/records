@@ -180,7 +180,7 @@ rule replicated_rule-5 {
 如上所示，一个crushmap包括有5个部分：tunable、devices、types、buckets、rules。 其中tunable是一些可调参数的设置，在后续rules生成相关PG映射时会用到；devices为当前ceph存储集群中的osd节点； types为当前crushmap中所定义的bucket类型；buckets为节点的一种组织方式，其类型可以为types中的任何一种；rules指定相应的规则。
 
 
-## 生成crushmap.bin
+## 2. 生成crushmap.bin
 我们将上面的crushmap.txt重新生成crushmap.bin，然后直观的看一下该crushmap的层级结构：
 {% highlight string %}
 crushtool -c crushmap.txt -o crushmap-new.bin
@@ -229,7 +229,7 @@ ID      WEIGHT  TYPE NAME
 </pre>
 
 
-## crushmap的内部数据结构
+## 3. crushmap的内部数据结构
 crushmap内部是由一个```struct crush_map```的数据结构来表示的：
 <pre>
 struct crush_bucket {
@@ -577,6 +577,10 @@ key::step:steps:rule:rules:op[6]="emit"
 </pre>
 
 如上，对于device id用正数表示，对于buckets id用负数表示。
+
+
+## 4. crushmap.txt生成crushmap过程分析
+
 
 
 
