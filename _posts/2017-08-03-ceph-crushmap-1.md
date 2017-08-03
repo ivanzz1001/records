@@ -581,7 +581,239 @@ key::step:steps:rule:rules:op[6]="emit"
 
 ## 4. crushmap.txt生成crushmap过程分析
 
+查看crushtool源代码，看到主要的生成代码如下：
 
+![crushmap-compile-entry](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-compile-entry.png)
 
+其中，```crush```为CrushWrapper数据类型，其主要结构如下：
+{% highlight string %}
+class CrushWrapper {
+public:
+  std::map<int32_t, string> type_map; /* bucket/device type names */
+  std::map<int32_t, string> name_map; /* bucket/device names */
+  std::map<int32_t, string> rule_name_map;
 
+private:
+  struct crush_map *crush;
 
+......
+};
+{% endhighlight %}
+
+在cc.compile()中首先读取crushmap.txt的每一行，将注释等去除，去除多余的空格，然后调用```boost/spirit```来解析：
+{% highlight string %}
+int CrushCompiler::compile(istream& in, const char *infn)
+{
+  if (!infn)
+    infn = "<input>";
+
+  // always start with legacy tunables, so that the compiled result of
+  // a given crush file is fixed for all time.
+  crush.set_tunables_legacy();
+
+  string big;
+  string str;
+  int line = 1;
+  map<int,int> line_pos;  // pos -> line
+  map<int,string> line_val;
+  while (getline(in, str)) {
+    // remove newline
+    int l = str.length();
+    if (l && str[l] == '\n')
+      str.erase(l-1, 1);
+
+    line_val[line] = str;
+
+    // strip comment
+    int n = str.find("#");
+    if (n >= 0)
+      str.erase(n, str.length()-n);
+    
+    if (verbose>1) err << line << ": " << str << std::endl;
+
+    // work around spirit crankiness by removing extraneous
+    // whitespace.  there is probably a more elegant solution, but
+    // this only broke with the latest spirit (with the switchover to
+    // "classic"), i don't want to spend too much time figuring it
+    // out.
+    string stripped = consolidate_whitespace(str);
+    if (stripped.length() && big.length() && big[big.length()-1] != ' ') big += " ";
+
+    line_pos[big.length()] = line;
+    line++;
+    big += stripped;
+  }
+  
+  if (verbose > 2) err << "whole file is: \"" << big << "\"" << std::endl;
+  
+  crush_grammar crushg;
+  const char *start = big.c_str();
+  //tree_parse_info<const char *> info = ast_parse(start, crushg, space_p);
+  tree_parse_info<> info = ast_parse(start, crushg, space_p);
+  
+  // parse error?
+  if (!info.full) {
+    int cpos = info.stop - start;
+    //out << "cpos " << cpos << std::endl;
+    //out << " linemap " << line_pos << std::endl;
+    assert(!line_pos.empty());
+    map<int,int>::iterator p = line_pos.upper_bound(cpos);
+    if (p != line_pos.begin())
+      --p;
+    int line = p->second;
+    int pos = cpos - p->first;
+    err << infn << ":" << line //<< ":" << (pos+1)
+	<< " error: parse error at '" << line_val[line].substr(pos) << "'" << std::endl;
+    return -1;
+  }
+
+  //out << "parsing succeeded\n";
+  //dump(info.trees.begin());
+  return parse_crush(info.trees.begin());
+}
+{% endhighlight %}
+
+上面```ast_parse```是boost/spirit的相关函数，其解析时需要相应的模板（参看：http://www.cnblogs.com/catch/p/3921751.html）：
+{% highlight string %}
+struct crush_grammar : public grammar<crush_grammar>
+{
+  enum {
+    _int = 1,
+    _posint,
+    _negint,
+    _name,
+    _device,
+    _bucket_type,
+    _bucket_id,
+    _bucket_alg,
+    _bucket_hash,
+    _bucket_item,
+    _bucket,
+    _step_take,
+    _step_set_chooseleaf_tries,
+    _step_set_chooseleaf_vary_r,
+    _step_set_choose_tries,
+    _step_set_choose_local_tries,
+    _step_set_choose_local_fallback_tries,
+    _step_choose,
+    _step_chooseleaf,
+    _step_emit,
+    _step,
+    _crushrule,
+    _crushmap,
+    _tunable,
+  };
+
+  template <typename ScannerT>
+  struct definition
+  {
+    rule<ScannerT, parser_context<>, parser_tag<_int> >      integer;
+    rule<ScannerT, parser_context<>, parser_tag<_posint> >      posint;
+    rule<ScannerT, parser_context<>, parser_tag<_negint> >      negint;
+    rule<ScannerT, parser_context<>, parser_tag<_name> >      name;
+
+    rule<ScannerT, parser_context<>, parser_tag<_tunable> >      tunable;
+
+    rule<ScannerT, parser_context<>, parser_tag<_device> >      device;
+
+    rule<ScannerT, parser_context<>, parser_tag<_bucket_type> >    bucket_type;
+
+    rule<ScannerT, parser_context<>, parser_tag<_bucket_id> >      bucket_id;
+    rule<ScannerT, parser_context<>, parser_tag<_bucket_alg> >     bucket_alg;
+    rule<ScannerT, parser_context<>, parser_tag<_bucket_hash> >    bucket_hash;
+    rule<ScannerT, parser_context<>, parser_tag<_bucket_item> >    bucket_item;
+    rule<ScannerT, parser_context<>, parser_tag<_bucket> >      bucket;
+
+    rule<ScannerT, parser_context<>, parser_tag<_step_take> >      step_take;
+    rule<ScannerT, parser_context<>, parser_tag<_step_set_choose_tries> >    step_set_choose_tries;
+    rule<ScannerT, parser_context<>, parser_tag<_step_set_choose_local_tries> >    step_set_choose_local_tries;
+    rule<ScannerT, parser_context<>, parser_tag<_step_set_choose_local_fallback_tries> >    step_set_choose_local_fallback_tries;
+    rule<ScannerT, parser_context<>, parser_tag<_step_set_chooseleaf_tries> >    step_set_chooseleaf_tries;
+    rule<ScannerT, parser_context<>, parser_tag<_step_set_chooseleaf_vary_r> >    step_set_chooseleaf_vary_r;
+    rule<ScannerT, parser_context<>, parser_tag<_step_choose> >    step_choose;
+    rule<ScannerT, parser_context<>, parser_tag<_step_chooseleaf> >      step_chooseleaf;
+    rule<ScannerT, parser_context<>, parser_tag<_step_emit> >      step_emit;
+    rule<ScannerT, parser_context<>, parser_tag<_step> >      step;
+    rule<ScannerT, parser_context<>, parser_tag<_crushrule> >      crushrule;
+
+    rule<ScannerT, parser_context<>, parser_tag<_crushmap> >      crushmap;
+
+    definition(crush_grammar const& /*self*/)
+    {
+      // base types
+      integer     =   leaf_node_d[ lexeme_d[
+					    (!ch_p('-') >> +digit_p)
+					    ] ];
+      posint     =   leaf_node_d[ lexeme_d[ +digit_p ] ];
+      negint     =   leaf_node_d[ lexeme_d[ ch_p('-') >> +digit_p ] ];
+      name = leaf_node_d[ lexeme_d[ +( alnum_p || ch_p('-') || ch_p('_') || ch_p('.')) ] ];
+
+      // tunables
+      tunable = str_p("tunable") >> name >> posint;
+
+      // devices
+      device = str_p("device") >> posint >> name;
+
+      // bucket types
+      bucket_type = str_p("type") >> posint >> name;
+
+      // buckets
+      bucket_id = str_p("id") >> negint;
+      bucket_alg = str_p("alg") >> name;
+      bucket_hash = str_p("hash") >> ( integer |
+				       str_p("rjenkins1") );
+      bucket_item = str_p("item") >> name
+				  >> !( str_p("weight") >> real_p )
+				  >> !( str_p("pos") >> posint );
+      bucket = name >> name >> '{' >> !bucket_id >> bucket_alg >> *bucket_hash >> *bucket_item >> '}';
+
+      // rules
+      step_take = str_p("take") >> name;
+      step_set_choose_tries = str_p("set_choose_tries") >> posint;
+      step_set_choose_local_tries = str_p("set_choose_local_tries") >> posint;
+      step_set_choose_local_fallback_tries = str_p("set_choose_local_fallback_tries") >> posint;
+      step_set_chooseleaf_tries = str_p("set_chooseleaf_tries") >> posint;
+      step_set_chooseleaf_vary_r = str_p("set_chooseleaf_vary_r") >> posint;
+      step_choose = str_p("choose")
+	>> ( str_p("indep") | str_p("firstn") )
+	>> integer
+	>> str_p("type") >> name;
+      step_chooseleaf = str_p("chooseleaf")
+	>> ( str_p("indep") | str_p("firstn") )
+	>> integer
+	>> str_p("type") >> name;
+      step_emit = str_p("emit");
+      step = str_p("step") >> ( step_take |
+				step_set_choose_tries |
+				step_set_choose_local_tries |
+				step_set_choose_local_fallback_tries |
+				step_set_chooseleaf_tries |
+				step_set_chooseleaf_vary_r |
+				step_choose |
+				step_chooseleaf |
+				step_emit );
+      crushrule = str_p("rule") >> !name >> '{'
+			   >> str_p("ruleset") >> posint
+			   >> str_p("type") >> ( str_p("replicated") | str_p("erasure") )
+			   >> str_p("min_size") >> posint
+			   >> str_p("max_size") >> posint
+			   >> +step
+			   >> '}';
+
+      // the whole crush map
+      crushmap = *(tunable | device | bucket_type) >> *(bucket | crushrule);
+    }
+
+    rule<ScannerT, parser_context<>, parser_tag<_crushmap> > const&
+    start() const { return crushmap; }
+  };
+};
+
+{% endhighlight %}
+
+通过上述模板解析成```tree_parse_info```结构，然后再进行解析：
+![crushmap-compile-parse](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-compile-parse.png)
+
+<br />
+<br />
+<br />
