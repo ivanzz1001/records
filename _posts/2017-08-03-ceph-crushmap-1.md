@@ -824,7 +824,145 @@ struct crush_grammar : public grammar<crush_grammar>
 
 ![crushmap-encode-pic2](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-encode-pic2.png)
 
+下面结合程序代码来看编码过程：
+{% highlight string %}
+void CrushWrapper::encode(bufferlist& bl, bool lean) const
+{
+  assert(crush);
 
+  __u32 magic = CRUSH_MAGIC;
+  ::encode(magic, bl);
+
+  ::encode(crush->max_buckets, bl);
+  ::encode(crush->max_rules, bl);
+  ::encode(crush->max_devices, bl);
+
+  // buckets
+  for (int i=0; i<crush->max_buckets; i++) {
+    __u32 alg = 0;
+    if (crush->buckets[i]) alg = crush->buckets[i]->alg;
+    ::encode(alg, bl);
+    if (!alg)
+      continue;
+
+    ::encode(crush->buckets[i]->id, bl);
+    ::encode(crush->buckets[i]->type, bl);
+    ::encode(crush->buckets[i]->alg, bl);
+    ::encode(crush->buckets[i]->hash, bl);
+    ::encode(crush->buckets[i]->weight, bl);
+    ::encode(crush->buckets[i]->size, bl);
+    for (unsigned j=0; j<crush->buckets[i]->size; j++)
+      ::encode(crush->buckets[i]->items[j], bl);
+
+    switch (crush->buckets[i]->alg) {
+    case CRUSH_BUCKET_UNIFORM:
+      ::encode((reinterpret_cast<crush_bucket_uniform*>(crush->buckets[i]))->item_weight, bl);
+      break;
+
+    case CRUSH_BUCKET_LIST:
+      for (unsigned j=0; j<crush->buckets[i]->size; j++) {
+	::encode((reinterpret_cast<crush_bucket_list*>(crush->buckets[i]))->item_weights[j], bl);
+	::encode((reinterpret_cast<crush_bucket_list*>(crush->buckets[i]))->sum_weights[j], bl);
+      }
+      break;
+
+    case CRUSH_BUCKET_TREE:
+      ::encode((reinterpret_cast<crush_bucket_tree*>(crush->buckets[i]))->num_nodes, bl);
+      for (unsigned j=0; j<(reinterpret_cast<crush_bucket_tree*>(crush->buckets[i]))->num_nodes; j++)
+	::encode((reinterpret_cast<crush_bucket_tree*>(crush->buckets[i]))->node_weights[j], bl);
+      break;
+
+    case CRUSH_BUCKET_STRAW:
+      for (unsigned j=0; j<crush->buckets[i]->size; j++) {
+	::encode((reinterpret_cast<crush_bucket_straw*>(crush->buckets[i]))->item_weights[j], bl);
+	::encode((reinterpret_cast<crush_bucket_straw*>(crush->buckets[i]))->straws[j], bl);
+      }
+      break;
+
+    case CRUSH_BUCKET_STRAW2:
+      for (unsigned j=0; j<crush->buckets[i]->size; j++) {
+	::encode((reinterpret_cast<crush_bucket_straw2*>(crush->buckets[i]))->item_weights[j], bl);
+      }
+      break;
+
+    default:
+      assert(0);
+      break;
+    }
+  }
+
+  // rules
+  for (unsigned i=0; i<crush->max_rules; i++) {
+    __u32 yes = crush->rules[i] ? 1:0;
+    ::encode(yes, bl);
+    if (!yes)
+      continue;
+
+    ::encode(crush->rules[i]->len, bl);
+    ::encode(crush->rules[i]->mask, bl);
+    for (unsigned j=0; j<crush->rules[i]->len; j++)
+      ::encode(crush->rules[i]->steps[j], bl);
+  }
+
+  // name info
+  ::encode(type_map, bl);
+  ::encode(name_map, bl);
+  ::encode(rule_name_map, bl);
+
+  // tunables
+  ::encode(crush->choose_local_tries, bl);
+  ::encode(crush->choose_local_fallback_tries, bl);
+  ::encode(crush->choose_total_tries, bl);
+  ::encode(crush->chooseleaf_descend_once, bl);
+  ::encode(crush->chooseleaf_vary_r, bl);
+  ::encode(crush->straw_calc_version, bl);
+  ::encode(crush->allowed_bucket_algs, bl);
+}
+{% endhighlight %}
+
+*注意：上面的编码都是采用机器的默认大小端（测试机器默认为小端）*
+
+(1) 编码CRUSH_MAGIC
+<pre>
+#define CRUSH_MAGIC 0x00010000ul   /* for detecting algorithm revisions */
+</pre>
+
+(2) 编码max_buckets,max_rules，max_devices
+
+这里我们max_buckets为0x00000010,而我们实际的buckets数目为12，这是允许的。max_rules为0x00000002，max_devices为0x00000009。
+
+(3) 编码buckets
+* bucket->alg
+* bucket->id
+* bucket->type
+* bucket->alg   (repeat)
+* bucket->hash
+* bucket->weight
+* bucket->size
+* bucket->items[i]
+* bucket->alg_alternate_info
+
+我们来分析第一个bucket：
+<pre>
+root default {
+        id -1           # do not change unnecessarily
+        # weight 1.350
+        alg straw
+        hash 0  # rjenkins1
+        item rack-01 weight 0.450
+        item rack-02 weight 0.450
+        item rack-03 weight 0.450
+}
+</pre>
+
+其alg为straw(CRUSH_BUCKET_STRAW = 4)；id为-1（负数以补码表示为0xFFFFFFFF)；type为root（结合我们上面定义bucket types时其值为10,即0x000A)；alg为0x04; hash值为0x00（即rjenkins1)；weight为0x00015999(即十进制的88473，这里需要再除以0x10000,得到的值刚好为1.350）；size为0x00000003,也恰好为我们的item数；3个items,分别是rack-01,rack-02,rack-03(值分别是0xFFFFFFFD,0xFFFFFFFB,0xFFFFFFF9）；3个alg_alternate_info(值分别为：0x00007333,0x00010000; 0x00007333,0x00010000;0x00007333,0x00010000)
+
+（4） 编码rules
+
+
+（5） 编码name info
+
+（6） 编码tunables
 
 <br />
 <br />
