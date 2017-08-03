@@ -820,7 +820,9 @@ struct crush_grammar : public grammar<crush_grammar>
 
 ## 5. 对crushmap进行编码
 上面对crushmap.txt解析之后在内存中生成crush_map进行编码：
+![crushmap-encode-pic1](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-encode-pic1.png)
 
+![crushmap-encode-pic2](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-encode-pic2.png)
 
 
 
