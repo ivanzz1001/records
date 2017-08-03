@@ -814,6 +814,16 @@ struct crush_grammar : public grammar<crush_grammar>
 通过上述模板解析成```tree_parse_info```结构，然后再进行解析：
 ![crushmap-compile-parse](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-compile-parse.png)
 
+然后再调用```crush_finalize```修正max_devices：
+![crushmap-compile-finalize](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-compile-finalize.png)
+
+
+## 5. 对crushmap进行编码
+上面对crushmap.txt解析之后在内存中生成crush_map进行编码：
+
+
+
+
 <br />
 <br />
 <br />
