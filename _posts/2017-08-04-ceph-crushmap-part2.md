@@ -568,17 +568,17 @@ int CrushTester::test()
 再接着调用```adjust_weights(weight)```调整设备权重，在函数中需要```mark_down_device_ratio > 0```，因此这里并不会被执行。
 
 3) 计算当前active devices
-<pre>
+{% highlight string %}
   int num_devices_active = 0;
   for (vector<__u32>::iterator p = weight.begin(); p != weight.end(); ++p)
     if (*p > 0)
       num_devices_active++;
-</pre>
+{% endhighlight %}
 
 这里所有9个device均为active
 
 4） 遍历所有的rule
-<pre>
+{% highlight string %}
 for (int r = min_rule; r < crush.get_max_rules() && r <= max_rule; r++) {
 
 	//1: 检测指定的rule是否存在，以及是否是我们使用crushtool时指定的ruleset 5
@@ -587,7 +587,7 @@ for (int r = min_rule; r < crush.get_max_rules() && r <= max_rule; r++) {
 
 
 }
-</pre>
+{% endhighlight %}
 
 
 
