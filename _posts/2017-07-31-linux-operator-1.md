@@ -2,7 +2,7 @@
 layout: post
 title: linux运维(1)
 tags:
-- linux oper
+- LinuxOps
 categories: linux运维
 description: Linux运维方面知识
 ---
