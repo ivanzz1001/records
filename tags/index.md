@@ -1,9 +1,10 @@
 ---
-title: 标签目录
-tags: 
+layout: categories
+title: 文章标签
+date: 2013-12-24 23:30:09
+categories:
+- Foo
+- Bar
+- Baz
 ---
 
-This is an emoji test. :smile:
-
-:bowtie::smile::laughing::blush::smiley::relaxed::smirk:
-:heart_eyes::kissing_heart::kissing_closed_eyes::flushed::relieved::satisfied::grin:
