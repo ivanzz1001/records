@@ -169,7 +169,7 @@ rule replicated_rule-5 {
 </pre>
 
 ## CRUSH算法
-![crushmap3-alg](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap3-alg.png)
+![crushmap3-alg](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap3_alg.png)
 
 
 
