@@ -1,11 +1,11 @@
 ---
 layout: post
-title: crushmap详解-2
+title: crushmap详解2
 tags:
 - ceph
 - crushmap
-categories: ceph
-description: crushmap详解
+categories: ceph2
+description: crushmap详解2
 ---
 
 本文主要介绍Linux运维方面的一些常见的命令的用法：
