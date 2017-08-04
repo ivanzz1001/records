@@ -581,13 +581,81 @@ int CrushTester::test()
 {% highlight string %}
 for (int r = min_rule; r < crush.get_max_rules() && r <= max_rule; r++) {
 
-	//1: 检测指定的rule是否存在，以及是否是我们使用crushtool时指定的ruleset 5
+    //1: 检测指定的rule是否存在，以及是否是我们使用crushtool时指定的ruleset 5
     
-    //2: 
+    //2: 获得表示副本数的minr,maxr。 由于我们在参数中传入了--num-rep=3，因此这里minr=maxr=3
+
+    for (int nr = minr; nr <= maxr; nr++) {
+        
+         per.size() = 9;
+         num_objects = 11;
+         num_devices = 9;
+         num_batches = 1;
+         objects_per_batch = 11;
+         batch_min = min_x;
+         batch_max = min_x + objects_per_batch - 1;
+        
+
+         //3: 计算total_weight(9*0x10000)
+
+         //4: get_maximum_affected_by_rule(r)，这里采用ruleset 5时，结果为1。因此expected_objects = 11
+
+         //5: 计算每一个device的权重占比，这里为均为1/9
+
+         //6: 根据权重占比计算平均每个device所存储的对象数
+         for (unsigned i = 0; i < num_devices; i++)
+         num_objects_expected[i] = (proportional_weights[i]*expected_objects);
+
+        
+         //7: 遍历当前所有的batches
+         for (int current_batch = 0; current_batch < num_batches; current_batch++) {
+
+                //nr为当前的副本数，这里取值为3；object_per_batch取值为11，因为我们只有一个batch
+                float batch_expected_objects = min(nr, get_maximum_affected_by_rule(r)) * objects_per_batch;
+
+                
+                //对当前batch内的所有PG做映射,这里batch_min为0,batch_max为10，及映射PG0~PG10
+                for (int x = batch_min; x <= batch_max; x++) {
+                      if (use_crush) {
+                          if (output_mappings)
+	                          err << "CRUSH"; // prepend CRUSH to placement output
 
 
+                      //8: do_rule是关键的PG映射函数。 第一个参数当前所采用的rule；第二个参数为所映射的PG；第三个参数为映射结果；
+                      // 第四个参数为当前的副本数； 第五个参数为各device的权重列表
+                      crush.do_rule(r, x, out, nr, weight);
+                      } else {
+                       if (output_mappings)
+	                       err << "RNG"; // prepend RNG to placement output to denote simulation
+
+                           // test our new monte carlo placement generator
+                           random_placement(r, out, nr, weight);
+                      }
+                }
+
+         }
+
+       
+       //9: 
+      
+
+	}
 }
 {% endhighlight %}
+
+从上面的分析，其实就是找到对应的rule,然后在该rule下，针对每一个rep数，对PG进行crushmap映射。
+<pre>
+while(rules)
+{
+   for(rep in rep_min:rep_max)
+   {
+        do_rule(rule,pg_id,out_vec,rep,device_weight_vec);
+   }
+}
+</pre>
+
+在讨论完了crushtool映射PG的一个整体流程之后，我们接下来就会详细讨论具体的do_rule算法。由于这一部分较为复杂，我们将其作为另外单独一章来讲解。
+
 
 
 
