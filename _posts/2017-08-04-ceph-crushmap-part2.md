@@ -539,7 +539,7 @@ int CrushTester::test()
 这里我们在传参时没有设置min_rule,max_rule，因此这里min_rule被设置为0，max_rule被设置为1（```crush.get_max_rules() -1```)；而min_x与max_x则直接为我们传入的参数值0，10.
 
 2) 初始化osd weights
-<pre>
+{% highlight string %}
 // initial osd weights
   vector<__u32> weight;
 
@@ -562,7 +562,7 @@ int CrushTester::test()
 
   // make adjustments
   adjust_weights(weight);
-</pre>
+{% endhighlight %}
 首先遍历所有的device,这里有osd.0~osd.8共9个OSD。如果该设备权重通过crushtool命令行参数```--weight```设置过了，则采用参数传递进的权重。否则，检查该device是否在bucket中有用到，如果用到则将该device权重标志为0x10000,没有被使用则将该设备权重置为0.
 
 再接着调用```adjust_weights(weight)```调整设备权重，在函数中需要```mark_down_device_ratio > 0```，因此这里并不会被执行。
