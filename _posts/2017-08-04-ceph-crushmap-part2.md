@@ -534,6 +534,61 @@ int CrushTester::test()
 
 {% endhighlight %}
 
+1) 判断min_rule，max_rule,min_x,max_x等的值
+
+这里我们在传参时没有设置min_rule,max_rule，因此这里min_rule被设置为0，max_rule被设置为1（```crush.get_max_rules() -1```)；而min_x与max_x则直接为我们传入的参数值0，10.
+
+2) 初始化osd weights
+<pre>
+// initial osd weights
+  vector<__u32> weight;
+
+  /*
+   * note device weight is set by crushtool
+   * (likely due to a given a command line option)
+   */
+  for (int o = 0; o < crush.get_max_devices(); o++) {
+    if (device_weight.count(o)) {
+      weight.push_back(device_weight[o]);
+    } else if (crush.check_item_present(o)) {
+      weight.push_back(0x10000);
+    } else {
+      weight.push_back(0);
+    }
+  }
+
+  if (output_utilization_all)
+    err << "devices weights (hex): " << hex << weight << dec << std::endl;
+
+  // make adjustments
+  adjust_weights(weight);
+</pre>
+首先遍历所有的device,这里有osd.0~osd.8共9个OSD。如果该设备权重通过crushtool命令行参数```--weight```设置过了，则采用参数传递进的权重。否则，检查该device是否在bucket中有用到，如果用到则将该device权重标志为0x10000,没有被使用则将该设备权重置为0.
+
+再接着调用```adjust_weights(weight)```调整设备权重，在函数中需要```mark_down_device_ratio > 0```，因此这里并不会被执行。
+
+3) 计算当前active devices
+<pre>
+  int num_devices_active = 0;
+  for (vector<__u32>::iterator p = weight.begin(); p != weight.end(); ++p)
+    if (*p > 0)
+      num_devices_active++;
+</pre>
+
+这里所有9个device均为active
+
+4） 遍历所有的rule
+<pre>
+for (int r = min_rule; r < crush.get_max_rules() && r <= max_rule; r++) {
+
+	//1: 检测指定的rule是否存在，以及是否是我们使用crushtool时指定的ruleset 5
+    
+    //2: 
+
+
+}
+</pre>
+
 
 
 <br />
