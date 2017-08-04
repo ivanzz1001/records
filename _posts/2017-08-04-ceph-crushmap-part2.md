@@ -12,7 +12,7 @@ description: crushmap详解
 <!-- more -->
 
 
-##1. 生成crushmap.bin
+## 1. 生成crushmap.bin
 我们有如下crushmap.txt:
 <pre>
 [root@localhost ceph-test]# cat crushmap.txt 
@@ -217,16 +217,16 @@ ID      WEIGHT  TYPE NAME
 </pre>
 
 
-##2. 测试PG映射到OSD的过程
+## 2. 测试PG映射到OSD的过程
 如下我们使用crushtool工具来测试PG到OSD的映射。上面我们有两个rule,其对应的ruleset分别是ruleset 0与ruleset 5。
 {% highlight string %}
-# 方式1： 指定使用rule 1(即ruleset 5),映射[0,10]这11个PG
+#方式1： 指定使用rule 1(即ruleset 5),映射[0,10]这11个PG
 crushtool --test -i crushmap-new.bin --show-mappings --rule 1 --num-rep=3 --min_x=0 --max_x=10
 
-# 方式2： 指定使用ruleset 5,映射[0,10]这11个PG
+#方式2： 指定使用ruleset 5,映射[0,10]这11个PG
 crushtool --test -i crushmap-new.bin --show-mappings --ruleset 5 --num-rep=3 --min_x=0 --max_x=10
 
-# 方式3： 单独指定映射某个PG
+#方式3： 单独指定映射某个PG
 crushtool --test -i crushmap-new.bin --show-mappings --ruleset 5 --num-rep=3 --x=100
 {% endhighlight %}
 
