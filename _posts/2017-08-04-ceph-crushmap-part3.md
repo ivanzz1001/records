@@ -168,6 +168,11 @@ rule replicated_rule-5 {
 # end crush map
 </pre>
 
+## CRUSH算法
+{% highlight string %}
+
+
+
 
 <br />
 <br />
