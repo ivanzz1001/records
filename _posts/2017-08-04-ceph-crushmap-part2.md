@@ -232,7 +232,7 @@ crushtool --test -i crushmap-new.bin --show-mappings --ruleset 5 --num-rep=3 --x
 
 *注意： 这里如果不指定min_x与max_x，则系统默认会映射[0,1023]这1024个PG*
 
-如下我们采用ruleset 5映射PG 0~PG 10:
+如下我们采用ruleset 5映射```PG 0~PG 10```:
 <pre>
 [root@localhost ceph-test]# crushtool --test -i crushmap-new.bin --show-mappings --ruleset 5 --num-rep=3 --min_x=0 --max_x=10
 CRUSH rule 1 x 0 [3,0,7]
@@ -247,6 +247,17 @@ CRUSH rule 1 x 8 [7,5,0]
 CRUSH rule 1 x 9 [8,3,1]
 CRUSH rule 1 x 10 [4,0,8]
 </pre>
+
+## 3. 源代码分析
+下面我们结合crushtool源代码来分析上述命令的执行过程，以进一步了解crushmap.
+
+### 3.1 解析--test参数
+表明以test方式运行，在这里```--test```参数是必须的，否则将不能执行到我们的映射函数：
+
+![crushmap-param-test](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap2-param-test.png)
+
+
+
 
 
 <br />
