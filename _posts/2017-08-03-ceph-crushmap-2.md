@@ -218,7 +218,7 @@ ID      WEIGHT  TYPE NAME
 </pre>
 
 
-## 测试PG映射到OSD的过程
+## 2. 测试PG映射到OSD的过程
 
 如下我们使用crushtool工具来测试PG到OSD的映射。上面我们有两个rule,其对应的ruleset分别是ruleset 0与ruleset 5。
 {% highlight string %}
