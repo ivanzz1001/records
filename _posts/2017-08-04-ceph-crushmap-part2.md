@@ -279,7 +279,7 @@ CRUSH rule 1 x 10 [4,0,8]
 ### 3.7 主要函数分析
 
 上述命令的主要执行过程为如下函数：
-<pre>
+{% highlight string %}
 int CrushTester::test()
 {
   if (min_rule < 0 || max_rule < 0) {
@@ -532,7 +532,9 @@ int CrushTester::test()
   return 0;
 }
 
-</pre>
+{% endhighlight %}
+
+
 
 <br />
 <br />
