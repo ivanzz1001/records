@@ -1,10 +1,11 @@
 ---
 layout: post
-title: linux运维(1)
+title: crushmap详解-2
 tags:
-- linux oper
-categories: linux运维
-description: Linux运维方面知识
+- ceph
+- crushmap
+categories: ceph
+description: crushmap详解
 ---
 
 本文主要介绍Linux运维方面的一些常见的命令的用法：
