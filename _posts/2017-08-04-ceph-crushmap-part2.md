@@ -1,121 +1,254 @@
 ---
 layout: post
-title: crushmap详解2
+title: crushmap详解-2
 tags:
 - ceph
 - crushmap
-categories: ceph2
-description: crushmap详解2
+categories: ceph
+description: crushmap详解
 ---
 
-本文主要介绍Linux运维方面的一些常见的命令的用法：
+本文主要通过一个crushmap的例子，来探讨crushmap将PG映射到OSD的过程。
 <!-- more -->
 
 
-## 查看Linux下cpu信息
-
-cpu信息记录在/proc/cpuinfo中，但信息比较多：
+## 1. 生成crushmap.bin
+我们有如下crushmap.txt:
 <pre>
-[root@ceph001-node1 ~ ]$ more /proc/cpuinfo
-processor       : 0
-vendor_id       : GenuineIntel
-cpu family      : 6
-model           : 63
-model name      : Intel(R) Xeon(R) CPU E5-2650 v3 @ 2.30GHz
-stepping        : 2
-microcode       : 0x2d
-cpu MHz         : 2300.628
-cache size      : 25600 KB
-physical id     : 0
-siblings        : 20
-core id         : 0
-cpu cores       : 10
-apicid          : 0
-initial apicid  : 0
-fpu             : yes
-fpu_exception   : yes
-cpuid level     : 15
-wp              : yes
-flags           : fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm cons
-tant_tsc arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc aperfmperf eagerfpu pni pclmulqdq dtes64 ds_cpl vmx smx est tm2 ssse3 fma cx16 xtpr pdcm pcid dca sse4_1
- sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm arat epb pln pts dtherm tpr_shadow vnmi flexpriority ept vpid fsgsbase tsc_adjust bmi1
- avx2 smep bmi2 erms invpcid cqm xsaveopt cqm_llc cqm_occup_llc
-bogomips        : 4589.59
-clflush size    : 64
-cache_alignment : 64
-address sizes   : 46 bits physical, 48 bits virtual
-power management:
+[root@localhost ceph-test]# cat crushmap.txt 
+# begin crush map
+tunable choose_local_tries 0
+tunable choose_local_fallback_tries 0
+tunable choose_total_tries 50
+tunable chooseleaf_descend_once 1
+tunable straw_calc_version 1
 
-....
+# devices
+device 0 osd.0
+device 1 osd.1
+device 2 osd.2
+device 3 osd.3
+device 4 osd.4
+device 5 osd.5
+device 6 osd.6
+device 7 osd.7
+device 8 osd.8
+
+# types
+type 0 osd
+type 1 host
+type 2 chassis
+type 3 rack
+type 4 row
+type 5 pdu
+type 6 pod
+type 7 room
+type 8 datacenter
+type 9 region
+type 10 root
+type 11 osd-domain
+type 12 host-domain
+type 13 replica-domain
+type 14 failure-domain
+
+# buckets
+host node7-1 {
+        id -2           # do not change unnecessarily
+        # weight 0.450
+        alg straw
+        hash 0  # rjenkins1
+        item osd.0 weight 0.150
+        item osd.1 weight 0.150
+        item osd.2 weight 0.150
+}
+rack rack-01 {
+        id -3           # do not change unnecessarily
+        # weight 0.450
+        alg straw
+        hash 0  # rjenkins1
+        item node7-1 weight 0.450
+}
+host node7-2 {
+        id -4           # do not change unnecessarily
+        # weight 0.450
+        alg straw
+        hash 0  # rjenkins1
+        item osd.3 weight 0.150
+        item osd.4 weight 0.150
+        item osd.5 weight 0.150
+}
+rack rack-02 {
+        id -5           # do not change unnecessarily
+        # weight 0.450
+        alg straw
+        hash 0  # rjenkins1
+        item node7-2 weight 0.450
+}
+host node7-3 {
+        id -6           # do not change unnecessarily
+        # weight 0.450
+        alg straw
+        hash 0  # rjenkins1
+        item osd.6 weight 0.150
+        item osd.7 weight 0.150
+        item osd.8 weight 0.150
+}
+rack rack-03 {
+        id -7           # do not change unnecessarily
+        # weight 0.450
+        alg straw
+        hash 0  # rjenkins1
+        item node7-3 weight 0.450
+}
+root default {
+        id -1           # do not change unnecessarily
+        # weight 1.350
+        alg straw
+        hash 0  # rjenkins1
+        item rack-01 weight 0.450
+        item rack-02 weight 0.450
+        item rack-03 weight 0.450
+}
+host-domain host-group-0-rack-01 {
+        id -8           # do not change unnecessarily
+        # weight 0.450
+        alg straw
+        hash 0  # rjenkins1
+        item node7-1 weight 0.450
+}
+host-domain host-group-0-rack-02 {
+        id -11          # do not change unnecessarily
+        # weight 0.450
+        alg straw
+        hash 0  # rjenkins1
+        item node7-2 weight 0.450
+}
+host-domain host-group-0-rack-03 {
+        id -12          # do not change unnecessarily
+        # weight 0.450
+        alg straw
+        hash 0  # rjenkins1
+        item node7-3 weight 0.450
+}
+replica-domain replica-0 {
+        id -9           # do not change unnecessarily
+        # weight 1.350
+        alg straw
+        hash 0  # rjenkins1
+        item host-group-0-rack-01 weight 0.450
+        item host-group-0-rack-02 weight 0.450
+        item host-group-0-rack-03 weight 0.450
+}
+failure-domain sata-00 {
+        id -10          # do not change unnecessarily
+        # weight 1.350
+        alg straw
+        hash 0  # rjenkins1
+        item replica-0 weight 1.350
+}
+
+# rules
+rule replicated_ruleset {
+        ruleset 0
+        type replicated
+        min_size 1
+        max_size 10
+        step take default
+        step choose firstn 0 type osd
+        step emit
+}
+rule replicated_rule-5 {
+        ruleset 5
+        type replicated
+        min_size 1
+        max_size 10
+        step take sata-00
+        step choose firstn 1 type replica-domain
+        step chooseleaf firstn 0 type host-domain
+        step emit
+}
+
+# end crush map
 </pre>
-下面我们简要介绍如何查看cpu的几个比较关键的数据。
 
-1） 查看cpu型号
+调用如下命令生成crushmap.bin:
 {% highlight string %}
-cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c
+crushtool -c crushmap.txt -o crushmap-new.bin
 {% endhighlight %}
-例如：
+
+整个crushmap的层级结构如下：
 <pre>
-[root@ceph001-node1 ~ ]$ cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c
-     40  Intel(R) Xeon(R) CPU E5-2650 v3 @ 2.30GHz
+[root@localhost ceph-test]# crushtool --test -i crushmap-new.bin --tree
+WARNING: no output selected; use --output-csv or --show-X
+ID      WEIGHT  TYPE NAME
+-10     1.34999 failure-domain sata-00
+-9      1.34999         replica-domain replica-0
+-8      0.45000                 host-domain host-group-0-rack-01
+-2      0.45000                         host node7-1
+0       0.14999                                 osd.0
+1       0.14999                                 osd.1
+2       0.14999                                 osd.2
+-11     0.45000                 host-domain host-group-0-rack-02
+-4      0.45000                         host node7-2
+3       0.14999                                 osd.3
+4       0.14999                                 osd.4
+5       0.14999                                 osd.5
+-12     0.45000                 host-domain host-group-0-rack-03
+-6      0.45000                         host node7-3
+6       0.14999                                 osd.6
+7       0.14999                                 osd.7
+8       0.14999                                 osd.8
+-1      1.34999 root default
+-3      0.45000         rack rack-01
+-2      0.45000                 host node7-1
+0       0.14999                         osd.0
+1       0.14999                         osd.1
+2       0.14999                         osd.2
+-5      0.45000         rack rack-02
+-4      0.45000                 host node7-2
+3       0.14999                         osd.3
+4       0.14999                         osd.4
+5       0.14999                         osd.5
+-7      0.45000         rack rack-03
+-6      0.45000                 host node7-3
+6       0.14999                         osd.6
+7       0.14999                         osd.7
+8       0.14999                         osd.8
 </pre>
 
-2) 查看cpu个数
 
-总核数 = 物理cpu个数 x 每颗物理cpu的核数
-
-总逻辑cpu数 = 物理cpu个数 x 每颗物理cpu的核数 x 超线程数
-
+## 2. 测试PG映射到OSD的过程
+如下我们使用crushtool工具来测试PG到OSD的映射。上面我们有两个rule,其对应的ruleset分别是ruleset 0与ruleset 5。
 {% highlight string %}
-# 查看物理cpu个数
-[root@ceph001-node1 ~ ]$ cat /proc/cpuinfo| grep "physical id"| sort| uniq| wc -l
-2
+ # 方式1： 指定使用rule 1(即ruleset 5),映射[0,10]这11个PG
+crushtool --test -i crushmap-new.bin --show-mappings --rule 1 --num-rep=3 --min_x=0 --max_x=10
 
+ # 方式2： 指定使用ruleset 5,映射[0,10]这11个PG
+crushtool --test -i crushmap-new.bin --show-mappings --ruleset 5 --num-rep=3 --min_x=0 --max_x=10
 
-# 查看每个物理cpu中core的个数
-[root@ceph001-node1 ~ ]$ cat /proc/cpuinfo| grep "cpu cores"| uniq
-cpu cores       : 10
-
-
-# 查看逻辑cpu的个数
-[root@ceph001-node1 ~ ]$ cat /proc/cpuinfo| grep "processor"| wc -l
-40
+ # 方式3： 单独指定映射某个PG
+crushtool --test -i crushmap-new.bin --show-mappings --ruleset 5 --num-rep=3 --x=100
 {% endhighlight %}
-由上图可知：主机ceph001-node1有2颗物理cpu，10核40线程
 
-如果不想自己算，也可以通过lscpu命令：
+*注意： 这里如果不指定min_x与max_x，则系统默认会映射[0,1023]这1024个PG*
+
+如下我们采用ruleset 5映射PG 0~PG 10:
 <pre>
-[root@ceph001-node1 ~ ]$ lscpu
-Architecture:          x86_64
-CPU op-mode(s):        32-bit, 64-bit
-Byte Order:            Little Endian
-CPU(s):                40
-On-line CPU(s) list:   0-39
-Thread(s) per core:    2
-Core(s) per socket:    10
-Socket(s):             2
-NUMA node(s):          2
-Vendor ID:             GenuineIntel
-CPU family:            6
-Model:                 63
-Model name:            Intel(R) Xeon(R) CPU E5-2650 v3 @ 2.30GHz
-Stepping:              2
-CPU MHz:               2300.179
-BogoMIPS:              4594.92
-Virtualization:        VT-x
-L1d cache:             32K
-L1i cache:             32K
-L2 cache:              256K
-L3 cache:              25600K
-NUMA node0 CPU(s):     0-9,20-29
-NUMA node1 CPU(s):     10-19,30-39
+[root@localhost ceph-test]# crushtool --test -i crushmap-new.bin --show-mappings --ruleset 5 --num-rep=3 --min_x=0 --max_x=10
+CRUSH rule 1 x 0 [3,0,7]
+CRUSH rule 1 x 1 [5,0,7]
+CRUSH rule 1 x 2 [8,3,1]
+CRUSH rule 1 x 3 [8,0,4]
+CRUSH rule 1 x 4 [1,4,7]
+CRUSH rule 1 x 5 [3,8,0]
+CRUSH rule 1 x 6 [3,6,1]
+CRUSH rule 1 x 7 [5,8,2]
+CRUSH rule 1 x 8 [7,5,0]
+CRUSH rule 1 x 9 [8,3,1]
+CRUSH rule 1 x 10 [4,0,8]
 </pre>
 
+
 <br />
 <br />
 <br />
-
-
-
-
-
