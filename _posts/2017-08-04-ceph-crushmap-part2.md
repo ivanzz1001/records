@@ -256,9 +256,20 @@ CRUSH rule 1 x 10 [4,0,8]
 
 ![crushmap-param-test](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap2-param-test.png)
 
+### 3.2 解析-i参数
+参数-i指定输入的crushmap.bin文件，crushtool工具需要通过解析该文件来获取crushmap对象：
 
+![crushmap-param-i](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap2-param-i.png)
 
+这里```crush.decode(p)```是《crushmap详解-1》中crushmap 编码的一个逆过程，这里不做详细解释。
 
+### 3.3 解析--show-mappings参数
+参数--show-mappings告诉crushtool将PG->OSD的映射打印出来。
+
+### 3.4 解析--ruleset参数
+指定使用哪一个规则：
+
+![crushmap-param-ruleset](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap2-param-ruleset.png)
 
 <br />
 <br />
