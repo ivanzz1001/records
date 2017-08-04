@@ -2,9 +2,9 @@
 layout: post
 title: crushmap详解(2)
 tags:
-- ceph
-- crushmap
-categories: ceph
+- ceph-1
+- crushmap-1
+categories: ceph-1
 description: crushmap详解
 ---
 
