@@ -197,13 +197,238 @@ Failed及Overloaded状态的设备均会在cluster map中进行标记，但会�
 
 在源代码分析过程中，我们可以通过执行如下命令来具体了解程序的执行过程：
 {% highlight string %}
-/root/ceph-src/ceph/src/crushtool --test -i test_crushmap.bin --show-mappings --ruleset 5 --num-rep=2 --min_x=0 --max_x=10
+/root/ceph-src/ceph/src/crushtool --test -i test_crushmap.bin --show-mappings --ruleset 5 --num-rep=3 --min_x=0 --max_x=10
 {% endhighlight %}
 
 接着上一篇《crushmap详解-2》，函数调用到do_rule:
 ![crushmap3-do-rule](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap3_do_rule.png)
 
-上面do_rule()函数使用指定的crush及rule规则将输入x映射到OSD设备上。
+上面do_rule()函数使用指定的crush及rule规则将输入x映射到OSD设备上（这里rule为1，maxout为3，weight值均为65536）。
+
+下面我们来分析crush_do_rule:
+{% highlight string %}
+/**
+ * crush_do_rule - calculate a mapping with the given input and rule
+ * @map: the crush_map
+ * @ruleno: the rule id
+ * @x: hash input
+ * @result: pointer to result vector
+ * @result_max: maximum result size
+ * @weight: weight vector (for map leaves)
+ * @weight_max: size of weight vector
+ * @scratch: scratch vector for private use; must be >= 3 * result_max
+ */
+int crush_do_rule(const struct crush_map *map,
+		  int ruleno, int x, int *result, int result_max,
+		  const __u32 *weight, int weight_max,
+		  int *scratch)
+{
+	int result_len;
+	int *a = scratch;
+	int *b = scratch + result_max;
+	int *c = scratch + result_max*2;
+	int recurse_to_leaf;
+	int *w;
+	int wsize = 0;
+	int *o;
+	int osize;
+	int *tmp;
+	struct crush_rule *rule;
+	__u32 step;
+	int i, j;
+	int numrep;
+	int out_size;
+	/*
+	 * the original choose_total_tries value was off by one (it
+	 * counted "retries" and not "tries").  add one.
+	 */
+	int choose_tries = map->choose_total_tries + 1;
+	int choose_leaf_tries = 0;
+	/*
+	 * the local tries values were counted as "retries", though,
+	 * and need no adjustment
+	 */
+	int choose_local_retries = map->choose_local_tries;
+	int choose_local_fallback_retries = map->choose_local_fallback_tries;
+
+	int vary_r = map->chooseleaf_vary_r;
+
+	if ((__u32)ruleno >= map->max_rules) {
+		dprintk(" bad ruleno %d\n", ruleno);
+		return 0;
+	}
+
+	rule = map->rules[ruleno];
+	result_len = 0;
+	w = a;
+	o = b;
+
+	for (step = 0; step < rule->len; step++) {
+		int firstn = 0;
+		struct crush_rule_step *curstep = &rule->steps[step];
+
+		switch (curstep->op) {
+		case CRUSH_RULE_TAKE:
+			if ((curstep->arg1 >= 0 &&
+			     curstep->arg1 < map->max_devices) ||
+			    (-1-curstep->arg1 >= 0 &&
+			     -1-curstep->arg1 < map->max_buckets &&
+			     map->buckets[-1-curstep->arg1])) {
+				w[0] = curstep->arg1;
+				wsize = 1;
+			} else {
+				dprintk(" bad take value %d\n", curstep->arg1);
+			}
+			break;
+
+		case CRUSH_RULE_SET_CHOOSE_TRIES:
+			if (curstep->arg1 > 0)
+				choose_tries = curstep->arg1;
+			break;
+
+		case CRUSH_RULE_SET_CHOOSELEAF_TRIES:
+			if (curstep->arg1 > 0)
+				choose_leaf_tries = curstep->arg1;
+			break;
+
+		case CRUSH_RULE_SET_CHOOSE_LOCAL_TRIES:
+			if (curstep->arg1 >= 0)
+				choose_local_retries = curstep->arg1;
+			break;
+
+		case CRUSH_RULE_SET_CHOOSE_LOCAL_FALLBACK_TRIES:
+			if (curstep->arg1 >= 0)
+				choose_local_fallback_retries = curstep->arg1;
+			break;
+
+		case CRUSH_RULE_SET_CHOOSELEAF_VARY_R:
+			if (curstep->arg1 >= 0)
+				vary_r = curstep->arg1;
+			break;
+
+		case CRUSH_RULE_CHOOSELEAF_FIRSTN:
+		case CRUSH_RULE_CHOOSE_FIRSTN:
+			firstn = 1;
+			/* fall through */
+		case CRUSH_RULE_CHOOSELEAF_INDEP:
+		case CRUSH_RULE_CHOOSE_INDEP:
+			if (wsize == 0)
+				break;
+
+			recurse_to_leaf =
+				curstep->op ==
+				 CRUSH_RULE_CHOOSELEAF_FIRSTN ||
+				curstep->op ==
+				CRUSH_RULE_CHOOSELEAF_INDEP;
+
+			/* reset output */
+			osize = 0;
+
+			for (i = 0; i < wsize; i++) {
+				int bno;
+				/*
+				 * see CRUSH_N, CRUSH_N_MINUS macros.
+				 * basically, numrep <= 0 means relative to
+				 * the provided result_max
+				 */
+				numrep = curstep->arg1;
+				if (numrep <= 0) {
+					numrep += result_max;
+					if (numrep <= 0)
+						continue;
+				}
+				j = 0;
+				/* make sure bucket id is valid */
+				bno = -1 - w[i];
+				if (bno < 0 || bno >= map->max_buckets) {
+					// w[i] is probably CRUSH_ITEM_NONE
+					dprintk("  bad w[i] %d\n", w[i]);
+					continue;
+				}
+				if (firstn) {
+					int recurse_tries;
+					if (choose_leaf_tries)
+						recurse_tries =
+							choose_leaf_tries;
+					else if (map->chooseleaf_descend_once)
+						recurse_tries = 1;
+					else
+						recurse_tries = choose_tries;
+					osize += crush_choose_firstn(
+						map,
+						map->buckets[bno],
+						weight, weight_max,
+						x, numrep,
+						curstep->arg2,
+						o+osize, j,
+						result_max-osize,
+						choose_tries,
+						recurse_tries,
+						choose_local_retries,
+						choose_local_fallback_retries,
+						recurse_to_leaf,
+						vary_r,
+						c+osize,
+						0);
+				} else {
+					out_size = ((numrep < (result_max-osize)) ?
+                                                    numrep : (result_max-osize));
+					crush_choose_indep(
+						map,
+						map->buckets[bno],
+						weight, weight_max,
+						x, out_size, numrep,
+						curstep->arg2,
+						o+osize, j,
+						choose_tries,
+						choose_leaf_tries ?
+						   choose_leaf_tries : 1,
+						recurse_to_leaf,
+						c+osize,
+						0);
+					osize += out_size;
+				}
+			}
+
+			if (recurse_to_leaf)
+				/* copy final _leaf_ values to output set */
+				memcpy(o, c, osize*sizeof(*o));
+
+			/* swap o and w arrays */
+			tmp = o;
+			o = w;
+			w = tmp;
+			wsize = osize;
+			break;
+
+
+		case CRUSH_RULE_EMIT:
+			for (i = 0; i < wsize && result_len < result_max; i++) {
+				result[result_len] = w[i];
+				result_len++;
+			}
+			wsize = 0;
+			break;
+
+		default:
+			dprintk(" unknown op %d at step %d\n",
+				curstep->op, step);
+			break;
+		}
+	}
+	return result_len;
+}
+{% endhighlight %}
+
+该函数接受8个参数：
+* map: 当前所采用的crushmap
+* ruleno: 当前所使用的规则编号
+* x：hash input，即当前所要映射的对象的hash值
+* result: 保存输出结果的的数组起始位置
+* result_max: 保存输出结果的数组的大小
+* weight: 权重向量（用于映射叶子）
+* weight_max: 权重向量中元素的个数
+* scratch: 辅助空间（内部使用，其大小应确保为>=3*result_max)
 
 
 
