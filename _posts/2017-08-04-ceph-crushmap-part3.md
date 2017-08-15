@@ -179,6 +179,7 @@ rule replicated_rule-5 {
 
 
 crush算法的基本思想就是：从```step take```根开始逐级遍历bucket层级结构，直到找到指定数量的副本节点或者失败退出。 
+<br />
 
 **Collisions, Failure, and Overload**
 
@@ -191,7 +192,10 @@ Failed及Overloaded状态的设备均会在cluster map中进行标记，但会�
 
 
 
+## 2. CRUSH算法源代码解析
 
+接着上一篇《crushmap详解-2》，函数调用到do_rule:
+![crushmap3-do-rule](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap3_do_rule.png)
 
 
 
