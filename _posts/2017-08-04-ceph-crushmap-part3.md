@@ -180,7 +180,7 @@ rule replicated_rule-5 {
 
 crush算法的基本思想就是：从```step take```根开始逐级遍历bucket层级结构，直到找到指定数量的副本节点或者失败退出。 
 
-** Collisions, Failure, and Overload**
+**Collisions, Failure, and Overload**
 
 在select(n,t)操作当中，为了选出n个t类型的不同的item，其会不断的进行递归。 在该递归操作当中，CRUSH通过一个被修正过的r'来拒绝或选择item。之所有采用修正的r'(而不是当前的简单的副本编号）主要有如下3个原因：
 * 该item已经处于当前被选中的集合中（发生了碰撞---select(n,t)算出来的结果必须必须不能冲突）
