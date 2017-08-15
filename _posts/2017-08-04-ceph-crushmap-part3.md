@@ -180,6 +180,7 @@ rule replicated_rule-5 {
 
 crush算法的基本思想就是：从```step take```根开始逐级遍历bucket层级结构，直到找到指定数量的副本节点或者失败退出。 
 <br />
+<br />
 
 **Collisions, Failure, and Overload**
 
@@ -194,10 +195,15 @@ Failed及Overloaded状态的设备均会在cluster map中进行标记，但会�
 
 ## 2. CRUSH算法源代码解析
 
+在源代码分析过程中，我们可以通过执行如下命令来具体了解程序的执行过程：
+{% highlight string %}
+/root/ceph-src/ceph/src/crushtool --test -i test_crushmap.bin --show-mappings --ruleset 5 --num-rep=2 --min_x=0 --max_x=10
+{% endhighlight %}
+
 接着上一篇《crushmap详解-2》，函数调用到do_rule:
 ![crushmap3-do-rule](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap3_do_rule.png)
 
-
+上面do_rule()函数使用指定的crush及rule规则将输入x映射到OSD设备上。
 
 
 
