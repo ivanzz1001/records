@@ -431,6 +431,96 @@ int crush_do_rule(const struct crush_map *map,
 * scratch: 辅助空间（内部使用，其大小应确保为>=3*result_max)
 
 
+### 2.1 相关变量初始化
+
+根据我们前面的配置（如下tries均为`retries`含义，在使用时应注意）：
+<pre>
+# begin crush map
+tunable choose_local_tries 0
+tunable choose_local_fallback_tries 0
+tunable choose_total_tries 50
+tunable chooseleaf_descend_once 1
+tunable straw_calc_version 1
+</pre>
+因此，这里choose_tries为51，choose_leaf_tries为0，choose_local_retries为0，choose_local_fallback_retries为0，vary_r为0。 我们这里使用的ruleset 5，因此rule->len为4。
+
+### 2.2 crush映射步骤
+
+参看下面的映射规则：
+{% highlight string %}
+rule replicated_rule-5 {
+        ruleset 5
+        type replicated
+        min_size 1
+        max_size 10
+        step take sata-00
+        step choose firstn 1 type replica-domain
+        step chooseleaf firstn 0 type host-domain
+        step emit
+}
+{% endhighlight %}
+根据前面《crushmap详解-1》我们得到如下：
+<pre>
+key::rule:rules:rule_id[1]="1" 
+key::rule:rules:rule_name[1]="replicated_rule-5" 
+key::rule:rules:ruleset[1]="5"
+key::rule:rules:type[1]="1" 
+key::rule:rules:min_size[1]="1" 
+key::rule:rules:max_size[1]="10" 
+key::step:steps:rule:rules:op[3]="take"
+key::step:steps:rule:rules:item[1]="-10" 
+key::step:steps:rule:rules:item_name[1]="sata-00"
+key::step:steps:rule:rules:op[4]="choose_firstn" 
+key::step:steps:rule:rules:num[1]="1" 
+key::step:steps:rule:rules:type[1]="replica-domain" 
+key::step:steps:rule:rules:op[5]="chooseleaf_firstn"
+key::step:steps:rule:rules:num[2]="0"
+key::step:steps:rule:rules:type[2]="host-domain" 
+key::step:steps:rule:rules:op[6]="emit"
+</pre>
+
+* *
+
+1） CRUSH_RULE_TAKE
+
+首先执行的是```CRUSH_RULE_TAKE```步骤，因为sata-00是一个bucket，而不是单个的device，因此这里curstep->arg1应小于0。此时有：
+<pre>
+w[0] = -10;
+wsize = 1;
+</pre>
+
+2） CRUSH_RULE_CHOOSE_FIRSTN
+
+recurse_to_leaf为0，表示不递归叶子节点。recurse_tries为1。接着调用crush_choose_firstn()函数。
+
+<pre>
+osize += crush_choose_firstn(
+						map,                      
+						map->buckets[bno],             //bno = 
+						weight, weight_max,
+						x, numrep,
+						curstep->arg2,
+						o+osize, j,
+						result_max-osize,
+						choose_tries,
+						recurse_tries,
+						choose_local_retries,
+						choose_local_fallback_retries,
+						recurse_to_leaf,
+						vary_r,
+						c+osize,
+						0);
+</pre>
+
+
+3） 
+
+
+
+
+
+
+
 
 <br />
 <br />
