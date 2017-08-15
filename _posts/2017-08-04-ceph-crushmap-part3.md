@@ -168,8 +168,31 @@ rule replicated_rule-5 {
 # end crush map
 </pre>
 
-## CRUSH算法
+## 1. CRUSH算法
 ![crushmap3-alg](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap3_alg.png)
+
+上面是CRUSH算法实现的一个伪代码。通常情况下CRUSH函数的输入参数是一个对象名或其他标识符。
+
+1） TAKE(a)操作会在整个存储拓扑结构中选择一个item(通常是一个bucket)，然后会将其指定给一个vector。该vector作为后续操作的一个输入。
+
+2) SELECT(n,t)操作会遍历上述vector中的每一个元素，并且会在以该元素作为根的子树中选择类型为t的n个不同的item。存储设备均有一个已知的、固定的类型，并且系统中的每一个bucket均有一个类型字段以反映bucket的不同层级结构。
+
+
+crush算法的基本思想就是：从```step take```根开始逐级遍历bucket层级结构，直到找到指定数量的副本节点或者失败退出。 
+
+** Collisions, Failure, and Overload**
+
+在select(n,t)操作当中，为了选出n个t类型的不同的item，其会不断的进行递归。 在该递归操作当中，CRUSH通过一个被修正过的r'来拒绝或选择item。之所有采用修正的r'(而不是当前的简单的副本编号）主要有如下3个原因：
+* 该item已经处于当前被选中的集合中（发生了碰撞---select(n,t)算出来的结果必须必须不能冲突）
+* 一个设备(device)处于failed状态
+* 一个设备处于overloaded状态（负载过重）
+
+Failed及Overloaded状态的设备均会在cluster map中进行标记，但会被保留在设备层级结构中以避免不必要的数据迁移。CRUSH会选择性的转移一部分负载过高的设备上的数据，这可以通过伪随机的拒绝一些的PG映射。针对Failed及Overloaded状态的设备，CRUSH算法会统一的在storage cluster的其他分支（跨storage cluster)来选择最后的映射（参看算法1第11行）；而对于collisions，一个新的r'会被用于下一次的递归搜索（参看算法1第14行），这样可以避免总体数据分步偏离更大可能发生碰撞的子树。
+
+
+
+
+
 
 
 
