@@ -479,7 +479,7 @@ key::step:steps:rule:rules:type[2]="host-domain"
 key::step:steps:rule:rules:op[6]="emit"
 </pre>
 
-* *
+上面每一个step的输出都作为下一个step的输入（参看上面伪代码37行）。
 
 1） CRUSH_RULE_TAKE
 
@@ -490,13 +490,21 @@ wsize = 1;
 </pre>
 
 2） CRUSH_RULE_CHOOSE_FIRSTN
+{% highlight string %}
+printf("\n(Before)wsize:%d bno:%d x:%d numrep:%d curstep->arg1:%d curstep->arg2:%d osize:%d recurse_to_leaf:%d\n",
+					wsize,					// 1 
+					bno,                    // 9 
+					x,                      // hash input
+					numrep,                 // 1
+					curstep->arg1,          // 1
+					curstep->arg2,          // 13
+					osize,                  // 0
+					recurse_to_leaf);       // 0
 
-recurse_to_leaf为0，表示不递归叶子节点。recurse_tries为1。接着调用crush_choose_firstn()函数。
 
-<pre>
-osize += crush_choose_firstn(
-						map,                      
-						map->buckets[bno],             //bno = 
+					osize += crush_choose_firstn(
+						map,
+						map->buckets[bno],
 						weight, weight_max,
 						x, numrep,
 						curstep->arg2,
@@ -510,10 +518,95 @@ osize += crush_choose_firstn(
 						vary_r,
 						c+osize,
 						0);
+
+					printf("(After)osize:%d\n",osize);      // 1
+{% endhighlight %}
+
+如上所示，经过上一步```step take sata-00```之后，wsize为1；bno为上一步```step take sata-00```所选中的bucket编号9(-1+10 = 9):
+<pre>
+key::bucket:buckets:id[9]="-10" 
+key::bucket:buckets:name[9]="sata-00" 
+key::bucket:buckets:type_id[9]="14" 
+key::bucket:buckets:type_name[9]="failure-domain"
+key::bucket:buckets:weight[9]="88473"
+key::bucket:buckets:alg[9]="straw" 
+key::bucket:buckets:hash[9]="rjenkins1"
+key::item:items:bucket:buckets:id[19]="-9" 
+key::item:items:bucket:buckets:weight[19]="88473"
+key::item:items:bucket:buckets:pos[19]="0" 
+</pre>
+numrep为当前step所指定的副本数1； curstep->arg1同numrep为副本数1；curstep->arg2为replica-domain，因此值为13; osize 为0；recurse_to_leaf为0，表示不递归叶子节点。 (After)osize为1.
+<br />
+
+
+*针对上面的numrep,有如下解释：*
+{% highlight string %}
+/*
+ * see CRUSH_N, CRUSH_N_MINUS macros.
+ * basically, numrep <= 0 means relative to
+ * the provided result_max
+ */
+{% endhighlight %}
+
+
+3） CRUSH_RULE_CHOOSELEAF_FIRSTN
+<pre>
+printf("\n(Before)wsize:%d bno:%d x:%d numrep:%d curstep->arg1:%d curstep->arg2:%d osize:%d recurse_to_leaf:%d\n",
+					wsize,             // 1
+					bno,               // 8
+					x,                 // hash input
+					numrep,            // 3 
+					curstep->arg1,     // 0
+					curstep->arg2,     // 12 
+					osize,             // 0
+					recurse_to_leaf);  // 1
+
+
+					osize += crush_choose_firstn(
+						map,
+						map->buckets[bno],
+						weight, weight_max,
+						x, numrep,
+						curstep->arg2,
+						o+osize, j,
+						result_max-osize,
+						choose_tries,
+						recurse_tries,
+						choose_local_retries,
+						choose_local_fallback_retries,
+						recurse_to_leaf,
+						vary_r,
+						c+osize,
+						0);
+
+					printf("(After)osize:%d\n",osize);   //3
 </pre>
 
+如上所示，经过上一步```step choose firstn 1 type replica-domain```之后，wsize为1；bno为上一步```step choose firstn 1 type replica-domain```之后所选中的replica-0; numrep值为3，表示副本数； curstep->arg1为0；curstep->arg2为host-domain，因此值为12；osize值为0；recurse_to_leaf值为1,表示需要递归叶子节点。（After）osize为3.
 
-3） 
+<br />
+<br />
+
+**小结**
+
+从上面我们可以看到，是通过：
+<pre>
+ step choose firstn 1 type replica-domain
+ step chooseleaf firstn 0 type host-domain
+</pre>
+使我们最后达到的副本数为3。也即从```sata-00```下选择到1个replica-domain，然后再从这1个replica-domain下选择3个host-domain,则最后刚好达到3个副本。我们再来看另外一个规则：
+<pre>
+rule replicated_ruleset {
+        ruleset 0
+        type replicated
+        min_size 1
+        max_size 10
+        step take default
+        step choose firstn 0 type osd
+        step emit
+}
+</pre>
+此规则直接在default下选择osd。因为可以直接选择到osd，因此可以不用递归，否则最后一步一般都要进行递归操作。此处0表示副本数为result_max，即为3。
 
 
 
