@@ -842,18 +842,18 @@ reject:
 我们可以看到有如下打印信息(第一次调用x为0时）：
 {% highlight string %}
 dprintk("CHOOSE%s bucket %d x %d outpos %d numrep %d tries %d recurse_tries %d local_retries %d local_fallback_retries %d parent_r %d vary_r %d type %d\n",
-		recurse_to_leaf ? "_LEAF" : "",     // ""
-		bucket->id,                         // -10
-        x,                                  // 0
-        outpos,                             // 0
-        numrep,                             // 1
-		tries,                              // 51
-        recurse_tries,                      // 1
-        local_retries,                      // 0
-        local_fallback_retries,             // 0
-		parent_r,                           // 0
-        vary_r,                             // 0
-        type);                              // 13
+	recurse_to_leaf ? "_LEAF" : "",     // ""
+	bucket->id,                         // -10
+	x,                                  // 0
+	outpos,                             // 0
+	numrep,                             // 1
+	tries,                              // 51
+	recurse_tries,                      // 1
+	local_retries,                      // 0
+	local_fallback_retries,             // 0
+	parent_r,                           // 0
+	vary_r,                             // 0
+	type);                              // 13
                                          
 {% endhighlight %}
 
