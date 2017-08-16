@@ -1,6 +1,6 @@
 ---
 layout: post
-title: crushmap详解-2
+title: crushmap算法详解-2
 tags:
 - ceph
 - crushmap
