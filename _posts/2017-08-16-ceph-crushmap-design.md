@@ -24,7 +24,13 @@ description: crushmap示例
 
 ![crushmap-tree-1.png](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-tree-1.png)
 
+<br />
 
+**模型2：**
+
+在我们介绍了cache pools之后，我们可以很容易的想象到添加SSD硬盘到存储集群中。如下示例中我们将SSD添加到新的主机上。添加完成后，我们需要管理两种类型的硬盘。在只需要描述cluster的物理分割时，我们可能会采用如下的层次结构：
+
+![crushmap-tree-2.png](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-tree-2.png)
 
 <br />
 <br />
