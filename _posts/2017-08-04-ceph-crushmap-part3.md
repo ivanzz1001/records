@@ -492,34 +492,34 @@ wsize = 1;
 2） CRUSH_RULE_CHOOSE_FIRSTN
 {% highlight string %}
 printf("\n(Before)wsize:%d bno:%d x:%d numrep:%d curstep->arg1:%d curstep->arg2:%d osize:%d recurse_to_leaf:%d\n",
-					wsize,					// 1 
-					bno,                    // 9 
-					x,                      // hash input
-					numrep,                 // 1
-					curstep->arg1,          // 1
-					curstep->arg2,          // 13
-					osize,                  // 0
-					recurse_to_leaf);       // 0
+		wsize,					// 1 
+		bno,                    // 9 
+		x,                      // hash input
+		numrep,                 // 1
+		curstep->arg1,          // 1
+		curstep->arg2,          // 13
+		osize,                  // 0
+		recurse_to_leaf);       // 0
 
 
-					osize += crush_choose_firstn(
-						map,
-						map->buckets[bno],
-						weight, weight_max,
-						x, numrep,
-						curstep->arg2,
-						o+osize, j,
-						result_max-osize,
-						choose_tries,
-						recurse_tries,
-						choose_local_retries,
-						choose_local_fallback_retries,
-						recurse_to_leaf,
-						vary_r,
-						c+osize,
-						0);
+		osize += crush_choose_firstn(
+			map,
+			map->buckets[bno],
+			weight, weight_max,
+			x, numrep,
+			curstep->arg2,
+			o+osize, j,
+			result_max-osize,
+			choose_tries,
+			recurse_tries,
+			choose_local_retries,
+			choose_local_fallback_retries,
+			recurse_to_leaf,
+			vary_r,
+			c+osize,
+			0);
 
-					printf("(After)osize:%d\n",osize);      // 1
+			printf("(After)osize:%d\n",osize);      // 1
 {% endhighlight %}
 
 如上所示，经过上一步```step take sata-00```之后，wsize为1；bno为上一步```step take sata-00```所选中的bucket编号9(-1+10 = 9):
@@ -552,34 +552,34 @@ numrep为当前step所指定的副本数1； curstep->arg1同numrep为副本数1
 3） CRUSH_RULE_CHOOSELEAF_FIRSTN
 <pre>
 printf("\n(Before)wsize:%d bno:%d x:%d numrep:%d curstep->arg1:%d curstep->arg2:%d osize:%d recurse_to_leaf:%d\n",
-					wsize,             // 1
-					bno,               // 8
-					x,                 // hash input
-					numrep,            // 3 
-					curstep->arg1,     // 0
-					curstep->arg2,     // 12 
-					osize,             // 0
-					recurse_to_leaf);  // 1
+		wsize,             // 1
+		bno,               // 8
+		x,                 // hash input
+		numrep,            // 3 
+		curstep->arg1,     // 0
+		curstep->arg2,     // 12 
+		osize,             // 0
+		recurse_to_leaf);  // 1
 
 
-					osize += crush_choose_firstn(
-						map,
-						map->buckets[bno],
-						weight, weight_max,
-						x, numrep,
-						curstep->arg2,
-						o+osize, j,
-						result_max-osize,
-						choose_tries,
-						recurse_tries,
-						choose_local_retries,
-						choose_local_fallback_retries,
-						recurse_to_leaf,
-						vary_r,
-						c+osize,
-						0);
+		osize += crush_choose_firstn(
+			map,
+			map->buckets[bno],
+			weight, weight_max,
+			x, numrep,
+			curstep->arg2,
+			o+osize, j,
+			result_max-osize,
+			choose_tries,
+			recurse_tries,
+			choose_local_retries,
+			choose_local_fallback_retries,
+			recurse_to_leaf,
+			vary_r,
+			c+osize,
+			0);
 
-					printf("(After)osize:%d\n",osize);   //3
+		printf("(After)osize:%d\n",osize);   //3
 </pre>
 
 如上所示，经过上一步```step choose firstn 1 type replica-domain```之后，wsize为1；bno为上一步```step choose firstn 1 type replica-domain```之后所选中的replica-0; numrep值为3，表示副本数； curstep->arg1为0；curstep->arg2为host-domain，因此值为12；osize值为0；recurse_to_leaf值为1,表示需要递归叶子节点。（After）osize为3.
@@ -610,8 +610,205 @@ rule replicated_ruleset {
 
 
 
+## 3. 分析crush_choose_firstn()
 
+上面我们在进行CRUSHMAP映射时，调用到了crush_choose_firstn()函数，该函数较为复杂，我们下边来分析该函数：
+{% highlight string %}
+/**
+ * crush_choose_firstn - choose numrep distinct items of given type
+ * @map: the crush_map
+ * @bucket: the bucket we are choose an item from
+ * @x: crush input value
+ * @numrep: the number of items to choose
+ * @type: the type of item to choose
+ * @out: pointer to output vector
+ * @outpos: our position in that vector
+ * @out_size: size of the out vector
+ * @tries: number of attempts to make
+ * @recurse_tries: number of attempts to have recursive chooseleaf make
+ * @local_retries: localized retries
+ * @local_fallback_retries: localized fallback retries
+ * @recurse_to_leaf: true if we want one device under each item of given type (chooseleaf instead of choose)
+ * @vary_r: pass r to recursive calls
+ * @out2: second output vector for leaf items (if @recurse_to_leaf)
+ * @parent_r: r value passed from the parent
+ */
+static int crush_choose_firstn(const struct crush_map *map,
+			       struct crush_bucket *bucket,
+			       const __u32 *weight, int weight_max,
+			       int x, int numrep, int type,
+			       int *out, int outpos,
+			       int out_size,
+			       unsigned int tries,
+			       unsigned int recurse_tries,
+			       unsigned int local_retries,
+			       unsigned int local_fallback_retries,
+			       int recurse_to_leaf,
+			       unsigned int vary_r,
+			       int *out2,
+			       int parent_r)
+{
+	int rep;
+	unsigned int ftotal, flocal;
+	int retry_descent, retry_bucket, skip_rep;
+	struct crush_bucket *in = bucket;
+	int r;
+	int i;
+	int item = 0;
+	int itemtype;
+	int collide, reject;
+	int count = out_size;
 
+	dprintk("CHOOSE%s bucket %d x %d outpos %d numrep %d tries %d recurse_tries %d local_retries %d local_fallback_retries %d parent_r %d\n",
+		recurse_to_leaf ? "_LEAF" : "",
+		bucket->id, x, outpos, numrep,
+		tries, recurse_tries, local_retries, local_fallback_retries,
+		parent_r);
+
+	for (rep = outpos; rep < numrep && count > 0 ; rep++) {
+		/* keep trying until we get a non-out, non-colliding item */
+		ftotal = 0;
+		skip_rep = 0;
+		do {
+			retry_descent = 0;
+			in = bucket;               /* initial bucket */
+
+			/* choose through intervening buckets */
+			flocal = 0;
+			do {
+				collide = 0;
+				retry_bucket = 0;
+				r = rep + parent_r;
+				/* r' = r + f_total */
+				r += ftotal;
+
+				/* bucket choose */
+				if (in->size == 0) {
+					reject = 1;
+					goto reject;
+				}
+				if (local_fallback_retries > 0 &&
+				    flocal >= (in->size>>1) &&
+				    flocal > local_fallback_retries)
+					item = bucket_perm_choose(in, x, r);
+				else
+					item = crush_bucket_choose(in, x, r);
+				if (item >= map->max_devices) {
+					dprintk("   bad item %d\n", item);
+					skip_rep = 1;
+					break;
+				}
+
+				/* desired type? */
+				if (item < 0)
+					itemtype = map->buckets[-1-item]->type;
+				else
+					itemtype = 0;
+				dprintk("  item %d type %d\n", item, itemtype);
+
+				/* keep going? */
+				if (itemtype != type) {
+					if (item >= 0 ||
+					    (-1-item) >= map->max_buckets) {
+						dprintk("   bad item type %d\n", type);
+						skip_rep = 1;
+						break;
+					}
+					in = map->buckets[-1-item];
+					retry_bucket = 1;
+					continue;
+				}
+
+				/* collision? */
+				for (i = 0; i < outpos; i++) {
+					if (out[i] == item) {
+						collide = 1;
+						break;
+					}
+				}
+
+				reject = 0;
+				if (!collide && recurse_to_leaf) {
+					if (item < 0) {
+						int sub_r;
+						if (vary_r)
+							sub_r = r >> (vary_r-1);
+						else
+							sub_r = 0;
+						if (crush_choose_firstn(map,
+							 map->buckets[-1-item],
+							 weight, weight_max,
+							 x, outpos+1, 0,
+							 out2, outpos, count,
+							 recurse_tries, 0,
+							 local_retries,
+							 local_fallback_retries,
+							 0,
+							 vary_r,
+							 NULL,
+							 sub_r) <= outpos)
+							/* didn't get leaf */
+							reject = 1;
+					} else {
+						/* we already have a leaf! */
+						out2[outpos] = item;
+					}
+				}
+
+				if (!reject) {
+					/* out? */
+					if (itemtype == 0)
+						reject = is_out(map, weight,
+								weight_max,
+								item, x);
+					else
+						reject = 0;
+				}
+
+reject:
+				if (reject || collide) {
+					ftotal++;
+					flocal++;
+
+					if (collide && flocal <= local_retries)
+						/* retry locally a few times */
+						retry_bucket = 1;
+					else if (local_fallback_retries > 0 &&
+						 flocal <= in->size + local_fallback_retries)
+						/* exhaustive bucket search */
+						retry_bucket = 1;
+					else if (ftotal < tries)
+						/* then retry descent */
+						retry_descent = 1;
+					else
+						/* else give up */
+						skip_rep = 1;
+					dprintk("  reject %d  collide %d  "
+						"ftotal %u  flocal %u\n",
+						reject, collide, ftotal,
+						flocal);
+				}
+			} while (retry_bucket);
+		} while (retry_descent);
+
+		if (skip_rep) {
+			dprintk("skip rep\n");
+			continue;
+		}
+
+		dprintk("CHOOSE got %d\n", item);
+		out[outpos] = item;
+		outpos++;
+		count--;
+
+		if (map->choose_tries && ftotal <= map->choose_total_tries)
+			map->choose_tries[ftotal]++;
+	}
+
+	dprintk("CHOOSE returns %d\n", outpos);
+	return outpos;
+}
+{% endhighlight %}
 
 
 
