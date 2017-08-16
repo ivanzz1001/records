@@ -14,6 +14,18 @@ description: crushmap示例
 <!-- more -->
 
 
+## 1. crushmap层级结构示例
+
+通常我们并不太容易知道如何在crushmap中组织数据，特别是当你需要将数据存储到不同类型的硬盘（例如：SATA硬盘、SAS硬盘、SSD硬盘）上时。下面我们来看如何将crushmap想象成为具有层级结构。
+
+**模型1：**
+
+假设我们将数据存储在两个数据中心。
+
+![crushmap-tree-1.png](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-tree-1.png)
+
+
+
 <br />
 <br />
 <br />
