@@ -809,6 +809,27 @@ reject:
 }
 {% endhighlight %}
 
+该函数主要功能为：选择指定类型的numrep个不同的item。其接受18个参数：
+* map： 当前所使用的crushmap
+* bucket: 我们从当前```bucket```中选择item
+* weight： 权重向量基址
+* weight_max: 权重向量大小
+* x： crush input value
+* numrep： 指定要选择的item数量
+* type： 要选择的item类型
+* out： 输出向量基址
+* outpos： 当前我们在输出向量out中的位置
+* out_size： 当前输出向量的剩余空间
+* tries： 尝试次数
+* recurse_tries： 递归选择叶子时候的尝试次数
+* local_retries： 本地重试(retry)次数
+* local_fallback_retries: 本地fallback重试（retry）次数。 注：在local_retries耗尽时，如果仍未选择到item，则会尝试fallback retry, 此时可能会根据相关算法随机选择一个item。
+* recurse_to_leaf： 假若我们需要在给定类型的item下选择一个device, 此时设置为true（表示选择叶子的意思）
+* vary_r： 传递r给递归调用
+* out2： 第二个输出向量基址，用于存放leaf items（当recurse_to_leaf为true时使用）
+* parent_r： 由parent传递过来的r值
+
+
 
 
 <br />
