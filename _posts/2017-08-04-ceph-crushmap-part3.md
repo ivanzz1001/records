@@ -829,6 +829,52 @@ reject:
 * out2： 第二个输出向量基址，用于存放leaf items（当recurse_to_leaf为true时使用）
 * parent_r： 由parent传递过来的r值
 
+因为我们在上面```CRUSH_RULE_CHOOSE_FIRSTN```与```CRUSH_RULE_CHOOSELEAF_FIRSTN```中均调用到了该函数，因此下面我们也分成两个步骤来看函数crush_choose_firstn（）的执行情况。下面给出该函数的一个整体流程：
+![crushmap3_choose_first_n](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap3_choose_first_n.png)
+
+1） CRUSH_RULE_CHOOSE_FIRSTN
+
+我们打开dprintk宏定义：
+{% highlight string %}
+# define dprintk(args...)  printf(args)
+{% endhighlight %}
+
+我们可以看到有如下打印信息(第一次调用x为0时）：
+{% highlight string %}
+dprintk("CHOOSE%s bucket %d x %d outpos %d numrep %d tries %d recurse_tries %d local_retries %d local_fallback_retries %d parent_r %d vary_r %d type %d\n",
+		recurse_to_leaf ? "_LEAF" : "",     // ""
+		bucket->id,                         // -10
+        x,                                  // 0
+        outpos,                             // 0
+        numrep,                             // 1
+		tries,                              // 51
+        recurse_tries,                      // 1
+        local_retries,                      // 0
+        local_fallback_retries,             // 0
+		parent_r,                           // 0
+        vary_r,                             // 0
+        type);                              // 13
+                                         
+{% endhighlight %}
+
+查看我们前面的规则：
+<pre>
+rule replicated_rule-5 {
+        ruleset 5
+        type replicated
+        min_size 1
+        max_size 10
+        step take sata-00
+        step choose firstn 1 type replica-domain
+        step chooseleaf firstn 0 type host-domain
+        step emit
+}
+</pre>
+本步我们要做的就是从sata-00这个bucket中选择1个类型为replica-domain的bucket。下面我们就来分析这个选择过程：
+
+
+
+
 
 
 
