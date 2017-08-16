@@ -519,7 +519,7 @@ printf("\n(Before)wsize:%d bno:%d x:%d numrep:%d curstep->arg1:%d curstep->arg2:
 			c+osize,
 			0);
 
-			printf("(After)osize:%d\n",osize);      // 1
+		printf("(After)osize:%d\n",osize);      // 1
 {% endhighlight %}
 
 如上所示，经过上一步```step take sata-00```之后，wsize为1；bno为上一步```step take sata-00```所选中的bucket编号9(-1+10 = 9):
@@ -552,34 +552,34 @@ numrep为当前step所指定的副本数1； curstep->arg1同numrep为副本数1
 3） CRUSH_RULE_CHOOSELEAF_FIRSTN
 <pre>
 printf("\n(Before)wsize:%d bno:%d x:%d numrep:%d curstep->arg1:%d curstep->arg2:%d osize:%d recurse_to_leaf:%d\n",
-		wsize,             // 1
-		bno,               // 8
-		x,                 // hash input
-		numrep,            // 3 
-		curstep->arg1,     // 0
-		curstep->arg2,     // 12 
-		osize,             // 0
-		recurse_to_leaf);  // 1
+	wsize,             // 1
+	bno,               // 8
+	x,                 // hash input
+	numrep,            // 3 
+	curstep->arg1,     // 0
+	curstep->arg2,     // 12 
+	osize,             // 0
+	recurse_to_leaf);  // 1
 
 
-		osize += crush_choose_firstn(
-			map,
-			map->buckets[bno],
-			weight, weight_max,
-			x, numrep,
-			curstep->arg2,
-			o+osize, j,
-			result_max-osize,
-			choose_tries,
-			recurse_tries,
-			choose_local_retries,
-			choose_local_fallback_retries,
-			recurse_to_leaf,
-			vary_r,
-			c+osize,
-			0);
+	osize += crush_choose_firstn(
+		map,
+		map->buckets[bno],
+		weight, weight_max,
+		x, numrep,
+		curstep->arg2,
+		o+osize, j,
+		result_max-osize,
+		choose_tries,
+		recurse_tries,
+		choose_local_retries,
+		choose_local_fallback_retries,
+		recurse_to_leaf,
+		vary_r,
+		c+osize,
+		0);
 
-		printf("(After)osize:%d\n",osize);   //3
+	printf("(After)osize:%d\n",osize);   //3
 </pre>
 
 如上所示，经过上一步```step choose firstn 1 type replica-domain```之后，wsize为1；bno为上一步```step choose firstn 1 type replica-domain```之后所选中的replica-0; numrep值为3，表示副本数； curstep->arg1为0；curstep->arg2为host-domain，因此值为12；osize值为0；recurse_to_leaf值为1,表示需要递归叶子节点。（After）osize为3.
