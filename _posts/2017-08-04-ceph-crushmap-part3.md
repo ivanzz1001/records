@@ -971,7 +971,6 @@ int crush_do_rule(const struct crush_map *map,
 		  const __u32 *weight, int weight_max,
 		  int *scratch)
 {
-
 	//1: process take
 
 	//2: process `choose` or `chooseleaf`, call function crush_choose_firstn()
@@ -1000,7 +999,6 @@ static int crush_choose_firstn(const struct crush_map *map,
 {
 	Loop over n replicas
 	{
-	
 		do{
 			do{
 				// 1: choose bucket
@@ -1012,11 +1010,10 @@ static int crush_choose_firstn(const struct crush_map *map,
 
 		//3: 将上面选择的item结果存放到out中
 	}
-	
 }
 {% endhighlight %}
 
-
+从上我们可以看到，与《CRUSH: Controlled, Scalable, Decentralized Placement of Replicated Data》一文中给出的CRUSH具有极高的相似性。
 
 
 
