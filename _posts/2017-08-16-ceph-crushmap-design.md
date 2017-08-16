@@ -32,6 +32,19 @@ description: crushmap示例
 
 ![crushmap-tree-2.png](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-tree-2.png)
 
+
+**模型3：**
+
+在上面```模型2```的层级结构中，我们很快就会意识到这样的配置并不能支持为特定pool区分硬盘类型。
+
+为了区分这些硬盘并且组织crushmap，最简单的方法就是从根节点开始重新复制一份该树形结构。这样我们就会有两个根：“default”（可以被命名为hdd)和“ssd”。
+
+![crushmap-tree-3.1.png](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-tree-3.1.png)
+
+另一个hdd与ssd混合的例子如下（你需要将每一个host分割开）：
+
+![crushmap-tree-3.2.png](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-tree-3.2.png)
+
 <br />
 <br />
 <br />
