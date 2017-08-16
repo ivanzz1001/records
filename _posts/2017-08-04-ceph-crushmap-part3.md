@@ -584,9 +584,21 @@ printf("\n(Before)wsize:%d bno:%d x:%d numrep:%d curstep->arg1:%d curstep->arg2:
 
 如上所示，经过上一步```step choose firstn 1 type replica-domain```之后，wsize为1；bno为上一步```step choose firstn 1 type replica-domain```之后所选中的replica-0; numrep值为3，表示副本数； curstep->arg1为0；curstep->arg2为host-domain，因此值为12；osize值为0；recurse_to_leaf值为1,表示需要递归叶子节点。（After）osize为3.
 
+4) CRUSH_RULE_EMIT
+
+将结果存放到result中：
+{% highlight string %}
+for (i = 0; i < wsize && result_len < result_max; i++)
+{
+	result[result_len] = w[i];
+	result_len++;
+}
+wsize = 0;
+{% endhighlight %}
+
 <br />
 
-**小结**
+**说明**
 
 从上面我们可以看到，是通过：
 <pre>
@@ -871,6 +883,138 @@ rule replicated_rule-5 {
 }
 </pre>
 本步我们要做的就是从sata-00这个bucket中选择1个类型为replica-domain的bucket。下面我们就来分析这个选择过程：
+{% highlight string %}
+
+// Loop over n replicas
+for (rep = outpos; rep < numrep && count > 0 ; rep++) 
+{
+	/* keep trying until we get a non-out, non-colliding item */
+
+	ftotal = 0;						//flag to indicate total failures
+	skip_rep = 0;                   //flag to indicate whether we should skip the replica
+
+	do{
+		retry_descent = 0;
+		in = bucket;
+
+		do{
+			retry_bucket = 0;
+			
+			//1: 选择相应的item
+
+			//2: 判断item类型是否为指定的类型
+			// item >= 0表示为osd设备 其type值为0
+            // item < 0表示为bucket， 其type值>0
+
+             if(typeof(item) != type)
+			 {
+				//3： 没有找到指定类型bucket，进入下一级遍历
+                in = next_bucket(item);
+				retry_bucket = 1;
+			 }
+
+			// 4: 判断当前有没有发生collision
+
+			// 5: 是否需要递归到叶子
+
+			// 6: 如果发生collision/failed/overloaded，调整相应的参数
+			if(collision || failed || overloaded)
+			{
+				ftotal++;
+				flocal++;
+
+				// 设置retry_bucket 或者 retry_descent
+			}
+
+		}while(retry_bucket);
+	}while(retry_descent);
+
+	//将选中的item增加到output中
+	count--;
+}
+
+{% endhighlight %}
+
+*注意*
+
+这里之所以有retry_bucket与retry_descent的区别，是因为crush算法里面一般会拥有两种不同的选择bucket的算法。一般情况下，通过适当的调整参数重新retry_bucket就可以选中到想要的bucket；而如果出现异常情况，我们可能会需要进行retry_descent重新调整算法。
+
+
+(2) CRUSH_RULE_CHOOSELEAF_FIRSTN
+
+我们可以看到有如下打印信息(第一次调用x为0时）,此处会进行叶子递归，这里我们打印出第一次调用：
+{% highlight string %}
+dprintk("CHOOSE%s bucket %d x %d outpos %d numrep %d tries %d recurse_tries %d local_retries %d local_fallback_retries %d parent_r %d vary_r %d type %d\n",
+	recurse_to_leaf ? "_LEAF" : "",     // "_LEAF"
+	bucket->id,                         // -9，即replica-domain
+	x,                                  // 0
+	outpos,                             // 0
+	numrep,                             // 3
+	tries,                              // 51
+	recurse_tries,                      // 1
+	local_retries,                      // 0
+	local_fallback_retries,             // 0
+	parent_r,                           // 0
+	vary_r,                             // 0
+	type);                              // 12
+                                         
+{% endhighlight %}
+
+其他与```CRUSH_RULE_CHOOSE_FIRSTN```类似，这里不再赘述。
+
+
+## 4. 总结
+在ceph源代码实现的CRUSH算法，总体调用调用流程如下：
+{% highlight string %}
+int crush_do_rule(const struct crush_map *map,
+		  int ruleno, int x, int *result, int result_max,
+		  const __u32 *weight, int weight_max,
+		  int *scratch)
+{
+
+	//1: process take
+
+	//2: process `choose` or `chooseleaf`, call function crush_choose_firstn()
+	for(previous_step_results)
+	{
+		crush_choose_firstn(...)
+	}
+
+	//3: process emit
+}
+
+static int crush_choose_firstn(const struct crush_map *map,
+			       struct crush_bucket *bucket,
+			       const __u32 *weight, int weight_max,
+			       int x, int numrep, int type,
+			       int *out, int outpos,
+			       int out_size,
+			       unsigned int tries,
+			       unsigned int recurse_tries,
+			       unsigned int local_retries,
+			       unsigned int local_fallback_retries,
+			       int recurse_to_leaf,
+			       unsigned int vary_r,
+			       int *out2,
+			       int parent_r)
+{
+	Loop over n replicas
+	{
+	
+		do{
+			do{
+				// 1: choose bucket
+		
+				// 2: process collision/failure/overloaded 
+				
+			}while(retry_bucket);
+		}while(retry_descent);
+
+		//3: 将上面选择的item结果存放到out中
+	}
+	
+}
+{% endhighlight %}
 
 
 
