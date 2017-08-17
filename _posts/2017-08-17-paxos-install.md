@@ -85,7 +85,7 @@ LMDB库是一个快速KV库。比leveldb快15%，但内存占用比leveldb大。
 </pre>
  
 
-### 3. 测试运行
+## 3. 测试运行
 在官方网站中给出有以下运行示例：
 <pre>
 # cd libpaxos/build
