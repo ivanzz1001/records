@@ -64,6 +64,160 @@ description: crushmap示例
 ![crushmap-tree-6.png](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-tree-6.png)
 
 
+**模型7：**
+
+上面```模型6```在小集群或者不需要更多层级的集群中具有较大优势。我们也可以其他一些另外的组织方式，比如将OSD分割到不同的层级，然后通过不同的规则来使用它们。例如，我们可以通过```step chooseleaf firstn 5 type host-sata```来选择sata硬盘，通过```step chooseleaf firstn 5 type host-ssd```来选择ssd硬盘。
+![crushmap-tree-7.png](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-tree-7.png)
+
+
+## 2. crushmap示例
+如下我们是针对```模型7```的一个crushmap.
+
+* 在每个DC中选择一个ssd的规则
+* 在每个DC中选择一个sata的规则
+* 在两个不同的host上选择一个sata的规则
+
+<pre>
+# begin crush map
+tunable choose_local_tries 0
+tunable choose_local_fallback_tries 0
+tunable choose_total_tries 50
+tunable chooseleaf_descend_once 0
+tunable chooseleaf_vary_r 0
+
+# devices
+device 0 osd.0
+device 1 osd.1
+device 2 osd.2
+device 3 osd.3
+device 4 osd.4
+device 5 osd.5
+device 6 osd.6
+device 7 osd.7
+device 8 osd.8
+device 9 osd.9
+device 10 osd.10
+device 11 osd.11
+device 12 osd.12
+device 13 osd.13
+device 14 osd.14
+device 15 osd.15
+device 16 osd.16
+device 17 osd.17
+device 18 osd.18
+
+# types
+type 0 osd
+type 1 host-ssd
+type 2 host-sata
+type 3 datacenter
+type 4 root
+
+# buckets
+host-sata host-01 {
+  alg straw
+  hash 0
+  item osd.1 weight 1.000
+  item osd.2 weight 1.000
+  item osd.3 weight 1.000
+}
+host-sata host-02 {
+  alg straw
+  hash 0
+  item osd.4 weight 1.000
+  item osd.5 weight 1.000
+  item osd.6 weight 1.000
+}
+host-sata host-03 {
+  alg straw
+  hash 0
+  item osd.7 weight 1.000
+  item osd.8 weight 1.000
+  item osd.9 weight 1.000
+}
+host-sata host-04 {
+  alg straw
+  hash 0
+  item osd.10 weight 1.000
+  item osd.11 weight 1.000
+  item osd.12 weight 1.000
+}
+
+host-ssd host-05 {
+  alg straw
+  hash 0
+  item osd.13 weight 1.000
+  item osd.14 weight 1.000
+  item osd.15 weight 1.000
+}
+host-ssd host-06 {
+  alg straw
+  hash 0
+  item osd.16 weight 1.000
+  item osd.17 weight 1.000
+  item osd.18 weight 1.000
+}
+
+datacenter dc1 {
+  alg straw
+  hash 0
+  item host-01 weight 1.000
+  item host-02 weight 1.000
+  item host-05 weight 1.000
+}
+datacenter dc2 {
+  alg straw
+  hash 0
+  item host-03 weight 1.000
+  item host-04 weight 1.000
+  item host-06 weight 1.000
+}
+
+root default {
+  alg straw
+  hash 0
+  item dc1 weight 1.000
+  item dc2 weight 1.000
+}
+
+# rules
+
+rule sata-rep_2dc {
+  ruleset 0
+  type replicated
+  min_size 2
+  max_size 2
+  step take default
+  step choose firstn 0 type datacenter
+  step chooseleaf firstn 1 type host-sata
+  step emit
+}
+
+rule ssd-rep_2dc {
+  ruleset 1
+  type replicated
+  min_size 2
+  max_size 2
+  step take default
+  step choose firstn 0 type datacenter
+  step chooseleaf firstn 1 type host-ssd
+  step emit
+}
+
+rule sata-all {
+  ruleset 2
+  type replicated
+  min_size 2
+  max_size 2
+  step take default
+  step chooseleaf firstn 0 type host-sata
+  step emit
+}
+
+# end crush map
+</pre>
+
+
 <br />
 <br />
 <br />
