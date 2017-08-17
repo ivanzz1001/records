@@ -54,6 +54,14 @@ description: crushmap示例
 
 假若我们需要在树中维持更多逻辑关系，我们可以添加更多的层级。例如一些逻辑层级代表磁盘类型，而其他一些则代表物理分布。这些层级可以根据我们的需要来添加。例如，这里我们添加了一个“pool”层级，或者也可以被称为“type”层级或其他（图中浅绿部分）：
 ![crushmap-tree-5.1.png](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-tree-5.1.png)
+![crushmap-tree-5.2.png](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-tree-5.2.png)
+
+
+
+**模型6：**
+
+在上面```模型5```中，虽然已经可以满足我们的需求了，但是因为层级太多，不便于我们阅读。特别是在当同一台宿主机上同时存在SSD和HDD时就会变得更加难以阅读。同样在这种情况下，```模型5```也并不能在物理数据存放层面进行逻辑区分。要解决这个问题，我们可以在HOST和OSD之间插入一个新的层级：
+![crushmap-tree-6.png](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-tree-6.png)
 
 
 <br />
