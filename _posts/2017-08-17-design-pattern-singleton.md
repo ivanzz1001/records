@@ -35,6 +35,7 @@ singleton::singleton()
 
 {% endhighlight %}
 
+<br />
 
 ```版本1```
 {% highlight string %}
@@ -49,7 +50,6 @@ singleton * singleton::getinstance()
 {% endhighlight %}
 
 然而，如果在多线程环境下，singleton::getinstance()同时被多个线程调用，也许第一个线程在通过if(NULL == instance)语句后被中断挂起，这时其他线程也会进入该区域，这时instance = new singleton()；语句就会被调用两次或更多，违背了singleton模式的初衷。为了保证对象构造区域为一个互斥区间，这时我们考虑引入mutex互斥信号量。比如：
-
 <br />
 
 ```版本2```
@@ -79,7 +79,6 @@ singleton * singleton::getinstance()
 	if(NULL == instance)
 	{
 		//对象实例第一次被创建之后，没有线程会进入该区域了，因此该版本的性能与版本1几乎相同，且安全性与版本2一样好。
-
 		lock(mutex);
 		if(NULL == instance)
 		{
