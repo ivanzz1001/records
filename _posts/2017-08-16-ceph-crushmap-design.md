@@ -41,6 +41,15 @@ description: crushmap示例
 另一个hdd与ssd混合的例子如下（你需要将每一个host分割开）：
 ![crushmap-tree-3.2.png](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-tree-3.2.png)
 
+
+**模型4：**
+
+上面```模型3```的问题是我们通过硬盘的不同类型来分割集群。这样的话我们就不能通过一个入口（entry）来选择“dc-1”和“dc-2”中任何一块硬盘。例如，我们就不能定义一个规则来将数据存储到数据中心的任何一块硬盘上。
+
+要解决这个问题，我们可以在root层级上增加一个其他的入口点。例如，按如下方式添加一个新的entry point来允许访问所有类型的硬盘。
+![crushmap-tree-4.png](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap-tree-4.png)
+
+
 <br />
 <br />
 <br />
