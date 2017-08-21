@@ -7,7 +7,9 @@ categories: distribute systems
 description: 分布式系统理论
 ---
 
-libpaxos库实现了paxos协议。在了解具体的paxos协议之前，我们先来编译安装libpaxos库。
+本文参考：http://www.dataguru.cn/article-10979-1.html
+
+
 
 <!-- more -->
 
