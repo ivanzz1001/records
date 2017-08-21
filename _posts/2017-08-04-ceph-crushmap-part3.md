@@ -904,14 +904,14 @@ for (rep = outpos; rep < numrep && count > 0 ; rep++)
 
 			//2: 判断item类型是否为指定的类型
 			// item >= 0表示为osd设备 其type值为0
-            // item < 0表示为bucket， 其type值>0
+			// item < 0表示为bucket， 其type值>0
 
-             if(typeof(item) != type)
-			 {
+			if(typeof(item) != type)
+			{
 				//3： 没有找到指定类型bucket，进入下一级遍历
-                in = next_bucket(item);
+				in = next_bucket(item);
 				retry_bucket = 1;
-			 }
+			}
 
 			// 4: 判断当前有没有发生collision
 
