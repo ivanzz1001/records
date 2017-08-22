@@ -83,6 +83,22 @@ To a flea crawling around on the circuit board, or to the engineer who designed 
 
 还能不能愉快的玩耍....![哭](https://ivanzz1001.github.io/records/assets/img/ceph/distribute/timg.png)
 
+<br />
+
+我们把以上所列的问题称为系统模型（system model)，讨论分布式系统理论和工程实践的时候，必须划定模型。例如，有如下两种模型：
+* 1： 异步环境（asynchronous)下，节点宕机（fail-stop)
+* 2： 异步环境（asynchronous)下，节点宕机恢复（fail-recover)、网络分化（network partition)
+
+2比1多了节点恢复、网络分化的考量，因而对这两种模型的研究和工程解决方案必定是不同的，在还没有明晰索要解决的问题前谈解决方案都是一本正经的耍流氓。
+
+<br/>
+
+一致性还具备两个属性： 一个是强一致性(safety)，它要求所有节点状态一致、共进退；一个是可用(liveness)，它要求分布式系统24*7无间断对外服务。 FLP定理（FLP impossibility)已经证明在一个收窄的模型中（异步环境并只存在节点宕机），不能同时满足safety和liveness。
+
+<br />
+
+FLP定理是分布式系统中的基础理论，正如物理学中的能量守恒定律彻底否定了永动机的存在，FLP定理否定了同时满足safety和liveness的一致性协议的存在。
+![《怦然心动 (Flipped)》，2010](https://ivanzz1001.github.io/records/assets/img/ceph/distribute/timg-1.png)
 
 
 
