@@ -101,6 +101,15 @@ FLP定理是分布式系统中的基础理论，正如物理学中的能量守�
 ![《怦然心动 (Flipped)》，2010](https://ivanzz1001.github.io/records/assets/img/ceph/distribute/timg-1.jpg)
 
 
+## 3. 二段/三段提交
+
+工程实践上根据具体的业务场景，或保证强一致性（safety），或在节点宕机、网络分化的时候保证可用（liveness)。 2PC、3PC是相对简单的解决一致性问题的协议。下面我们就来了解2PC和3PC。
+
+<br />
+
+**2PC**
+
+
 
 
 <br />
