@@ -27,7 +27,12 @@ To a flea crawling around on the circuit board, or to the engineer who designed 
 ## 2. 一致性(consensus)
 何为一致性问题？简单而言，一致性问题就是相互独立的节点之间如何达成一项决议的问题。分布式系统中，进行数据库事务提交（commit transaction)、Leader选举、序列号生成等都会遇到一致性问题。这个问题在我们的日常生活中也很常见，比如牌友怎么商定在几点在哪打几圈麻将：
 ![《赌圣》，1990](https://ivanzz1001.github.io/records/assets/img/ceph/distribute/timg.jpg)
-《赌圣》，1990
+
+假设一个具有N个节点的分布式系统，当其满足以下条件时，我们说这个系统满足一致性：
+* 1. 全认同（agreement）：所有N个节点都认同一个结果
+* 2. 值合法（validity)： 该结果必须由N个节点中的节点提出
+* 3. 可结束（termination）： 决议过程在一定时间内结束，不会无休止的进行下去
+
 
 
 
