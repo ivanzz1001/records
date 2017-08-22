@@ -21,6 +21,10 @@ To the user sitting at the keyboard, his IBM personal computer is a nondistribut
 To a flea crawling around on the circuit board, or to the engineer who designed it, it's very much a distributed system.
 </pre>
 
+一致性是分布式理论中的根本性问题，近半个世纪以来，科学家们围绕着一致性问题提出了很多理论模型，依据这些理论模型，业界也出现了很多工程实践投影。下面我们从一致性问题、特定条件下解决一致性问题的两种方法（2PC，3PC）入门，了解最基础的分布式系统理论。
+
+
+
 
 
 
