@@ -98,7 +98,7 @@ To a flea crawling around on the circuit board, or to the engineer who designed 
 <br />
 
 FLP定理是分布式系统中的基础理论，正如物理学中的能量守恒定律彻底否定了永动机的存在，FLP定理否定了同时满足safety和liveness的一致性协议的存在。
-![《怦然心动 (Flipped)》，2010](https://ivanzz1001.github.io/records/assets/img/ceph/distribute/timg-1.png)
+![《怦然心动 (Flipped)》，2010](https://ivanzz1001.github.io/records/assets/img/ceph/distribute/timg-1.jpg)
 
 
 
