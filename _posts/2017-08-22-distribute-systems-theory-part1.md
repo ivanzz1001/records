@@ -26,7 +26,7 @@ To a flea crawling around on the circuit board, or to the engineer who designed 
 
 ## 2. 一致性(consensus)
 何为一致性问题？简单而言，一致性问题就是相互独立的节点之间如何达成一项决议的问题。分布式系统中，进行数据库事务提交（commit transaction)、Leader选举、序列号生成等都会遇到一致性问题。这个问题在我们的日常生活中也很常见，比如牌友怎么商定在几点在哪打几圈麻将：
-![《赌圣》，1990](https://ivanzz1001.github.io/records/assets/img/ceph/distribute/timg.jpg)
+![《赌圣》，1990](https://ivanzz1001.github.io/records/assets/img/distribute/timg.jpg)
 
 假设一个具有N个节点的分布式系统，当其满足以下条件时，我们说这个系统满足一致性：
 
@@ -81,7 +81,7 @@ To a flea crawling around on the circuit board, or to the engineer who designed 
 ------------------------------------------------------------------
 {% endhighlight %}
 
-还能不能愉快的玩耍....![哭](https://ivanzz1001.github.io/records/assets/img/ceph/distribute/timg.png)
+还能不能愉快的玩耍....![哭](https://ivanzz1001.github.io/records/assets/img/distribute/timg.png)
 
 <br />
 
@@ -98,7 +98,7 @@ To a flea crawling around on the circuit board, or to the engineer who designed 
 <br />
 
 FLP定理是分布式系统中的基础理论，正如物理学中的能量守恒定律彻底否定了永动机的存在，FLP定理否定了同时满足safety和liveness的一致性协议的存在。
-![《怦然心动 (Flipped)》，2010](https://ivanzz1001.github.io/records/assets/img/ceph/distribute/timg-1.jpg)
+![《怦然心动 (Flipped)》，2010](https://ivanzz1001.github.io/records/assets/img/distribute/timg-1.jpg)
 
 
 ## 3. 二段/三段提交
@@ -108,6 +108,37 @@ FLP定理是分布式系统中的基础理论，正如物理学中的能量守�
 <br />
 
 **2PC**
+
+2PC(two phase commit)两阶段提交顾名思义它分成两个阶段，先由一方进行提议（Propose)并收集其他节点的反馈（vote），再根据反馈决定提交（commit）或终止（abort）事务。我们将提议的节点称为协调者（coordinator)，其他参与的节点称为参与者（participants或corhorts)。
+![2PC，phase one](https://ivanzz1001.github.io/records/assets/img/distribute/timg-2pc-phase-1.png)
+
+在阶段1中，coordinator发起一个提议，分别询问个participants是否接受。
+
+![2PC，phase two](https://ivanzz1001.github.io/records/assets/img/distribute/timg-2pc-phase-2.png)
+
+在阶段2中，coordinator根据participants的反馈，提交或终止事务。如果participants全部同意则提交，只要有一个participant不同意就终止。
+
+<br />
+
+在异步环境(asynchoronous)并且没有节点宕机（fail-stop)的模型下，2PC可以完全满足全认同、值合法、可结束，是解决一致性问题的一种协议。但如果再加上节点宕机恢复(fail-recover),2PC是否还能解决一致性问题呢？
+
+coordinator如果在发起提议后宕机，那么participant将进入阻塞(block)状态、一直等待coordinator回应以完成该次决议。这时需要另一个角色把系统从不可结束状态中带出来，我们把新增的这一角色叫做协调备份（coordinator watchdog)。coordinator宕机一定时间后，watchdog接替原coordinator工作，通过问询（query)个participant的状态，决定阶段2是提交还是终止。这也要求coordinator/participants记录(logging)历史状态，以备coordinator宕机后watchdog对participant查询，coordinator宕机恢复后重新找回状态。
+
+从coordinator接受一次事务请求、发起提议到事务完成，经过2PC协议后增加了2次RTT(propose + commit)，带来的时延(latency)增加相对较少。
+
+<br />
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
