@@ -125,8 +125,16 @@ FLP定理是分布式系统中的基础理论，正如物理学中的能量守�
 coordinator如果在发起提议后宕机，那么participant将进入阻塞(block)状态、一直等待coordinator回应以完成该次决议。这时需要另一个角色把系统从不可结束状态中带出来，我们把新增的这一角色叫做协调备份（coordinator watchdog)。coordinator宕机一定时间后，watchdog接替原coordinator工作，通过问询（query)个participant的状态，决定阶段2是提交还是终止。这也要求coordinator/participants记录(logging)历史状态，以备coordinator宕机后watchdog对participant查询，coordinator宕机恢复后重新找回状态。
 
 从coordinator接受一次事务请求、发起提议到事务完成，经过2PC协议后增加了2次RTT(propose + commit)，带来的时延(latency)增加相对较少。
-ff
+
 <br />
+
+**3PC**
+
+3PC(three phase commit)即三阶段提交。既然2PC可以在异步网络+节点宕机恢复的模型下实现一致，那还需要3PC做什么呢？ 什么是3PC？
+
+
+在2PC中一个participant的状态只有它自己和coordinator知晓，假如coordinator提议后自身宕机，在watchdog启用前一个participant又宕机，其他participant就会进入既不能回滚、又不能强制commit的阻塞状态，直到participant宕机恢复。这引出两个疑问：
+
 
 
 
