@@ -153,7 +153,7 @@ participant如果在不同阶段宕机，我们来看看3PC如何	应对：
 因为有了准备提交(prepare to commit)阶段，3PC的事务处理延时也增加了1个RTT，变为3个RTT(propose+precommit+commit)，但是它防止participant宕机后整个系统进入阻塞态，增强了系统的可用性，对一些现实业务场景是非常值得的。
 
 
-## 3. 小结
+## 4. 小结
 
 以上介绍了分布式系统理论中的部分基础知识，阐述了一致性(consensus)的定义和实现一致性所要面临的问题，最后讨论在异步网络(asynchronous)、节点宕机恢复(fail-recover)模型下2PC、3PC怎么解决一致性问题。
 
