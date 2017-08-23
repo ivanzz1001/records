@@ -135,15 +135,29 @@ coordinator如果在发起提议后宕机，那么participant将进入阻塞(blo
 
 在2PC中一个participant的状态只有它自己和coordinator知晓，假如coordinator提议后自身宕机，在watchdog启用前一个participant又宕机，其他participant就会进入既不能回滚、又不能强制commit的阻塞状态，直到participant宕机恢复。这引出两个疑问：
 
+* 1. 能不能去掉阻塞，使系统可以在commit/abort前回滚(rollback)到决议发起前的初始状态
+* 2. 当次决议中，participant间能不能相互知道对方的状态，又或者participant间根本不依赖对方的状态
+
+相比2PC，3PC增加了一个准备提交(prepare to commit)阶段来解决以上问题：
+
+![图片截取自wikipedia](https://ivanzz1001.github.io/records/assets/img/distribute/timg-3pc.png)
+
+coordinator接收完participant的反馈(vote)之后，进入阶段2，给各个participant发送准备提交(prepare to commit)指令。participant接收到准备提交指令后可以锁定资源，但要求相关操作必须可回滚。coordinator接收完确认（ACK）后进入阶段3，进行commit/abort。 3PC的阶段3与2PC的阶段2无异。 协调者备份（coordinator watchdog)、状态记录(logging)同样应用在3PC。
+
+participant如果在不同阶段宕机，我们来看看3PC如何	应对：
+
+* 阶段1：coordinator或watchdog未收到宕机participant的vote，直接中止事务；宕机的participant恢复后，读取logging发现未发出赞成vote，自行中止该次事务。
+* 阶段2： coordinator未收到宕机participant的precommit ACK，但因为之前已经收到了宕机participant的赞成反馈（不然也不会进入到阶段2），coordinator进行commit； watchdog可以通过询问其他participant获得这些信息，过程同理；宕机的participant恢复后发现收到precommit且已经发出赞成vote，则自行commit该次事务。
+* 阶段3：即便coordinator或watchdog未收到宕机participant的commit ACK，也结束该次事务；宕机的participant恢复后发现收到commit或者precommit，也将自行commit该次事务。
+
+因为有了准备提交(prepare to commit)阶段，3PC的事务处理延时也增加了1个RTT，变为3个RTT(propose+precommit+commit)，但是它防止participant宕机后整个系统进入阻塞态，增强了系统的可用性，对一些现实业务场景是非常值得的。
 
 
+## 3. 小结
 
+以上介绍了分布式系统理论中的部分基础知识，阐述了一致性(consensus)的定义和实现一致性所要面临的问题，最后讨论在异步网络(asynchronous)、节点宕机恢复(fail-recover)模型下2PC、3PC怎么解决一致性问题。
 
-
-
-
-
-
+阅读前人对分布式系统的各项理论研究，其中有严谨地推理、证明，有一种数学的美；观现实中的分布式系统实现，是综合各种因素下妥协的结果。
 
 
 
