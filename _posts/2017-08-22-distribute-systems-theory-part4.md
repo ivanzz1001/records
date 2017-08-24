@@ -95,7 +95,7 @@ P2c
 ![Paxon manuscript](https://ivanzz1001.github.io/records/assets/img/distribute/paxos_manuscript.png)
 
 上图中共有5个acceptor（Α、Β、Γ、Δ、Ε），其中空白处表示acceptor因宕机等原因缺席当次决议， 带方框的acceptor表示接受提议，未带方框的acceptor表示不接受提议。多数派accepor接受提议后提议被确定：
-<pre>
+{% highlight string %}
 1: ID为2的提议最早提出，根据P2c其提议值可为任意值，这里假设为α
 
 2: ID为5的提议中，其4个quorum成员均没有在之前的决议中接受(accept)任何提议，因此其提议值也可以为任意值，这里假设为β
@@ -106,8 +106,21 @@ P2c
    该轮提议被多数派acceptor接受，因此该轮提议得以确定。
 
 5: ID为29的提议中，其3个quorum成员均接受过早期提议。相比之下Γ、Δ曾接受的ID 为27的提议，其ID值最大。因此本轮的提议值必须与ID为27的提议值相同，即为β。
-</pre>
+{% endhighlight %}
 
+以上提到的各项约束条件可以归纳为3点，如果proposer/acceptor满足下面3点，那么在少数节点宕机、网络分化隔离的情况下，在“确定并只确定一个值”这件事情上可以保证一致性（consistency）：
+{% highlight string %}
+B1(β): β中每一轮决议都有唯一的ID标识。
+
+B2(β): 如果决议B被acceptor多数派接受，则确定决议B
+
+B3(β): 对于β中的任意提议B(n,v)，acceptor的多数派中如果存在acceptor最近一次(即ID值最大）接受的提议的值为v'，那么要求v = v'；否则v可为任何值。
+下面是本条规则英文原文：
+B3(B) For every ballot B in B, if any priest in B’s quorum voted in an earlier ballot in B, then the decree of B equals the decree of the latest of those earlier ballots.
+
+
+（注：希腊字母ß表示多轮决议的集合，字母B表示一轮决议)
+{% endhighlight %}
 
 
 	
