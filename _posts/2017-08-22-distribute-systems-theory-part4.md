@@ -1,6 +1,6 @@
 ---
 layout: post
-title: (转）分布式系统理论基础 -- CAP
+title: (转）分布式系统理论进阶 - Paxos
 tags:
 - 分布式系统
 categories: distribute-systems
