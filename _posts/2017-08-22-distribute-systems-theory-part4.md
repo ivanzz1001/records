@@ -80,6 +80,7 @@ P2b
 
 
 **(3) P2c** 
+
 P2b约束的是提议被确定(chosen)后proposer的行为，我们更关心提议被确定前proposer应该怎么做：
 {% highlight string %}
 P2c
