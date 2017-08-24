@@ -123,7 +123,41 @@ B3(B) For every ballot B in B, if any priest in B’s quorum voted in an earlier
 {% endhighlight %}
 
 
-	
+另外，为保证P2c，我们对acceptor作两个要求：
+
+* 记录曾接受的ID最大的提议，因proposer需要问询该信息以决定提议值
+* 在回应提议ID为N的proposer自己曾接受过ID最大的提议时，acceptor同时保证(promise)不再接受ID小于n的提议 
+
+
+至此，proposer/acceptor完成一轮决议可归纳为prepare和accept两个阶段。在prepare阶段，proposer发起提议问询提议值，acceptor回应问询并进行promise； accept阶段完成决议，图示如下：
+![Paxos 2pc](https://ivanzz1001.github.io/records/assets/img/distribute/paxos_2pc.png)
+
+
+还有一个问题需要考量，假如proposer A发起ID为N的提议，在提议未完成前proposer B又发起ID为N+1的提议，在N+1提议未完成前proposer C又发起ID为n+2的提议..., 如此acceptor不能完成决议、形成活锁（livelock)，虽然这不影响一致性，但我们一般不想让这样的情况发生。解决的方法是从proposer中选出一个leader，提议统一由leader发起。
+
+最后我们再引入一个新的角色： learner。 learner依附于acceptor，用于习得已确定的决议。 以上决议过程都只要求acceptor多数派参与，而我们希望尽量所有acceptor的状态一致。如果部分acceptor因宕机等原因未知晓已确定的决议，宕机恢复后可经本机learner采用pull的方式从其他acceptor习得。
+ 
+
+## 3. Multi Paxos
+
+通过以上步骤分布式系统已经能确定一个值，“只确定一个值有什么用？这可解决不了我面临的问题。” 你心中可能有这样的疑问。
+
+
+其实不断地进行“确定一个值”的过程、再为每个过程编上序号，就能得到具有全序关系(total order)的系列值，进而能应用在数据库副本存储等很多场景。我们把单次“确定一个值”的过程称为实例(instance)，它由proposer/acceptor/learner组成，下图说明了A/B/C三机上的实例：
+
+![Multi Paxos](https://ivanzz1001.github.io/records/assets/img/distribute/paxos_multi.png)
+
+不同序号的实例之间互相不影响，A/B/C三机输入相同、过程实质等同于执行相同序列的状态机(state machine)指令 ，因而将得到一致的结果。
+
+
+proposer leader在Multi Paxos中还有助于提升性能，常态下统一由leader发起提议，可节省prepare步骤(leader不用问询acceptor曾接受过的ID最大的提议，只有leader提议也不需要acceptor进行promise)直至发生leader宕机、重新选主。
+
+
+## 4. 小结
+
+以上介绍了Paxos的推演过程、如何在Basic Paxos的基础上通过状态机构建Multi Paxos。 Paxos协议比较“艰深晦涩”， 但多读几篇论文一般能理解其内涵，更难的是如何将Paxos真正应用到工程实践。
+
+微信后台开发开发同学实现并开源了一套基于Paxos协议的多机状态拷贝类库[PhxPaxos](https://github.com/tencent-wechat/phxpaxos)，PhxPaxos用于将单机服务扩展到多机，其经过线上系统验证并在一致性保证、性能等方面做了很多考量。 
 
 
 
