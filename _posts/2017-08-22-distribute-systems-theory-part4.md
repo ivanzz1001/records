@@ -36,8 +36,8 @@ P1
 
 首先proposer和acceptor需要满足以下两个条件：
 
-* 1. properser发起的每项提议分别用一个ID标识，提议的组成因此变为（ID，value）
-* 2. acceptor可以接受(accept)不止一项提议，当多数(quorum)acceptor接受一项提议时该提议被确定（chosen）
+* properser发起的每项提议分别用一个ID标识，提议的组成因此变为（ID，value）
+* acceptor可以接受(accept)不止一项提议，当多数(quorum)acceptor接受一项提议时该提议被确定（chosen）
 
 *(注：注意以上“接受”和“确定”的区别)*
 
@@ -52,7 +52,8 @@ P2
 <br />
 
 
-
+**(1) P2a**
+ 
 由于一项提议被确定(chosen)前必须先被多数派acceptor接受(accepted)，为实现P2，实际上acceptor需要做到：
 {% highlight string %}
 P2a
@@ -63,7 +64,7 @@ P2a
 <br />
 
 
-
+**(2) P2b**
 
 目前在多个proposer可以同时发起提议的情况下，满足P1、P2a即能做到确定并只确定一个值。如果再加上节点宕机恢复、消息丢包的考量呢？
 
@@ -78,7 +79,7 @@ P2b
 <br />
 
 
-
+**(3) P2c** 
 P2b约束的是提议被确定(chosen)后proposer的行为，我们更关心提议被确定前proposer应该怎么做：
 {% highlight string %}
 P2c
@@ -90,14 +91,21 @@ P2c
 
 
 条件P2c是Basic Paxos的核心，光看P2c的描述可能会觉得一头雾水，我们通过[The Part-Time Parliament  ](http://research.microsoft.com/en-us/um/people/lamport/pubs/lamport-paxos.pdf)中的例子加深理解：
+![Paxon manuscript](https://ivanzz1001.github.io/records/assets/img/distribute/paxos_manuscript.png)
 
+上图中共有5个acceptor（Α、Β、Γ、Δ、Ε），其中空白处表示acceptor因宕机等原因缺席当次决议， 带方框的acceptor表示接受提议，未带方框的acceptor表示不接受提议。多数派accepor接受提议后提议被确定：
+<pre>
+1: ID为2的提议最早提出，根据P2c其提议值可为任意值，这里假设为α
 
+2: ID为5的提议中，其4个quorum成员均没有在之前的决议中接受(accept)任何提议，因此其提议值也可以为任意值，这里假设为β
 
+3: ID为14的提议中，其3个quorum成员唯一接受(accept)过早期提议的是Δ，根据P2c，该轮提议值必须与ID为2的提议值相同，这里为α
 
+4: ID为27的提议中，Α未接受过之前的任何提议；Γ接受过ID为5的提议；Δ接受过ID为2的提议。相比之下ID 5较ID 2大，根据P2c，本轮提议的值必须与ID为5的提议值相同，即为β。 
+   该轮提议被多数派acceptor接受，因此该轮提议得以确定。
 
-
-
-
+5: ID为29的提议中，其3个quorum成员均接受过早期提议。相比之下Γ、Δ曾接受的ID 为27的提议，其ID值最大。因此本轮的提议值必须与ID为27的提议值相同，即为β。
+</pre>
 
 
 
