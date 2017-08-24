@@ -15,7 +15,7 @@ description: 分布式系统理论
 
 [《分布式系统理论基础 - 一致性、2PC和3PC》](https://ivanzz1001.github.io/records/post/distribute-systems/2017/08/22/distribute-systems-theory-part1) 一文介绍了一致性、达成一致性需要面临的各种问题以及2PC、3PC模型，Paxos协议在节点宕机恢复、消息无序或丢失、网络分化的场景下能保证决议的一致性，是被讨论最广泛的一致性协议。
 
-Paxos协议同时又以其“艰深晦涩”著称，下面结合 Paxos Made Simple 、The Part-Time Parliament 两篇论文，尝试通过Paxos推演、学习和了解Paxos协议。
+Paxos协议同时又以其“艰深晦涩”著称，下面结合[Paxos Made Simple](http://research.microsoft.com/en-us/um/people/lamport/pubs/paxos-simple.pdf) 、[The Part-Time Parliament](http://research.microsoft.com/en-us/um/people/lamport/pubs/lamport-paxos.pdf) 两篇论文，尝试通过Paxos推演、学习和了解Paxos协议。
 
 
 ## 2. Basic Paxos
