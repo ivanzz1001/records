@@ -51,12 +51,51 @@ P2
 
 <br />
 
+
+
 由于一项提议被确定(chosen)前必须先被多数派acceptor接受(accepted)，为实现P2，实际上acceptor需要做到：
 {% highlight string %}
 P2a
 . 如果一项值为v的提议被确定，那么acceptor后续只接受值为v的提议
 {% endhighlight %}
 满足P2a则P2成立(P2a=>P2)
+
+<br />
+
+
+
+
+目前在多个proposer可以同时发起提议的情况下，满足P1、P2a即能做到确定并只确定一个值。如果再加上节点宕机恢复、消息丢包的考量呢？
+
+假设acceptor c宕机一段时间后恢复， c 宕机期间其他acceptor已经确定了一项值为v的决议，但 c 因为宕机并不知晓； c 恢复后如果有proposer马上发起一项值不是v的提议， 由于条件P1， c会接受该提议，这与P2a矛盾。 为了避免这样的情况出现，进一步地我们对proposer作约束：
+{% highlight string %}
+P2b
+. 如果一项值为v的提议被确定，那么proposer后续只发起值为v的提议
+{% endhighlight %}
+
+满足P2b则P2a成立(P2b=>P2a=>P2).
+
+<br />
+
+
+
+P2b约束的是提议被确定(chosen)后proposer的行为，我们更关心提议被确定前proposer应该怎么做：
+{% highlight string %}
+P2c
+. 对于提议(n,v), acceptor的多数派S中，如果存在acceptor最近一次(即ID值最大）接受的提议的值为v',那么要求v = v'；否则v可为任意值
+{% endhighlight %}
+满足P2c则P2b成立(P2c=>P2b=>P2a=>P2)
+
+<br />
+
+
+条件P2c是Basic Paxos的核心，光看P2c的描述可能会觉得一头雾水，我们通过[The Part-Time Parliament  ](http://research.microsoft.com/en-us/um/people/lamport/pubs/lamport-paxos.pdf)中的例子加深理解：
+
+
+
+
+
+
 
 
 
