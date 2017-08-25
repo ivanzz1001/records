@@ -160,6 +160,13 @@ proposer leader在Multi Paxos中还有助于提升性能，常态下统一由lea
 微信后台开发开发同学实现并开源了一套基于Paxos协议的多机状态拷贝类库[PhxPaxos](https://github.com/tencent-wechat/phxpaxos)，PhxPaxos用于将单机服务扩展到多机，其经过线上系统验证并在一致性保证、性能等方面做了很多考量。 
 
 
+<br />
+<br />
+
+【参看】：
+
+[Paxos算法 - wiki](https://zh.wikipedia.org/zh-cn/Paxos%E7%AE%97%E6%B3%95)
+
 
 
 <br />
