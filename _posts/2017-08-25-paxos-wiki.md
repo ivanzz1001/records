@@ -38,7 +38,6 @@ description: paxos算法 - wiki
 {% endhighlight %}
 
 草案要通过侍从送到其他议员的案头。 A1的草案将由4位侍从送到A2-A5那里。 现在，负责A2和A3的侍从将草案顺利送达，负责A4和A5的侍从则不上班。A5的草案则顺利的送至A4和A3手中。如下图所示：
-
 ![实例](https://ivanzz1001.github.io/records/assets/img/distribute/paxos-wiki-example.png)
 
 
