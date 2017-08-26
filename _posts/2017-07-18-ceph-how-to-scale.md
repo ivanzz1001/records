@@ -1073,4 +1073,28 @@ ceph osd pool delete benchmark benchmark --yes-i-really-really-mean-it
 在此，我们模拟了因OSD FULL导致ceph集群出现HEALTH_ERR的情况，并给出了在此情况下的集群读写、删除等特性。并提供了普通情况与极限情况下集群的修复方法。可以较为彻底的解决此方面的问题。
 
 
+<br />
+<br />
+几个常用命令：
+
+1) 查看ceph当前配置相关
+{% highlight string %}
+# ceph daemon osd.0 help
+
+# ceph daemon /var/run/ceph/ceph-osd.0.asok help 
+{% endhighlight %}
+
+2) 查看默认配置参数
+{% highlight string %}
+# ceph --show-config
+{% endhighlight %}
+
+3) 在指定pool中创建rbd
+{% highlight string %}
+# rbd create benchmark/ceph-client1-rbd1 --size 10240 -c ceph.conf
+{% endhighlight %}
+
+<br />
+<br />
+<br />
 
