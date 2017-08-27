@@ -52,7 +52,7 @@ description: nginx源代码编译安装
 
 * ```--with-pcre-jit:``` 构建支持“just-in-time compilation”特性的PCRE库。
 
-* ```--with-zlib=path:``` 设置zlib库源文件的路径。该库的发布版本(version 1.1.3-1.2.11)需要从zlib官方网站下载然后解压。剩余的操作是由nginx的./configure及make来完成。ngx_http_gzip_module模块需要依赖于该库。
+* ```--with-zlib=path:``` 设置zlib库源文件的路径。该库的发布版本(version 1.1.3 - 1.2.11)需要从zlib官方网站下载然后解压。剩余的操作是由nginx的./configure及make来完成。ngx_http_gzip_module模块需要依赖于该库。
 
 * ```--with-cc-opt=parameters:``` 设置一些额外的参数，这些参数会被添加到CFLAGS变量后。当在FreeBSD系统下使用系统PCRE库的时候，--with-cc-opt="-I /usr/local/include" 应该被指定。假如需要指定select()函数支持的文件句柄数也可以通过这样指定：--with-cc-opt="-D FD_SETSIZE=2048"。
 
