@@ -58,6 +58,20 @@ description: nginx源代码编译安装
 
 * ```--with-ld-opt=parameters:``` 设置链接时候的一些额外的参数。当在FreeBSD系统下使用PCRE库时，应该指定```--with-ld-opt```="-L /usr/local/lib"。
 
+<br />
+如下是一个例子（所有参数都应该处于同一行）：
+{% highlight string %}
+# ./configure \
+--sbin-path=/usr/local/nginx/nginx \
+--conf-path=/usr/local/nginx/nginx.conf \
+--pid-path=/usr/local/nginx/nginx.pid \
+--with-http_ssl_module \
+--with-pcre=../pcre-8.40 \
+--with-zlib=../zlib-1.2.11 \
+{% endhighlight %}
+
+在执行完配置之后，就可以使用make来完成nginx的编译与安装。
+
 
 
 
