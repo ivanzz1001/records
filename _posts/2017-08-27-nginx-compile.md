@@ -67,7 +67,7 @@ description: nginx源代码编译安装
 --pid-path=/usr/local/nginx/nginx.pid \
 --with-http_ssl_module \
 --with-pcre=../pcre-8.40 \
---with-zlib=../zlib-1.2.11 \
+--with-zlib=../zlib-1.2.11 
 {% endhighlight %}
 
 在执行完配置之后，就可以使用make来完成nginx的编译与安装。
