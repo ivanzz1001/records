@@ -113,11 +113,11 @@ $ ceph osd tree
 ### 3.3 开启rgw服务
 逐台开启rgw服务：
 <pre>
-service ceph-radosgw start
+$ service ceph-radosgw start
 </pre>
 确认下rgw服务状态：
 <pre>
-service ceph-radosgw status
+$ service ceph-radosgw status
 </pre>
 
 
@@ -126,13 +126,13 @@ service ceph-radosgw status
 
 在ceph集群任意节点执行：
 <pre>
-ceph osd unset noout
-ceph osd unset norebalance
-ceph osd unset norecover
+$ ceph osd unset noout
+$ ceph osd unset norebalance
+$ ceph osd unset norecover
 </pre>
 去掉标志位后注意检查ceph集群状态是否恢复至HEALTH_OK
 <pre>
-ceph -s    #检查集群当前状态
+$ ceph -s    #检查集群当前状态
 </pre>
 
 
