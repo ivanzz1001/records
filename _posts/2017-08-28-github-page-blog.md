@@ -13,7 +13,7 @@ description: github pages
 
 
 ## 1. 注册github账号
-请在https://github.com/完成github账号的注册
+请在```https://github.com/```完成github账号的注册
 
 
 ## 2. 创建仓库
