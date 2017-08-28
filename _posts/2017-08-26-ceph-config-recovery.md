@@ -38,6 +38,16 @@ ceph_fsid  current  fsid  keyring  magic  ready  store_version  superblock  whoa
 
 现假如我们有如下线上环境：
 <pre>
+[root@mceph-node1 lzy]# ceph mon dump
+dumped monmap epoch 1
+epoch 1
+fsid 1d5e7f3d-8e4a-43b6-9787-4c55196f8b1b
+last_changed 2017-07-04 15:19:55.711176
+created 2017-07-04 15:19:55.711176
+0: 172.20.30.224:6789/0 mon.mceph-node1
+1: 172.20.30.225:6789/0 mon.mceph-node2
+2: 172.20.30.226:6789/0 mon.mceph-node3
+
 [root@mceph-node1 lzy]# ceph osd tree
 ID  WEIGHT  TYPE NAME           UP/DOWN REWEIGHT PRIMARY-AFFINITY 
 -12 1.50000 root ssd                                              
@@ -185,7 +195,7 @@ client.radosgw.mceph-node3
 {% highlight string %}
 # ceph auth export client.admin -o ${cluster}.client.admin.keyring
 
-# ceph auth export client.admin -o ${cluster}.client.radosgw.keyring
+# ceph auth export client.admin -o ${cluster}.client.radosrgw.keyring
 {% endhighlight %}
 
 请用上面具体的cluster名称替换${cluster}。例如：
@@ -193,7 +203,7 @@ client.radosgw.mceph-node3
 [root@mceph-node1 lzy]# ceph auth export client.admin -o ceph.client.admin.keyring
 export auth(auid = 0 key=AQB/QFtZ2uMFLBAA3Wh7ykaL9WYQQiupkYBcmg== with 3 caps)
 [root@mceph-node1 lzy]# 
-[root@mceph-node1 lzy]# ceph auth export client.admin -o ceph.client.radosgw.keyring
+[root@mceph-node1 lzy]# ceph auth export client.admin -o ceph.client.radosrgw.keyring
 export auth(auid = 0 key=AQB/QFtZ2uMFLBAA3Wh7ykaL9WYQQiupkYBcmg== with 3 caps)
 [root@mceph-node1 lzy]# 
 [root@mceph-node1 lzy]# cat ceph.client.admin.keyring 
@@ -203,7 +213,7 @@ export auth(auid = 0 key=AQB/QFtZ2uMFLBAA3Wh7ykaL9WYQQiupkYBcmg== with 3 caps)
         caps mds = "allow"
         caps mon = "allow *"
         caps osd = "allow *"
-[root@mceph-node1 lzy]# cat ceph.client.radosgw.keyring 
+[root@mceph-node1 lzy]# cat ceph.client.radosrgw.keyring 
 [client.admin]
         key = AQB/QFtZ2uMFLBAA3Wh7ykaL9WYQQiupkYBcmg==
         auid = 0
@@ -212,8 +222,277 @@ export auth(auid = 0 key=AQB/QFtZ2uMFLBAA3Wh7ykaL9WYQQiupkYBcmg== with 3 caps)
         caps osd = "allow *"
 </pre>
 
+这样我们就恢复了ceph.client.admin.keyring及ceph.client.radosrgw.keyring两个文件。后续我们只需要将这两个文件拷贝到/etc/ceph/目录下即可。
+
+## 恢复ceph.conf文件
+
+/etc/ceph/ceph.conf是ceph启动时默认加载的配置文件。ceph配置文件中一般有如下section:
+* global section
+* 全局mon section
+* 具体mon section 
+* 全局osd section
+* 具体osd section
+* rgw section
+
+因为ceph配置参数较多，总共约900个。因此大部分参数系统都已经给其指定了默认值。我们可以分别获取osd节点、mon节点、rgw节点的当前值，然后分别与默认值进行比较，找出其中的不同来恢复丢失的ceph.conf文件。
 
 
+（1） 获取所有配置参数的默认值
+
+我们可以通过如下命令来获取所有配置参数的默认值：
+<pre>
+[root@mceph-node1 lzy]# ceph --show-config > ceph_default.txt
+[root@mceph-node1 lzy]# cat ceph_default.txt
+name = client.admin
+cluster = ceph
+debug_none = 0/5
+debug_lockdep = 0/0
+debug_context = 0/0
+debug_crush = 0/0
+debug_mds = 0/0
+debug_mds_balancer = 0/0
+debug_mds_locker = 0/0
+debug_mds_log = 0/0
+debug_mds_log_expire = 0/0
+debug_mds_migrator = 0/0
+debug_buffer = 0/0
+debug_timer = 0/0
+debug_filer = 0/0
+debug_striper = 0/1
+debug_objecter = 0/0
+debug_rados = 0/0
+
+//后续省略
+</pre>
+
+（2） 获取osd节点当前值
+
+我们可以通过如下命令获取osd节点（例如osd.0)的当前值:
+<pre>
+[root@mceph-node1 lzy]# ceph daemon osd.0 config show > ceph_osd.0.txt
+[root@mceph-node1 lzy]# cat ceph_osd.0.txt
+{
+    "name": "osd.0",
+    "cluster": "ceph",
+    "debug_none": "0\/5",
+    "debug_lockdep": "0\/0",
+    "debug_context": "0\/0",
+    "debug_crush": "0\/0",
+    "debug_mds": "0\/0",
+    "debug_mds_balancer": "0\/0",
+    "debug_mds_locker": "0\/0",
+    "debug_mds_log": "0\/0",
+    "debug_mds_log_expire": "0\/0",
+    "debug_mds_migrator": "0\/0",
+    "debug_buffer": "0\/0",
+    "debug_timer": "0\/0",
+    "debug_filer": "0\/0",
+    "debug_striper": "0\/1",
+    "debug_objecter": "0\/0",
+    "debug_rados": "0\/0",
+    "debug_rbd": "0\/0",
+    "debug_rbd_replay": "0\/5",
+
+//后续省略
+</pre>
+
+（2） 获取mon节点的当前值
+
+我们可以通过如下命令获取mon节点(例如mon.mceph-node1)的当前值：
+<pre>
+[root@mceph-node1 lzy]# ceph daemon mon.mceph-node1 config show > mon.mceph-node1.txt
+[root@mceph-node1 lzy]# cat mon.mceph-node1.txt 
+{
+    "name": "mon.mceph-node1",
+    "cluster": "ceph",
+    "debug_none": "0\/5",
+    "debug_lockdep": "0\/0",
+    "debug_context": "0\/0",
+    "debug_crush": "0\/0",
+    "debug_mds": "0\/0",
+    "debug_mds_balancer": "0\/0",
+    "debug_mds_locker": "0\/0",
+    "debug_mds_log": "0\/0",
+
+//后续省略
+</pre>
+
+(3) 获取rgw节点的当前值
+
+我们可以通过如下命令获取rgw节点（例如client.radosgw.mceph-node1)的当前值：
+<pre>
+[root@mceph-node1 lzy]# ceph daemon client.radosgw.mceph-node1 config show > rgw.mceph-node1.txt
+[root@mceph-node1 lzy]# cat rgw.mceph-node1.txt | less
+{
+    "name": "client.radosgw.mceph-node1",
+    "cluster": "ceph",
+    "debug_none": "0\/5",
+    "debug_lockdep": "0\/0",
+    "debug_context": "0\/0",
+    "debug_crush": "0\/0",
+    "debug_mds": "0\/0",
+    "debug_mds_balancer": "0\/0",
+    "debug_mds_locker": "0\/0",
+    "debug_mds_log": "0\/0",
+    "debug_mds_log_expire": "0\/0",
+    "debug_mds_migrator": "0\/0",
+    "debug_buffer": "0\/0",
+    "debug_timer": "0\/0",
+    "debug_filer": "0\/0",
+    "debug_striper": "0\/1",
+    "debug_objecter": "0\/0",
+    "debug_rados": "0\/0",
+    "debug_rbd": "0\/0",
+    "debug_rbd_replay": "0\/5",
+    "debug_journaler": "0\/0",
+    "debug_objectcacher": "0\/0",
+
+//后续省略
+</pre>
+
+
+<br />
+在获取了上述ceph配置参数默认值、osd当前值、mon当前值、rgw当前值之后，对数据进行适当的处理，然后通过相应的工具找出不同，将这些不同的数据提取出来，再进行后续的调整即可恢复出ceph.conf文件。但是这可能会比较麻烦，我们可以直接通过如下命令找出与默认值不同的参数（以osd.0, mon.mceph-node1, client.radosgw.mceph-node1节点为例）：
+<pre>
+[root@mceph-node1 lzy]# ceph daemon osd.0 config diff > osd.0.diff
+[root@mceph-node1 lzy]# ceph daemon mon.mceph-node1 config diff > mon.mceph-node1.diff
+[root@mceph-node1 lzy]# ceph daemon client.radosgw.mceph-node1 config diff > rgw.mceph-node1.diff
+
+[root@mceph-node1 lzy]# cat osd.0.diff
+{
+    "diff": {
+        "current": {
+            "auth_client_required": "cephx",
+            "auth_supported": "cephx",
+            "cluster_addr": "172.20.55.8:0\/0",
+            "cluster_network": "172.20.55.0\/24",
+            "filestore_fd_cache_shards": "2048",
+            "filestore_fd_cache_size": "131072",
+            "filestore_fiemap": "true",
+            "filestore_max_inline_xattrs": "6",
+            "filestore_max_sync_interval": "300",
+            "filestore_min_sync_interval": "30",
+            "filestore_omap_header_cache_size": "204800",
+//后续省略
+
+[root@mceph-node1 lzy]# cat mon.mceph-node1.diff 
+{
+    "diff": {
+        "current": {
+            "auth_client_required": "cephx",
+            "auth_supported": "cephx",
+            "cluster_network": "172.20.55.0\/24",
+            "fsid": "1d5e7f3d-8e4a-43b6-9787-4c55196f8b1b",
+            "internal_safe_to_start_threads": "true",
+            "leveldb_block_size": "65536",
+            "leveldb_cache_size": "536870912",
+            "leveldb_compression": "false",
+            "leveldb_log": "",
+            "leveldb_write_buffer_size": "33554432",
+            "log_to_stderr": "false",
+            "mon_cluster_log_file": "\/var\/log\/ceph\/ceph.log",
+            "mon_cluster_log_to_syslog": "False",
+            "mon_host": "172.20.30.224,172.20.30.225,172.20.30.226",
+            "mon_initial_members": "mceph-node1,mceph-node2,mceph-node3",
+            "mon_osd_adjust_down_out_interval": "false",
+            "mon_osd_adjust_heartbeat_grace": "false",
+            "mon_osd_allow_primary_affinity": "true",
+            "mon_osd_down_out_interval": "43200",
+            "mon_pg_warn_max_per_osd": "0",
+            "mon_warn_on_legacy_crush_tunables": "false",
+//后续省略
+
+[root@mceph-node1 lzy]# cat rgw.mceph-node1.diff 
+{
+    "diff": {
+        "current": {
+            "admin_socket": "\/var\/run\/ceph\/radosgw-mceph-node1.asok",
+            "auth_client_required": "cephx",
+            "auth_supported": "cephx",
+            "cluster_network": "172.20.55.0\/24",
+            "daemonize": "true",
+            "fsid": "1d5e7f3d-8e4a-43b6-9787-4c55196f8b1b",
+            "internal_safe_to_start_threads": "true",
+            "keyring": "\/etc\/ceph\/ceph.client.radosgw.keyring",
+            "log_file": "\/var\/log\/ceph\/radosgw-mceph-node1.log",
+            "log_to_stderr": "false",
+            "mon_host": "172.20.30.224,172.20.30.225,172.20.30.226",
+            "mon_initial_members": "mceph-node1,mceph-node2,mceph-node3",
+            "mon_pg_warn_max_per_osd": "200",
+            "osd_crush_chooseleaf_type": "0",
+            "osd_pool_default_crush_rule": "5",
+            "osd_pool_default_min_size": "2",
+            "public_network": "172.20.30.0\/24",
+            "rgw_enable_usage_log": "true",
+            "rgw_frontends": "civetweb port=7480",
+            "rgw_multipart_min_part_size": "524288",
+//后续省略
+
+</pre>
+
+将这些diff提取出来之后，我们可以直接创建出ceph-preprocess.conf文件，将这些differ的当前值分别填入配置文件的各个section下。例如：
+<pre>
+[root@mceph-node1 lzy]# cat ceph-preprocess.conf 
+[mon.mceph-node1]
+# monitor mceph-node1 differ 处理后的值
+
+
+
+[osd.0]
+# osd.0 differ 处理后的值
+
+
+[client.radosgw.mceph-node1]
+# rgw mceph-node1 differ 处理后的值
+
+
+[root@mceph-node1 lzy]# 
+</pre>
+然后对这些节点的值进行整理，看哪些字段可以提升为[global] section，哪些字段可以提升为全局[mon] section，哪些字段可以提升为全局[osd] section。调整完之后就可以形成最后的ceph.conf文件，拷贝到/etc/ceph/目录即可。一般ceph.conf配置文件各个section下有哪些字段，这里给出一个大体的参考：
+<pre>
+[global]
+# fsid 字段
+# public network 
+# cluster network
+
+
+# auth_service_required
+# auth_supported
+# auth_cluster_required
+# auth_client_required
+
+# mon_initial_members = mceph-node1,mceph-node2,mceph-node3
+# mon_host = 172.20.30.220,172.20.30.221,172.20.30.222
+# mon_osd_full_ratio 
+# mon_osd_nearfull_ratio 
+
+# osd_pool_default_size = 3
+# osd_pool_default_min_size = 2
+
+# debug相关字段
+
+
+[mon]
+# mon_cluster_log_file
+# mon_pg_warn_max_per_osd
+# mon_warn_on_legacy_crush_tunables
+# mon_osd_down_out_interval
+# mon_osd_adjust_heartbeat_grace
+
+[osd]
+# osd相关
+# journal日志相关
+# leveldb相关
+# filestore相关
+
+
+</pre>
+
+
+
+## 3. 总结
+
+ceph在运行过程中内存中保存有所有相关的必要信息，并且自身也提供了很方便的接口/工具将这些数据导出。在配置文件丢失的情况下，我们也可以据此很容易的进行恢复。
 
 
 
