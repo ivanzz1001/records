@@ -188,7 +188,29 @@ client.radosgw.mceph-node3
 # ceph auth export client.admin -o ${cluster}.client.radosgw.keyring
 {% endhighlight %}
 
-请用上面具体的cluster名称替换${cluster}。
+请用上面具体的cluster名称替换${cluster}。例如：
+<pre>
+[root@mceph-node1 lzy]# ceph auth export client.admin -o ceph.client.admin.keyring
+export auth(auid = 0 key=AQB/QFtZ2uMFLBAA3Wh7ykaL9WYQQiupkYBcmg== with 3 caps)
+[root@mceph-node1 lzy]# 
+[root@mceph-node1 lzy]# ceph auth export client.admin -o ceph.client.radosgw.keyring
+export auth(auid = 0 key=AQB/QFtZ2uMFLBAA3Wh7ykaL9WYQQiupkYBcmg== with 3 caps)
+[root@mceph-node1 lzy]# 
+[root@mceph-node1 lzy]# cat ceph.client.admin.keyring 
+[client.admin]
+        key = AQB/QFtZ2uMFLBAA3Wh7ykaL9WYQQiupkYBcmg==
+        auid = 0
+        caps mds = "allow"
+        caps mon = "allow *"
+        caps osd = "allow *"
+[root@mceph-node1 lzy]# cat ceph.client.radosgw.keyring 
+[client.admin]
+        key = AQB/QFtZ2uMFLBAA3Wh7ykaL9WYQQiupkYBcmg==
+        auid = 0
+        caps mds = "allow"
+        caps mon = "allow *"
+        caps osd = "allow *"
+</pre>
 
 
 
