@@ -13,9 +13,9 @@ description: gitbook的使用
 
 
 ## 1. 简介
-<pre>
+{% highlight string %}
 Modern book format and toolchain using Git and Markdown
-</pre>
+{% endhighlight %}
 这是 gitbook 项目主页上对 gitbook 的定义。
 
 gitbook 首先是一个软件，正如上面定义的那样，它使用 Git 和 Markdown 来编排书本，如果用户没有听过 Git 和 Markdown，那么 gitbook 可能不适合你！
@@ -131,8 +131,9 @@ gitbook editor 的使用非常简单，这里不再介绍！
 如果读者不了解 GitHub Pages 为何物，简单说就是一个可以托管静态网站的 Git 项目，支持使用 markdown 语法以及 Jekyll 来构建，或者直接使用已经生成好的静态站点。详细可以参考 GitHub Pages 主页。
 
 由于 gitbook 书籍可以通过 gitbook 本地构建出 site 格式，所以可以直接将构建好的书籍直接放到 GitHub Pages 中托管，之后，可以通过如下地址访问书籍：
-
+{% highlight string %}
 <username>.github.io/<project>
+{% endhighlight %}
 
 例如：这本书中使用的例子 'test' 项目可以通过地址：chengweiv5.github.io/test 来访问。
 
@@ -140,6 +141,7 @@ gitbook editor 的使用非常简单，这里不再介绍！
 
 master, 保存书籍的源码
 gh-pages, 保存书籍编译后的 HTML 文件
+
 
 ### 4.1 构建书籍
 首先，使用 gitbook build 将书籍内容输出到默认目录，也就是当前目录下的 _book 目录。
