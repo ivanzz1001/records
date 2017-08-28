@@ -40,7 +40,7 @@ gitbook 的基本用法非常简单，基本上就只有两步：
 
 下面将结合一个非常简单的实例，来介绍 gitbook 的基本用法。
 
-## 3.1 gitbook init
+### 3.1 gitbook init
 首先，创建如下目录结构：
 <pre>
 $ tree book/
@@ -95,7 +95,7 @@ $ tree
 注意：在我的实验中，gitbook init 只支持两级目录！
 
 
-# 3.2 gitbook serve
+### 3.2 gitbook serve
 书籍目录结构创建完成以后，就可以使用 gitbook serve 来编译和预览书籍了：
 
 <pre>
@@ -141,7 +141,7 @@ gitbook editor 的使用非常简单，这里不再介绍！
 master, 保存书籍的源码
 gh-pages, 保存书籍编译后的 HTML 文件
 
-## 4.1 构建书籍
+### 4.1 构建书籍
 首先，使用 gitbook build 将书籍内容输出到默认目录，也就是当前目录下的 _book 目录。
 <pre>
 $ gitbook build
@@ -153,12 +153,12 @@ GLOSSARY.html       chapter1            chapter2            gitbook             
 </pre>
 
 
-## 4.2 发布书籍
+### 4.2 发布书籍
 <pre>
 $ gitbook serve
 </pre>
 
-## 4.3 创建 gh-pages 分支
+### 4.3 创建 gh-pages 分支
 执行如下命令来创建分支，并且删除不需要的文件：
 
 <pre>
@@ -170,12 +170,12 @@ $ rm -rf *~
 
 
 现在，目录下应该只剩下 _book 目录了，首先，忽略一些文件：
-<pre>
+{% highlight string %}
 $ echo "*~" > .gitignore
 $ echo "_book" >> .gitignore
 $ git add .gitignore
 $ git commit -m "Ignore some files"
-</pre>
+{% endhighlight %}
 
 
 然后，加入 _book 下的内容到分支中：
