@@ -24,6 +24,7 @@ description: go开发环境的搭建
 * PATH：一般需要导出GOROOT,GOROOT下的bin两个目录
 
 例如：
+
 ![go-env](https://ivanzz1001.github.io/records/assets/img/go/go-env.png)
 
 
