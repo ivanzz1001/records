@@ -73,6 +73,76 @@ python setup.py install
 编译运行，打印出hello,world
 
 
+## 2. Linux上安装python
+
+我们系统上默认安装有python2.7:
+{% highlight string %}
+[root@localhost install-pkg]# python -V
+Python 2.7.5
+{% endhighlight %}
+
+下面我们来安装python3。
+
+### 2.1 下载python3源码
+
+到官方网站下载python源码：https://www.python.org/downloads/source/
+{% highlight string %}
+#  wget https://www.python.org/ftp/python/3.6.2/Python-3.6.2.tgz
+{% endhighlight %}
+
+### 2.2 安装编译环境（依赖包）
+{% highlight string %}
+# yum install zlib-devel bzip2-devel  openssl-devel ncurses-devel
+{% endhighlight %}
+
+
+### 2.3 编译安装Python
+{% highlight string %}
+# tar -xvf Python-3.6.2.tgz
+
+# cd Python-3.6.2/
+
+# ./configure --prefix=/usr/local/python3
+
+# make
+# make test
+# sudo make install
+{% endhighlight %}
+
+建立软链接：
+{% highlight string %}
+# ln -s /usr/local/python3/bin/python3.6 /usr/local/bin/python3
+# ln -s /usr/local/python3/bin/pip3.6 /usr/local/bin/pip3
+{% endhighlight %}
+
+如果提示：Ignoring ensurepip failure: pip 7.1.2 requires SSL/TLS
+
+这是原因没有安装或升级oenssl:```yum install openssl-devel```。再次重复编译方案python3.5
+
+
+### 2.4 pip升级
+执行如下命令进行pip升级：
+{% highlight string %}
+# pip install --upgrade pip
+{% endhighlight %}
+
+
+
+### 2.5 使用pip安装包
+示例：
+
+{% highlight string %}
+//requests包：
+# pip install requests
+
+//pyquery包：
+# pip install pyquery
+
+//pymysql包：
+# pip install pymysql
+{% endhighlight %}
+
+
 
 
 
