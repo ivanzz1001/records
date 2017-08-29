@@ -32,14 +32,8 @@ description: python开发环境的搭建
 
 如若不能找到相应的python命令，在一般需要在PATH环境变量中添加截图中的这两个环境变量。
 
-### 1.4 安装集成开发环境
 
-这里使用pycharm集成开发环境。到官方网站下载（http://www.jetbrains.com/pycharm/download/#section=windows)。专业版需要收费，这里下载社区版本。下载后直接安装即可。
-
-![pycharm-install](https://ivanzz1001.github.io/records/assets/img/python/pycharm-install.png)
-
-
-### 1.5 升级pip
+### 1.4 升级pip
 python pip是python包管理工具，可以通过如下命令进行升级：
 {% highlight string %}
 python -m pip install --upgrade pip
@@ -60,6 +54,15 @@ python -m pip install --upgrade pip --force-reinstall
 {% highlight string %}
 python setup.py install
 {% endhighlight %}
+
+### 1.5 安装集成开发环境
+
+这里使用pycharm集成开发环境。到官方网站下载（http://www.jetbrains.com/pycharm/download/#section=windows)。专业版需要收费，这里下载社区版本。下载后直接安装即可。
+
+![pycharm-install](https://ivanzz1001.github.io/records/assets/img/python/pycharm-install.png)
+
+安装完成后，配置相应的Project Interpreter。 从"File" -> "Default Settings" -> "Project Interpreter"进行配置。
+
 
 
 
