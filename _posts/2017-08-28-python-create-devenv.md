@@ -63,6 +63,17 @@ python setup.py install
 
 安装完成后，配置相应的Project Interpreter。 从"File" -> "Default Settings" -> "Project Interpreter"进行配置。
 
+### 1.6 编写一个hello,world程序
+
+注意我们这里使用的是Python3:
+
+![python-helloworld](https://ivanzz1001.github.io/records/assets/img/python/python-helloworld.png)
+
+
+编译运行，打印出hello,world
+
+
+
 
 
 
