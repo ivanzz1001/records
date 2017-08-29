@@ -39,8 +39,27 @@ description: python开发环境的搭建
 ![pycharm-install](https://ivanzz1001.github.io/records/assets/img/python/pycharm-install.png)
 
 
+### 1.5 升级pip
+python pip是python包管理工具，可以通过如下命令进行升级：
+{% highlight string %}
+python -m pip install --upgrade pip
+
+# 或
+
+pip install --upgrade pip
+{% endhighlight %}
+
+通过如下命令进行重装：
+{% highlight string %}
+python -m pip install --upgrade pip --force-reinstall
+{% endhighlight %}
+假如我们在Windows上同时安装了python2与python3，则可能需要安装两个版本的pip。但是一般情况下，我们在安装2个版本python的时候可能系统只会自动帮我们安装上一个版本的pip，此时我们可以通过上述命令，选择适当的python版本（python2/python3)来重新安装pip。后续我们就可以通过pip2/pip3来决定使用哪一个pip了。
 
 
+此外，我们也可以到官方网站上下载来安装：https://pypi.python.org/pypi/pip。下载完成后，进入到对应的目录，执行如下命令进行安装：
+{% highlight string %}
+python setup.py install
+{% endhighlight %}
 
 
 
