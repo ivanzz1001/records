@@ -30,6 +30,14 @@ description: python开发环境的搭建
 
 ![python-windows-running](https://ivanzz1001.github.io/records/assets/img/python/python-windows-running.png)
 
+如若不能找到相应的python命令，在一般需要在PATH环境变量中添加截图中的这两个环境变量。
+
+### 1.4 安装集成开发环境
+
+这里使用pycharm集成开发环境。到官方网站下载（http://www.jetbrains.com/pycharm/download/#section=windows)。专业版需要收费，这里下载社区版本。下载后直接安装即可。
+
+![pycharm-install](https://ivanzz1001.github.io/records/assets/img/python/pycharm-install.png)
+
 
 
 
