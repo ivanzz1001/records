@@ -18,6 +18,8 @@ description: python开发环境的搭建
 ### 1.1 下载python
 到[python官方网站](https://www.python.org/downloads/windows/)下载windows操作系统下的最新python版本：python3.6.2。
 
+```(注：windows xp上最后支持的python版本是python3.4)```
+
 ### 1.2 安装python3.6.2
 这里采用自定义安装：
 
