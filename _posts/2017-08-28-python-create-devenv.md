@@ -61,6 +61,8 @@ python setup.py install
 
 这里使用pycharm集成开发环境。到官方网站下载（http://www.jetbrains.com/pycharm/download/#section=windows)。专业版需要收费，这里下载社区版本。下载后直接安装即可。
 
+```（windows xp下使用pycharm-2016.2版本)）```
+
 ![pycharm-install](https://ivanzz1001.github.io/records/assets/img/python/pycharm-install.png)
 
 安装完成后，配置相应的Project Interpreter。 从"File" -> "Default Settings" -> "Project Interpreter"进行配置。
