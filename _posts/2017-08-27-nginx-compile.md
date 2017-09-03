@@ -75,7 +75,26 @@ description: nginx源代码编译安装
 
 
 
+## 2. Ubuntu16.04 + nginx1.10.3安装
+参看：http://www.cnblogs.com/badboyf/p/6422547.html
 
+**(1) gcc,g++依赖库的安装**
+{% highlight string %}
+# apt-get install build-essential
+# apt-get install libtool
+{% endhighlight %}
+
+这里简单介绍一下这两个库：
+
+```build-essential:``` 软件包的作用是提供编译程序必须软件包的列表信息，也就是说编译程序有了这个软件包，它才知道头文件在哪，才知道库函数在哪，还会下载依赖的软件包，最后才组成一个开发环境。
+
+```libtool:``` 软件包是一个用于支持script的通用库。它通过提供一个一致性、可移植性的接口来隐藏使用共享库的复杂性。
+
+我们可以通过如下命令来查看这两个包是否已经安装：
+{% highlight string %}
+# dpkg -l | grep build-essential
+# dpkg -l | grep libtool
+{% endhighlight %}
 
 
 
