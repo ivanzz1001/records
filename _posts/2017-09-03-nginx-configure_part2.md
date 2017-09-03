@@ -9,6 +9,8 @@ description: nginx编译脚本解析
 
 接上一章，此文我们来解析auto/options脚本。此脚本主要用来设定配置选项。
 
+参看：```http://blog.csdn.net/poechant/article/details/7327206```
+
 <!-- more -->
 
 
@@ -610,7 +612,7 @@ esac
 {% endhighlight %}
 
 
-
+## 2. 读取configure配置参数
 
 
 
