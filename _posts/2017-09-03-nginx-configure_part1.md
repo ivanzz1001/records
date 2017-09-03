@@ -145,7 +145,15 @@ fi
 
 如下是我们执行configure后的输出：
 {% highlight string %}
-root@ubuntu:/home/ivan1001/Share/nginx-1.10.3# ./configure --sbin-path=/usr/local/nginx/nginx --conf-path=/usr/local/nginx/nginx.conf --pid-path=/usr/local/nginx/nginx.pid --with-http_ssl_module --with-pcre=../pcre-8.40 --with-zlib=../zlib-1.2.11
+root@ubuntu:/home/ivan1001/Share/nginx-1.10.3# ./configure \
+--sbin-path=/usr/local/nginx/nginx \
+--conf-path=/usr/local/nginx/nginx.conf \
+--pid-path=/usr/local/nginx/nginx.pid \
+--with-http_ssl_module \
+--with-pcre=../pcre-8.40 \
+--with-zlib=../zlib-1.2.11
+
+
 checking for OS
  + Linux 4.8.0-36-generic i686
 checking for C compiler ... found
@@ -266,6 +274,8 @@ Configuration summary
   nginx http fastcgi temporary files: "fastcgi_temp"
   nginx http uwsgi temporary files: "uwsgi_temp"
   nginx http scgi temporary files: "scgi_temp"
+
+
 {% endhighlight %}
 
    
