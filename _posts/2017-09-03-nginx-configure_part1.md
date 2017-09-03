@@ -268,7 +268,7 @@ Configuration summary
   nginx http scgi temporary files: "scgi_temp"
 {% endhighlight %}
 
-
+ 
 <br />
 <br />
 <br />
