@@ -614,6 +614,41 @@ esac
 
 ## 2. 读取configure配置参数
 
+**(1) 变量定义**
+
+我们注意到在auto/options脚本的最开始定义了很多变量，有些设定了初始值，有些则没有。其他变量都很稀疏平常，但是我们注意到有如下一个比较特别：
+{% highlight string %}
+CC=${CC:-cc}
+{% endhighlight %} 
+则句话的含义为如果```CC```变量没有定义，则```CC```定义为cc；否则为```CC```定义的变量值。
+
+**(2) 解析参数选项**
+
+接着在auto/options中，有如下一段：
+{% highlight string %}
+opt=
+
+for option
+do
+    opt="$opt `echo $option | sed -e \"s/\(--[^=]*=\)\(.* .*\)/\1'\2'/\"`"
+
+    case "$option" in
+        -*=*) value=`echo "$option" | sed -e 's/[-_a-zA-Z0-9]*=//'` ;;
+           *) value="" ;;
+    esac
+done
+{% endhighlight %}
+
+这段实际上是处理./configure携带的参数选项，for循环每次对应一个参数选项option。要注意的是for循环体上面有一个全局的opt变量。这个循环体内第一个语句是最重要的：
+{% highlight string %}
+opt="$opt `echo $option | sed -e \"s/\(--[^=]*=\)\(.* .*\)/\1'\2'/\"`"
+{% endhighlight %}
+它的实际作用是匹配configure的参数选项（把匹配到的第一部分作为参数1，匹配到的第二部分作为参数2）。因此，通过循环该语句后，最后opt的值就是一个由空格分隔的参数列表。
+
+
+
+
+
 
 
 <br />
