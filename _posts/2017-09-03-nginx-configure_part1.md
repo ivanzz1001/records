@@ -142,7 +142,7 @@ fi
 在这一节我们就来分析auto/options脚本.
 
 ## 2.  auto/options脚本解析
-参看：http://blog.csdn.net/poechant/article/details/7327206
+参看：```http://blog.csdn.net/poechant/article/details/7327206```
 
  
 
