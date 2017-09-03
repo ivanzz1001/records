@@ -146,6 +146,7 @@ Python 2.7.5
 # pip install pymysql
 {% endhighlight %}
 
+```默认情况下，pip会从https://pypi.python.org/pypi来安装包```
 
 
 
