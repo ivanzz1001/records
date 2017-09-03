@@ -96,7 +96,90 @@ description: nginx源代码编译安装
 # dpkg -l | grep libtool
 {% endhighlight %}
 
+**(2) 安装pcre依赖库**
 
+参看：http://www.pcre.org/
+
+执行如下命令进行安装：
+{% highlight string %}
+# sudo apt-get install libpcre3 libpcre3-dev
+{% endhighlight %}
+或源码安装：
+{% highlight string %}
+# wget ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.40.tar.gz
+# tar –zxvf pcre-8.40.tar.gz
+# cd pcre-8.40
+# ./configure
+# make
+# make install
+{% endhighlight %}
+(注：这里可以暂时解压出来，不用进行安装，后续让nginx脚本来进行安装)
+
+
+**(3) 安装zlib依赖库**
+
+参看：http://www.zlib.net
+{% highlight string %}
+# apt-get install zliblg-dev
+{% endhighlight %}
+
+或源码安装：
+{% highlight string %}
+# wget http://zlib.net/zlib-1.2.11.tar.gz
+# tar -zxvf zlib-1.2.11.tar.gz
+# cd zlib-1.2.11
+# ./configure
+# make
+# make install
+{% endhighlight %}
+(注：这里可以暂时解压出来，不用进行安装，后续让nginx脚本来进行安装)
+
+
+
+**(4) 安装ssl依赖库**
+
+执行如下命令进行安装：
+{% highlight string %}
+# apt-get install openssl libssl-dev
+{% endhighlight %}
+也可以通过如下命令来下载二进制安装包：
+{% highlight string %}
+# apt-get download openssl
+{% endhighlight %}
+
+
+**(5) 安装nginx **
+
+这里我们所用的nginx版本为：nginx-1.10.3
+{% highlight string %}
+# ./configure \
+--sbin-path=/usr/local/nginx/nginx \
+--conf-path=/usr/local/nginx/nginx.conf \
+--pid-path=/usr/local/nginx/nginx.pid \
+--with-http_ssl_module \
+--with-pcre=../pcre-8.40 \
+--with-zlib=../zlib-1.2.11
+
+# make 
+
+# make install 
+{% endhighlight %}
+
+
+**(6) 查看nginx是否安装成功 **
+
+启动、停止、重载配置、测试配置文件是否正确：
+
+{% highlight string %}
+# sudo /usr/local/nginx/nginx             #采用默认的配置文件启动
+# sudo /usr/local/nginx/nginx -c /usr/local/nginx/nginx.conf                                #采用指定的配置文件启动 
+
+# sudo /usr/local/nginx/nginx -t         #检测配置文件是否正确
+
+# sudo /usr/local/nginx/nginx -s stop    #停止
+
+# sudo /usr/local/nginx/nginx -s reload  #重载配置文件
+{% endhighlight %}
 
 
 
