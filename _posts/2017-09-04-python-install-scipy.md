@@ -164,8 +164,30 @@ scikit-learn: 里面有很多机器学习相关的算法（如聚类算法，SVM
 
 matplotlib: 是一个画图工具，和Matlab中的画图工程类似。 
 
+
+
+## 5. Linux上安装opencv
+
+当前安装环境为Centos7.1(64bit) + python3.6.2。在Linux下安装OpenCV-Python相对简单，直接采用如下命令：
+{% highlight string %}
+pip install numpy
+pip install scipy
+pip install matplotlib
+pip install scikit-learn
+pip install opencv-python
+{% endhighlight %}
+
+要源代码编译安装请参看：
+(1) [Install OpenCV 3.0 with Python 3.4 on OSX & Ubuntu](https://github.com/rainyear/lolita/issues/18)
+
+(2) [Ubuntu14.04 64位+Python3.4环境下安装opencv3.0的方法](http://blog.csdn.net/qingyuanluofeng/article/details/51558270)
+
+(3) [ubuntu14/16 安装python3-opencv3](http://jingyan.baidu.com/article/e4511cf348dac52b845eafc8.html)
+
+
 <br />
 <br />
+
 
 
 
