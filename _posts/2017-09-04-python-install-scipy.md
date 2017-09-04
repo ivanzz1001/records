@@ -10,6 +10,12 @@ description: Python环境搭建之OpenCV
 本文主要讲述在python3.6环境下如何搭建OpenCV开发环境。
 
 <!-- more -->
+文章主要包含以下几个部分：
+* OpenCV介绍
+* 安装OpenCV
+* OpenCV测试
+* Python机器学习库介绍
+
 
 ## 1. OpenCV介绍
 Open Source Computer Vision Library.OpenCV于1999年由Intel建立，如今由Willow Garage提供支持。OpenCV是一个基于BSD许可（开源）发行的跨平台计算机视觉库，可以运行在Linux、Windows、MacOS操作系统上。它轻量级而且高效——由一系列 C 函数和少量C++类构成，同时提供了Python、Ruby、MATLAB等语言的接口，实现了图像处理和计算机视觉方面的很多通用算法。
@@ -98,9 +104,76 @@ matplotlib.pyplot.show()
 
 
 
+### 2.2 安装OpenCV
+上面我们已经成功的安装了numpy + matplotlib，此时我们一般可以直接通过如下命令来安装OpenCV：
+{% highlight string %}
+pip install opencv-python
+{% endhighlight %}
 
 
 
+
+## 3. OpenCV测试
+编写如下脚本：
+{% highlight string %}
+# -*- coding: utf-8 -*-
+
+import numpy
+import cv2
+
+# read image, support bmp,jpg,png,tiff format
+img = cv2.imread("D:\\timg2.jpg")
+
+
+emptyImage = numpy.zeros(img.shape,numpy.uint8)
+emptyImage2 = img.copy()
+emptyImage3 = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+
+# create window and display the created window
+cv2.namedWindow("Image")
+#cv2.imshow("Image",img)
+#cv2.waitKey(0)
+
+#cv2.imshow("Image",emptyImage2)
+#cv2.waitKey(0)
+
+cv2.imshow("Image",emptyImage3)
+cv2.waitKey(0)
+
+# destory window
+cv2.destroyAllWindows()
+{% endhighlight %}
+
+运行结果如下：
+
+![python-opencv](https://ivanzz1001.github.io/records/assets/img/python/python-opencv.png)
+
+
+## 4. Python机器学习库介绍
+Python下有很多关于机器学习的库，最常用的组合有以下四个：
+
+numpy: 主要用来做一些科学运算，主要是矩阵运算。NumPy为Python带来了真正的多维数组功能，并且提供了丰富的函数库处理这些数组。它将常用的数学函数都进行数组化，使得这些数学函数能够直接对数组进行操作，将本来需要在Python级别进行的循环，放到C语言的运算中，明显地提高了程序的运算速度。
+
+scipy: 主要是一些科学计算工具集，信号处理工具集（如线性代数使用LAPACK库，快速傅里叶变换FFTPACK库）及数值计算的一些工具（常微分方程求解使用ODEPACK库，非线性方程组求解以及最小值求解等）。
+
+scikit-learn: 里面有很多机器学习相关的算法（如聚类算法，SVM等）
+
+matplotlib: 是一个画图工具，和Matlab中的画图工程类似。 
+
+<br />
+<br />
+
+
+
+
+
+
+
+[参考]:
+
+openCV学习网站：http://www.opencv.org.cn/opencvdoc/2.3.2/html/doc/tutorials/tutorials.html
+openCV-python教程：http://opencv-python-tutroals.readthedocs.io/en/latest/index.html
 
 
 
