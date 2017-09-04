@@ -197,6 +197,7 @@ Type "help", "copyright", "credits" or "license" for more information.
 
 (3) [ubuntu14/16 安装python3-opencv3](http://jingyan.baidu.com/article/e4511cf348dac52b845eafc8.html)
 
+(4) [Linux下安装OpenCV+Python支持](http://www.cnblogs.com/freeweb/p/5794447.html)
 
 <br />
 
