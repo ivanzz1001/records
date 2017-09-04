@@ -674,7 +674,7 @@ case "$option" in
     --user=*)                        NGX_USER="$value"          ;;
     --group=*)                       NGX_GROUP="$value"         ;;
 
-	// 后续省略
+    // 后续省略
 esac
 {% endhighlight %}
 各匹配的分支语句中进行配置变量的赋值。这些变量再auto/options脚本的最开始处赋予默认值。其中那些模块配置变量被赋予```YES```的表示默认开启，赋予```NO```的表示默认关闭。但他们开启与否是由这个auto/options中的case-esac语句来决定的。
