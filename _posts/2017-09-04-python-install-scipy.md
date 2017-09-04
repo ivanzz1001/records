@@ -177,6 +177,18 @@ pip install scikit-learn
 pip install opencv-python
 {% endhighlight %}
 
+安装好后测试：
+{% highlight string %}
+[root@localhost python]# python3
+Python 3.6.2 (default, Aug 28 2017, 23:56:32) 
+[GCC 4.8.5 20150623 (Red Hat 4.8.5-11)] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import cv2
+>>> print(cv2.__version__)
+3.3.0
+>>> 
+{% endhighlight %}
+
 要源代码编译安装请参看：
 (1) [Install OpenCV 3.0 with Python 3.4 on OSX & Ubuntu](https://github.com/rainyear/lolita/issues/18)
 
