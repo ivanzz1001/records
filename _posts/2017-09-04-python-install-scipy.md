@@ -190,6 +190,7 @@ Type "help", "copyright", "credits" or "license" for more information.
 {% endhighlight %}
 
 要源代码编译安装请参看：
+
 (1) [Install OpenCV 3.0 with Python 3.4 on OSX & Ubuntu](https://github.com/rainyear/lolita/issues/18)
 
 (2) [Ubuntu14.04 64位+Python3.4环境下安装opencv3.0的方法](http://blog.csdn.net/qingyuanluofeng/article/details/51558270)
@@ -198,7 +199,6 @@ Type "help", "copyright", "credits" or "license" for more information.
 
 
 <br />
-<br />
 
 
 
@@ -207,7 +207,7 @@ Type "help", "copyright", "credits" or "license" for more information.
 
 
 
-[参考]:
+## 6. 参考
 
 openCV学习网站：[http://www.opencv.org.cn/opencvdoc/2.3.2/html/doc/tutorials/tutorials.html](http://www.opencv.org.cn/opencvdoc/2.3.2/html/doc/tutorials/tutorials.html)
 
