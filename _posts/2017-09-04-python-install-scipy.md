@@ -124,6 +124,9 @@ pip install opencv-python
 import numpy
 import cv2
 
+
+print(cv2.__version__)
+
 # read image, support bmp,jpg,png,tiff format
 img = cv2.imread("D:\\timg2.jpg")
 
