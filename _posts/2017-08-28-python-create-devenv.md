@@ -146,7 +146,8 @@ Python 2.7.5
 # pip install pymysql
 {% endhighlight %}
 
-默认情况下，pip会从https://pypi.python.org/pypi来安装包。根据系统不同，在windows环境下通过pip安装的扩展模块一般位于python目录下Lib\site-packages目录； 而在linux环境下通过pip安装的扩展模块一般位于/usr/local/lib/python/dist-packages/目录。
+默认情况下，pip会从https://pypi.python.org/pypi来安装包。根据系统不同，在windows环境下通过pip安装的扩展模块一般位于python目录下Lib\site-packages目录； 而在linux环境下通过pip安装的扩展模块一般位于/usr/local/lib/python/dist-packages/目录。win7下pip下载的安装包缓存位置为：c:\用户\(你的用户名)\AppData\Local\pip\cache\； Linux下pip下载的安装包缓存位置为：~/.cache/pip
+
 
 
 
