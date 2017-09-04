@@ -175,8 +175,9 @@ matplotlib: 是一个画图工具，和Matlab中的画图工程类似。
 
 [参考]:
 
-openCV学习网站：http://www.opencv.org.cn/opencvdoc/2.3.2/html/doc/tutorials/tutorials.html
-openCV-python教程：http://opencv-python-tutroals.readthedocs.io/en/latest/index.html
+openCV学习网站：[http://www.opencv.org.cn/opencvdoc/2.3.2/html/doc/tutorials/tutorials.html](http://www.opencv.org.cn/opencvdoc/2.3.2/html/doc/tutorials/tutorials.html)
+
+openCV-python教程：[http://opencv-python-tutroals.readthedocs.io/en/latest/index.html](http://opencv-python-tutroals.readthedocs.io/en/latest/index.html)
 
 
 
