@@ -643,9 +643,94 @@ done
 {% highlight string %}
 opt="$opt `echo $option | sed -e \"s/\(--[^=]*=\)\(.* .*\)/\1'\2'/\"`"
 {% endhighlight %}
-它的实际作用是匹配configure的参数选项（把匹配到的第一部分作为参数1，匹配到的第二部分作为参数2）。因此，通过循环该语句后，最后opt的值就是一个由空格分隔的参数列表。参看：http://blog.csdn.net/u010552788/article/details/51019367
+它的实际作用是匹配configure的参数选项（把匹配到的第一部分作为参数1，匹配到的第二部分作为参数2）。因此，通过循环该语句后，最后opt的值就是一个由空格分隔的参数列表。参看：[正则表达式括号、中括号、大括号的区别小结](http://blog.csdn.net/u010552788/article/details/51019367)
+
+<br />
+
+接下来是：
+{% highlight string %}
+case "$option" in
+    -*=*) value=`echo "$option" | sed -e 's/[-_a-zA-Z0-9]*=//'` ;;
+       *) value="" ;;
+esac
+{% endhighlight %}
+其含义是将value赋值为参数选项值。如果该选项不符合匹配```-*=*```,则将value值设置为"".
+
+<br>
+
+再接着是匹配各参数选项：
+{% highlight string %}
+case "$option" in
+    --help)                          help=yes                   ;;
+
+    --prefix=)                       NGX_PREFIX="!"             ;;
+    --prefix=*)                      NGX_PREFIX="$value"        ;;
+    --sbin-path=*)                   NGX_SBIN_PATH="$value"     ;;
+    --modules-path=*)                NGX_MODULES_PATH="$value"  ;;
+    --conf-path=*)                   NGX_CONF_PATH="$value"     ;;
+    --error-log-path=*)              NGX_ERROR_LOG_PATH="$value";;
+    --pid-path=*)                    NGX_PID_PATH="$value"      ;;
+    --lock-path=*)                   NGX_LOCK_PATH="$value"     ;;
+    --user=*)                        NGX_USER="$value"          ;;
+    --group=*)                       NGX_GROUP="$value"         ;;
+
+// 后续省略
+esac
+{% endhighlight %}
+各匹配的分支语句中进行配置变量的赋值。这些变量再auto/options脚本的最开始处赋予默认值。其中那些模块配置变量被赋予```YES```的表示默认开启，赋予```NO```的表示默认关闭。但他们开启与否是由这个auto/options中的case-esac语句来决定的。
+
+还有一些安装相关的选项变量也在这里被赋值，比如:
+
+* prefix参数值被赋予NGX_PREFIX
+* sbin-path参数值被赋予NGX_SBIN_PATH
+* conf-path参数值被赋予NGX_CONF_PATH
+* error-log-path参数值被赋予NGX_ERROR_LOG_PATH
+* pid-path参数值被赋予NGX_PID_PATH
+* lock-path参数值被赋予NGX_LOCK_PATH
+
+<br />
 
 
+如果option并不符合预设的这些匹配，也就是用户使用configure脚本的时候携带的参数错误，则auto/options会匹配该语句：
+{% highlight string %}
+*)
+    echo "$0: error: invalid option \"$option\""
+    exit 1
+;;
+{% endhighlight %}
+
+从而提示用户参数错误，并使脚本退出运行。经过多次循环，for-do-done就结束。
+
+
+## 3. 设定NGX_CONFIGURE变量
+处理完所有option后，opt就如我们上面提到的，成为由空格分隔的配置项值，并被赋给NGX_CONFIGURE变量：
+{% highlight string %}
+NGX_CONFIGURE="$opt"
+{% endhighlight %}
+
+
+
+## 4. 是否显示configure的帮助信息
+再看下面这句：
+{% highlight string %}
+if [ $help = yes ]; then
+
+cat << END
+
+  --help                             print this message
+
+  --prefix=PATH                      set installation prefix
+  --sbin-path=PATH                   set nginx binary pathname
+  --modules-path=PATH                set modules path
+  --conf-path=PATH                   set nginx.conf pathname
+
+ //后续省略
+END
+
+exit
+fi
+{% endhighlight %}
+默认情况下，$help变量值在初始化时就为no. 如果configure选项中指定了help参数，则$help参数为yes，则会运行cat命令，显示大段的帮助信息，然互退出。
 
 
 
