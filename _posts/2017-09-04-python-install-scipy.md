@@ -36,7 +36,7 @@ Type "help", "copyright", "credits" or "license" for more information.
 OpenCV依赖于numpy、matplotlib、opencv-python三个包。这里我们首先介绍一下python3.6下安装numpy + scipy + matplotlib，注意这里我们安装的numpy为numpy+mkl，因为scipy需要依赖于numpy + mkl。
 
 
-### 2.1 安装 numpy + scipy + matplotlib
+### 2.1 安装 numpy + scipy + matplotlib + scikit-learn
 参看：http://blog.csdn.net/yxpyxp12341234/article/details/70436854
 
 **(1) 安装**
@@ -54,6 +54,8 @@ pip install matplotlib
 numpy‑1.13.1+mkl‑cp36‑cp36m‑win_amd64.whl
 
 scipy-0.19.1-cp36-cp36m-win_amd64.whl
+
+scikit_learn‑0.19.0‑cp36‑cp36m‑win_amd64.whl
 </pre> 
 
 
@@ -69,6 +71,7 @@ numpy‑1.13.1+mkl‑cp36‑cp36m‑win_amd64.whl is not a valid wheel filename.
 pip install E:\numpy-1.12.1-cp36-none-win_amd64.whl
 pip install E:\scipy-0.19.1-cp36-cp36m-win_amd64.whl
 pip install matplotlib                        # matplotlib直接安装即可
+pip install 
 {% endhighlight %}
 
 
