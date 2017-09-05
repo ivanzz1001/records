@@ -133,12 +133,47 @@ matplotlib.pyplot.show()
 
 可以看到上述窗口大小使用为11，当窗口越小的时候，得到的图像越细。想象一下，如果把窗口设置足够大以后（不能超过图像大小），那么得到的结果可能和第二幅图像相同了。
 
-
-## 4.  
-
-
+{% highlight string %}
+# -*- coding: utf-8 -*-
 
 
+import cv2
+import numpy 
+import matplotlib.pyplot
+
+
+print(cv2.__version__)
+
+
+img = cv2.imread("D:\\timg2.jpg")
+GrayImage=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+
+# 中值滤波
+GrayImage= cv2.medianBlur(GrayImage,3)
+ret,th1 = cv2.threshold(GrayImage,127,255,cv2.THRESH_BINARY)
+
+#3 为Block size, 5为param1值
+th2 = cv2.adaptiveThreshold(GrayImage,255,cv2.ADAPTIVE_THRESH_MEAN_C,cv2.THRESH_BINARY,3,5)
+th3 = cv2.adaptiveThreshold(GrayImage,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,3,5)
+
+titles = ['Gray Image', 'Global Thresholding (v = 127)', 'Adaptive Mean Thresholding', 'Adaptive Gaussian Thresholding']
+images = [GrayImage, th1, th2, th3]
+
+
+for i in range(4):
+    matplotlib.pyplot.subplot(2,2,i+1)
+    matplotlib.pyplot.imshow(images[i],'gray')
+    matplotlib.pyplot.title(titles[i])
+    matplotlib.pyplot.xticks([])
+    matplotlib.pyplot.yticks([])
+
+matplotlib.pyplot.show()
+{% endhighlight %}
+
+![python-opencv-adaptive2](https://ivanzz1001.github.io/records/assets/img/python/python-opencv-adaptive2.png)
+
+
+## 4. Otsu’s二值化
 
 
 
@@ -147,6 +182,16 @@ matplotlib.pyplot.show()
 
 
 
+
+
+
+<br />
+<br />
+参看：
+
+1) [http://blog.csdn.net/jjddss/article/details/72841141](http://blog.csdn.net/jjddss/article/details/72841141)
+
+2) [http://blog.csdn.net/what_lei/article/details/49159655](http://blog.csdn.net/what_lei/article/details/49159655)
 
 
 
