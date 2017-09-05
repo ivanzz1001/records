@@ -25,9 +25,49 @@ description: Python下OpenCV的使用
 
 **(1) 分量法**
 
+将彩色图像中的三分量的亮度作为三个灰度图像的灰度值，可根据应用需要选取一种灰度图像。
+<pre>
+F1(i,j) = R(i,j)
+
+F2(i,j) = G(i,j)
+
+F3(i,j) = B(i,j)
+</pre>
+
+代码示例：
+{% highlight string %}
+# -*- coding: utf-8 -*-
 
 
+import cv2
+import numpy
+import matplotlib.pyplot
 
+image = cv2.imread("D:\\ImageNet\\timg4.png")
+print(image.shape)
+r,g,b = cv2.split(image)
+
+cv2.namedWindow("Image")
+cv2.imshow("Image",image)
+
+cv2.namedWindow("ImageR")
+cv2.imshow("ImageR",r)
+
+cv2.namedWindow("ImageG")
+cv2.imshow("ImageG",g)
+
+cv2.namedWindow("ImageB")
+cv2.imshow("ImageB",b)
+cv2.waitKey(0)
+
+cv2.destroyAllWindows()
+{% endhighlight %}
+
+**(2) 最大值法**
+将彩色图像中的三分量亮度最大值作为灰度图的灰度值。
+<pre>
+F(i,j) = max(R(i,j),G(i,j),B(i,j))
+</pre>
 
 
 
