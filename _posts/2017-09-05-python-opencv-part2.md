@@ -50,7 +50,7 @@ import matplotlib.pyplot
 print(cv2.__version__)
 
 # read image, support bmp,jpg,png,tiff format
-img = cv2.imread("D:\\timg1.jpg",cv2.IMREAD_GRAYSCALE)
+img = cv2.imread("D:\\timg2.jpg",cv2.IMREAD_GRAYSCALE)
 
 ret,thresh1 = cv2.threshold(img,127,255,cv2.THRESH_BINARY)
 ret,thresh2 = cv2.threshold(img,127,255,cv2.THRESH_BINARY_INV)
@@ -83,6 +83,58 @@ matplotlib.pyplot.show()
 ![python-opencv-threshold](https://ivanzz1001.github.io/records/assets/img/python/python-opencv-threshold.png)
 
 可以看到这里把阈值设置成了127，对于BINARY方法，当图像中的灰度值大于127的重置像素值为255.
+
+
+## 3. 自适应阈值
+
+前面看到简单阈值是一种全局性的阈值，只需要规定一个阈值值，整个图像和这个阈值比较。而自适应阈值可以看成一种局部性的阈值，通过规定一个区域大小，比较这个点与区域大小里面像素点的平均值（或者其他特征）的大小关系确定这个像素点是属于黑或者白（如果是二值情况）。使用的函数为：
+{% highlight string %}
+adaptiveThreshold(src, maxValue, adaptiveMethod, thresholdType, blockSize, C, dst=None)
+{% endhighlight %}
+
+* src: 指原图像，原图像应该是灰度图
+* maxValue: 指当像素值高于（有时是小于）阈值时应该被赋予的新的像素值
+* adaptiveMethod: 指CV_ADAPTIVE_THRESH_MEAN_C 或 CV_ADAPTIVE_THRESH_GAUSSIAN_C
+* thresholdType: 指取阈值类型，必须是CV_THRESH_BINARY 或者 CV_THRESH_BINARY_INV
+* blockSize: 指用来计算阈值的像素领域大小：3,5,7,...
+* C: 指与方法有关的参数。阈值等于均值或者加权值减去这个常数（为0相当于阈值 就是求得领域内均值或者加权值） 
+
+这种方法理论上得到的效果更好，相当于在动态自适应的调整属于自己像素点的阈值，而不是整幅图像都用一个阈值。
+{% highlight string %}
+# -*- coding: utf-8 -*-
+
+import numpy
+import cv2
+import matplotlib.pyplot
+
+
+
+print(cv2.__version__)
+
+# read image, support bmp,jpg,png,tiff format
+img = cv2.imread("D:\\timg2.jpg",cv2.IMREAD_GRAYSCALE)
+
+ret, threshold1 = cv2.threshold(img,127,255,cv2.THRESH_BINARY)
+threshold2 = cv2.adaptiveThreshold(img,255,cv2.ADAPTIVE_THRESH_MEAN_C,cv2.THRESH_BINARY,7,2)
+threshold3 = cv2.adaptiveThreshold(img,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,cv2.THRESH_BINARY,7,2)
+
+images = [img,threshold1,threshold2,threshold3]
+
+matplotlib.pyplot.figure()
+for i in range(4):
+    matplotlib.pyplot.subplot(2,2,i+1)
+    matplotlib.pyplot.imshow(images[i],"gray")
+
+
+matplotlib.pyplot.show()
+{% endhighlight %}
+
+![python-opencv-adaptive](https://ivanzz1001.github.io/records/assets/img/python/python-opencv-adaptive.png)
+
+可以看到上述窗口大小使用为11，当窗口越小的时候，得到的图像越细。想象一下，如果把窗口设置足够大以后（不能超过图像大小），那么得到的结果可能和第二幅图像相同了。
+
+
+## 4.  
 
 
 
