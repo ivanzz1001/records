@@ -45,7 +45,7 @@ import matplotlib.pyplot
 
 image = cv2.imread("D:\\ImageNet\\timg4.png")
 print(image.shape)
-r,g,b = cv2.split(image)
+b,g,r = cv2.split(image)   # the order is not r,g,b
 
 cv2.namedWindow("Image")
 cv2.imshow("Image",image)
@@ -68,6 +68,41 @@ cv2.destroyAllWindows()
 <pre>
 F(i,j) = max(R(i,j),G(i,j),B(i,j))
 </pre>
+
+代码示例：
+{% highlight string %}
+# -*- coding: utf-8 -*-
+
+
+import cv2
+import numpy
+import matplotlib.pyplot
+
+image = cv2.imread("D:\\ImageNet\\timg4.png")
+print(image.shape)
+
+#b,g,r = cv2.split(image)   # the order is not r,g,b
+#print(b.shape)
+#print(type(b))
+#print(b.dtype)
+#print(image.dtype)
+
+shape = (image.shape[0],image.shape[1])
+newImage = numpy.ndarray(shape,image.dtype)
+
+
+for i in range(image.shape[0]):
+    for j in range(image.shape[1]):
+       newImage[i,j] = max(image[i,j][0],image[i,j][1],image[i,j][2])
+
+cv2.namedWindow("NewImage")
+cv2.imshow("NewImage",newImage)
+cv2.waitKey(0)
+
+cv2.destroyAllWindows()
+{% endhighlight %}
+
+
 
 
 
