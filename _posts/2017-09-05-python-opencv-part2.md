@@ -37,7 +37,7 @@ threshold(src, thresh, maxval, type, dst=None)
 
 该函数有两个返回值，第一个retval(得到的阈值值（在后面一个方法中会用到))，第二个就是阈值化后的图像。
 
-（注意：使用cv2.THRESH_OTSU、cv2.THRESH_TRIANGLE时,所对应的图像必须是灰度图像。
+（注意：使用```cv2.THRESH_OTSU```、```cv2.THRESH_TRIANGLE```时,所对应的图像必须是灰度图像)
 {% highlight string %}
 # -*- coding: utf-8 -*-
 
@@ -79,6 +79,10 @@ for i in range(9):
 
 matplotlib.pyplot.show()
 {% endhighlight %}
+
+![python-opencv-threshold](https://ivanzz1001.github.io/records/assets/img/python/python-opencv-threshold.png)
+
+可以看到这里把阈值设置成了127，对于BINARY方法，当图像中的灰度值大于127的重置像素值为255.
 
 
 
