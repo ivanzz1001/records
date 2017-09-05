@@ -175,12 +175,56 @@ matplotlib.pyplot.show()
 
 ## 4. Otsu’s二值化
 
+我们前面说到，cv2.thrshold函数是有两个返回值的，前面一直用的第二个返回值，也就是阈值处理后的图像，那么第一个返回值(得到的图像的阈值）将会在这里用到。
+
+前面对于阈值的处理上，我们选择的阈值都是127，那么实际情况下，怎么去选择这个127呢？ 有的图像可能阈值不是127得到的效果更好。那么这里我们需要算法自己去寻找到一个阈值，而Otsu's就可以自己找到一个认为最好的阈值。并且Otsu's非常适合于图像灰度直方图具有双峰的情况，他会在双峰之间找到一个值作为阈值；对于非双峰图像，可能并不是很好用。
+
+那么经过Otsu's得到的那个阈值就是函数cv2.threshold的第一个参数了。因为Otsu's方法会产生一个阈值，那么函数cv2.threshold的第二个参数(设置阈值）就是0了，并且在cv2.threshold的方法参数中还得加上语句cv2.THRESH_OTSU。那么什么是双峰图像（只能是灰度图像才有），就是图像的灰度统计图中可以明显看出只有两个波峰，比如下面一个图的灰度直方图就可以是双峰图：
+
+![opencv_shuangfeng](https://ivanzz1001.github.io/records/assets/img/python/opencv_shuangfeng.jpg)
+
+对这个图进行Otsu’s阈值处理就非常的好，通过函数cv2.threshold会自动找到一个介于两波峰之间的阈值。一个实例如下：
+{% highlight string %}
+# -*- coding: utf-8 -*-
 
 
+import cv2
+import matplotlib.pyplot
 
 
+print(cv2.__version__)
+
+# read image, support bmp,jpg,png,tiff format
+img = cv2.imread("D:\\timg2.png",cv2.IMREAD_GRAYSCALE)
+
+# 简单滤波
+ret1, th1 = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
+print(ret1)
+
+# Otsu 滤波
+ret2, th2 = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+print(ret2)
+
+matplotlib.pyplot.figure()
+
+matplotlib.pyplot.subplot(221)
+matplotlib.pyplot.imshow(img,"gray")
+
+matplotlib.pyplot.subplot(222)
+matplotlib.pyplot.hist(img.ravel(), 256)  # .ravel方法将矩阵转化为一维
+
+matplotlib.pyplot.subplot(223)
+matplotlib.pyplot.imshow(th1,"gray")
+
+matplotlib.pyplot.subplot(224)
+matplotlib.pyplot.imshow(th2,"gray")
 
 
+matplotlib.pyplot.show()
+{% endhighlight %}
+![opencv-otcus](https://ivanzz1001.github.io/records/assets/img/python/opencv-otcus.png)
+
+实验证明，对于ret2返回的阈值小于160的情况，使用Otsu's二值化可以达到较好的效果。
 
 
 
