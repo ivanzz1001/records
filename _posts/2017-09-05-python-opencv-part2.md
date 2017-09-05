@@ -222,7 +222,7 @@ matplotlib.pyplot.imshow(th2,"gray")
 
 matplotlib.pyplot.show()
 {% endhighlight %}
-![opencv-otcus](https://ivanzz1001.github.io/records/assets/img/python/opencv-otcus.png)
+![opencv-otcus2](https://ivanzz1001.github.io/records/assets/img/python/opencv-otcus2.png)
 
 实验证明，对于ret2返回的阈值小于160的情况，使用Otsu's二值化可以达到较好的效果。
 
