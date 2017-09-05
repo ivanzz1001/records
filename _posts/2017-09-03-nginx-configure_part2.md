@@ -733,6 +733,87 @@ fi
 默认情况下，```$help```变量值在初始化时就为no. 如果configure选项中指定了help参数，则```$help```参数为yes，则会运行cat命令，显示大段的帮助信息，然互退出。
 
 
+## 5. 是否关闭HTTP功能
+
+默认情况下HTTP的一些基本功能是被开启的，如果用户指定了```--without-http```参数，则变量HTTP会被赋值为NO，则下面这段代码会被被执行：
+{% highlight string %}
+if [ $HTTP = NO ]; then
+    HTTP_CHARSET=NO
+    HTTP_GZIP=NO
+    HTTP_SSI=NO
+    HTTP_USERID=NO
+    HTTP_ACCESS=NO
+    HTTP_STATUS=NO
+    HTTP_REWRITE=NO
+    HTTP_PROXY=NO
+    HTTP_FASTCGI=NO
+fi
+{% endhighlight %}
+
+## 6.是否指定运行于Windows平台
+
+如果显示指定了```--crossbuild```参数，则变量NGX_PLATFORM会被赋予当前for-do-done循环中的```$value```值，也就是```--crossbuild```的参数值，一般考虑在Windows平台使用时才会用到，看下面的语句：
+{% highlight string %}
+if [ ".$NGX_PLATFORM" = ".win32" ]; then
+    NGX_WINE=$WINE
+fi
+{% endhighlight %}
+如果指定了```--crossbuild=win32```，则NGX_WINE就会被赋值了。
+
+
+## 7. nginx配置文件路径
+在加载configure的参数时，如果没有指定```--config-path```参数，则```$NGX_CONF_PATH```变量是没有值的，下面的语句会为NGX_CONF_PATH赋予conf/nginx.conf的缺省值。不过觉得完全可以再auto/options开始处和其他参数一样先指定NGX_CONF_PATH的默认值。
+{% highlight string %}
+NGX_SBIN_PATH=${NGX_SBIN_PATH:-sbin/nginx}
+NGX_MODULES_PATH=${NGX_MODULES_PATH:-modules}
+NGX_CONF_PATH=${NGX_CONF_PATH:-conf/nginx.conf}
+NGX_CONF_PREFIX=`dirname $NGX_CONF_PATH`
+NGX_PID_PATH=${NGX_PID_PATH:-logs/nginx.pid}
+NGX_LOCK_PATH=${NGX_LOCK_PATH:-logs/nginx.lock}
+{% endhighlight %}
+
+上面如果指定参数```--conf-path```=/home/michael/nginx/conf/nginx.conf，则NGX_CONF_PREFIX的值就是/home/michael/nginx/conf.
+
+
+## 8. 错误日志文件路径
+如果指定了参数```--error-log-path```，则NGX_ERROR_LOG_PATH变量的值会被指定。根据下面的语句，如果指定的是stderr则将NGX_ERROR_LOG_PATH修改为空，即不需要错误日志文件。如果不是标准输出，且其值为空，则设置为缺省logs/error.log。
+{% highlight string %}
+if [ ".$NGX_ERROR_LOG_PATH" = ".stderr" ]; then
+    NGX_ERROR_LOG_PATH=
+else
+    NGX_ERROR_LOG_PATH=${NGX_ERROR_LOG_PATH:-logs/error.log}
+fi
+{% endhighlight %}
+
+
+## 9. HTTP相关路径
+{% highlight string %}
+NGX_HTTP_LOG_PATH=${NGX_HTTP_LOG_PATH:-logs/access.log}
+NGX_HTTP_CLIENT_TEMP_PATH=${NGX_HTTP_CLIENT_TEMP_PATH:-client_body_temp}
+NGX_HTTP_PROXY_TEMP_PATH=${NGX_HTTP_PROXY_TEMP_PATH:-proxy_temp}
+NGX_HTTP_FASTCGI_TEMP_PATH=${NGX_HTTP_FASTCGI_TEMP_PATH:-fastcgi_temp}
+NGX_HTTP_UWSGI_TEMP_PATH=${NGX_HTTP_UWSGI_TEMP_PATH:-uwsgi_temp}
+NGX_HTTP_SCGI_TEMP_PATH=${NGX_HTTP_SCGI_TEMP_PATH:-scgi_temp}
+{% endhighlight %}
+
+## 10. Perl模块
+如果指定了```--with-perl_modules_path```参数，则NGX_PERL_MODULES变量被设定。如果NGX_PERL_MODULES变量未设定值或者值为一个绝对路径，那么不做任何处理；而如果指定的是一个相对路径，则最后设定为```$NGX_PREFIX/$NGX_PERL_MODULES```。
+
+{% highlight string %}
+case ".$NGX_PERL_MODULES" in
+    ./*)
+    ;;
+
+    .)
+    ;;
+
+    *)
+        NGX_PERL_MODULES=$NGX_PREFIX/$NGX_PERL_MODULES
+    ;;
+esac
+{% endhighlight %}
+
+
 
 
 
