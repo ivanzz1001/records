@@ -763,6 +763,7 @@ fi
 
 ## 7. nginx配置文件路径
 在加载configure的参数时，如果没有指定```--config-path```参数，则```$NGX_CONF_PATH```变量是没有值的，下面的语句会为NGX_CONF_PATH赋予conf/nginx.conf的缺省值。不过觉得完全可以再auto/options开始处和其他参数一样先指定NGX_CONF_PATH的默认值。
+
 {% highlight string %}
 NGX_SBIN_PATH=${NGX_SBIN_PATH:-sbin/nginx}
 NGX_MODULES_PATH=${NGX_MODULES_PATH:-modules}
