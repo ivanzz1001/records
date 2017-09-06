@@ -175,7 +175,7 @@ newImage = numpy.ndarray(shape,image.dtype)
 
 for i in range(image.shape[0]):
     for j in range(image.shape[1]):
-       newImage[i,j] = 0.30 * image[i,j][0] + 0.59 * image[i,j][1] + 0.11 * image[i,j][2]
+        newImage[i,j] = 0.11 * image[i,j][0] + 0.59 * image[i,j][1] + 0.30 * image[i,j][2]
 
 cv2.namedWindow("NewImageWeightAver")
 cv2.imshow("NewImageWeightAver",newImage)
@@ -186,7 +186,7 @@ cv2.destroyAllWindows()
 
 我们可以调整上面的分量，比如:
 <pre>
-newImage[i,j] = 0.25 * image[i,j][0] + 0.65 * image[i,j][1] + 0.1 * image[i,j][2]
+newImage[i, j] = 0.10 * image[i, j][0] + 0.65 * image[i, j][1] + 0.25 * image[i, j][2]
 </pre>
 
 
