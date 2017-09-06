@@ -9,10 +9,13 @@ description: nginx编译脚本解析
 
 在configure中运行完auto/option脚本之后，接着就会运行auto/init脚本。其主要是定义生成的文件名。
 
-参看：```http://blog.csdn.net/Poechant/article/details/7327211```
+<br />
+<br />
+
 
 <!-- more -->
 
+参看：```http://blog.csdn.net/poechant/article/details/7327206```
 
 ## 1. auto/init脚本
 
@@ -73,22 +76,102 @@ END
 {% endhighlight %}
 
 
-## 2. Makefile文件名变量
+**(1) Makefile文件名变量**
 
 默认情况下是:objs/Makefile
 {% highlight string %}
 NGX_MAKEFILE=$NGX_OBJS/Makefile
 {% endhighlight %}
 
-## 3. 源文件名变量
+**(2) 源文件名变量**
+
 默认情况下是:objs/ngx_modules.c
 {% highlight string %}
 NGX_MODULES_C=$NGX_OBJS/ngx_modules.c
 {% endhighlight %}
 
-## 4.
+**(3) 头文件名变量**
+
+默认情况下是：
+* objs/ngx_auto_header.h
+* objs/ngx_auto_config.h
+
+{% highlight string %}
+NGX_AUTO_HEADERS_H=$NGX_OBJS/ngx_auto_headers.h
+NGX_AUTO_CONFIG_H=$NGX_OBJS/ngx_auto_config.h
+{% endhighlight %}
 
 
+**(4) 自动测试文件名和配置错误文件名变量**
+
+默认情况下是：
+* objs/autotest
+* objs/autoconf.err
+
+{% highlight string %}
+NGX_AUTOTEST=$NGX_OBJS/autotest
+NGX_AUTOCONF_ERR=$NGX_OBJS/autoconf.err
+{% endhighlight %}
+
+
+**(5) STUBS相关变量**
+
+默认情况下是：
+* objs/autoconf.err
+* objs/Makefile
+
+{% highlight string %}
+# STUBs
+NGX_ERR=$NGX_OBJS/autoconf.err
+MAKEFILE=$NGX_OBJS/Makefile
+{% endhighlight %}
+
+
+**(6) PCH相关变量**
+{% highlight string %}
+NGX_PCH=
+NGX_USE_PCH=
+{% endhighlight %}
+
+**(7) 测试所在环境下"-n"和"\c"**
+
+由于Nginx支持多种操作系统，比如Mac OS、Linux、Solaris等，不同的系统下的shell也有小的差别。所以在auto/init脚本中有如下两个变量：
+* ngx_n
+* ngx_c
+
+{% highlight string %}
+# check the echo's "-n" option and "\c" capability
+
+if echo "test\c" | grep c >/dev/null; then
+
+    if echo -n test | grep n >/dev/null; then
+        ngx_n=
+        ngx_c=
+
+    else
+        ngx_n=-n
+        ngx_c=
+    fi
+
+else
+    ngx_n=
+    ngx_c='\c'
+f
+{% endhighlight %}
+
+
+**(8) 创建并写入Makefile**
+{% highlight string %}
+# create Makefile
+
+cat << END > Makefile
+
+default:	build
+
+clean:
+	rm -rf Makefile $NGX_OBJS
+END
+{% endhighlight %}
 
 
 <br />
