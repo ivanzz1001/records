@@ -122,12 +122,154 @@ cv2.destroyAllWindows()
 {% endhighlight %}
 
 
-## 5. 
+## 5. 图像平移
+{% highlight string %}
+# -*- coding: utf-8 -*-
+
+
+import cv2
+import numpy
+import matplotlib.pyplot
+
+image = cv2.imread("D:\\ImageNet\\timg2.jpg")
+print(image.shape)
+
+
+rows,cols = image.shape[:2]
+
+
+M = numpy.float32([[1,0,100],[0,1,50]])
+dst = cv2.warpAffine(image,M,(cols,rows))
+
+cv2.imshow("image",dst)
+cv2.waitKey(0)
+
+cv2.destroyAllWindows()
+{% endhighlight %}
+
+
+## 6. 图像旋转
+{% highlight string %}
+# -*- coding: utf-8 -*-
+
+
+import cv2
+import numpy
+import matplotlib.pyplot
+
+image = cv2.imread("D:\\ImageNet\\timg2.jpg")
+print(image.shape)
 
 
 
+rows,cols = image.shape[:2]
+
+M = cv2.getRotationMatrix2D((cols/2,rows/2),90,1)
+dst = cv2.warpAffine(image,M,(cols,rows))
 
 
+cv2.imshow("image",dst)
+cv2.waitKey(0)
+
+cv2.destroyAllWindows()
+{% endhighlight %}
+
+## 7. 仿射变换
+{% highlight string %}
+# -*- coding: utf-8 -*-
+
+
+import cv2
+import numpy
+import matplotlib.pyplot
+
+image = cv2.imread("D:\\ImageNet\\timg2.jpg")
+print(image.shape)
+
+rows,cols = image.shape[:2]
+
+pts1 = numpy.float32([[50,50],[200,50],[50,200]])
+pts2 = numpy.float32([[10,100],[200,50],[100,250]])
+
+M = cv2.getAffineTransform(pts1,pts2)
+
+dst = cv2.warpAffine(image,M,(cols,rows))
+
+
+cv2.imshow("image",dst)
+cv2.waitKey(0)
+
+cv2.destroyAllWindows()
+
+{% endhighlight %}
+
+## 8. 通道的拆分、合并处理
+对于一张图片的 R、G、B 通道，我们可以很方便的使用 OpenCV 获取并分离或者合并：
+
+(这是将图像灰度化处理的一种方式)
+{% highlight string %}
+# -*- coding: utf-8 -*-
+
+
+import cv2
+import numpy
+
+
+
+image = cv2.imread("D:\\ImageNet\\timg2.jpg")
+print(image.shape)
+
+b,g,r = cv2.split(image)
+img = cv2.merge((b,g,r))
+
+cv2.imshow("image",img)
+cv2.waitKey(0)
+
+cv2.destroyAllWindows()
+{% endhighlight %}
+
+
+## 9. 图片添加边距
+{% highlight string %}
+# -*- coding: utf-8 -*-
+
+
+import cv2
+import numpy
+
+
+
+image = cv2.imread("D:\\ImageNet\\timg2.jpg")
+print(image.shape)
+
+BLUE = [255,0,0]
+
+replicate = cv2.copyMakeBorder(image,10,10,10,10,cv2.BORDER_REPLICATE)
+reflect = cv2.copyMakeBorder(image,10,10,10,10,cv2.BORDER_REFLECT)
+reflect101 = cv2.copyMakeBorder(image,10,10,10,10,cv2.BORDER_REFLECT_101)
+wrap = cv2.copyMakeBorder(image,10,10,10,10,cv2.BORDER_WRAP)
+constant= cv2.copyMakeBorder(image,10,10,10,10,cv2.BORDER_CONSTANT,value=BLUE)
+
+
+#cv2.imshow("image",replicate)
+cv2.imshow("image",reflect)
+#cv2.imshow("image",reflect101)
+#cv2.imshow("image",wrap)
+#cv2.imshow("image",constant)
+#cv2.imshow("image",image)
+cv2.waitKey(0)
+
+cv2.destroyAllWindows()
+{% endhighlight %}
+
+
+
+<br />
+<br />
+
+**[参看]**
+
+1. [Python-OpenCV 处理图像（一）：基本操作](https://segmentfault.com/a/1190000003742422)
 
 
 
