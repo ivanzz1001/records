@@ -189,6 +189,7 @@ cv2.destroyAllWindows()
 newImage[i, j] = 0.10 * image[i, j][0] + 0.65 * image[i, j][1] + 0.25 * image[i, j][2]
 </pre>
 
+上面的公式可以看出绿色（G 分量）所占的比重比较大，所以有时候也会直接取G 分量进行灰度化
 
 ```注意： cv2.split()函数分割出来的颜色三个分量顺序是BGR```
 
