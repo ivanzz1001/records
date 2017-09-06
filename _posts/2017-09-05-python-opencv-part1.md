@@ -191,6 +191,14 @@ newImage[i,j] = 0.25 * image[i,j][0] + 0.65 * image[i,j][1] + 0.1 * image[i,j][2
 
 
 
+<br />
+<br />
+
+[参看]:
+
+1. [https://segmentfault.com/a/1190000003755100](https://segmentfault.com/a/1190000003755100)
+
+2. [http://blog.csdn.net/what_lei/article/details/48681903](http://blog.csdn.net/what_lei/article/details/48681903)
 
 
 
