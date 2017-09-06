@@ -111,7 +111,78 @@ F(i,j) = (R(i,j) + G(i,j) + B(i,j)) /3
 </pre>
 
 
+代码示例如下：
+{% highlight string %}
+# -*- coding: utf-8 -*-
 
+
+import cv2
+import numpy
+import matplotlib.pyplot
+
+image = cv2.imread("D:\\ImageNet\\timg4.png")
+print(image.shape)
+
+#b,g,r = cv2.split(image)   # the order is not r,g,b
+#print(b.shape)
+#print(type(b))
+#print(b.dtype)
+#print(image.dtype)
+
+shape = (image.shape[0],image.shape[1])
+newImage = numpy.ndarray(shape,image.dtype)
+
+
+for i in range(image.shape[0]):
+    for j in range(image.shape[1]):
+       newImage[i,j] = (int(image[i,j][0]) + int(image[i,j][1]) + int(image[i,j][2])) / 3
+
+cv2.namedWindow("NewImage")
+cv2.imshow("NewImage",newImage)
+cv2.waitKey(0)
+
+cv2.destroyAllWindows()
+{% endhighlight %}
+
+**(4) 加权平均法**
+
+根据重要性及其他指标，将三个分量以不同的权值进行加权平均。由于人眼对绿色的敏感最高，对蓝色敏感最低，因此按下式对RGB分量进行加权平均能得到较合理的灰度图像。
+<pre>
+F(i,j) = 0.30R(i,j) + 0.59G(i,j) + 0.11B(i,j))
+</pre>
+
+代码示例如下：
+{% highlight string %}
+# -*- coding: utf-8 -*-
+
+
+import cv2
+import numpy
+import matplotlib.pyplot
+
+image = cv2.imread("D:\\ImageNet\\timg4.png")
+print(image.shape)
+
+b,g,r = cv2.split(image)   # the order is not r,g,b
+#print(b.shape)
+#print(type(b))
+#print(b.dtype)
+#print(image.dtype)
+
+shape = (image.shape[0],image.shape[1])
+newImage = numpy.ndarray(shape,image.dtype)
+
+
+for i in range(image.shape[0]):
+    for j in range(image.shape[1]):
+       newImage[i,j] = 0.30 * image[i,j][0] + 0.59 * image[i,j][1] + 0.11 * image[i,j][2]
+
+cv2.namedWindow("NewImage")
+cv2.imshow("NewImage",newImage)
+cv2.waitKey(0)
+
+cv2.destroyAllWindows()
+{% endhighlight %}
 
 
 
