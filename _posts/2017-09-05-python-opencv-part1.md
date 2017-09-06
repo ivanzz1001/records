@@ -190,6 +190,8 @@ newImage[i,j] = 0.25 * image[i,j][0] + 0.65 * image[i,j][1] + 0.1 * image[i,j][2
 </pre>
 
 
+```注意： cv2.split()函数分割出来的颜色三个分量顺序是BGR```
+
 
 <br />
 <br />
