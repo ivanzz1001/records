@@ -103,7 +103,12 @@ cv2.waitKey(0)
 cv2.destroyAllWindows()
 {% endhighlight %}
 
+** (3) 平均值法**
 
+将彩色图像中的三分量亮度求平均得到一个灰度值。
+<pre>
+F(i,j) = (R(i,j) + G(i,j) + B(i,j)) /3
+</pre>
 
 
 
