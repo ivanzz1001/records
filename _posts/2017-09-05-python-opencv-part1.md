@@ -96,8 +96,8 @@ for i in range(image.shape[0]):
     for j in range(image.shape[1]):
        newImage[i,j] = max(image[i,j][0],image[i,j][1],image[i,j][2])
 
-cv2.namedWindow("NewImage")
-cv2.imshow("NewImage",newImage)
+cv2.namedWindow("NewImageMax")
+cv2.imshow("NewImageMax",newImage)
 cv2.waitKey(0)
 
 cv2.destroyAllWindows()
@@ -137,8 +137,8 @@ for i in range(image.shape[0]):
     for j in range(image.shape[1]):
        newImage[i,j] = (int(image[i,j][0]) + int(image[i,j][1]) + int(image[i,j][2])) / 3
 
-cv2.namedWindow("NewImage")
-cv2.imshow("NewImage",newImage)
+cv2.namedWindow("NewImageAver")
+cv2.imshow("NewImageAver",newImage)
 cv2.waitKey(0)
 
 cv2.destroyAllWindows()
