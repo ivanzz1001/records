@@ -64,6 +64,7 @@ cv2.destroyAllWindows()
 {% endhighlight %}
 
 **(2) 最大值法**
+
 将彩色图像中的三分量亮度最大值作为灰度图的灰度值。
 <pre>
 F(i,j) = max(R(i,j),G(i,j),B(i,j))
