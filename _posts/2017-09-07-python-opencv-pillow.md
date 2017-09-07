@@ -282,6 +282,53 @@ pil_im2.show("rebuild from array")
 
 
 
+## 12. OpenCV与Pillow示例
+
+下面给出一个OpenCV与Pillow协同工作的例子：
+{% highlight string %}
+# -*- coding: utf-8 -*-
+
+import cv2
+import numpy
+from PIL import Image
+from PIL import ImageFilter
+from PIL import ImageEnhance
+
+
+
+image = Image.open("D:\\ImageNet\\card1.jpg")
+outF = image.filter(ImageFilter.DETAIL)
+
+enhanced = ImageEnhance.Color(outF)
+enhanced_color = enhanced.enhance(1.3)
+
+sharpness = ImageEnhance.Sharpness(enhanced_color)
+sharpnessImg = sharpness.enhance(1.3)
+
+
+img = numpy.array(sharpnessImg)
+
+
+
+shape = (img.shape[0],img.shape[1])
+newImage = numpy.ndarray(shape,img.dtype)
+
+
+for i in range(img.shape[0]):
+    for j in range(img.shape[1]):
+        newImage[i,j] = 0.11 * img[i,j][0] + 0.59 * img[i,j][1] + 0.30 * img[i,j][2]
+
+
+#ret2, th2 = cv2.threshold(newImage, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+cv2.namedWindow("NewImageWeightAver")
+cv2.imshow("NewImageWeightAver",newImage)
+cv2.waitKey(0)
+
+cv2.destroyAllWindows()
+{% endhighlight %}
+
+
 <br />
 <br />
 **[参考]:**
