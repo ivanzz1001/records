@@ -1,6 +1,6 @@
 ---
 layout: post
-title: （转）Python下OpenCV的使用 -- 二值化
+title: （转）Python下OpenCV的使用 -- 基本操作
 tags:
 - python
 - OpenCV
