@@ -43,7 +43,12 @@ int add(int a,int b);
 
 ```源文件:test.c```
 {% highlight string %}
+#include "test.h"
 
+int add(int a,int b)
+{
+        return a + b;
+}
 {% endhighlight %}
 
 编译成动态链接库：
