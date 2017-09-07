@@ -156,7 +156,7 @@ if echo "test\c" | grep c >/dev/null; then
 else
     ngx_n=
     ngx_c='\c'
-f
+fi
 {% endhighlight %}
 
 
