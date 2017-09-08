@@ -19,7 +19,7 @@ Leptonica 1.74 or higher is required. Try to install libleptonica-dev package.
 
 ```pkg-config```在编译应用程序和库的时候作为一个工具来使用。例如你在命令行通过如下命令编译程序时：
 {% highlight string %}
-gcc -o test test.c `pkg-config --libs --cflags glib-2.0`
+# gcc -o test test.c `pkg-config --libs --cflags glib-2.0`
 {% endhighlight %}
 pkg-config可以帮助你插入正确的编译选项，而不需要你通过硬编码的方式来找到glib(或其他库）。
 
@@ -252,7 +252,8 @@ Hello, World!
 </pre>
 可以看到运行成功。
 
-
+<br />
+<br />
 
 **[参看]:**
 
