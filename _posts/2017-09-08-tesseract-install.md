@@ -124,6 +124,7 @@ UTC 2016 x86_64 x86_64 x86_64 GNU/Linux
 (3) 安装Leptonica
 
 Leptonica主要用于图像处理和图像分析，这里我们需要安装的版本>=1.74。
+
 参看：http://www.leptonica.org/download.html
 {% highlight string %}
 # wget http://www.leptonica.org/source/leptonica-1.74.4.tar.gz
