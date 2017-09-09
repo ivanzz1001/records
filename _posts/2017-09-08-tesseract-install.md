@@ -71,6 +71,120 @@ pytesseract (0.1.7)  - Python-tesseract is a python wrapper for google's Tessera
 {% endhighlight %}
 
 
+### 1.2 源代码编译安装tesseract
+
+当前(2017-9-9)[github](https://github.com/tesseract-ocr/tesseract)最新版本tesseract为4.0.0版本，还未稳定,git clone下来尝试了一下编译也有比较大问题。当前的稳定版本是3.05.01，因此我们就采用该版本来安装。
+<pre>
+The latest stable version is 3.05.01, released on June 1, 2017. Latest source code for 3.05 is available from 3.05 branch on github.
+</pre>
+
+参看：https://github.com/tesseract-ocr/tesseract/wiki/Compiling
+
+
+(1) 安装环境
+
+当前我们安装环境是Centos7.3.1:
+
+如下我们是在Centos7.01:下通过二进制包安装tesseract:
+{% highlight string %}
+[root@localhost tesseract-3.05.01]# lsb_release -a
+LSB Version:    :core-4.1-amd64:core-4.1-noarch
+Distributor ID: CentOS
+Description:    CentOS Linux release 7.3.1611 (Core) 
+Release:        7.3.1611
+Codename:       Core
+
+[root@localhost tesseract-3.05.01]# uname -a
+Linux localhost.localdomain 3.10.0-514.el7.x86_64 #1 SMP Tue Nov 22 16:42:41 
+UTC 2016 x86_64 x86_64 x86_64 GNU/Linux
+
+{% endhighlight %}
+
+(2) 安装tesseract
+
+安装依赖项：
+{% highlight string %}
+# yum install autoconf
+# yum install automake
+# yum install libtool
+# yum install pkgconfig.x86_64
+
+# yum install libpng12-devel.x86_64
+# yum install libjpeg-devel
+# yum install libtiff-devel.x86_64
+# yum install zlib-devel.x86_64
+{% endhighlight %}
+<br />
+
+这里在安装时也安装训练工具所依赖的库：
+{% highlight string %}
+# yum install libicu-devel.x86_64
+# yum install pango-devel.x86_64
+# yum install cairo-devel.x86_64
+{% endhighlight %}
+<br />
+
+
+安装```Leptonica```，这里我们需要安装的版本>=1.74。参看：http://www.leptonica.org/download.html
+{% highlight string %}
+# wget http://www.leptonica.org/source/leptonica-1.74.4.tar.gz
+# tar -zxvf leptonica-1.74.4.tar.gz
+# cd leptonica-1.74.4
+
+# ./configure
+# make
+# make install
+
+# make uninstall  #卸载可执行
+{% endhighlight %}
+这里安装完成之后，默认会安装到/usr/local/lib目录。请执行如下命令：
+<pre>
+[root@localhost tesseract-src]# pkg-config --list-all | grep lept
+lept                      leptonica - An open source C library for efficient image processing and image analysis operations
+</pre>
+如果没有出现类似如上信息，请将leptconica的库所对应的lept.pc目录添加到PKG_CONFIG_PATH环境变量，否则后面编译tesseract会有问题.
+<pre>
+# cd /usr/local/lib/pkgconfig/
+# ls
+lept.pc  libevent.pc  libevent_pthreads.pc  msgpack.pc  
+
+# export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/lib/pkgconfig/  #此方法仅针对当前窗口有效
+</pre>
+请参看我的另一篇博文：[Linux中pkg-config的使用](https://ivanzz1001.github.io/records/post/linux/2017/09/08/linux-pkg-config)
+<br />
+
+安装tesseract:
+{% highlight string %}
+# wget https://github.com/tesseract-ocr/tesseract/archive/3.05.01.tar.gz
+
+# tar -zxvf 3.05.01.tar.gz 
+
+# ./autogen.sh
+# ./configure
+
+
+
+You can now build and install tesseract by running:
+# make
+# sudo make install
+
+
+Training tools can be build and installed (after building of tesseract) with:
+# make training
+# sudo make training-install
+
+
+# make uninstall  #卸载可执行
+{% endhighlight %}
+
+按如上方式一般能够成功的安装上tesseract：
+<pre>
+[root@localhost pkgconfig]# tesseract -v
+tesseract 3.05.01
+ leptonica-1.74.4
+  libpng 1.5.13 : libtiff 4.0.3 : zlib 1.2.7
+</pre>
+
 
 
 
