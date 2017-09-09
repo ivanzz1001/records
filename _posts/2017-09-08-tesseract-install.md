@@ -187,9 +187,66 @@ tesseract 3.05.01
 </pre>
 
 
+## 2. windows上安装tesseract
+
+
+## 3. 下载训练语言包
+
+在tesseract官网的langdata工程下有很多语言包，我们可以将这些语言包下载下来，然后自己通过这些语言包来进行训练，来获得我们自己的训练数据。
+{% highlight string %}
+# git clone https://github.com/tesseract-ocr/langdata.git
+{% endhighlight %}
+语言包下载下来之后，把里面自己所需要的语言复制到/usr/local/share/tessdata目录下。
+
+参看：https://github.com/tesseract-ocr/langdata
+
+## 4. 下载已经训练好的数据
+
+在tesseract官网的tessdata工程下有很多已经为我们训练好的各种语言的数据，我们如果不想自己训练，就可以直接采用。由于整个工程训练数据比较大，我们可以只下载自己所需要的训练数据即可。
+{% highlight string %}
+# git clone https://github.com/tesseract-ocr/tessdata.git     # 这里我们全部下载
+{% endhighlight %}
+
+下载下来之后，把自己所需要的训练数据复制到/usr/local/share/tessdata目录下。
+
+
+## 5. 测试
 
 
 
+
+
+
+
+<br />
+<br />
+**参看:**
+
+1. [Python下Tesseract Ocr引擎及安装介绍](http://www.cnblogs.com/zhongtang/p/5554784.html)
+
+2. [tesseract使用记录](http://git.malu.me/tesseract%E4%BD%BF%E7%94%A8%E8%AE%B0%E5%BD%95/)
+
+3. [Tesseract安裝](http://m.wangchao.net.cn/it/tcdetail_354205.html)
+
+4. [图片识别工具Tesseract初探_实用技巧](https://yq.aliyun.com/ziliao/132180)
+
+5. [tesseract-ocr 实现图片识别功能](http://blog.csdn.net/haluoluo211/article/details/53286999)
+
+6. [Tesseract-OCR的简单使用与训练](http://www.cnblogs.com/cnlian/p/5765871.html)
+
+7. [tesseract 3.04在centos6上安装](http://www.dayanmei.com/how-to-install-tersseract-on-centos-6/)
+
+8. [CentOS7下编译安装tesseract-ocr](http://blog.csdn.net/diandianxiyu_geek/article/details/50522582)
+
+9. [Tesseract-OCR引擎安装](http://www.cnblogs.com/syqlp/p/5462562.html)
+
+10. [Tesseract-OCR安装简明教程](http://blog.csdn.net/blueheart20/article/details/53206202)
+
+11. [python使用tesseract-ocr完成验证码识别](http://blog.csdn.net/a349458532/article/details/51490291)
+
+12. [Tesseract-OCR识别中文与训练字库实例](http://www.cnblogs.com/wzben/p/5930538.html)
+
+13. [CentOS7下编译安装tesseract-ocr](http://blog.csdn.net/strugglerookie/article/details/71606540)
 
 
 
