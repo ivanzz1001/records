@@ -100,9 +100,7 @@ UTC 2016 x86_64 x86_64 x86_64 GNU/Linux
 
 {% endhighlight %}
 
-(2) 安装tesseract
-
-安装依赖项：
+(2) 安装依赖项
 {% highlight string %}
 # yum install autoconf
 # yum install automake
@@ -122,10 +120,12 @@ UTC 2016 x86_64 x86_64 x86_64 GNU/Linux
 # yum install pango-devel.x86_64
 # yum install cairo-devel.x86_64
 {% endhighlight %}
-<br />
 
 
-安装```Leptonica```，这里我们需要安装的版本>=1.74。参看：http://www.leptonica.org/download.html
+(3) 安装Leptonica
+
+Leptonica主要用于图像处理和图像分析，这里我们需要安装的版本>=1.74。
+参看：http://www.leptonica.org/download.html
 {% highlight string %}
 # wget http://www.leptonica.org/source/leptonica-1.74.4.tar.gz
 # tar -zxvf leptonica-1.74.4.tar.gz
@@ -151,9 +151,10 @@ lept.pc  libevent.pc  libevent_pthreads.pc  msgpack.pc
 # export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/lib/pkgconfig/  #此方法仅针对当前窗口有效
 </pre>
 请参看我的另一篇博文：[Linux中pkg-config的使用](https://ivanzz1001.github.io/records/post/linux/2017/09/08/linux-pkg-config)
-<br />
 
-安装tesseract:
+
+
+(4) 安装tesseract
 {% highlight string %}
 # wget https://github.com/tesseract-ocr/tesseract/archive/3.05.01.tar.gz
 
