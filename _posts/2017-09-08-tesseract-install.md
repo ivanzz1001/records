@@ -203,6 +203,8 @@ tesseract 3.05.01
 ## 4. 下载已经训练好的数据
 
 在tesseract官网的tessdata工程下有很多已经为我们训练好的各种语言的数据，我们如果不想自己训练，就可以直接采用。由于整个工程训练数据比较大，我们可以只下载自己所需要的训练数据即可。
+
+```(注意：我们这里采用的是3.05.01版本的tesseract，应该要采用对应版本的训练好的数据)```
 {% highlight string %}
 # git clone https://github.com/tesseract-ocr/tessdata.git     # 这里我们全部下载
 {% endhighlight %}
