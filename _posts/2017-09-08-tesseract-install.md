@@ -112,7 +112,6 @@ UTC 2016 x86_64 x86_64 x86_64 GNU/Linux
 # yum install libtiff-devel.x86_64
 # yum install zlib-devel.x86_64
 {% endhighlight %}
-<br />
 
 这里在安装时也安装训练工具所依赖的库：
 {% highlight string %}
