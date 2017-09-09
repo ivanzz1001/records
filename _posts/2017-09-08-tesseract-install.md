@@ -16,7 +16,7 @@ description: tesseract的安装
 
 2. [python使用tesseract-ocr完成验证码识别](http://blog.csdn.net/a349458532/article/details/51490291)
 
-
+3. [ CentOS7下编译安装tesseract-ocr](http://blog.csdn.net/strugglerookie/article/details/71606540)
 
 ## 1. Linux上安装tesseract
 
