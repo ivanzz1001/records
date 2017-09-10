@@ -289,21 +289,21 @@ nginx核心模块是整个nginx运行的一个最基本框架，其他任何模�
 
 (1) 模块名称
 
-nginx核心模块名称为CORE_MODULES，该变量记录了nginx的核心模块。默认包括：ngx_core_module、ngx_errlog_module和ngx_conf_module。相应初始化代码如下：
+nginx核心模块名称为```CORE_MODULES```，该变量记录了nginx的核心模块。默认包括：ngx_core_module、ngx_errlog_module和ngx_conf_module。相应初始化代码如下：
 {% highlight string %}
 CORE_MODULES="ngx_core_module ngx_errlog_module ngx_conf_module"
 {% endhighlight %}
 
 (2) 模块头文件所在目录
 
-CORE_INCS变量记录了nginx核心模块所在的目录：
+```CORE_INCS```变量记录了nginx核心模块所在的目录：
 {% highlight string %}
 CORE_INCS="src/core"
 {% endhighlight %}
 
 (3) 模块头文件
 
-CORE_DEPS变量记录了nginx核心模块所依赖的头文件。DEPS的含义为dependencies。其包含src/core/目录下的35个头文件，唯独没有包括唯src/core/ngx_regex.h和src/core/ngx_thread_pool.h这两个：
+```CORE_DEPS```变量记录了nginx核心模块所依赖的头文件。DEPS的含义为dependencies。其包含src/core/目录下的35个头文件，唯独没有包括唯src/core/ngx_regex.h和src/core/ngx_thread_pool.h这两个：
 
 {%highlight string %}
 CORE_DEPS="src/core/nginx.h \
@@ -345,7 +345,7 @@ CORE_DEPS="src/core/nginx.h \
 
 (4) 模块源代码文件
 
-CORE_SRCS变量记录了nginx核心模块所依赖的源代码文件。SRCS的含义是sources，包含src/core目录下的34个源文件，仅仅没有包含src/core/ngx_regex.c和src/core/ngx_thread_pool.c则两个：
+```CORE_SRCS```变量记录了nginx核心模块所依赖的源代码文件。SRCS的含义是sources，包含src/core目录下的34个源文件，仅仅没有包含src/core/ngx_regex.c和src/core/ngx_thread_pool.c则两个：
 
 {% highlight string %}
 CORE_SRCS="src/core/nginx.c \
