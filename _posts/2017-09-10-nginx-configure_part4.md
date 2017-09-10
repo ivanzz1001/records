@@ -285,8 +285,107 @@ HTTP_FILE_CACHE_SRCS=src/http/ngx_http_file_cache.c
 
 ## 2. nginx核心模块
 
+nginx核心模块是整个nginx运行的一个最基本框架，其他任何模块的运行都需要依赖于这个核心模块。因此如果我们自己想要复用nginx来编写一个最简单的应用程序，其他模块都可以被裁减掉，然而核心模块是必不可少的.
+
+(1) 模块名称
+
+nginx核心模块名称为CORE_MODULES，该变量记录了nginx的核心模块。默认包括：ngx_core_module、ngx_errlog_module和ngx_conf_module。相应初始化代码如下：
+{% highlight string %}
+CORE_MODULES="ngx_core_module ngx_errlog_module ngx_conf_module"
+{% endhighlight %}
+
+(2) 模块头文件所在目录
+
+CORE_INCS变量记录了nginx核心模块所在的目录：
+{% highlight string %}
+CORE_INCS="src/core"
+{% endhighlight %}
+
+(3) 模块头文件
+
+CORE_DEPS变量记录了nginx核心模块所依赖的头文件。DEPS的含义为dependencies。其包含src/core/目录下的35个头文件，唯独没有包括唯src/core/ngx_regex.h和src/core/ngx_thread_pool.h这两个：
+
+{%highlight string %}
+CORE_DEPS="src/core/nginx.h \
+           src/core/ngx_config.h \
+           src/core/ngx_core.h \
+           src/core/ngx_log.h \
+           src/core/ngx_palloc.h \
+           src/core/ngx_array.h \
+           src/core/ngx_list.h \
+           src/core/ngx_hash.h \
+           src/core/ngx_buf.h \
+           src/core/ngx_queue.h \
+           src/core/ngx_string.h \
+           src/core/ngx_parse.h \
+           src/core/ngx_parse_time.h \
+           src/core/ngx_inet.h \
+           src/core/ngx_file.h \
+           src/core/ngx_crc.h \
+           src/core/ngx_crc32.h \
+           src/core/ngx_murmurhash.h \
+           src/core/ngx_md5.h \
+           src/core/ngx_sha1.h \
+           src/core/ngx_rbtree.h \
+           src/core/ngx_radix_tree.h \
+           src/core/ngx_rwlock.h \
+           src/core/ngx_slab.h \
+           src/core/ngx_times.h \
+           src/core/ngx_shmtx.h \
+           src/core/ngx_connection.h \
+           src/core/ngx_cycle.h \
+           src/core/ngx_conf_file.h \
+           src/core/ngx_module.h \
+           src/core/ngx_resolver.h \
+           src/core/ngx_open_file_cache.h \
+           src/core/ngx_crypt.h \
+           src/core/ngx_proxy_protocol.h \
+           src/core/ngx_syslog.h"
+{% endhighlight %}
+
+(4) 模块源代码文件
+
+CORE_SRCS变量记录了nginx核心模块所依赖的源代码文件。SRCS的含义是sources，包含src/core目录下的34个源文件，仅仅没有包含src/core/ngx_regex.c和src/core/ngx_thread_pool.c则两个：
+
+{% highlight string %}
+CORE_SRCS="src/core/nginx.c \
+           src/core/ngx_log.c \
+           src/core/ngx_palloc.c \
+           src/core/ngx_array.c \
+           src/core/ngx_list.c \
+           src/core/ngx_hash.c \
+           src/core/ngx_buf.c \
+           src/core/ngx_queue.c \
+           src/core/ngx_output_chain.c \
+           src/core/ngx_string.c \
+           src/core/ngx_parse.c \
+           src/core/ngx_parse_time.c \
+           src/core/ngx_inet.c \
+           src/core/ngx_file.c \
+           src/core/ngx_crc32.c \
+           src/core/ngx_murmurhash.c \
+           src/core/ngx_md5.c \
+           src/core/ngx_rbtree.c \
+           src/core/ngx_radix_tree.c \
+           src/core/ngx_slab.c \
+           src/core/ngx_times.c \
+           src/core/ngx_shmtx.c \
+           src/core/ngx_connection.c \
+           src/core/ngx_cycle.c \
+           src/core/ngx_spinlock.c \
+           src/core/ngx_rwlock.c \
+           src/core/ngx_cpuinfo.c \
+           src/core/ngx_conf_file.c \
+           src/core/ngx_module.c \
+           src/core/ngx_resolver.c \
+           src/core/ngx_open_file_cache.c \
+           src/core/ngx_crypt.c \
+           src/core/ngx_proxy_protocol.c \
+           src/core/ngx_syslog.c"
+{% endhighlight %}
 
 
+## 3. nginx事件模块
 
 
 
