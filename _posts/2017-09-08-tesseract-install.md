@@ -255,8 +255,25 @@ tesseract也包括一个hOCR模式，它可以根据每个词的坐标产生一�
 
 执行如下命令进行识别：
 <pre>
+[root@localhost workspace]# tesseract myscan.png out
+Tesseract Open Source OCR Engine v3.05.01 with Leptonica
+Warning. Invalid resolution 0 dpi. Using 70 instead.
 
+[root@localhost workspace]# cat out.txt 
+Tesserzcl is a commandrline program, so ﬁrst open a (ermina‘ or command prompt. The command
+I: used m m:
+
+teSsEr-act imagsname outputbasE [71 lang] [rpsm pagEsEgmude] [(0nfigfile.
 </pre>
+
+从上面的识别结果来看，效果还不甚理想。
+
+### 5.3 识别中文
+
+这里我们只是简单测试一下对中文的识别。现有如下图片：
+
+![myscan](/records/asserts/img/tesseract/tesseract-chinese-1.png)
+
 
 
 
