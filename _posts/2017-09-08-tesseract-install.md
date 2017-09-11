@@ -105,7 +105,17 @@ UTC 2016 x86_64 x86_64 x86_64 GNU/Linux
 # yum install pkgconfig.x86_64
 
 # yum install libpng12-devel.x86_64
+
+
 # yum install libjpeg-devel
+或通过源代码安装
+# wget http://www.ijg.org/files/jpegsrc.v8d.tar.gz
+# tar -zxvf jpegsrc.v8d.tar.gz
+# cd jpeg-8d/
+# ./configure --enable-shared
+# make
+# make install
+
 # yum install libtiff-devel.x86_64
 # yum install zlib-devel.x86_64
 {% endhighlight %}
@@ -184,7 +194,7 @@ Training tools can be build and installed (after building of tesseract) with:
 
 
 # make uninstall  #卸载可执行
-# training-uninstall #卸载可执行
+# make training-uninstall #卸载可执行
 {% endhighlight %}
 
 按如上方式一般能够成功的安装上tesseract：
