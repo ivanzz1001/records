@@ -274,7 +274,18 @@ teSsEr-act imagsname outputbasE [71 lang] [rpsm pagEsEgmude] [(0nfigfile.
 
 ![myscan](/records/asserts/img/tesseract/tesseract-chinese-1.png)
 
+执行如下命令进行识别：
+<pre>
+[root@localhost workspace]# tesseract tesseract-chinese-1.png out -l chi_sim
+Tesseract Open Source OCR Engine v3.05.01 with Leptonica
+Warning. Invalid resolution 0 dpi. Using 70 instead.
+[root@localhost workspace]# cat out.txt 
+责朐十/\大L义耒 ' 习近平总书记丕丑系列重要讲话中又寸全面从严蒙合竟提出很多新
+理含'涵盖责朐思惧建设 组织健设、 1乍风建设、 反腐倡廉建章良租制度建设'概茅舌
+起耒有十个方面'形成了完 含体系'成为全面从严蒙合竞朐思想统领. 党建
+网微平台趟丧题锢学习.
 
+</pre>
 
 
 
