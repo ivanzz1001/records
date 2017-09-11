@@ -71,10 +71,7 @@ pytesseract (0.1.7)  - Python-tesseract is a python wrapper for google's Tessera
 
 ### 1.2 源代码编译安装tesseract
 
-当前(2017-9-9)[github](https://github.com/tesseract-ocr/tesseract)最新版本tesseract为4.0.0版本，还未稳定,git clone下来尝试了一下编译也有比较大问题。当前的稳定版本是3.05.01，因此我们就采用该版本来安装。
-<pre>
-The latest stable version is 3.05.01, released on June 1, 2017. Latest source code for 3.05 is available from 3.05 branch on github.
-</pre>
+当前(2017-9-9)[github](https://github.com/tesseract-ocr/tesseract)最新版本tesseract为4.0.0版本。我们可以同时安装当前最新稳定版本3.05.1和最新版本4.0.0。这里以安装tesseract 4.0.0版本为例：
 
 参看：https://github.com/tesseract-ocr/tesseract/wiki/Compiling
 
@@ -113,9 +110,18 @@ UTC 2016 x86_64 x86_64 x86_64 GNU/Linux
 # yum install zlib-devel.x86_64
 {% endhighlight %}
 
-这里在安装时也安装训练工具所依赖的库：
+这里在安装时也安装训练工具所依赖的库(tesseract 4.0.0版本需要最新libicu-devel，需手动安装)：
 {% highlight string %}
-# yum install libicu-devel.x86_64
+# wget http://download.icu-project.org/files/icu4c/58.2/icu4c-58_2-src.tgz
+# tar -zxvf icu4c-58_2-src.tgz
+# cd icu/source
+# chmod +x runConfigureICU configure install-sh
+# ./runConfigureICU Linux/gcc --with-library-bits=64
+# make
+# make check
+# make install
+
+
 # yum install pango-devel.x86_64
 # yum install cairo-devel.x86_64
 {% endhighlight %}
@@ -158,10 +164,12 @@ lept.pc  libevent.pc  libevent_pthreads.pc  msgpack.pc
 {% highlight string %}
 # wget https://github.com/tesseract-ocr/tesseract/archive/3.05.01.tar.gz
 
+# mkdir -p /opt/tesseract4.0
+
 # tar -zxvf 3.05.01.tar.gz 
 
 # ./autogen.sh
-# ./configure
+# ./configure --prefix=/opt/tesseract4.0
 
 
 
@@ -176,6 +184,7 @@ Training tools can be build and installed (after building of tesseract) with:
 
 
 # make uninstall  #卸载可执行
+# training-uninstall #卸载可执行
 {% endhighlight %}
 
 按如上方式一般能够成功的安装上tesseract：
