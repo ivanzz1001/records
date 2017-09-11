@@ -274,6 +274,7 @@ teSsEr-act imagsname outputbasE [71 lang] [rpsm pagEsEgmude] [(0nfigfile.
 
 ![myscan](/records/assets/img/tesseract/tesseract-chinese-1.png)
 
+
 执行如下命令进行识别：
 <pre>
 [root@localhost workspace]# tesseract tesseract-chinese-1.png out -l chi_sim
