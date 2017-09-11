@@ -251,7 +251,7 @@ tesseract也包括一个hOCR模式，它可以根据每个词的坐标产生一�
 
 这里我们只是简单测试一下对英文的识别。现有如下图片：
 
-![tesseract-english-1](assets/img/tesseract/tesseract-english-1.png)
+![tesseract-english-1](../../../../../assets/img/tesseract/tesseract-english-1.png)
 
 
 
