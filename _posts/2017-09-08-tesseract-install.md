@@ -189,10 +189,17 @@ Training tools can be build and installed (after building of tesseract) with:
 
 按如上方式一般能够成功的安装上tesseract：
 <pre>
-[root@localhost pkgconfig]# tesseract -v
-tesseract 3.05.01
+[root@localhost tesseract-master]# ls /opt/tesseract4.0/
+bin  include  lib  share
+
+[root@localhost tesseract-master]# /opt/tesseract4.0/bin/tesseract -v
+tesseract 4.00.00alpha
  leptonica-1.74.4
   libpng 1.5.13 : libtiff 4.0.3 : zlib 1.2.7
+
+ Found AVX2
+ Found AVX
+ Found SSE
 </pre>
 
 
@@ -205,7 +212,7 @@ tesseract 3.05.01
 {% highlight string %}
 # git clone https://github.com/tesseract-ocr/langdata.git
 {% endhighlight %}
-语言包下载下来之后，把里面自己所需要的语言复制到/usr/local/share/tessdata目录下。
+语言包下载下来之后，把里面自己所需要的语言复制到安装目录下的share/tessdata目录。例如我们上面把tesseract安装到了/opt/tesseract4.0目录下，则这里我们可以将所需要的语言包复制到/opt/tesseract4.0/share/tessdata目录下。
 
 参看：https://github.com/tesseract-ocr/langdata
 
@@ -218,7 +225,7 @@ tesseract 3.05.01
 # git clone https://github.com/tesseract-ocr/tessdata.git     # 这里我们全部下载
 {% endhighlight %}
 
-下载下来之后，把自己所需要的训练数据复制到/usr/local/share/tessdata目录下。
+下载下来之后，把自己所需要的训练数据复制到安装目录下的share/tessdata目录。例如我们上面把tesseract安装到了/opt/tesseract4.0目录下，则这里我们可以将所需要的语言包复制到/opt/tesseract4.0/share/tessdata目录下。
 
 
 ## 5. 测试
@@ -266,18 +273,20 @@ tesseract也包括一个hOCR模式，它可以根据每个词的坐标产生一�
 
 执行如下命令进行识别：
 <pre>
-[root@localhost workspace]# tesseract myscan.png out
-Tesseract Open Source OCR Engine v3.05.01 with Leptonica
+[root@localhost workspace]# /opt/tesseract4.0/bin/tesseract tesseract-english-1.png out
+Tesseract Open Source OCR Engine v4.00.00alpha with Leptonica
 Warning. Invalid resolution 0 dpi. Using 70 instead.
+Estimating resolution as 129
 
 [root@localhost workspace]# cat out.txt 
-Tesserzcl is a commandrline program, so ﬁrst open a (ermina‘ or command prompt. The command
-I: used m m:
+Tesseract is a command-line program, so first open a terminal or command prompt. The command
+is used like thi
 
-teSsEr-act imagsname outputbasE [71 lang] [rpsm pagEsEgmude] [(0nfigfile.
+tesseract imagename outputbase [-1 lang] [-psm pagesegnode] [configfile.
+
 </pre>
 
-从上面的识别结果来看，效果还不甚理想。
+从上面的识别结果来看，效果还OK。
 
 ### 5.3 识别中文
 
@@ -288,19 +297,21 @@ teSsEr-act imagsname outputbasE [71 lang] [rpsm pagEsEgmude] [(0nfigfile.
 
 执行如下命令进行识别：
 <pre>
-[root@localhost workspace]# tesseract tesseract-chinese-1.png out -l chi_sim
-Tesseract Open Source OCR Engine v3.05.01 with Leptonica
+[root@localhost workspace]# /opt/tesseract4.0/bin/tesseract tesseract-chinese-1.png out -l chi_sim
+Tesseract Open Source OCR Engine v4.00.00alpha with Leptonica
 Warning. Invalid resolution 0 dpi. Using 70 instead.
+Estimating resolution as 219
+
 [root@localhost workspace]# cat out.txt 
-责朐十/\大L义耒 ' 习近平总书记丕丑系列重要讲话中又寸全面从严蒙合竟提出很多新
-理含'涵盖责朐思惧建设 组织健设、 1乍风建设、 反腐倡廉建章良租制度建设'概茅舌
-起耒有十个方面'形成了完 含体系'成为全面从严蒙合竞朐思想统领. 党建
-网微平台趟丧题锢学习.
+党 的 十 八大 以 来 ， 习 近 平 总 书记 在 系列 重要 讲话 中 对 全 面 从 严 治 党 提出 很 多 新
+理念 ， 涵 盖 党 的 思想 建设 、 组 织 建 设 、 作 风 建 设 、 反 腐 倡 廉 建设 和 制度 建设 ， 概 括
+起 来 有 十 个 方面 ， 形 成 了 完 念 体系 ， 成 为 全 面 从 严 治 党 的 思想 统领 。 党 建
+网 微 平台 邀 您 一 起 学 习 。
 
 </pre>
 
 
-
+如上出现相应的警告信息，原因暂时未明。
 
 
 <br />
