@@ -162,11 +162,11 @@ lept.pc  libevent.pc  libevent_pthreads.pc  msgpack.pc
 
 (4) 安装tesseract
 {% highlight string %}
-# wget https://github.com/tesseract-ocr/tesseract/archive/3.05.01.tar.gz
+# wget https://github.com/tesseract-ocr/tesseract/archive/master.zip
 
 # mkdir -p /opt/tesseract4.0
 
-# tar -zxvf 3.05.01.tar.gz 
+# unzip master.zip 
 
 # ./autogen.sh
 # ./configure --prefix=/opt/tesseract4.0
