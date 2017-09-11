@@ -272,7 +272,7 @@ teSsEr-act imagsname outputbasE [71 lang] [rpsm pagEsEgmude] [(0nfigfile.
 
 这里我们只是简单测试一下对中文的识别。现有如下图片：
 
-![myscan](/records/asserts/img/tesseract/tesseract-chinese-1.png)
+![myscan](/records/assets/img/tesseract/tesseract-chinese-1.png)
 
 执行如下命令进行识别：
 <pre>
