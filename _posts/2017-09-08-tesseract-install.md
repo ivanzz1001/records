@@ -102,6 +102,8 @@ UTC 2016 x86_64 x86_64 x86_64 GNU/Linux
 {% highlight string %}
 # yum install autoconf
 # yum install automake
+# wget http://www6.atomicorp.com/channels/atomic/centos/7/x86_64/RPMS/autoconf-archive-2012.09.08-4.el7.art.noarch.rpm
+# rpm -ivh autoconf-archive-2012.09.08-4.el7.art.noarch.rpm --nosignature  --nodigest
 # yum install libtool
 # yum install pkgconfig.x86_64
 
