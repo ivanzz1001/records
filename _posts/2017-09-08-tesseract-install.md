@@ -2,21 +2,19 @@
 layout: post
 title: tesseract的安装
 tags:
-- python
-categories: python
+- ocr
+categories: ocr
 description: tesseract的安装
 ---
 
-在做图片文字提取时，会使用到tesseract开源软件。这里简要介绍tesseract的安装。这里我们会分别介绍Linux与Windows平台的安装方法。
+在做图片文字提取时，会使用到tesseract开源软件。这里简要介绍tesseract的安装，需要安装两个部分：tesseract引擎、训练好的语言数据。这里我们会分别介绍Linux与Windows平台的安装方法。
 
 <!-- more -->
 参看:
 
 1. [tesseract官网](https://github.com/tesseract-ocr/)
 
-2. [python使用tesseract-ocr完成验证码识别](http://blog.csdn.net/a349458532/article/details/51490291)
 
-3. [ CentOS7下编译安装tesseract-ocr](http://blog.csdn.net/strugglerookie/article/details/71606540)
 
 ## 1. Linux上安装tesseract
 
@@ -214,41 +212,50 @@ tesseract 3.05.01
 
 ## 5. 测试
 
+在这一节，我们首先会讲述一下tesseract的基本用法，然后给出一些简单的文字识别示例，对与更复杂的测试，我们后续会再分章节进行讲解。
+
+### 5.1 tesseract基本用法
+tesseract是一个命令行程序，其基本用法如下：
+{% highlight string %}
+# tesseract imagename outputbase [-l lang] [-psm pagesegmode] [configfile...]
+{% endhighlight %}
+
+因此，我们可以通过如下命令从myscan.png中识别文字，然后将结果保存到out.txt中：
+{% highlight string %}
+# tesseract myscan.png out.txt
+{% endhighlight %}
+
+默认情况下，tesseract识别的语言是英文，我们可以通过如下方式来执行识别其他语言，比如德语：
+{% highlight string %}
+# tesseract myscan.png out -l deu
+{% endhighlight %}
+
+也可以指定同时识别多种语言，比如：英语 和 德语
+{% highlight string %}
+# tesseract myscan.png out -l eng+deu
+{% endhighlight %}
+
+tesseract也包括一个hOCR模式，它可以根据每个词的坐标产生一个特殊的HTML文件。而这可以通过使用[Hocr2PDF工具](https://exactcode.com/opensource/exactimage/)产生一个可搜索的pdf文件。要想使用该功能，可以添加```hocr```配置选项，例如：
+{% highlight string %}
+# tesseract myscan.png out hocr
+{% endhighlight %}
+
+
+对于版本>=3.03的tesseract，我们也可以直接通过如下方式产生一个可搜索的pdf文件：
+{% highlight string %}
+# tesseract myscan.png out pdf
+{% endhighlight %}
+
+
+### 5.2 测试识别英文
+
+这里我们只是简单测试一下对英文的识别。现有如下图片：
+
+![tesseract-english-1](assets/img/tesseract/tesseract-english-1.png)
 
 
 
 
-
-
-<br />
-<br />
-**参看:**
-
-1. [Python下Tesseract Ocr引擎及安装介绍](http://www.cnblogs.com/zhongtang/p/5554784.html)
-
-2. [tesseract使用记录](http://git.malu.me/tesseract%E4%BD%BF%E7%94%A8%E8%AE%B0%E5%BD%95/)
-
-3. [Tesseract安裝](http://m.wangchao.net.cn/it/tcdetail_354205.html)
-
-4. [图片识别工具Tesseract初探_实用技巧](https://yq.aliyun.com/ziliao/132180)
-
-5. [tesseract-ocr 实现图片识别功能](http://blog.csdn.net/haluoluo211/article/details/53286999)
-
-6. [Tesseract-OCR的简单使用与训练](http://www.cnblogs.com/cnlian/p/5765871.html)
-
-7. [tesseract 3.04在centos6上安装](http://www.dayanmei.com/how-to-install-tersseract-on-centos-6/)
-
-8. [CentOS7下编译安装tesseract-ocr](http://blog.csdn.net/diandianxiyu_geek/article/details/50522582)
-
-9. [Tesseract-OCR引擎安装](http://www.cnblogs.com/syqlp/p/5462562.html)
-
-10. [Tesseract-OCR安装简明教程](http://blog.csdn.net/blueheart20/article/details/53206202)
-
-11. [python使用tesseract-ocr完成验证码识别](http://blog.csdn.net/a349458532/article/details/51490291)
-
-12. [Tesseract-OCR识别中文与训练字库实例](http://www.cnblogs.com/wzben/p/5930538.html)
-
-13. [CentOS7下编译安装tesseract-ocr](http://blog.csdn.net/strugglerookie/article/details/71606540)
 
 
 
