@@ -76,7 +76,7 @@ pytesseract (0.1.7)  - Python-tesseract is a python wrapper for google's Tessera
 参看：https://github.com/tesseract-ocr/tesseract/wiki/Compiling
 
 
-(1) 安装环境
+**(1) 安装环境**
 
 当前我们安装环境是Centos7.3.1:
 
@@ -95,7 +95,7 @@ UTC 2016 x86_64 x86_64 x86_64 GNU/Linux
 
 {% endhighlight %}
 
-(2) 安装依赖项
+**(2) 安装依赖项**
 {% highlight string %}
 # yum install autoconf
 # yum install automake
@@ -157,7 +157,7 @@ Cflags: -I${includedir}
 {% endhighlight %}
 
 
-(3) 安装Leptonica
+**(3) 安装Leptonica**
 
 Leptonica主要用于图像处理和图像分析，这里我们需要安装的版本>=1.74。
 
@@ -190,7 +190,7 @@ lept.pc  libevent.pc  libevent_pthreads.pc  msgpack.pc
 
 
 
-(4) 安装tesseract
+**(4) 安装tesseract**
 {% highlight string %}
 # wget https://github.com/tesseract-ocr/tesseract/archive/master.zip
 
