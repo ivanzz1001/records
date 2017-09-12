@@ -289,9 +289,36 @@ rm -rf $NGX_AUTOTEST*
 
 ### 5.1 脚本分析
 
+**(1) 格式化提示信息**
+
+还记得我们在```auto/init脚本分析```的文章中介绍过ngx_n和ngx_c两个变量，其实际表示的是换行与退行。 在auto/feature中有如下：
+{% highlight string %}
+echo $ngx_n "checking for $ngx_feature ...$ngx_c"
+{% endhighlight %}
+
+其实就是打印出一句: checking for $ngx_feature ...，然后换行。当然存在$ngx_n和$ngx_c都为空的情况，此时真就没有主动换行了。
+
+
+**(2) 文件中生成信息提示**
+{% highlight string %}
+cat << END >> $NGX_AUTOCONF_ERR
+
+----------------------------------------
+checking for $ngx_feature
+
+END
+{% endhighlight %}
+
+然后向```NGX_AUTOCONF_ERR```表示的文件添加自动配置错误信息。该文件是在auto/init文件中初始化的,其值为:
+<pre>
+NGX_AUTOCONF_ERR=$NGX_OBJS/autoconf.err
+</pre>
+默认情况下为objs/autoconf.err
 
 
 
+
+就是echo一句checking for $ngx_feature，然后换行。当然存在ngx_n和ngx_c都为空的情况，这时真就没有主动换行了。
 <br />
 <br />
 <br />
