@@ -108,14 +108,15 @@ UTC 2016 x86_64 x86_64 x86_64 GNU/Linux
 
 
 # yum install libjpeg-devel
-或通过源代码安装
+或通过源代码安装,通过源代码安装我们需要为libjpeg建立pc文件（请见后文）
 # wget http://www.ijg.org/files/jpegsrc.v8d.tar.gz
 # tar -zxvf jpegsrc.v8d.tar.gz
 # cd jpeg-8d/
 # ./configure --enable-shared
 # make
 # make install
-通过源代码安装我们需要为libjpeg建立pc文件（请见后文）
+
+
 
 # yum install libtiff-devel.x86_64
 # yum install zlib-devel.x86_64
@@ -136,6 +137,7 @@ Cflags: -I${includedir}
 {% endhighlight %}
 请根据libjpeg的实际安装位置，调整上述代码然后保存为libjpeg.pc，然后再将该文件拷贝到pkg-config能找到的位置，比如本人机器上保存在/usr/local/lib/pkgconfig/libjpeg.pc。
 
+<br />
 
 
 这里在安装时也安装训练工具所依赖的库(tesseract 4.0.0版本需要最新libicu-devel，需手动安装)：
