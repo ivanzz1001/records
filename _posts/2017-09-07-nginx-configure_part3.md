@@ -159,6 +159,11 @@ else
 fi
 {% endhighlight %}
 
+说明：
+
+在UNIX下，echo输出内容以后，默认会添加输出一个换行符，以便下一次echo从下一行开始输出。而在输出内容末尾添加一个\c可以改变这一规则，输出内容完毕后光标仍然在本行，下一个echo的内功接在后面。
+
+
 
 **(8) 创建并写入Makefile**
 {% highlight string %}
