@@ -298,8 +298,9 @@ rm -rf $NGX_AUTOTEST*
 echo $ngx_n "checking for $ngx_feature ...$ngx_c"
 {% endhighlight %}
 
-其实就是打印出一句: checking for $ngx_feature ...，然后换行。当然存在$ngx_n和$ngx_c都为空的情况，此时真就没有主动换行了。
+其实就是打印出一句: checking for ```$ngx_feature``` ...，然后换行。当然存在```$ngx_n```和```$ngx_c```都为空的情况，此时真就没有主动换行了。
 
+<br />
 
 **(2) 文件中生成信息提示**
 {% highlight string %}
@@ -317,6 +318,7 @@ NGX_AUTOCONF_ERR=$NGX_OBJS/autoconf.err
 </pre>
 默认情况下为objs/autoconf.err
 
+<br />
 
 **(3) 初始化相关变量**
 {% highlight string %}
@@ -335,6 +337,8 @@ fi
 {% endhighlight %}
 
 上述首先初始化ngx_found为no; 接着判断```$ngx_feature_name```长度是否为0，不为0的话则将```$ngx_feature_name```转换成大写保存在ngx_have_feature变量中； 接着再判断```$ngx_feature_path```长度是否为0，不为0的话则在```$ngx_feature_path```中的每一个路径前加上-I选项，将结果保存在ngx_feature_inc_path变量中。
+
+<br />
 
 **(4) 生成feature测试程序**
 {% highlight string %}
@@ -359,6 +363,8 @@ END
 
 ```$NGX_INCLUDE_UNISTD_H```似乎没有地方定义
 
+<br />
+
 **(5) 编译feature测试程序**
 {% highlight string %}
 ngx_test="$CC $CC_TEST_FLAGS $CC_AUX_FLAGS $ngx_feature_inc_path \
@@ -373,8 +379,9 @@ eval "/bin/sh -c \"$ngx_test\" >> $NGX_AUTOCONF_ERR 2>&1"
 
 上述eval命令中首先将标准输出(stdout)重定向到了```$NGX_AUTOCONF_ERR```文件中，接着将标准错误(stderr)重定向到了标准输出(stdout), 因此最后标准错误也会重定向到```$NGX_AUTOCONF_ERR```文件中。
 
-ngx_test编译命令中：$CC_TEST_FLAGS、$CC_AUX_FLAGS、$NGX_TEST_LD_OPT一般与编译器相关，我们后续会介绍。
+ngx_test编译命令中：```$CC_TEST_FLAGS```、```$CC_AUX_FLAGS```、```$NGX_TEST_LD_OPT```一般与编译器相关，我们后续会介绍。
 
+<br />
 
 **(6) 执行测试程序**
 {% highlight string %}
@@ -471,6 +478,7 @@ I) 文件存在且可执行
 
 
 
+<br />
 <br />
 
 II) 文件不存在或不可执行
