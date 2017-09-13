@@ -291,7 +291,7 @@ rm -rf $NGX_AUTOTEST*
 
 我们首先来分析一下整个脚本的工作过程。
 
-***(1) 格式化提示信息***
+****(1) 格式化提示信息****
 
 还记得我们在```auto/init脚本分析```的文章中介绍过ngx_n和ngx_c两个变量，其实际表示的是换行与退行。 在auto/feature中有如下：
 {% highlight string %}
@@ -302,7 +302,7 @@ echo $ngx_n "checking for $ngx_feature ...$ngx_c"
 
 <br />
 
-***(2) 文件中生成信息提示***
+****(2) 文件中生成信息提示****
 {% highlight string %}
 cat << END >> $NGX_AUTOCONF_ERR
 
@@ -320,7 +320,7 @@ NGX_AUTOCONF_ERR=$NGX_OBJS/autoconf.err
 
 <br />
 
-***(3) 初始化相关变量***
+****(3) 初始化相关变量****
 {% highlight string %}
 ngx_found=no
 
@@ -340,7 +340,7 @@ fi
 
 <br />
 
-***(4) 生成feature测试程序***
+****(4) 生成feature测试程序****
 {% highlight string %}
 cat << END > $NGX_AUTOTEST.c
 
@@ -365,7 +365,7 @@ END
 
 <br />
 
-***(5) 编译feature测试程序***
+****(5) 编译feature测试程序****
 {% highlight string %}
 ngx_test="$CC $CC_TEST_FLAGS $CC_AUX_FLAGS $ngx_feature_inc_path \
           -o $NGX_AUTOTEST $NGX_AUTOTEST.c $NGX_TEST_LD_OPT $ngx_feature_libs"
@@ -383,7 +383,7 @@ ngx_test编译命令中：```$CC_TEST_FLAGS```、```$CC_AUX_FLAGS```、```$NGX_T
 
 <br />
 
-***(6) 执行测试程序***
+****(6) 执行测试程序****
 {% highlight string %}
 if [ -x $NGX_AUTOTEST ]; then
 
