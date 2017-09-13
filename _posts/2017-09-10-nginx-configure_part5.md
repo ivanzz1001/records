@@ -375,7 +375,7 @@ ngx_feature_inc_path=
 eval "/bin/sh -c \"$ngx_test\" >> $NGX_AUTOCONF_ERR 2>&1"
 {% endhighlight %}
 
-首先ngx_test变量保存编译命令，然后再执行eval，使用ngx_test变量保存的编译命令编译feature测试程序，并将编译输出写到$NGX_AUTOCONF_ERR中。
+首先ngx_test变量保存编译命令，然后再执行eval，使用ngx_test变量保存的编译命令编译feature测试程序，并将编译输出写到```$NGX_AUTOCONF_ERR```中。
 
 上述eval命令中首先将标准输出(stdout)重定向到了```$NGX_AUTOCONF_ERR```文件中，接着将标准错误(stderr)重定向到了标准输出(stdout), 因此最后标准错误也会重定向到```$NGX_AUTOCONF_ERR```文件中。
 
@@ -467,15 +467,87 @@ fi
 
 * $ngx_feature_run值为yes
 
+执行如下指令：
+{% highlight string %}
+# /bin/sh is used to intercept "Killed" or "Abort trap" messages
+if /bin/sh -c $NGX_AUTOTEST >> $NGX_AUTOCONF_ERR 2>&1; then
+    echo " found"
+    ngx_found=yes
+
+    if test -n "$ngx_feature_name"; then
+        have=$ngx_have_feature . auto/have
+    fi
+
+else
+    echo " found but is not working"
+fi
+{% endhighlight %}
+执行```$NGX_AUTOTEST```(即autotest)，然后将标准输出以及标准错误都写到```$NGX_AUTOCONF_ERR```(即autoconf.err)中。如果执行autotest返回成功，且```$ngx_feature_name```长度不为0，则调用auto/have脚本向ngx_auto_config.h头文件写入```$ngx_have_feature```特征； 如果执行autotest失败，则打印相应的提示。
+
+<br />
 
 * $ngx_feature_run值为value
+
+执行如下指令：
+{% highlight string %}
+# /bin/sh is used to intercept "Killed" or "Abort trap" messages
+if /bin/sh -c $NGX_AUTOTEST >> $NGX_AUTOCONF_ERR 2>&1; then
+    echo " found"
+    ngx_found=yes
+
+    cat << END >> $NGX_AUTO_CONFIG_H
+
+#ifndef $ngx_feature_name
+#define $ngx_feature_name  `$NGX_AUTOTEST`
+#endif
+
+END
+else
+    echo " found but is not working"
+fi
+{% endhighlight %}
+
+执行```$NGX_AUTOTEST```(即autotest)，然后将标准输出以及标准错误都写到```$NGX_AUTOCONF_ERR```(即autoconf.err)中。如果执行autotest返回成功，则向 ```$NGX_AUTO_CONFIG_H```(即ngx_auto_config.h)头文件中写入```$ngx_feature_name```宏定义，该宏定义的值为执行autotest的结果。
+
+<br />
+
 
 
 * $ngx_feature_run值为bug
 
+执行如下指令：
+{% highlight string %}
+# /bin/sh is used to intercept "Killed" or "Abort trap" messages
+if /bin/sh -c $NGX_AUTOTEST >> $NGX_AUTOCONF_ERR 2>&1; then
+    echo " not found"
+
+else
+    echo " found"
+    ngx_found=yes
+
+    if test -n "$ngx_feature_name"; then
+        have=$ngx_have_feature . auto/have
+    fi
+fi
+{% endhighlight %}
+
+看到与```$ngx_feature_run值为yes```刚好相反。
+
+<br />
 
 * $ngx_feature_run为其他值
 
+执行如下指令：
+{% highlight string %}
+echo " found"
+ngx_found=yes
+
+if test -n "$ngx_feature_name"; then
+    have=$ngx_have_feature . auto/have
+fi
+{% endhighlight %}
+
+直接不执行```$NGX_AUTOTEST```，判断```$ngx_feature_name```长度是否为0，如果非0则调用auto/have脚本向ngx_auto_config.h头文件中写入```$ngx_have_feature```特征。
 
 
 <br />
