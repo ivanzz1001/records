@@ -289,6 +289,8 @@ rm -rf $NGX_AUTOTEST*
 
 ### 5.1 脚本分析
 
+我们首先来分析一下整个脚本的工作过程。
+
 **(1) 格式化提示信息**
 
 还记得我们在```auto/init脚本分析```的文章中介绍过ngx_n和ngx_c两个变量，其实际表示的是换行与退行。 在auto/feature中有如下：
@@ -316,9 +318,178 @@ NGX_AUTOCONF_ERR=$NGX_OBJS/autoconf.err
 默认情况下为objs/autoconf.err
 
 
+**(3) 初始化相关变量**
+{% highlight string %}
+ngx_found=no
+
+if test -n "$ngx_feature_name"; then
+    ngx_have_feature=`echo $ngx_feature_name \
+                   | tr abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ`
+fi
+
+if test -n "$ngx_feature_path"; then
+    for ngx_temp in $ngx_feature_path; do
+        ngx_feature_inc_path="$ngx_feature_inc_path -I $ngx_temp"
+    done
+fi
+{% endhighlight %}
+
+上述首先初始化ngx_found为no; 接着判断$ngx_feature_name长度是否为0，不为0的话则将$ngx_feature_name转换成大写保存在ngx_have_feature变量中； 接着再判断$ngx_feature_path长度是否为0，不为0的话则在$ngx_feature_path中的每一个路径前加上-I选项，将结果保存在ngx_feature_inc_path变量中。
+
+**(4) 生成feature测试程序**
+{% highlight string %}
+cat << END > $NGX_AUTOTEST.c
+
+#include <sys/types.h>
+$NGX_INCLUDE_UNISTD_H
+$ngx_feature_incs
+
+int main() {
+    $ngx_feature_test;
+    return 0;
+}
+
+END
+{% endhighlight %}
 
 
-就是echo一句checking for $ngx_feature，然后换行。当然存在ngx_n和ngx_c都为空的情况，这时真就没有主动换行了。
+$NGX_AUTOTEST是在auto/init脚本中初始化为$NGX_OBJS/autotest的，默认为objs/autotest。加上后缀名则为objs/autotest.c。 
+
+其中$ngx_feature_incs 和 $ngx_feature_test都算是auto/feature脚本的参数。
+
+```$NGX_INCLUDE_UNISTD_H```似乎没有地方定义
+
+**(5) 编译feature测试程序**
+{% highlight string %}
+ngx_test="$CC $CC_TEST_FLAGS $CC_AUX_FLAGS $ngx_feature_inc_path \
+          -o $NGX_AUTOTEST $NGX_AUTOTEST.c $NGX_TEST_LD_OPT $ngx_feature_libs"
+
+ngx_feature_inc_path=
+
+eval "/bin/sh -c \"$ngx_test\" >> $NGX_AUTOCONF_ERR 2>&1"
+{% endhighlight %}
+
+首先ngx_test变量保存编译命令，然后再执行eval，使用ngx_test变量保存的编译命令编译feature测试程序，并将编译输出写到$NGX_AUTOCONF_ERR中。
+
+上述eval命令中首先将标准输出(stdout)重定向到了$NGX_AUTOCONF_ERR文件中，接着将标准错误(stderr)重定向到了标准输出(stdout), 因此最后标准错误也会重定向到$NGX_AUTOCONF_ERR文件中。
+
+ngx_test编译命令中：$CC_TEST_FLAGS、$CC_AUX_FLAGS、$NGX_TEST_LD_OPT一般与编译器相关，我们后续会介绍。
+
+
+**(6) 执行测试程序**
+{% highlight string %}
+if [ -x $NGX_AUTOTEST ]; then
+
+    case "$ngx_feature_run" in
+
+        yes)
+            # /bin/sh is used to intercept "Killed" or "Abort trap" messages
+            if /bin/sh -c $NGX_AUTOTEST >> $NGX_AUTOCONF_ERR 2>&1; then
+                echo " found"
+                ngx_found=yes
+
+                if test -n "$ngx_feature_name"; then
+                    have=$ngx_have_feature . auto/have
+                fi
+
+            else
+                echo " found but is not working"
+            fi
+        ;;
+
+        value)
+            # /bin/sh is used to intercept "Killed" or "Abort trap" messages
+            if /bin/sh -c $NGX_AUTOTEST >> $NGX_AUTOCONF_ERR 2>&1; then
+                echo " found"
+                ngx_found=yes
+
+                cat << END >> $NGX_AUTO_CONFIG_H
+
+#ifndef $ngx_feature_name
+#define $ngx_feature_name  `$NGX_AUTOTEST`
+#endif
+
+END
+            else
+                echo " found but is not working"
+            fi
+        ;;
+
+        bug)
+            # /bin/sh is used to intercept "Killed" or "Abort trap" messages
+            if /bin/sh -c $NGX_AUTOTEST >> $NGX_AUTOCONF_ERR 2>&1; then
+                echo " not found"
+
+            else
+                echo " found"
+                ngx_found=yes
+
+                if test -n "$ngx_feature_name"; then
+                    have=$ngx_have_feature . auto/have
+                fi
+            fi
+        ;;
+
+        *)
+            echo " found"
+            ngx_found=yes
+
+            if test -n "$ngx_feature_name"; then
+                have=$ngx_have_feature . auto/have
+            fi
+        ;;
+
+    esac
+
+else
+    echo " not found"
+
+    echo "----------"    >> $NGX_AUTOCONF_ERR
+    cat $NGX_AUTOTEST.c  >> $NGX_AUTOCONF_ERR
+    echo "----------"    >> $NGX_AUTOCONF_ERR
+    echo $ngx_test       >> $NGX_AUTOCONF_ERR
+    echo "----------"    >> $NGX_AUTOCONF_ERR
+fi
+{% endhighlight %}
+
+首先判断$NGX_AUTOTEST(即autotest）文件是否存在并且是可执行的，根据条件是否成立分如下两种情况：
+
+I) 文件存在且可执行
+
+根据$ngx_feature_run的值不同又可以分成如下几种情况：
+
+* $ngx_feature_run值为yes
+
+
+* $ngx_feature_run值为value
+
+
+* $ngx_feature_run值为bug
+
+
+* $ngx_feature_run为其他值
+
+
+
+<br />
+
+II) 文件不存在或不可执行
+
+执行如下部分，将相应信息写到```$NGX_AUTOCONF_ERR```(即autoconf.err)文件中：
+{% highlight string %}
+echo " not found"
+
+echo "----------"    >> $NGX_AUTOCONF_ERR
+cat $NGX_AUTOTEST.c  >> $NGX_AUTOCONF_ERR
+echo "----------"    >> $NGX_AUTOCONF_ERR
+echo $ngx_test       >> $NGX_AUTOCONF_ERR
+echo "----------"    >> $NGX_AUTOCONF_ERR
+{% endhighlight %}
+
+
+
+
+
 <br />
 <br />
 <br />
