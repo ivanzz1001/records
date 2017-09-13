@@ -334,7 +334,7 @@ if test -n "$ngx_feature_path"; then
 fi
 {% endhighlight %}
 
-上述首先初始化ngx_found为no; 接着判断$ngx_feature_name长度是否为0，不为0的话则将$ngx_feature_name转换成大写保存在ngx_have_feature变量中； 接着再判断$ngx_feature_path长度是否为0，不为0的话则在$ngx_feature_path中的每一个路径前加上-I选项，将结果保存在ngx_feature_inc_path变量中。
+上述首先初始化ngx_found为no; 接着判断```$ngx_feature_name```长度是否为0，不为0的话则将```$ngx_feature_name```转换成大写保存在ngx_have_feature变量中； 接着再判断```$ngx_feature_path```长度是否为0，不为0的话则在```$ngx_feature_path```中的每一个路径前加上-I选项，将结果保存在ngx_feature_inc_path变量中。
 
 **(4) 生成feature测试程序**
 {% highlight string %}
@@ -353,9 +353,9 @@ END
 {% endhighlight %}
 
 
-$NGX_AUTOTEST是在auto/init脚本中初始化为$NGX_OBJS/autotest的，默认为objs/autotest。加上后缀名则为objs/autotest.c。 
+```$NGX_AUTOTEST```是在auto/init脚本中初始化为```$NGX_OBJS/autotest```的，默认为objs/autotest。加上后缀名则为objs/autotest.c。 
 
-其中$ngx_feature_incs 和 $ngx_feature_test都算是auto/feature脚本的参数。
+其中```$ngx_feature_incs``` 和 ```$ngx_feature_test```都算是auto/feature脚本的参数。
 
 ```$NGX_INCLUDE_UNISTD_H```似乎没有地方定义
 
@@ -371,7 +371,7 @@ eval "/bin/sh -c \"$ngx_test\" >> $NGX_AUTOCONF_ERR 2>&1"
 
 首先ngx_test变量保存编译命令，然后再执行eval，使用ngx_test变量保存的编译命令编译feature测试程序，并将编译输出写到$NGX_AUTOCONF_ERR中。
 
-上述eval命令中首先将标准输出(stdout)重定向到了$NGX_AUTOCONF_ERR文件中，接着将标准错误(stderr)重定向到了标准输出(stdout), 因此最后标准错误也会重定向到$NGX_AUTOCONF_ERR文件中。
+上述eval命令中首先将标准输出(stdout)重定向到了```$NGX_AUTOCONF_ERR```文件中，接着将标准错误(stderr)重定向到了标准输出(stdout), 因此最后标准错误也会重定向到```$NGX_AUTOCONF_ERR```文件中。
 
 ngx_test编译命令中：$CC_TEST_FLAGS、$CC_AUX_FLAGS、$NGX_TEST_LD_OPT一般与编译器相关，我们后续会介绍。
 
@@ -452,7 +452,7 @@ else
 fi
 {% endhighlight %}
 
-首先判断$NGX_AUTOTEST(即autotest）文件是否存在并且是可执行的，根据条件是否成立分如下两种情况：
+首先判断```$NGX_AUTOTEST```(即autotest）文件是否存在并且是可执行的，根据条件是否成立分如下两种情况：
 
 I) 文件存在且可执行
 
