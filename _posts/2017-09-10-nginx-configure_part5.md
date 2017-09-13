@@ -336,7 +336,7 @@ if test -n "$ngx_feature_path"; then
 fi
 {% endhighlight %}
 
-上述首先初始化ngx_found为no; 接着判断```$ngx_feature_name```长度是否为0，不为0的话则将```$ngx_feature_name```转换成大写保存在ngx_have_feature变量中； 接着再判断```$ngx_feature_path```长度是否为0，不为0的话则在```$ngx_feature_path```中的每一个路径前加上-I选项，将结果保存在ngx_feature_inc_path变量中。
+上述首先初始化ngx_found为no; 接着判断```$ngx_feature_name```长度是否为0，不为0的话则将```$ngx_feature_name```转换成大写保存在ngx_have_feature变量中； 接着再判断```$ngx_feature_path```长度是否为0，不为0的话则在```$ngx_feature_path```中的每一个路径前加上 -I 选项，将结果保存在ngx_feature_inc_path变量中。
 
 <br />
 
