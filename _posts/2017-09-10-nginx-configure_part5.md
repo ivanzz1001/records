@@ -482,9 +482,8 @@ else
     echo " found but is not working"
 fi
 {% endhighlight %}
-执行```$NGX_AUTOTEST```(即autotest)，然后将标准输出以及标准错误都写到```$NGX_AUTOCONF_ERR```(即autoconf.err)中。如果执行autotest返回成功，且```$ngx_feature_name```长度不为0，则调用auto/have脚本向ngx_auto_config.h头文件写入```$ngx_have_feature```特征； 如果执行autotest失败，则打印相应的提示。
+执行```$NGX_AUTOTEST```(即autotest)，然后将标准输出以及标准错误都写到autoconf.err中。如果执行autotest返回成功，且```$ngx_feature_name```长度不为0，则调用auto/have脚本向ngx_auto_config.h头文件写入```$ngx_have_feature```特征； 如果执行autotest失败，则打印相应的提示。
 
-<br />
 
 * $ngx_feature_run值为value
 
@@ -507,9 +506,7 @@ else
 fi
 {% endhighlight %}
 
-执行```$NGX_AUTOTEST```(即autotest)，然后将标准输出以及标准错误都写到```$NGX_AUTOCONF_ERR```(即autoconf.err)中。如果执行autotest返回成功，则向 ```$NGX_AUTO_CONFIG_H```(即ngx_auto_config.h)头文件中写入```$ngx_feature_name```宏定义，该宏定义的值为执行autotest的结果。
-
-<br />
+执行```$NGX_AUTOTEST```(即autotest)，然后将标准输出以及标准错误都写到autoconf.err中。如果执行autotest返回成功，则向 ngx_auto_config.h头文件中写入```$ngx_feature_name```宏定义，该宏定义的值为执行autotest的结果。
 
 
 
@@ -533,7 +530,6 @@ fi
 
 看到与```$ngx_feature_run值为yes```刚好相反。
 
-<br />
 
 * $ngx_feature_run为其他值
 
