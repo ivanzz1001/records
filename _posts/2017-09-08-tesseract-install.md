@@ -344,6 +344,14 @@ Estimating resolution as 219
 ```如上出现相应的警告信息，原因暂时未明。```
 
 
+
+
+<br />
+<br />
+**[参考]:**
+
+1. [Tesseract-OCR识别中文与训练字库实例](http://www.cnblogs.com/wzben/p/5930538.html)
+
 <br />
 <br />
 <br />
