@@ -302,6 +302,7 @@ tesseract官网有很多训练好的语言包版本，tesseract中有些命令�
 比如当我们使用 --oem 2模式时（即 Tesseract + LSTM模式），就必须配合 LSTM + lang models 类型的语言包.
 </pre>
 
+<br />
 
 ### 5.2 测试识别英文
 
@@ -310,7 +311,7 @@ tesseract官网有很多训练好的语言包版本，tesseract中有些命令�
 ![myscan](/records/assets/img/tesseract/tesseract-english-1.png)
 
 执行如下命令进行识别：
-<pre>
+{% highlight string %}
 [root@localhost workspace]# /opt/tesseract4.0/bin/tesseract tesseract-english-1.png out
 Tesseract Open Source OCR Engine v4.00.00alpha with Leptonica
 Warning. Invalid resolution 0 dpi. Using 70 instead.
@@ -322,7 +323,7 @@ is used like thi
 
 tesseract imagename outputbase [-1 lang] [-psm pagesegnode] [configfile.
 
-</pre>
+{% endhighlight %}
 
 从上面的识别结果来看，效果还OK。
 
@@ -334,7 +335,7 @@ tesseract imagename outputbase [-1 lang] [-psm pagesegnode] [configfile.
 
 
 执行如下命令进行识别：
-<pre>
+{% highlight string %}
 [root@localhost workspace]# /opt/tesseract4.0/bin/tesseract tesseract-chinese-1.png out -l chi_sim
 Tesseract Open Source OCR Engine v4.00.00alpha with Leptonica
 Warning. Invalid resolution 0 dpi. Using 70 instead.
@@ -346,7 +347,7 @@ Estimating resolution as 219
 起 来 有 十 个 方面 ， 形 成 了 完 念 体系 ， 成 为 全 面 从 严 治 党 的 思想 统领 。 党 建
 网 微 平台 邀 您 一 起 学 习 。
 
-</pre>
+{% endhighlight %}
 
 
 ```如上出现相应的警告信息，原因暂时未明。```
