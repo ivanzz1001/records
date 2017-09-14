@@ -13,7 +13,12 @@ description: nginx编译脚本解析
 <br />
 
 <!-- more -->
-参看：```http://blog.csdn.net/poechant/article/details/7327206```
+参看：
+
+1) ```http://blog.csdn.net/poechant/article/details/7327206```
+
+2) ```http://man.linuxde.net/sed```
+
 
 ## 1. auto/options脚本
 
@@ -814,15 +819,6 @@ case ".$NGX_PERL_MODULES" in
     ;;
 esac
 {% endhighlight %}
-
-
-<br />
-<br />
-
-**参看:**
-
-1. [sed命令](http://man.linuxde.net/sed)
-
 
 
 
