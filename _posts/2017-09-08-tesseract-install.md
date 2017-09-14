@@ -300,6 +300,8 @@ tesseract也包括一个hOCR模式，它可以根据每个词的坐标产生一�
 tesseract官网有很多训练好的语言包版本，tesseract中有些命令参数必须结合对应的语言包版本才能使用。
 
 比如当我们使用 --oem 2模式时（即 Tesseract + LSTM模式），就必须配合 LSTM + lang models 类型的语言包.
+
+注意： TESSDATA_PREFIX environment variable should be set to the parent directory of "tessdata" directory.
 </pre>
 
 <br />
