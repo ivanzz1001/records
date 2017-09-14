@@ -816,7 +816,12 @@ esac
 {% endhighlight %}
 
 
+<br />
+<br />
 
+**参看:**
+
+1. [sed命令](http://man.linuxde.net/sed)
 
 
 
