@@ -217,9 +217,9 @@ if [ ".$CPP" = "." ]; then
 fi
 {% endhighlight %}
 
-脚本主要是用于配置CFLAGS编译选项。
+脚本主要是用于配置```CFLAGS```编译选项。
 
-## 2 
+## 2. 
 
 
 
