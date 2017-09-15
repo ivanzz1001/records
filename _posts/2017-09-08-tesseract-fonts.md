@@ -71,8 +71,71 @@ chi_sim.AR_PL_UMing_TW_MBE_Semi-Light.tif  chi_sim.WenQuanYi_Micro_Hei.tif      
 </pre>
 
 
+## 2. 字体的安装
+
+在Centos上一般我们可以通过如下方式找到字体，然后安装：
+<pre>
+[root@localhost workspace]# yum search fonts | grep Chinese
+wqy-microhei-fonts.noarch : Compact Chinese fonts derived from Droid
+                                      : Simplified Chinese
+                                        : Traditional Chinese
+cjkuni-ukai-fonts.noarch : Chinese Unicode TrueType font in Kai face
+cjkuni-uming-fonts.noarch : Chinese Unicode TrueType font in Ming face
+ghostscript-chinese-zh_CN.noarch : Ghostscript Simplified Chinese fonts
+ghostscript-chinese-zh_TW.noarch : Ghostscript Traditional Chinese fonts
+google-noto-sans-simplified-chinese-fonts.noarch : Sans Simplified Chinese font
+google-noto-sans-traditional-chinese-fonts.noarch : Sans Traditional Chinese
+</pre>
+这里我们安装当前机器上尚未安装的几个：
+<pre>
+# yum install cjkuni-ukai-fonts.noarch ghostscript-chinese-zh_CN.noarch google-noto-sans-simplified-chinese-fonts.noarch
+</pre>
 
 
+我们在WIN7上有大量的中文字体，但是很多时候我们不能通过上述方法进行安装，下面我们介绍如何安装WIN7上的一些字体。
+
+(1) 安装字体管理工具
+<pre>
+# yum install fontconfig mkfontscale
+</pre>
+
+(2) 把WIN7上的一些字体拷贝到Linux上
+
+Win7上的字体在C:\Windows\Fonts目录。 我们可以在Linux上创建相应的目录,例如：
+<pre>
+# mkdir -p /usr/share/fonts/chinese
+</pre>
+此处我们将C:\Windows/Fonts\simsun.ttc及C:\Windows\Fonts\simfang.ttf拷贝到上述目录
+
+执行如下命令更改权限：
+<pre>
+# chmod -R 755 /usr/share/fonts/chinese
+</pre>
+
+(3) 建立字体缓存
+
+执行如下命令建立字体缓存：
+<pre>
+# cd /usr/share/fonts/chinese
+# mkfontscale
+# mkfontdir
+# fc-cache -fv
+</pre>
+
+(4) 查看字体
+<pre>
+[root@localhost chinese]# fc-list | grep SimSun
+/usr/share/fonts/chinese/simsun.ttc: NSimSun,新宋体:style=Regular
+/usr/share/fonts/chinese/simsun.ttc: SimSun,宋体:style=Regular
+[root@localhost chinese]# 
+[root@localhost chinese]# fc-list | grep FangSong
+/usr/share/fonts/chinese/simfang.ttf: FangSong,仿宋:style=Regular,Normal,obyčejné,Standard,Κανονικά,
+Normaali,Normál,Normale,Standaard,Normalny,Обычный,Normálne,Navadno,Arrunta
+</pre>
+
+(5) 使字体生效
+
+系统操作系统，是字体生效。
 
 
 <br />
