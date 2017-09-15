@@ -138,6 +138,15 @@ Normaali,Normál,Normale,Standaard,Normalny,Обычный,Normálne,Navadno,Arr
 系统操作系统，是字体生效。
 
 
+## 3. 查看当前可用字体
+
+执行如下命令查看当期系统可用字体：
+<pre>
+# /opt/tesseract4.0/bin/text2image --fonts_dir /usr/share/fonts --list_available_fonts
+</pre>
+
+
+
 <br />
 <br />
 <br />
