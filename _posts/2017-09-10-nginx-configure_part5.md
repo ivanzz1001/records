@@ -43,7 +43,7 @@ END
 
 (3) 示例
 
-如果have值为SOME_FLAG，则引用该脚本而运行后，objs/ngx_auto_config.h头文件中将追加如下内容：
+如果have值为```SOME_FLAG```，则引用该脚本而运行后，objs/ngx_auto_config.h头文件中将追加如下内容：
 {% highlight string %}
 #ifndef SOME_FLAG
 #define SOME_FLAG 1
@@ -78,7 +78,7 @@ END
 
 (3) 示例
 
-如果have值为SOME_FLAG，则引用该脚本而运行后，objs/ngx_auto_config.h头文件中将追加如下内容：
+如果have值为```SOME_FLAG```，则引用该脚本而运行后，objs/ngx_auto_config.h头文件中将追加如下内容：
 {% highlight string %}
 #ifndef SOME_FLAG
 #define SOME_FLAG 0
@@ -114,7 +114,7 @@ END
 
 (3) 示例
 
-如果have值为SOME_FLAG，value值为1234,则引用该脚本而运行后，objs/ngx_auto_config.h头文件中将追加如下内容：
+如果have值为```SOME_FLAG```，value值为1234,则引用该脚本而运行后，objs/ngx_auto_config.h头文件中将追加如下内容：
 {% highlight string %}
 #ifndef SOME_FLAG
 #define SOME_FLAG 1234
@@ -150,7 +150,7 @@ END
 
 (3) 示例
 
-如果have值为SOME_HEADER，则引用该脚本而运行后，objs/ngx_auto_headers.h头文件中将追加如下内容：
+如果have值为```SOME_HEADER```，则引用该脚本而运行后，objs/ngx_auto_headers.h头文件中将追加如下内容：
 {% highlight string %}
 #ifndef SOME_HEADER
 #define SOME_HEADER 1
@@ -562,6 +562,53 @@ echo $ngx_test       >> $NGX_AUTOCONF_ERR
 echo "----------"    >> $NGX_AUTOCONF_ERR
 {% endhighlight %}
 
+
+### 5.2 主要功能
+auto/feature脚本主要用于检测当前系统是否具有某项特性，如果有相应的特性，则通过ngx_found=yes返回，否则通过ngx_found=no返回。
+
+### 5.3 处理变量
+主要处理的变量有：
+{% highlight string %}
+$ngx_n
+$ngx_c
+
+$ngx_feature
+$ngx_feature_name
+$ngx_feature_run
+$ngx_feature_incs
+$ngx_feature_path
+$ngx_feature_libs
+$ngx_feature_test
+
+$NGX_AUTOCONF_ERR
+$NGX_AUTOTEST
+
+$NGX_INCLUDE_UNISTD_H 
+
+$CC
+$CC_TEST_FLAGS
+$CC_AUX_FLAGS
+$NGX_TEST_LD_OPT
+{% endhighlight %}
+
+
+### 5.4 示例
+
+(1) 测试当前系统是否具有-pipe特性
+{% highlight string %}
+CC_TEST_FLAGS="-pipe"
+
+ngx_feature="gcc -pipe switch"
+ngx_feature_name=
+ngx_feature_run=no
+ngx_feature_incs=
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test=
+. auto/feature
+{% endhighlight %}
+
+(2) 
 
 
 
