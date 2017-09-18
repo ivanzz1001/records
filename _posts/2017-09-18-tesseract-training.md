@@ -45,8 +45,17 @@ about 400000 textlines spanning about 4500 fonts.
 要训练Tesseract4.0.0，你不需要有任何神经网络的背景，但是了解神经网络有助于你理解一些训练选项的差异。在你深入研究训练流程之前，建议阅读[Implementation introduction](https://github.com/tesseract-ocr/tesseract/wiki/NeuralNetsInTesseract4.00)和[ImproveQuality](https://github.com/tesseract-ocr/tesseract/wiki/ImproveQuality)等相关内容。
 
 
+## 3. 安装必要库
 
+从Tesseract3.03开始，我们需要一些额外的库来构建训练工具：
+{% highlight string %}
+sudo apt-get install libicu-dev
+sudo apt-get install libpango1.0-dev
+sudo apt-get install libcairo2-dev
+{% endhighlight %}
+这一步，可能会由于库版本原因，我们需要手动安装。具体安装方法我们前面已经介绍过了。
 
+## 4. 构建训练工具
 
 
 
