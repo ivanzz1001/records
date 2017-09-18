@@ -323,19 +323,15 @@ ngx_long_end=
 <pre>
 在 bcc 中，设置为'@&&|
 	'
-
 在 msvc 中，设置为'@<<
 	'
-
 在 owc 中，设置为' '
-<pre>
+</pre>
 
 ```ngx_long_end:```
 <pre>
 在 bcc 中，设置为'|'
-
 在 msvc 中，设置为'<<'
-
 在 owc 中，设置为' '
 </pre>
 
