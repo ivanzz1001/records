@@ -640,6 +640,78 @@ should not be used as arguments. See Section 3.2 [Overall Options], page 24.
 </pre>
 主要功能就是禁止linker选项中包含一些特定的```选项值```和```文件名```.
 
+<br />
+
+**(3) 测试是否具有内置原子操作**
+{% highlight string %}
+ngx_feature="gcc builtin atomic operations"
+ngx_feature_name=NGX_HAVE_GCC_ATOMIC
+ngx_feature_run=yes
+ngx_feature_incs=
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="long  n = 0;
+                  if (!__sync_bool_compare_and_swap(&n, 0, 1))
+                      return 1;
+                  if (__sync_fetch_and_add(&n, 1) != 1)
+                      return 1;
+                  if (n != 2)
+                      return 1;
+                  __sync_synchronize();"
+. auto/feature
+{% endhighlight %}
+
+<br />
+
+**(4) 测试是否支持C99可变参数宏**
+{% highlight string %}
+    if [ "$NGX_CC_NAME" = "ccc" ]; then
+        echo "checking for C99 variadic macros ... disabled"
+    else
+        ngx_feature="C99 variadic macros"
+        ngx_feature_name="NGX_HAVE_C99_VARIADIC_MACROS"
+        ngx_feature_run=yes
+        ngx_feature_incs="#include <stdio.h>
+#define var(dummy, ...)  sprintf(__VA_ARGS__)"
+        ngx_feature_path=
+        ngx_feature_libs=
+        ngx_feature_test="char  buf[30]; buf[0] = '0';
+                          var(0, buf, \"%d\", 1);
+                          if (buf[0] != '1') return 1"
+        . auto/feature
+     fi
+{% endhighlight %}
+
+<br />
+
+**(5) 测试是否支持gcc可变参数宏**
+{% highlight string %}
+    ngx_feature="gcc variadic macros"
+    ngx_feature_name="NGX_HAVE_GCC_VARIADIC_MACROS"
+    ngx_feature_run=yes
+    ngx_feature_incs="#include <stdio.h>
+#define var(dummy, args...)  sprintf(args)"
+    ngx_feature_path=
+    ngx_feature_libs=
+    ngx_feature_test="char  buf[30]; buf[0] = '0';
+                      var(0, buf, \"%d\", 1);
+                      if (buf[0] != '1') return 1"
+    . auto/feature
+{% endhighlight %}
+
+<br />
+
+**(6) 测试是否支持内置的64bit 字节交换**
+{% highlight string %}
+ngx_feature="gcc builtin 64 bit byteswap"
+ngx_feature_name="NGX_HAVE_GCC_BSWAP64"
+ngx_feature_run=no
+ngx_feature_incs=
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="__builtin_bswap64(0)"
+. auto/feature
+{% endhighlight %}
 
 
 

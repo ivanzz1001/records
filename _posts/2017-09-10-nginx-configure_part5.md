@@ -608,7 +608,22 @@ ngx_feature_test=
 . auto/feature
 {% endhighlight %}
 
+<br />
 
+(2) 检查当前编译器是否支持gcc可变参数宏
+{% highlight string %}
+    ngx_feature="gcc variadic macros"
+    ngx_feature_name="NGX_HAVE_GCC_VARIADIC_MACROS"
+    ngx_feature_run=yes
+    ngx_feature_incs="#include <stdio.h>
+#define var(dummy, args...)  sprintf(args)"
+    ngx_feature_path=
+    ngx_feature_libs=
+    ngx_feature_test="char  buf[30]; buf[0] = '0';
+                      var(0, buf, \"%d\", 1);
+                      if (buf[0] != '1') return 1"
+    . auto/feature
+{% endhighlight %}
 
 ## 6. 删除测试程序
 执行如下命令删除测试程序：
