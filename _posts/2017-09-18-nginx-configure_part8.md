@@ -320,18 +320,24 @@ ngx_long_end=
 {% endhighlight %}
 
 ```ngx_long_start:```
+<pre>
+在 bcc 中，设置为'@&&|
+	'
 
-* 在 bcc 中，设置为'@&&|
-* 在 msvc 中，设置为@<<
-* 在 owc 中，设置为''
+在 msvc 中，设置为'@<<
+	'
 
-<br />
+在 owc 中，设置为' '
+<pre>
 
 ```ngx_long_end:```
+<pre>
+在 bcc 中，设置为'|'
 
-* 在 bcc 中，设置为|
-* 在 msvc 中，设置为<<
-* 在 owc 中，设置为''
+在 msvc 中，设置为'<<'
+
+在 owc 中，设置为' '
+</pre>
 
 
 ## 6. 一些分隔符
