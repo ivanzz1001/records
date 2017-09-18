@@ -10,10 +10,12 @@ description: nginx编译脚本解析
 
 我们在分析configure脚本的过程中，发现里面定义了很多工具型的脚本。这里我们统一的来讲述一下nginx工具型脚本。
 
-参看：http://blog.csdn.net/poechant/article/details/7347046
-
-
 <!-- more -->
+
+
+<br />
+<br />
+参看：http://blog.csdn.net/poechant/article/details/7347046
 
 
 ## 1. auto/have脚本
