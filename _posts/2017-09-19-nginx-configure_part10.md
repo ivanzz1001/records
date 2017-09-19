@@ -585,6 +585,23 @@ NGX_MACH_CACHE_LINE=32
 
 当前我们并没有进行```$CPU```的设置，因此```$NGX_CPU_CACHE_LINE```当前也没有值，这里根据我们的系统环境会被设置为32。
 
+<br />
+<br />
+
+*Tips：*
+<pre>
+Linux发行版中i386/i686/x86-64有什么区别？
+
+i386 适用于intel和AMD所有32位的CPU以及via采用x86架构的32位CPU。intel平台包括8086，80286，80386，80486，奔腾系列(1,2,3,4)，
+赛扬系列，Pentium D系列以及centrino P-M, Core duo等。
+
+x86_64 适用于intel的Core 2 Duo, Centrino Core 2 Duo, Xeno 和 AMD Athlon64/x2， Sempron64/x2, Duron64等采用x86架构的64
+位CPU。
+
+i686 只是i386的一个子集，支持的CPU从Pentium 2(686)开始,之前的型号不支持.
+</pre>
+
+
 
 <br />
 <br />
