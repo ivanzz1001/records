@@ -57,6 +57,22 @@ sudo apt-get install libcairo2-dev
 
 ## 4. 构建训练工具
 
+从Tesseract3.03版本开始，假如你是通过源代码的方式来编译生成Tesseract的话，你需要单独执行命令来编译安装训练工具。一旦上面的这些库已经被安装，在Tesseract的源码目录执行如下命令：
+{% highlight string %}
+make
+make training
+sudo make training-install
+{% endhighlight %}
+
+可以执行如下命令来编译```ScrollView.java```:
+{% highlight string %}
+make ScrollView.jar
+export SCROLLVIEW_PATH=$PWD/java
+{% endhighlight %}
+注： 我们上面没有特别执行安装命令```make install-jars```来进行安装，可以认为我们的安装目录就是```Tesseract源码目录/java```,并且我们通过export命令将该目录导出到```SCROLLVIEW_PATH```环境变量中。
+
+## 5. 所需硬-软件环境
+
 
 
 
