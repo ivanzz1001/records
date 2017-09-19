@@ -73,6 +73,8 @@ export SCROLLVIEW_PATH=$PWD/java
 
 ## 5. 所需硬-软件环境
 
+训练Tesseract4.0, 最好（但非必须）是在多核（4核）CPU上，并且拥有OpenMP及Intel Intrinsics以支持```SSE/AVX```扩展。基本上只要有足够的内存。
+
 
 
 
