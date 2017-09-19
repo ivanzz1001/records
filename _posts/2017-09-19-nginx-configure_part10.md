@@ -588,7 +588,7 @@ NGX_MACH_CACHE_LINE=32
 <br />
 <br />
 
-*Tips：*
+```Tips>>>```：
 <pre>
 Linux发行版中i386/i686/x86-64有什么区别？
 
