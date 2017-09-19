@@ -143,7 +143,7 @@ Hello,world
 
 **参看：**
 
-1. http://www.cnblogs.com/layezi/p/7049015.html
+1. [Centos7.2下部署Java开发环境](http://www.cnblogs.com/layezi/p/7049015.html)
 
 <br />
 <br />
