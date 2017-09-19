@@ -111,8 +111,26 @@ export PATH=$JAVA_HOME/bin:$PATH
 /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.141-1.b16.el7_3.x86_64/lib:/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.141-1.b16.el7_3.x86_64/jre/lib:
 </pre>
 
+## 4. 测试
+编写如下测试程序(HelloWorld.java)：
+{% highlight string %}
+package com.TT;
 
+public class HelloWorld{
+        public static void main(String[] args)
+        {
+                System.out.println("Hello,world");
+        }
+}
+{% endhighlight %}
 
+执行如下命令进行编译、执行：
+<pre>
+[root@localhost java-src]# javac  -d . HelloWorld.java
+[root@localhost java-src]# 
+[root@localhost java-src]# java com.TT.HelloWorld
+Hello,world
+</pre>
 
 
 
