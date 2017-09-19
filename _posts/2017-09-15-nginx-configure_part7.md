@@ -365,6 +365,9 @@ CFLAGS="$CFLAGS $PIPE $CPU_OPT"
 
 ```CC_AUX_FLAGS```作为辅助参数，并不会反映到最后生成的Makefile文件中，其只在脚本解析过程中被用到。而CFLAGS会作为编译选项反映到最后生成的Makefile文件中。
 
+这里在auto/options脚本当中，CPU默认被初始化为NO,我们后续也没有通过```--with-cpu-opt```选项来对CPU进行专门的设置。
+
+
 ## 8. nginx依赖库的编译选项
 {% highlight string %}
 if [ ".$PCRE_OPT" = "." ]; then
