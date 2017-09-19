@@ -575,7 +575,9 @@ fi
 have=NGX_CPU_CACHE_LINE value=$NGX_CPU_CACHE_LINE . auto/define
 {% endhighlight %}
 
-这里```$NGX_PLATFORM```为Linux，因此执行auto/os/linux脚本；```$NGX_MACHINE```为i686，因此执行如下：
+这里```$NGX_PLATFORM```为Linux，因此执行auto/os/linux脚本。
+
+```$NGX_MACHINE```为i686，因此执行如下：
 {% highlight string %}
 have=NGX_HAVE_NONALIGNED . auto/have
 NGX_MACH_CACHE_LINE=32
