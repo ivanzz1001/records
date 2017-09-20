@@ -73,7 +73,38 @@ export SCROLLVIEW_PATH=$PWD/java
 
 ## 5. 所需硬-软件环境
 
-训练Tesseract4.0, 最好（但非必须）是在多核（4核）CPU上，并且拥有OpenMP及Intel Intrinsics以支持```SSE/AVX```扩展。基本上只要有足够的内存。
+训练Tesseract4.0, 最好（但非必须）是在多核（4核）CPU上，并且拥有OpenMP及Intel Intrinsics以支持```SSE/AVX```扩展。基本上只要有足够的内存就可以运行，而CPU性能越高，则运行越快。并不需要（也不支持）GPU。内存的控制可以通过命令行选项```--max_image_MB```来指定，但是建议至少需要1GB的内存。
+
+
+## 6. 训练文本需求
+对于基于Latin的语言，当前已存在的模型已经训练了大概4500种字体，400000个textline。而对于其他的脚本，并没有这么多的字体可用，但是它们也被训练了大体相等数量的textline。
+
+
+## 7. 训练流程概况
+Tesseract4.0.0的整个训练流程与Tesseract3.04的训练流程，从概念上来说都是相同的：
+
+* 准备训练文本
+* 将训练文本变成 image + box文件（如果你已有image文件的话，只需要手动生成box文件）
+* 生成unicharset文件（可以部分指定，比如手工创建）
+* 用unicharset文件及可选的字典数据创建初始traineddata文件。
+* 运行tesseract来处理image + box文件以生成一个数据集合
+* 在数据集合上进行训练
+* 合并数据文件
+
+主要的不同有：
+
+* box文件只需要是textline级别。这样从image文件生成训练数据会更容易
+* .tr文件被替换成了.lstmf数据文件
+* Fonts可以并且应该自由的混合在一起，而不是分开
+* 组合步骤（mftraining,cntraining,shapeclustering)被替换成了一个单独的慢速lsmtraining步骤
+
+Tesseract4.0的训练不能做到像Tesseract3.04那么自动化，主要原因在于：
+
+* 慢速lsmtraining步骤并不能够很好的从中间开始运行，但是在停止之后它可以重新开始训练。并且在训练结束之后很难自动的进行报告
+* 有很多选项来指定如何训练神经网络
+* 新训练的语言模型、unicharset 与 base Tesseract的语言模型、unicharset可能不一样
+* 针对神经网络Tesseract，并不需要一个相同语言的base Tesseract
+
 
 
 
