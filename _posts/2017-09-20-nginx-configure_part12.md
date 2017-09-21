@@ -935,6 +935,66 @@ ngx_feature_test='struct addrinfo *res;
 
 如下我们对脚本进行分析：
 
+## 2. 指定nginx进程user和group
+{% highlight string %}
+NGX_USER=${NGX_USER:-nobody}
+
+if [ -z "$NGX_GROUP" ]; then
+    if [ $NGX_USER = nobody ]; then
+        if grep nobody /etc/group 2>&1 >/dev/null; then
+            echo "checking for nobody group ... found"
+            NGX_GROUP=nobody
+        else
+            echo "checking for nobody group ... not found"
+
+            if grep nogroup /etc/group 2>&1 >/dev/null; then
+                echo "checking for nogroup group ... found"
+                NGX_GROUP=nogroup
+            else
+                echo "checking for nogroup group ... not found"
+                NGX_GROUP=nobody
+            fi
+        fi
+    else
+        NGX_GROUP=$NGX_USER
+    fi
+fi
+{% endhighlight %}
+这里我们在编译时并没有通过```--user```与```--group```选项指定nginx进程运行时的所属用户和组。因此这里```NGX_USER```会被设置为 nobody, 而默认在ubuntu16.04系统中，/etc/group中也没有定义nobody组，但是定义了nogroup组，因此这里NGX_GROUP会被设置为 nogroup。
+
+## 3. 特性检测
+
+auto/unix脚本剩余部分都是进行特性检测。当前相关变量值如下：
+
+* CC_TEST_FLAGS: 为空
+* CC_AUX_FLAGS: -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 （在auto/os/linux脚本最后设置）
+* NGX_TEST_LD_OPT: 为空
+
+<br />
+
+**(1) poll特性检测**
+{% highlight string %}
+ngx_feature="poll()"
+ngx_feature_name=
+ngx_feature_run=no
+ngx_feature_incs="#include <poll.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="int  n; struct pollfd  pl;
+                  pl.fd = 0;
+                  pl.events = 0;
+                  pl.revents = 0;
+                  n = poll(&pl, 1, 0);
+                  if (n == -1) return 1"
+. auto/feature
+
+if [ $ngx_found = no ]; then
+    EVENT_POLL=NONE
+fi
+{% endhighlight %}
+
+
+
 
 
 
