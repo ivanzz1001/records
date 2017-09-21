@@ -42,7 +42,7 @@ about 400000 textlines spanning about 4500 fonts.
 
 ## 2. 预备工作
 
-要训练Tesseract4.0.0，你不需要有任何神经网络的背景，但是了解神经网络有助于你理解一些训练选项的差异。在你深入研究训练流程之前，建议阅读[Implementation introduction](https://github.com/tesseract-ocr/tesseract/wiki/NeuralNetsInTesseract4.00)和[ImproveQuality](https://github.com/tesseract-ocr/tesseract/wiki/ImproveQuality)等相关内容。
+要训练Tesseract4.0.0，你不需要有任何神经网络的背景，但是了解神经网络有助于你理解一些训练选项的差异。在你深入研究训练流程之前，建议阅读[Implementation introduction](https://github.com/tesseract-ocr/tesseract/wiki/NeuralNetsInTesseract4.00) 和 [ImproveQuality](https://github.com/tesseract-ocr/tesseract/wiki/ImproveQuality)等相关内容。
 
 
 ## 3. 安装必要库

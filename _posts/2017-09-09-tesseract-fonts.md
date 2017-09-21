@@ -142,7 +142,200 @@ Normaali,Normál,Normale,Standaard,Normalny,Обычный,Normálne,Navadno,Arr
 
 执行如下命令查看当期系统可用字体：
 <pre>
-# /opt/tesseract4.0/bin/text2image --fonts_dir /usr/share/fonts --list_available_fonts
+[root@localhost tesseract-master]# /opt/tesseract4.0/bin/text2image --fonts_dir /usr/share/fonts --list_available_fonts
+  0: AR PL UKai CN
+  1: AR PL UKai HK
+  2: AR PL UKai TW
+  3: AR PL UKai TW MBE
+  4: AR PL UMing CN Semi-Light
+  5: AR PL UMing HK Semi-Light
+  6: AR PL UMing TW MBE Semi-Light
+  7: AR PL UMing TW Semi-Light
+  8: Abyssinica SIL
+  9: Arial Unicode MS
+ 10: Caladea
+ 11: Caladea Bold
+ 12: Caladea Bold Italic
+ 13: Caladea Italic
+ 14: Cantarell
+ 15: Cantarell Bold
+ 16: Carlito
+ 17: Carlito Bold
+ 18: Carlito Bold Italic
+ 19: Carlito Italic
+ 20: Century Schoolbook L Bold
+ 21: Century Schoolbook L Bold Italic
+ 22: Century Schoolbook L Italic
+ 23: Century Schoolbook L Medium
+ 24: Clean
+ 25: DejaVu Sans
+ 26: DejaVu Sans Bold
+ 27: DejaVu Sans Bold Oblique
+ 28: DejaVu Sans Bold Oblique Semi-Condensed
+ 29: DejaVu Sans Bold Semi-Condensed
+ 30: DejaVu Sans Mono
+ 31: DejaVu Sans Mono Bold
+ 32: DejaVu Sans Mono Bold Oblique
+ 33: DejaVu Sans Mono Oblique
+ 34: DejaVu Sans Oblique
+ 35: DejaVu Sans Oblique Semi-Condensed
+ 36: DejaVu Sans Semi-Condensed
+ 37: DejaVu Sans Ultra-Light
+ 38: DejaVu Serif
+ 39: DejaVu Serif Bold
+ 40: DejaVu Serif Bold Italic
+ 41: DejaVu Serif Bold Italic Semi-Condensed
+ 42: DejaVu Serif Bold Semi-Condensed
+ 43: DejaVu Serif Italic
+ 44: DejaVu Serif Italic Semi-Condensed
+ 45: DejaVu Serif Semi-Condensed
+ 46: Dingbats
+ 47: FangSong
+ 48: Fixed
+ 49: FreeMono
+ 50: FreeMono Bold
+ 51: FreeMono Bold Italic
+ 52: FreeMono Italic
+ 53: FreeSans
+ 54: FreeSans Italic
+ 55: FreeSans Semi-Bold
+ 56: FreeSans Semi-Bold Italic
+ 57: FreeSerif
+ 58: FreeSerif Bold
+ 59: FreeSerif Bold Italic
+ 60: FreeSerif Italic
+ 61: Jomolhari
+ 62: KaiTi
+ 63: Khmer OS
+ 64: Khmer OS Content
+ 65: Khmer OS System
+ 66: LKLUG
+ 67: LiSu
+ 68: Liberation Mono
+ 69: Liberation Mono Bold
+ 70: Liberation Mono Bold Italic
+ 71: Liberation Mono Italic
+ 72: Liberation Sans
+ 73: Liberation Sans Bold
+ 74: Liberation Sans Bold Italic
+ 75: Liberation Sans Italic
+ 76: Liberation Serif
+ 77: Liberation Serif Bold
+ 78: Liberation Serif Bold Italic
+ 79: Liberation Serif Italic
+ 80: Lohit Assamese
+ 81: Lohit Bengali
+ 82: Lohit Devanagari
+ 83: Lohit Gujarati
+ 84: Lohit Kannada
+ 85: Lohit Malayalam
+ 86: Lohit Marathi
+ 87: Lohit Nepali
+ 88: Lohit Oriya
+ 89: Lohit Punjabi
+ 90: Lohit Tamil
+ 91: Lohit Telugu
+ 92: Madan2
+ 93: Meera
+ 94: Microsoft YaHei
+ 95: Microsoft YaHei Bold
+ 96: NSimSun
+ 97: NanumGothic
+ 98: NanumGothic Bold
+ 99: NanumGothic Semi-Bold
+100: Nimbus Mono L
+101: Nimbus Mono L Bold
+102: Nimbus Mono L Bold Oblique
+103: Nimbus Mono L Oblique
+104: Nimbus Roman No9 L
+105: Nimbus Roman No9 L Bold
+106: Nimbus Roman No9 L Bold Italic
+107: Nimbus Roman No9 L Italic
+108: Nimbus Sans L
+109: Nimbus Sans L Bold
+110: Nimbus Sans L Bold Condensed
+111: Nimbus Sans L Bold Italic
+112: Nimbus Sans L Bold Italic Condensed
+113: Nimbus Sans L Condensed
+114: Nimbus Sans L Italic
+115: Nimbus Sans L Italic Condensed
+116: Noto Sans SC
+117: Noto Sans SC Bold
+118: Noto Sans SC Heavy
+119: Noto Sans SC Medium
+120: Noto Sans SC Medium
+121: Noto Sans SC Semi-Light
+122: Noto Sans SC Semi-Light
+123: Nuosu SIL
+124: Open Sans
+125: Open Sans Bold
+126: Open Sans Bold Italic
+127: Open Sans Italic
+128: Open Sans Semi-Bold
+129: Open Sans Semi-Bold Italic
+130: Open Sans Semi-Light
+131: Open Sans Semi-Light Italic
+132: Open Sans Ultra-Bold
+133: Open Sans Ultra-Bold Italic
+134: OpenSymbol
+135: Overpass
+136: Overpass Bold
+137: Overpass Bold Italic
+138: Overpass Italic
+139: Overpass Semi-Light
+140: Overpass Semi-Light Italic
+141: Overpass Ultra-Light
+142: Overpass Ultra-Light Italic
+143: PT Sans
+144: PT Sans Bold
+145: PT Sans Bold Italic
+146: PT Sans Italic
+147: PT Sans Narrow Bold Condensed
+148: PT Sans Narrow Condensed
+149: Padauk
+150: Padauk Bold
+151: PakType Naskh Basic
+152: STFangsong
+153: STIX
+154: STIX Bold
+155: STIX Bold Italic
+156: STIX Italic
+157: STKaiti
+158: STSong
+159: STXihei
+160: STXinwei
+161: STZhongsong
+162: SimHei
+163: SimSun
+164: Standard Symbols L
+165: URW Bookman L
+166: URW Bookman L Bold
+167: URW Bookman L Bold Italic
+168: URW Bookman L Italic
+169: URW Chancery L Medium Italic
+170: URW Gothic L Book
+171: URW Gothic L Book Oblique
+172: URW Gothic L Semi-Bold
+173: URW Gothic L Semi-Bold Oblique
+174: URW Palladio L Bold
+175: URW Palladio L Bold Italic
+176: URW Palladio L Italic
+177: URW Palladio L Medium
+178: Utopia
+179: Utopia Bold
+180: Utopia Bold Italic
+181: Utopia Italic
+182: VL Gothic
+183: Waree
+184: Waree Bold
+185: Waree Bold Oblique
+186: Waree Oblique
+187: WenQuanYi Micro Hei
+188: WenQuanYi Micro Hei Mono
+189: WenQuanYi Zen Hei Medium
+190: WenQuanYi Zen Hei Mono Medium
+191: WenQuanYi Zen Hei Sharp Medium
+192: YouYuan
 </pre>
 
 
