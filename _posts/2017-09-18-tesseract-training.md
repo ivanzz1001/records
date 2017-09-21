@@ -173,6 +173,12 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 我们在下面讲述tune的时候就会用到该数据。
 
 
+```注--fontlist后接多个字体：````
+<pre>
+# training/tesstrain.sh --fontlist "fontname 1" "fontname 2"
+</pre>
+
+
 ## 10. Tutorial Guide to lstmtraining
 
 
