@@ -197,6 +197,28 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 (1个配置文件,可选)
 6. config file
 </pre>
+除了上述这些，并不需要其他组件，假如存在的话也会被忽略，并不会被使用。
+
+并没有工具可以直接的来创建```lstm-recoder```。然而tesseract4.0有一个新的工具```combine_lang_model```,它接受如下文件作为输入：
+
+* input_unicharset
+* script_dir(script_dir指向langdata目录）
+* word list文件(可选）
+
+以```input_unicharset```作为输入，通过```combine_lang_model```这个工具可以创建出lstm-recoder和所有的dawgs。假若也提供了wordlist的话，都会将这些打包进traineddata文件中。
+
+下面给出一个示例：
+{% highlight string %}
+ combine_lang_model    \
+ --input_unicharset  ../tesstutorial/sanskrit2003/san/san.unicharset  \
+ --script_dir "../langdata"   \
+ --words "../langdata/san/san.wordlist" \
+ --numbers "../langdata/san/san.numbers"   \
+ --puncs "../langdata/san/san.punc" \
+ --output_dir ../tesstutorial/sanskrit2003   \
+ --lang "san"     --pass_through_recoder \
+     --version_str "4.0.0alpha-20170816 sanskrit2003"
+{% endhighlight %}
 
 
 
