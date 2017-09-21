@@ -186,16 +186,16 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 
 作为```unicharset``` 和 ```script_dir```的替代，当前```lstmtraining```需要在命令行传入一个```traineddata```文件，以获得lstm针对某种语言训练的所有相关信息。```traineddata```所需要的文件如下：
 <pre>
-lstm-unicharset (必须）
-lstm-recoder （必须）
+1. lstm-unicharset (必须）
+2. lstm-recoder （必须）
 
-3个dawg文件:
-lstm-punc-dawg(可选）
-lstm-word-dawg（可选）
-lstm-number-dawg（可选）
+(3个dawg文件,可选)
+3. lstm-punc-dawg
+4. lstm-word-dawg
+5. lstm-number-dawg
 
-1个配置文件：
-config file（可选）
+(1个配置文件,可选)
+6. config file
 </pre>
 
 
