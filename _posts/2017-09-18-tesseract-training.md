@@ -173,10 +173,100 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 我们在下面讲述tune的时候就会用到该数据。
 
 
-```注--fontlist后接多个字体：````
-<pre>
-# training/tesstrain.sh --fontlist "fontname 1" "fontname 2"
-</pre>
+下面我们我们针对中文，生成tiff/box文件：
+{% highlight string %}
+# mkdir -p results/chi_sim
+# mkdir -p tesstutorial/chieval
+
+# cd tesseract-master/
+# training/text2image --find_fonts \
+--fonts_dir /usr/share/fonts \
+--text ../langdata/chi_sim/chi_sim.training_text \
+--min_coverage .9  \
+--outputbase ../results/chi_sim/chi_sim\
+|& grep raw | sed -e 's/ :.*/" \\/g'  | sed -e 's/^/  "/' >../results/chi_sim/fontslist.txt
+
+# cat ../results/chi_sim/fontslist.txt
+  "AR PL UKai CN" \
+  "AR PL UKai HK" \
+  "AR PL UKai TW" \
+  "AR PL UKai TW MBE" \
+  "AR PL UMing CN Semi-Light" \
+  "AR PL UMing HK Semi-Light" \
+  "AR PL UMing TW MBE Semi-Light" \
+  "AR PL UMing TW Semi-Light" \
+  "Arial Unicode MS" \
+  "FangSong" \
+  "KaiTi" \
+  "LiSu" \
+  "Microsoft YaHei" \
+  "Microsoft YaHei Bold" \
+  "NSimSun" \
+  "Noto Sans SC" \
+  "Noto Sans SC Bold" \
+  "Noto Sans SC Heavy" \
+  "Noto Sans SC Medium" \
+  "Noto Sans SC Medium" \
+  "Noto Sans SC Semi-Light" \
+  "Noto Sans SC Semi-Light" \
+  "STFangsong" \
+  "STKaiti" \
+  "STSong" \
+  "STXihei" \
+  "STXinwei" \
+  "STZhongsong" \
+  "SimHei" \
+  "SimSun" \
+  "WenQuanYi Micro Hei" \
+  "WenQuanYi Micro Hei Mono" \
+  "WenQuanYi Zen Hei Medium" \
+  "WenQuanYi Zen Hei Mono Medium" \
+  "WenQuanYi Zen Hei Sharp Medium" \
+  "YouYuan" \
+
+# training/tesstrain.sh --fonts_dir /usr/share/fonts --lang chi_sim --linedata_only \
+  --noextract_font_properties --langdata_dir ../langdata \
+  --tessdata_dir ../tessdata \
+  --fontlist "AR PL UKai CN" \
+  "AR PL UKai HK" \
+  "AR PL UKai TW" \
+  "AR PL UKai TW MBE" \
+  "AR PL UMing CN Semi-Light" \
+  "AR PL UMing HK Semi-Light" \
+  "AR PL UMing TW MBE Semi-Light" \
+  "AR PL UMing TW Semi-Light" \
+  "Arial Unicode MS" \
+  "FangSong" \
+  "KaiTi" \
+  "LiSu" \
+  "Microsoft YaHei" \
+  "Microsoft YaHei Bold" \
+  "NSimSun" \
+  "Noto Sans SC" \
+  "Noto Sans SC Bold" \
+  "Noto Sans SC Heavy" \
+  "Noto Sans SC Medium" \
+  "Noto Sans SC Medium" \
+  "Noto Sans SC Semi-Light" \
+  "Noto Sans SC Semi-Light" \
+  "STFangsong" \
+  "STKaiti" \
+  "STSong" \
+  "STXihei" \
+  "STXinwei" \
+  "STZhongsong" \
+  "SimHei" \
+  "SimSun" \
+  "WenQuanYi Micro Hei" \
+  "WenQuanYi Micro Hei Mono" \
+  "WenQuanYi Zen Hei Medium" \
+  "WenQuanYi Zen Hei Mono Medium" \
+  "WenQuanYi Zen Hei Sharp Medium" \
+  "YouYuan" \
+  --output_dir ../tesstutorial/chieval
+{% endhighlight %}
+
+
 
 
 ## 10. Tutorial Guide to lstmtraining
