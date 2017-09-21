@@ -263,7 +263,8 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "WenQuanYi Zen Hei Mono Medium" \
   "WenQuanYi Zen Hei Sharp Medium" \
   "YouYuan" \
-  --output_dir ../tesstutorial/chieval
+  --output_dir ../tesstutorial/chieval \
+  --overwrite
 {% endhighlight %}
 
 
@@ -307,7 +308,7 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
  --puncs "../langdata/san/san.punc" \
  --output_dir ../tesstutorial/sanskrit2003   \
  --lang "san"     --pass_through_recoder \
-     --version_str "4.0.0alpha-20170816 sanskrit2003"
+ --version_str "4.0.0alpha-20170816 sanskrit2003"
 {% endhighlight %}
 
 
