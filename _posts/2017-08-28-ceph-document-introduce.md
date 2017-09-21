@@ -32,6 +32,12 @@ description: redhat ceph资料
 
 
 
+## rgw访问客户端
+
+{% highlight string %}
+1. https://godoc.org/github.com/rook/rook/pkg/ceph/rgw
+{% endhighlight %}
+
 
 <br />
 <br />
