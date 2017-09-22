@@ -973,6 +973,8 @@ auto/unix脚本剩余部分都是进行特性检测。当前相关变量值如�
 <br />
 
 **(1) poll特性检测**
+
+检查系统是否支持poll函数：
 {% highlight string %}
 ngx_feature="poll()"
 ngx_feature_name=
@@ -993,7 +995,127 @@ if [ $ngx_found = no ]; then
 fi
 {% endhighlight %}
 
+注意这里```EVENT_POLL```可以取：
 
+* NO: 初始默认值，表示没有对poll特性进行手动设置
+* YES: 通过```--with-poll_module```对poll特性进行了手动设置，会置为YES
+* NONE: 通过```--without-poll_module```对poll特性进行了手动设置，或者这里检测没有poll特性，则会设置为NONE
+
+
+后面auto/modules脚本中会根据这些值决定是否需要编译对应的源代码文件。
+
+
+**(2) devpoll特性检测**
+
+检测系统是否支持devpoll特性：
+{% highlight string %}
+ngx_feature="/dev/poll"
+ngx_feature_name="NGX_HAVE_DEVPOLL"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/devpoll.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="int  n, dp; struct dvpoll  dvp;
+                  dp = 0;
+                  dvp.dp_fds = NULL;
+                  dvp.dp_nfds = 0;
+                  dvp.dp_timeout = 0;
+                  n = ioctl(dp, DP_POLL, &dvp);
+                  if (n == -1) return 1"
+. auto/feature
+
+if [ $ngx_found = yes ]; then
+    CORE_SRCS="$CORE_SRCS $DEVPOLL_SRCS"
+    EVENT_MODULES="$EVENT_MODULES $DEVPOLL_MODULE"
+    EVENT_FOUND=YES
+fi
+{% endhighlight %}
+如果检测到有devpoll特性，则将```EVENT_FOUND```置为```YES```.
+
+devpoll是Solaris操作系统上的一种类似于epoll的机制。
+
+**(3) 检测kqueue特性**
+
+{% highlight string %}
+if test -z "$NGX_KQUEUE_CHECKED"; then
+    ngx_feature="kqueue"
+    ngx_feature_name="NGX_HAVE_KQUEUE"
+    ngx_feature_run=no
+    ngx_feature_incs="#include <sys/event.h>"
+    ngx_feature_path=
+    ngx_feature_libs=
+    ngx_feature_test="int kq; kq = kqueue()"
+    . auto/feature
+
+    if [ $ngx_found = yes ]; then
+
+        have=NGX_HAVE_CLEAR_EVENT . auto/have
+        EVENT_MODULES="$EVENT_MODULES $KQUEUE_MODULE"
+        CORE_SRCS="$CORE_SRCS $KQUEUE_SRCS"
+        EVENT_FOUND=YES
+
+        ngx_feature="kqueue's NOTE_LOWAT"
+        ngx_feature_name="NGX_HAVE_LOWAT_EVENT"
+        ngx_feature_run=no
+        ngx_feature_incs="#include <sys/event.h>"
+        ngx_feature_path=
+        ngx_feature_libs=
+        ngx_feature_test="struct kevent  kev;
+                          kev.fflags = NOTE_LOWAT;"
+        . auto/feature
+
+
+        ngx_feature="kqueue's EVFILT_TIMER"
+        ngx_feature_name="NGX_HAVE_TIMER_EVENT"
+        ngx_feature_run=yes
+        ngx_feature_incs="#include <sys/event.h>
+                          #include <sys/time.h>"
+        ngx_feature_path=
+        ngx_feature_libs=
+        ngx_feature_test="int      kq;
+                  struct kevent    kev;
+                  struct timespec  ts;
+
+                  if ((kq = kqueue()) == -1) return 1;
+
+                  kev.ident = 0;
+                  kev.filter = EVFILT_TIMER;
+                  kev.flags = EV_ADD|EV_ENABLE;
+                  kev.fflags = 0;
+                  kev.data = 1000;
+                  kev.udata = 0;
+
+                  ts.tv_sec = 0;
+                  ts.tv_nsec = 0;
+
+                  if (kevent(kq, &kev, 1, &kev, 1, &ts) == -1) return 1;
+
+                  if (kev.flags & EV_ERROR) return 1;"
+
+        . auto/feature
+    fi
+fi
+
+
+if [ "$NGX_SYSTEM" = "NetBSD" ]; then
+
+    # NetBSD 2.0 incompatibly defines kevent.udata as "intptr_t"
+
+    cat << END >> $NGX_AUTO_CONFIG_H
+
+#define NGX_KQUEUE_UDATA_T
+
+END
+
+else
+    cat << END >> $NGX_AUTO_CONFIG_H
+
+#define NGX_KQUEUE_UDATA_T  (void *)
+
+END
+
+fi
+{% endhighlight %}
 
 
 

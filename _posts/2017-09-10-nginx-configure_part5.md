@@ -627,7 +627,7 @@ ngx_feature_test=
     . auto/feature
 {% endhighlight %}
 
-## 6. 删除测试程序
+### 5.5 删除测试程序
 执行如下命令删除测试程序：
 {% highlight string %}
 rm -rf $NGX_AUTOTEST*
