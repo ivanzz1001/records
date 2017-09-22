@@ -227,7 +227,7 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 # training/tesstrain.sh --fonts_dir /usr/share/fonts --lang chi_sim --linedata_only \
   --noextract_font_properties --langdata_dir ../langdata \
   --tessdata_dir ../tessdata \
-  ----exposures "0" \
+  --exposures "0" \
   --fontlist "AR PL UKai CN" \
   "AR PL UKai HK" \
   "AR PL UKai TW" \
