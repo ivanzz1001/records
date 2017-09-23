@@ -1118,6 +1118,148 @@ END
 fi
 {% endhighlight %}
 
+kqueue是一个可伸缩的事件通知接口，从FreeBSD 4.1开始引入，现在NetBSD、OpenBSD、DragonflyBSD和OSX系统上都支持。上面首先检测系统是否支持kqueue事件，如果支持再检测是否支持```EVFILT_TIMER```。
+
+最后再向objs/ngx_auto_config.h头文件添加```NGX_KQUEUE_UDATA_T```宏定义，以兼容不同的版本之间的区别。
+
+
+**(4) 检测是否支持crypt()特性**
+{% highlight string %}
+ngx_feature="crypt()"
+ngx_feature_name=
+ngx_feature_run=no
+ngx_feature_incs=
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="crypt(\"test\", \"salt\");"
+. auto/feature
+
+
+if [ $ngx_found = no ]; then
+
+    ngx_feature="crypt() in libcrypt"
+    ngx_feature_name=
+    ngx_feature_run=no
+    ngx_feature_incs=
+    ngx_feature_path=
+    ngx_feature_libs=-lcrypt
+    . auto/feature
+
+    if [ $ngx_found = yes ]; then
+        CRYPT_LIB="-lcrypt"
+    fi
+fi
+{% endhighlight %}
+crypt()采用AES对称加密算法对密码进行加密。检测如果支持，这将```CRYPT_LIB``置为 -lcrypt。
+
+**(5) 检查是否支持F_READAHEAD特性**
+{% highlight string %}
+ngx_feature="F_READAHEAD"
+ngx_feature_name="NGX_HAVE_F_READAHEAD"
+ngx_feature_run=no
+ngx_feature_incs="#include <fcntl.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="fcntl(0, F_READAHEAD, 1);"
+. auto/feature
+{% endhighlight %}
+
+Linux的文件预读readahead，指Linux系统内核将指定文件的某区域预读进页缓存起来，便于接下来对该区域进行读取时，不会因区域(page fault)而阻塞。因为从内存读取比从磁盘读取要快很多。预读可以有效的减少磁盘的寻道次数和应用程序的I/O等待时间，是改进磁盘读I/O性能的重要优化手段之一。
+
+**(6) 检测是否支持posix_fadvise()特性**
+{% highlight string %}
+ngx_feature="posix_fadvise()"
+ngx_feature_name="NGX_HAVE_POSIX_FADVISE"
+ngx_feature_run=no
+ngx_feature_incs="#include <fcntl.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="posix_fadvise(0, 0, 0, POSIX_FADV_SEQUENTIAL);"
+. auto/feature
+{% endhighlight %}
+对于posix_fadvise的解释如下：
+<pre>
+Programs can use posix_fadvise() to announce an intention to access file data in a specific pattern in the future,
+thus allowing the kernel to perform appropriate optimizations.
+</pre>
+
+**(7) 检测是否支持O_DIRECT特性**
+{% highlight string %}
+ngx_feature="O_DIRECT"
+ngx_feature_name="NGX_HAVE_O_DIRECT"
+ngx_feature_run=no
+ngx_feature_incs="#include <fcntl.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="fcntl(0, F_SETFL, O_DIRECT);"
+. auto/feature
+
+
+if [ $ngx_found = yes -a "$NGX_SYSTEM" = "Linux" ]; then
+    have=NGX_HAVE_ALIGNED_DIRECTIO . auto/have
+fi
+{% endhighlight %}
+对于```O_DIRECT```的解释如下：
+<pre>
+Try to minimize cache effects of the I/O to and from this file.  In general this
+will degrade performance, but it is useful in special situations, such  as  when
+applications do their own caching.  File I/O is done directly to/from user space
+buffers.  The I/O is synchronous, that is, at the completion  of  a  read(2)  or
+write(2), data is guaranteed to have been transferred.  See NOTES below for 
+further discussion.
+</pre>
+Linux操作系统下使用```O_DIRECT```特性时还有一些对齐要求。
+
+
+**(8) 检测是否支持F_NOCACHE特性**
+{% highlight string %}
+ngx_feature="F_NOCACHE"
+ngx_feature_name="NGX_HAVE_F_NOCACHE"
+ngx_feature_run=no
+ngx_feature_incs="#include <fcntl.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="fcntl(0, F_NOCACHE, 1);"
+. auto/feature
+{% endhighlight %}
+```F_NOCACHE```表示禁止使用缓存。
+
+
+**(9) 是否支持directio()特性**
+{% highlight string %}
+ngx_feature="directio()"
+ngx_feature_name="NGX_HAVE_DIRECTIO"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/types.h>
+                  #include <sys/fcntl.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="directio(0, DIRECTIO_ON);"
+. auto/feature
+{% endhighlight %}
+
+提议```O_DIRECT```类似，只是这里判断是否直接支持directio()函数。directio()不适用操作系统缓存，使得磁盘IO(或者DMA)直接将数据存入用户空间的buffer。避免内核缓冲的内存消耗与CPU拷贝(数据从内核空间到用户空间的拷贝）的消耗。
+
+DirectIO使用场景：DirectIO要读取大文件，因为每次都要初始化DMA；如果是读取小文件，初始化DMA花费的时间比系统读小文件的时间还长，所以小文件使用directIO没有优势。对于大文件也只是在只读一次，并且后续没有其他应用再次读取此文件的时候，才能有优势，如果后续还有其他应用需要使用，这个时候DirectIO也没有优势。
+
+direct实际上有几方面的优势，不使用系统缓存一方面，另一方面是使用dma直接由dma控制从内存输入到用户空间的buffer中不经过cpu做mov操作，不消耗cpu。
+
+
+**(10) 检测是否支持statfs()特性**
+{% highlight string %}
+ngx_feature="statfs()"
+ngx_feature_name="NGX_HAVE_STATFS"
+ngx_feature_run=no
+ngx_feature_incs="$NGX_INCLUDE_SYS_PARAM_H
+                  $NGX_INCLUDE_SYS_MOUNT_H
+                  $NGX_INCLUDE_SYS_VFS_H"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="struct statfs  fs;
+                  statfs(\".\", &fs);"
+. auto/feature
+{% endhighlight %}
+
 
 
 
