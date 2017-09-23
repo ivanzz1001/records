@@ -1031,7 +1031,7 @@ if [ $ngx_found = yes ]; then
     EVENT_FOUND=YES
 fi
 {% endhighlight %}
-如果检测到有devpoll特性，则将```EVENT_FOUND```置为```YES```.
+如果检测到有devpoll特性，则将```EVENT_FOUND```置为```YES```,表明当前已经找到了事件处理器。
 
 devpoll是Solaris操作系统上的一种类似于epoll的机制。
 

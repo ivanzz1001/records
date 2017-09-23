@@ -310,7 +310,7 @@ if [ $ngx_found = yes ]; then
 fi
 {% endhighlight %}
 
-如果检测到当前系统支持epoll，则向```$CORE_SRCS```变量中添加```$EPOLL_MODULE```.
+如果检测到当前系统支持epoll，则向```$CORE_SRCS```变量中添加```$EPOLL_MODULE```，同时将```EVENT_FOUNT```置为yes。
 
 
 ### 1.6 检查O_PATH特性
