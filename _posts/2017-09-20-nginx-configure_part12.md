@@ -1259,7 +1259,33 @@ ngx_feature_test="struct statfs  fs;
                   statfs(\".\", &fs);"
 . auto/feature
 {% endhighlight %}
+statfs()查询文件系统相关信息。
 
+**(11) 检测是否支持statvfs()特性**
+{% highlight string %}
+ngx_feature="statvfs()"
+ngx_feature_name="NGX_HAVE_STATVFS"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/types.h>
+                  #include <sys/statvfs.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="struct statvfs  fs;
+                  statvfs(\".\", &fs);"
+. auto/feature
+{% endhighlight %}
+关于statfs()与statvfs()如此相似，主要是有如下“历史原因”：
+<pre>
+Originally 4.4BSD defined a statfs() call. Linux later implemented a slightly different call with the same name. Posix standardized it between all freenix and Unix versions by defining statvfs().
+
+statfs() is OS-specific
+
+statvfs() is posix-conforming
+
+As they all return slightly different structures, later ones to come along can't replace the first.
+
+In general you should use statvfs(), the Posix one. Be careful about "use Posix" advice, though, as in some cases (pty, for example) the BSD (or whatever) one is more portable in practice.
+</pre>
 
 
 
