@@ -965,12 +965,13 @@ fi
 ## 3. 特性检测
 
 auto/unix脚本剩余部分都是进行特性检测。当前相关变量值如下：
+<pre>
+CC_TEST_FLAGS: 为空
 
-* CC_TEST_FLAGS: 为空
-* CC_AUX_FLAGS: -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 （在auto/os/linux脚本最后设置）
-* NGX_TEST_LD_OPT: 为空
+CC_AUX_FLAGS: -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 （在auto/os/linux脚本最后设置）
 
-<br />
+NGX_TEST_LD_OPT: 为空
+</pre>
 
 **(1) poll特性检测**
 
