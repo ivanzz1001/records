@@ -1287,7 +1287,121 @@ As they all return slightly different structures, later ones to come along can't
 In general you should use statvfs(), the Posix one. Be careful about "use Posix" advice, though, as in some cases (pty, for example) the BSD (or whatever) one is more portable in practice.
 </pre>
 
+**(12) 检查是否支持dlopen()特性**
+{% highlight string %}
+ngx_feature="dlopen()"
+ngx_feature_name="NGX_HAVE_DLOPEN"
+ngx_feature_run=no
+ngx_feature_incs="#include <dlfcn.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="dlopen(NULL, RTLD_NOW | RTLD_GLOBAL); dlsym(NULL, NULL)"
+. auto/feature
 
+
+if [ $ngx_found != yes ]; then
+
+    ngx_feature="dlopen() in libdl"
+    ngx_feature_libs="-ldl"
+    . auto/feature
+
+    if [ $ngx_found = yes ]; then
+        CORE_LIBS="$CORE_LIBS -ldl"
+        NGX_LIBDL="-ldl"
+    fi
+fi
+{% endhighlight %}
+
+dlopen()用于加载动态链接库，并且返回一个表示该动态链接库的句柄。
+
+**(13) 检查是否支持sched_yield()特性**
+{% highlight string %}
+ngx_feature="sched_yield()"
+ngx_feature_name="NGX_HAVE_SCHED_YIELD"
+ngx_feature_run=no
+ngx_feature_incs="#include <sched.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="sched_yield()"
+. auto/feature
+
+
+if [ $ngx_found != yes ]; then
+
+    ngx_feature="sched_yield() in librt"
+    ngx_feature_libs="-lrt"
+    . auto/feature
+
+    if [ $ngx_found = yes ]; then
+        CORE_LIBS="$CORE_LIBS -lrt"
+    fi
+fi
+{% endhighlight %}
+
+sche_yield()导致调用线程让出CPU，该线程会根据其优先级移动到线程队列末尾，然后一个新的线程被开始调用。
+
+**(14) 检查是否支持SO_SETFIB特性**
+{% highlight string %}
+ngx_feature="SO_SETFIB"
+ngx_feature_name="NGX_HAVE_SETFIB"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="setsockopt(0, SOL_SOCKET, SO_SETFIB, NULL, 0)"
+. auto/feature
+{% endhighlight %}
+
+参看:[FreeBSD Manual Pages](https://www.freebsd.org/cgi/man.cgi?query=setsockopt&sektion=2)
+
+该选项在FreeBSD上被引入，主要作用是：
+<pre>
+set the associated FIB (routing table) for the socket (set only)
+</pre>
+
+**(15) 检查是否支持SO_REUSEPORT特性**
+{% highlight string %}
+ngx_feature="SO_REUSEPORT"
+ngx_feature_name="NGX_HAVE_REUSEPORT"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="setsockopt(0, SOL_SOCKET, SO_REUSEPORT, NULL, 0)"
+. auto/feature
+{% endhighlight %}
+主要作用：
+<pre>
+enables duplicate address and port bindings
+</pre>
+
+**(16) 检查是否支持SO_ACCEPTFILTER特性**
+{% highlight string %}
+ngx_feature="SO_ACCEPTFILTER"
+ngx_feature_name="NGX_HAVE_DEFERRED_ACCEPT"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="setsockopt(0, SOL_SOCKET, SO_ACCEPTFILTER, NULL, 0)"
+. auto/feature
+{% endhighlight %}
+主要作用为：```set accept filter	on listening socket```
+
+**(17) 检查是否支持IP_RECVDSTADDR特性**
+{% highlight string %}
+# BSD way to get IPv4 datagram destination address
+
+ngx_feature="IP_RECVDSTADDR"
+ngx_feature_name="NGX_HAVE_IP_RECVDSTADDR"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <netinet/in.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="setsockopt(0, IPPROTO_IP, IP_RECVDSTADDR, NULL, 0)"
+. auto/feature
+{% endhighlight %}
 
 <br />
 <br />
