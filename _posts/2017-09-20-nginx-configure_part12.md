@@ -1403,6 +1403,29 @@ ngx_feature_test="setsockopt(0, IPPROTO_IP, IP_RECVDSTADDR, NULL, 0)"
 . auto/feature
 {% endhighlight %}
 
+该选项导致所接收到的UDP数据报的目的IP地址由函数recvmsg作为辅助数据返回。主要是在BSD操作系统上使用。
+
+**(18) **
+{% highlight string %}
+# RFC 3542 way to get IPv6 datagram destination address
+
+ngx_feature="IPV6_RECVPKTINFO"
+ngx_feature_name="NGX_HAVE_IPV6_RECVPKTINFO"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <netinet/in.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="setsockopt(0, IPPROTO_IPV6, IPV6_RECVPKTINFO, NULL, 0)"
+. auto/feature
+{% endhighlight %}
+设置在接收到的数据报中添加```IPV6_PKTINFO```控制信息。这些控制信息包含在一个struct in6_pktinfo的机构中（请参看RFC 3542),只允许SOCK_DGRAM和SOCK_RAW socket使用。它是从Linux 2.6.14开始引入。
+
+请参看：[Linux Programmer's Manual](http://www.man7.org/linux/man-pages/man7/ipv6.7.html)
+
+
+
+
 <br />
 <br />
 <br />
