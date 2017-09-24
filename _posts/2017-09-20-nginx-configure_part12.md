@@ -1405,7 +1405,7 @@ ngx_feature_test="setsockopt(0, IPPROTO_IP, IP_RECVDSTADDR, NULL, 0)"
 
 该选项导致所接收到的UDP数据报的目的IP地址由函数recvmsg作为辅助数据返回。主要是在BSD操作系统上使用。
 
-**(18) **
+**(18) 检查是否支持IPV6_RECVPKTINFO特性**
 {% highlight string %}
 # RFC 3542 way to get IPv6 datagram destination address
 
@@ -1424,7 +1424,100 @@ ngx_feature_test="setsockopt(0, IPPROTO_IPV6, IPV6_RECVPKTINFO, NULL, 0)"
 请参看：[Linux Programmer's Manual](http://www.man7.org/linux/man-pages/man7/ipv6.7.html)
 
 
+**(19) 检查是否支持TCP_DEFER_ACCEPT特性**
+{% highlight string %}
+ngx_feature="TCP_DEFER_ACCEPT"
+ngx_feature_name="NGX_HAVE_DEFERRED_ACCEPT"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <netinet/in.h>
+                  #include <netinet/tcp.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="setsockopt(0, IPPROTO_TCP, TCP_DEFER_ACCEPT, NULL, 0)"
+. auto/feature
+{% endhighlight %}
 
+对于```TCP_DEFER_ACCEPT```的解释：
+<pre>TCP_DEFER_ACCEPT (since Linux 2.4)
+Allow a listener to be awakened only when data arrives on the socket. Takes an integer value (seconds), 
+this can bound the maximum number of attempts TCP will make to complete the connection. 
+This option should not be used in code intended to be portable. 
+</pre>
+
+参看：[Linux TCP_DEFER_ACCEPT的作用](http://blog.csdn.net/for_tech/article/details/54175571)
+
+
+**(20) 检查是否支持TCP_KEEPIDLE特性**
+{% highlight string %}
+ngx_feature="TCP_KEEPIDLE"
+ngx_feature_name="NGX_HAVE_KEEPALIVE_TUNABLE"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <netinet/in.h>
+                  #include <netinet/tcp.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="setsockopt(0, IPPROTO_TCP, TCP_KEEPIDLE, NULL, 0);
+                  setsockopt(0, IPPROTO_TCP, TCP_KEEPINTVL, NULL, 0);
+                  setsockopt(0, IPPROTO_TCP, TCP_KEEPCNT, NULL, 0)"
+. auto/feature
+{% endhighlight %}
+
+* TCP_KEEPIDLE: 对一个连接进行有效性探测之前运行的最大非活跃时间间隔，默认值为7200(即2个小时）
+* TCP_KEEPINTVL: 两个探测的时间间隔，默认值为75，即75秒。
+* TCP_KEEPCNT: 关闭一个非活跃连接之前，默认值为9次。
+
+参看：
+
+1. [TCP keep-alive的三个参数](http://blog.csdn.net/hengyunabc/article/details/44310193)
+
+2. [TCP Keepalive HOWTO](http://www.tldp.org/HOWTO/html_single/TCP-Keepalive-HOWTO/)
+
+
+**(21) 检测是否支持TCP_FASTOPEN特性**
+{% highlight string %}
+ngx_feature="TCP_FASTOPEN"
+ngx_feature_name="NGX_HAVE_TCP_FASTOPEN"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <netinet/in.h>
+                  #include <netinet/tcp.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="setsockopt(0, IPPROTO_TCP, TCP_FASTOPEN, NULL, 0)"
+. auto/feature
+{% endhighlight %}
+参看：
+
+1. [Linux TCP_FASTOPEN的作用](http://blog.csdn.net/for_tech/article/details/54237556)
+
+2. [TCP Fast Open](https://en.wikipedia.org/wiki/TCP_Fast_Open)
+
+**(22) **
+{% highlight string %}
+ngx_feature="TCP_INFO"
+ngx_feature_name="NGX_HAVE_TCP_INFO"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <netinet/in.h>
+                  #include <netinet/tcp.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="socklen_t optlen = sizeof(struct tcp_info);
+                  struct tcp_info ti;
+                  ti.tcpi_rtt = 0;
+                  ti.tcpi_rttvar = 0;
+                  ti.tcpi_snd_cwnd = 0;
+                  ti.tcpi_rcv_space = 0;
+                  getsockopt(0, IPPROTO_TCP, TCP_INFO, &ti, &optlen)"
+. auto/feature
+{% endhighlight %}
+在内核的函数tcp_getsockopt的代码中，可以看到这个选项TCP_INFO，返回了几乎所有的参数，同时还有其他的许多参数可以得到一些其他的信息。具体每个参数的含义可以参考内核中的注释.
+
+参看：
+
+1. [打印输出tcp拥塞窗口](http://www.cnblogs.com/mydomain/archive/2013/04/18/3027664.html)
 
 <br />
 <br />
