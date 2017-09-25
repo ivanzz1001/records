@@ -1662,6 +1662,9 @@ ngx_type="long long"; . auto/types/sizeof
 ngx_type="void *"; . auto/types/sizeof; ngx_ptr_size=$ngx_size
 ngx_param=NGX_PTR_SIZE; ngx_value=$ngx_size; . auto/types/value
 {% endhighlight %}
+上述开头三行不会向配置文件写入任何内容，因此实际上不会产生任何效果。最后两行求得```void *```类型的长度，然后向objs/ngx_auto_config.h头文件写入```NGX_PTR_SIZE```宏定义。ngx_ptr_size变量会在auto/types/uintptr_t脚本中用到。
+
+
 
 **(27) 检查posix类型**
 {% highlight string %}
@@ -1701,6 +1704,45 @@ ngx_param=NGX_TIME_T_SIZE; ngx_value=$ngx_size; . auto/types/value
 ngx_param=NGX_TIME_T_LEN; ngx_value=$ngx_max_len; . auto/types/value
 ngx_param=NGX_MAX_TIME_T_VALUE; ngx_value=$ngx_max_value; . auto/types/value
 {% endhighlight %}
+
+主要包括以下几个部分：
+
+1) 定义 ```NGX_INCLUDE_AUTO_CONFIG_H```会在auto/types/sizeof脚本中使用到。
+
+2) 一些数据类型的typedef定义检测(这里通过宏```NGX_SIG_ATOMIC_T_SIZE```来保存当前平台的机器字长）
+
+3) 调用auto/types/uintptr_t脚本定义```uintptr_t```与```intptr_t```类型，其类型大小与当前机器字长相同。
+
+4) 调用auto/endianness脚本，获得机器的大小端
+
+5) 处理size_t，off_t,time_t类型
+
+
+<br />
+
+*如下主要是检测syscalls, libc calls and some features
+*
+
+**(28) 检测是否支持IPv6**
+{% highlight string %}
+if [ $NGX_IPV6 = YES ]; then
+    ngx_feature="AF_INET6"
+    ngx_feature_name="NGX_HAVE_INET6"
+    ngx_feature_run=no
+    ngx_feature_incs="#include <sys/socket.h>
+                      #include <netinet/in.h>
+                      #include <arpa/inet.h>"
+    ngx_feature_path=
+    ngx_feature_libs=
+    ngx_feature_test="struct sockaddr_in6  sin6;
+                      sin6.sin6_family = AF_INET6;"
+    . auto/feature
+fi
+{% endhighlight %}
+
+
+
+
 
 
 <br />
