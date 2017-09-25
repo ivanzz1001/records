@@ -1494,7 +1494,7 @@ ngx_feature_test="setsockopt(0, IPPROTO_TCP, TCP_FASTOPEN, NULL, 0)"
 
 2. [TCP Fast Open](https://en.wikipedia.org/wiki/TCP_Fast_Open)
 
-**(22) **
+**(22) 检测是否支持TCP_INFO特性**
 {% highlight string %}
 ngx_feature="TCP_INFO"
 ngx_feature_name="NGX_HAVE_TCP_INFO"
@@ -1515,9 +1515,193 @@ ngx_feature_test="socklen_t optlen = sizeof(struct tcp_info);
 {% endhighlight %}
 在内核的函数tcp_getsockopt的代码中，可以看到这个选项TCP_INFO，返回了几乎所有的参数，同时还有其他的许多参数可以得到一些其他的信息。具体每个参数的含义可以参考内核中的注释.
 
-参看：
+参看：[打印输出tcp拥塞窗口](http://www.cnblogs.com/mydomain/archive/2013/04/18/3027664.html)
 
-1. [打印输出tcp拥塞窗口](http://www.cnblogs.com/mydomain/archive/2013/04/18/3027664.html)
+
+**(23) 检测是否支持ACCEPT4特性**
+{% highlight string %}
+ngx_feature="accept4()"
+ngx_feature_name="NGX_HAVE_ACCEPT4"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="accept4(0, NULL, NULL, SOCK_NONBLOCK)"
+. auto/feature
+{% endhighlight %}
+accept4()是属于```_GNU_SOURCE```的一个增强。
+<pre>
+If flags is 0, then accept4() is the same as accept().  The following values can be bitwise ORed in flags to obtain different behavior:
+
+SOCK_NONBLOCK   Set the O_NONBLOCK file status flag on the new open file description.  Using this flag saves extra  calls  to  fcntl(2)  to  achieve  the  same result.
+
+SOCK_CLOEXEC    Set  the close-on-exec (FD_CLOEXEC) flag on the new file descriptor.  See the description of the O_CLOEXEC flag in open(2) for reasons why this may be useful.
+</pre>
+
+
+
+**(24) 检测是否支持FILE_AIO特性**
+{% highlight string %}
+if [ $NGX_FILE_AIO = YES ]; then
+
+    ngx_feature="kqueue AIO support"
+    ngx_feature_name="NGX_HAVE_FILE_AIO"
+    ngx_feature_run=no
+    ngx_feature_incs="#include <aio.h>"
+    ngx_feature_path=
+    ngx_feature_libs=
+    ngx_feature_test="int  n; struct aiocb  iocb;
+                      iocb.aio_sigevent.sigev_notify = SIGEV_KEVENT;
+                      n = aio_read(&iocb)"
+    . auto/feature
+
+    if [ $ngx_found = yes ]; then
+        CORE_SRCS="$CORE_SRCS $FILE_AIO_SRCS"
+    fi
+
+    if [ $ngx_found = no ]; then
+
+        ngx_feature="Linux AIO support"
+        ngx_feature_name="NGX_HAVE_FILE_AIO"
+        ngx_feature_run=no
+        ngx_feature_incs="#include <linux/aio_abi.h>
+                          #include <sys/eventfd.h>"
+        ngx_feature_path=
+        ngx_feature_libs=
+        ngx_feature_test="struct iocb  iocb;
+                          iocb.aio_lio_opcode = IOCB_CMD_PREAD;
+                          iocb.aio_flags = IOCB_FLAG_RESFD;
+                          iocb.aio_resfd = -1;
+                          (void) eventfd(0, 0)"
+        . auto/feature
+
+        if [ $ngx_found = yes ]; then
+            have=NGX_HAVE_EVENTFD . auto/have
+            have=NGX_HAVE_SYS_EVENTFD_H . auto/have
+            CORE_SRCS="$CORE_SRCS $LINUX_AIO_SRCS"
+        fi
+    fi
+
+    if [ $ngx_found = no ]; then
+
+        ngx_feature="Linux AIO support (SYS_eventfd)"
+        ngx_feature_incs="#include <linux/aio_abi.h>
+                          #include <sys/syscall.h>"
+        ngx_feature_test="int  n = SYS_eventfd;
+                          struct iocb  iocb;
+                          iocb.aio_lio_opcode = IOCB_CMD_PREAD;
+                          iocb.aio_flags = IOCB_FLAG_RESFD;
+                          iocb.aio_resfd = -1;"
+        . auto/feature
+
+        if [ $ngx_found = yes ]; then
+            have=NGX_HAVE_EVENTFD . auto/have
+            CORE_SRCS="$CORE_SRCS $LINUX_AIO_SRCS"
+        fi
+    fi
+
+    if [ $ngx_found = no ]; then
+        cat << END
+
+$0: no supported file AIO was found
+Currently file AIO is supported on FreeBSD 4.3+ and Linux 2.6.22+ only
+
+END
+        exit 1
+    fi
+
+else
+
+    ngx_feature="eventfd()"
+    ngx_feature_name="NGX_HAVE_EVENTFD"
+    ngx_feature_run=no
+    ngx_feature_incs="#include <sys/eventfd.h>"
+    ngx_feature_path=
+    ngx_feature_libs=
+    ngx_feature_test="(void) eventfd(0, 0)"
+    . auto/feature
+
+    if [ $ngx_found = yes ]; then
+        have=NGX_HAVE_SYS_EVENTFD_H . auto/have
+    fi
+
+    if [ $ngx_found = no ]; then
+
+        ngx_feature="eventfd() (SYS_eventfd)"
+        ngx_feature_incs="#include <sys/syscall.h>"
+        ngx_feature_test="int n = SYS_eventfd"
+        . auto/feature
+    fi
+fi
+{% endhighlight %}
+
+首先检查```NGX_FILE_AIO```有没有被设置,如果值为```YES```，则继续检查aio是否可用；否则检查是否支持eventfd().
+
+（注：在auto/options脚本中，```NGX_FILE_AIO```默认被设置为no，可以通过```--with-file-aio```进行设置)
+
+
+**(25) 设定UNIX_DOMAIN并清空ngx_feature_libs**
+{% highlight string %}
+have=NGX_HAVE_UNIX_DOMAIN . auto/have
+
+ngx_feature_libs=
+{% endhighlight %}
+
+
+
+**(26) 检查C类型**
+{% highlight string %}
+# C types
+
+ngx_type="int"; . auto/types/sizeof
+
+ngx_type="long"; . auto/types/sizeof
+
+ngx_type="long long"; . auto/types/sizeof
+
+ngx_type="void *"; . auto/types/sizeof; ngx_ptr_size=$ngx_size
+ngx_param=NGX_PTR_SIZE; ngx_value=$ngx_size; . auto/types/value
+{% endhighlight %}
+
+**(27) 检查posix类型**
+{% highlight string %}
+# POSIX types
+
+NGX_INCLUDE_AUTO_CONFIG_H="#include \"ngx_auto_config.h\""
+
+ngx_type="uint32_t"; ngx_types="u_int32_t"; . auto/types/typedef
+ngx_type="uint64_t"; ngx_types="u_int64_t"; . auto/types/typedef
+
+ngx_type="sig_atomic_t"; ngx_types="int"; . auto/types/typedef
+. auto/types/sizeof
+ngx_param=NGX_SIG_ATOMIC_T_SIZE; ngx_value=$ngx_size; . auto/types/value
+
+ngx_type="socklen_t"; ngx_types="int"; . auto/types/typedef
+
+ngx_type="in_addr_t"; ngx_types="uint32_t u_int32_t"; . auto/types/typedef
+
+ngx_type="in_port_t"; ngx_types="u_short"; . auto/types/typedef
+
+ngx_type="rlim_t"; ngx_types="int"; . auto/types/typedef
+
+. auto/types/uintptr_t
+
+. auto/endianness
+
+ngx_type="size_t"; . auto/types/sizeof
+ngx_param=NGX_MAX_SIZE_T_VALUE; ngx_value=$ngx_max_value; . auto/types/value
+ngx_param=NGX_SIZE_T_LEN; ngx_value=$ngx_max_len; . auto/types/value
+
+ngx_type="off_t"; . auto/types/sizeof
+ngx_param=NGX_MAX_OFF_T_VALUE; ngx_value=$ngx_max_value; . auto/types/value
+ngx_param=NGX_OFF_T_LEN; ngx_value=$ngx_max_len; . auto/types/value
+
+ngx_type="time_t"; . auto/types/sizeof
+ngx_param=NGX_TIME_T_SIZE; ngx_value=$ngx_size; . auto/types/value
+ngx_param=NGX_TIME_T_LEN; ngx_value=$ngx_max_len; . auto/types/value
+ngx_param=NGX_MAX_TIME_T_VALUE; ngx_value=$ngx_max_value; . auto/types/value
+{% endhighlight %}
+
 
 <br />
 <br />
