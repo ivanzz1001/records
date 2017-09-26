@@ -1,6 +1,6 @@
 ---
 layout: post
-title: auto/unix脚本分析-part12
+title: auto/unix脚本分析-part13
 tags:
 - nginx
 categories: nginx
