@@ -1769,7 +1769,7 @@ ngx_feature_test="char buf[1]; ssize_t n; n = pread(0, buf, 1, 0);
                   if (n == -1) return 1"
 . auto/feature
 {% endhighlight %}
-pread()从一个文件中读取指定数量的数据到buffer缓存中。pread()系统调用在多线程应用程序中很有作用，它允许多线程同时对同一个文件句柄fd进行IO操作，而并不会影响到其他线程中该文件的offset。
+pread()从一个文件中读取指定数量的数据到buffer缓存中。pread()系统调用在多线程应用程序中很有作用，它允许多线程同时对同一个文件句柄fd进行IO操作，而并不会影响到其他线程中该文件的offset。 注意fd所引用的文件必须是```seekable```的.
 
 pread()函数需要：
 <pre>
@@ -1797,7 +1797,7 @@ ngx_feature_test="char buf[1]; ssize_t n; n = pwrite(1, buf, 1, 0);
 . auto/feature
 {% endhighlight %}
 
-pwrite()将buffer中的缓存数据写入到文件中。pwrite()系统调用在多线程应用程序中很有作用，它允许多线程同时对同一个文件句柄fd进行IO操作，而并不会影响到其他线程中该文件的offset。
+pwrite()将buffer中的缓存数据写入到文件中。pwrite()系统调用在多线程应用程序中很有作用，它允许多线程同时对同一个文件句柄fd进行IO操作，而并不会影响到其他线程中该文件的offset。注意fd所引用的文件必须是```seekable```的.
 
 
 **(32) 检测是否支持pwritev()**
@@ -1817,7 +1817,66 @@ ngx_feature_test="char buf[1]; struct iovec vec[1]; ssize_t n;
                   if (n == -1) return 1"
 . auto/feature
 {% endhighlight %}
+与pwrite()类似，但是可以支持分散写操作。
 
+**(33) 检查是否支持SYS_NERR特性**
+{% highlight string %}
+ngx_feature="sys_nerr"
+ngx_feature_name="NGX_SYS_NERR"
+ngx_feature_run=value
+ngx_feature_incs='#include <errno.h>
+                  #include <stdio.h>'
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test='printf("%d", sys_nerr);'
+. auto/feature
+
+
+if [ $ngx_found = no ]; then
+
+    # Cygiwn defines _sys_nerr
+    ngx_feature="_sys_nerr"
+    ngx_feature_name="NGX_SYS_NERR"
+    ngx_feature_run=value
+    ngx_feature_incs='#include <errno.h>
+                      #include <stdio.h>'
+    ngx_feature_path=
+    ngx_feature_libs=
+    ngx_feature_test='printf("%d", _sys_nerr);'
+    . auto/feature
+fi
+
+
+if [ $ngx_found = no ]; then
+
+    # Solaris has no sys_nerr
+    ngx_feature='maximum errno'
+    ngx_feature_name=NGX_SYS_NERR
+    ngx_feature_run=value
+    ngx_feature_incs='#include <errno.h>
+                      #include <string.h>
+                      #include <stdio.h>'
+    ngx_feature_path=
+    ngx_feature_libs=
+    ngx_feature_test='int  n;
+                      char *p;
+                      for (n = 1; n < 1000; n++) {
+                          errno = 0;
+                          p = strerror(n);
+                          if (errno == EINVAL
+                              || p == NULL
+                              || strncmp(p, "Unknown error", 13) == 0)
+                          {
+                              break;
+                          }
+                      }
+                      printf("%d", n);'
+    . auto/feature
+fi
+{% endhighlight %}
+
+sys_nerr为当前系统定义的error个数。
+参看：[sys_nerr(3)](https://linux.die.net/man/3/sys_nerr)
 
 <br />
 <br />
