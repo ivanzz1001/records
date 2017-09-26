@@ -94,7 +94,7 @@ Tesseract4.0.0的整个训练流程与Tesseract3.04的训练流程，从概念�
 主要的不同有：
 
 * box文件只需要是textline级别。这样从image文件生成训练数据会更容易
-* .tr文件被替换成了.lstmf数据文件
+* .tr文件被替换成了 .lstmf 数据文件
 * Fonts可以并且应该自由的混合在一起，而不是分开
 * 组合步骤（mftraining,cntraining,shapeclustering)被替换成了一个单独的慢速lsmtraining步骤
 
@@ -226,7 +226,7 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 
 # training/tesstrain.sh --fonts_dir /usr/share/fonts --lang chi_sim --linedata_only \
   --noextract_font_properties --langdata_dir ../langdata \
-  --tessdata_dir ../tessdata \
+  --tessdata_dir ./tessdata \
   --exposures "0" \
   --fontlist "AR PL UKai CN" \
   "AR PL UKai HK" \
