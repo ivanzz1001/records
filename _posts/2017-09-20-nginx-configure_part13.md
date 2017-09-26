@@ -2171,7 +2171,8 @@ ngx_feature_test='struct addrinfo *res;
 关于getaddrinfo()的解释如下：
 <pre>
 The getaddrinfo() function combines the functionality provided by  the  gethostbyname(3)and  getservbyname(3)
- functions into a single interface, but unlike the latter functions, getaddrinfo() is reentrant and allows programs to eliminate IPv4-ver,sus-IPv6 dependencies.
+functions into a single interface, but unlike the latter functions, getaddrinfo() is reentrant and allows
+programs to eliminate IPv4-ver,sus-IPv6 dependencies.
 </pre>
 
 
