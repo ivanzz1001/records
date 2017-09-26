@@ -1720,10 +1720,12 @@ ngx_param=NGX_MAX_TIME_T_VALUE; ngx_value=$ngx_max_value; . auto/types/value
 
 <br />
 
-*如下主要是检测syscalls, libc calls and some features
-*
 
+
+```如下主要是检测syscalls, libc calls and some features```
 **(28) 检测是否支持IPv6**
+
+检查是否支持IPv6 socket地址：
 {% highlight string %}
 if [ $NGX_IPV6 = YES ]; then
     ngx_feature="AF_INET6"
@@ -1741,8 +1743,80 @@ fi
 {% endhighlight %}
 
 
+**(29) 检测是否支持setproctitle()**
+{% highlight string %}
+ngx_feature="setproctitle()"
+ngx_feature_name="NGX_HAVE_SETPROCTITLE"
+ngx_feature_run=no
+ngx_feature_incs="#include <stdlib.h>"
+ngx_feature_path=
+ngx_feature_libs=$NGX_SETPROCTITLE_LIB
+ngx_feature_test="setproctitle(\"test\");"
+. auto/feature
+{% endhighlight %}
+setproctitle()用于修改一个进程的名称，其最开始是在FreeBSD 2.2开始引入的。
 
 
+**(30) 检测是否支持pread()**
+{% highlight string %}
+ngx_feature="pread()"
+ngx_feature_name="NGX_HAVE_PREAD"
+ngx_feature_run=no
+ngx_feature_incs=
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="char buf[1]; ssize_t n; n = pread(0, buf, 1, 0);
+                  if (n == -1) return 1"
+. auto/feature
+{% endhighlight %}
+pread()从一个文件中读取指定数量的数据到buffer缓存中。pread()系统调用在多线程应用程序中很有作用，它允许多线程同时对同一个文件句柄fd进行IO操作，而并不会影响到其他线程中该文件的offset。
+
+pread()函数需要：
+<pre>
+Feature Test Macro Requirements for glibc (see feature_test_macros(7)):
+
+       pread(), pwrite():
+           _XOPEN_SOURCE >= 500
+           || /* Since glibc 2.12: */ _POSIX_C_SOURCE >= 200809L
+</pre>
+默认情况下gcc编译器已经定义```_POSIX_C_SOURCE=200809L```,因此这里可以直接使用.
+
+参看：[FEATURE_TEST_MACRO(7)](http://www.man7.org/linux/man-pages/man7/feature_test_macros.7.html)
+
+
+**（31） 检测是否支持pwrite()**
+{% highlight string %}
+ngx_feature="pwrite()"
+ngx_feature_name="NGX_HAVE_PWRITE"
+ngx_feature_run=no
+ngx_feature_incs=
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="char buf[1]; ssize_t n; n = pwrite(1, buf, 1, 0);
+                  if (n == -1) return 1"
+. auto/feature
+{% endhighlight %}
+
+pwrite()将buffer中的缓存数据写入到文件中。pwrite()系统调用在多线程应用程序中很有作用，它允许多线程同时对同一个文件句柄fd进行IO操作，而并不会影响到其他线程中该文件的offset。
+
+
+**(32) 检测是否支持pwritev()**
+{% highlight string %}
+# pwritev() was introduced in FreeBSD 6 and Linux 2.6.30, glibc 2.10
+
+ngx_feature="pwritev()"
+ngx_feature_name="NGX_HAVE_PWRITEV"
+ngx_feature_run=no
+ngx_feature_incs='#include <sys/uio.h>'
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="char buf[1]; struct iovec vec[1]; ssize_t n;
+                  vec[0].iov_base = buf;
+                  vec[0].iov_len = 1;
+                  n = pwritev(1, vec, 1, 0);
+                  if (n == -1) return 1"
+. auto/feature
+{% endhighlight %}
 
 
 <br />
