@@ -1723,6 +1723,7 @@ ngx_param=NGX_MAX_TIME_T_VALUE; ngx_value=$ngx_max_value; . auto/types/value
 
 
 ```如下主要是检测syscalls, libc calls and some features```
+
 **(28) 检测是否支持IPv6**
 
 检查是否支持IPv6 socket地址：
