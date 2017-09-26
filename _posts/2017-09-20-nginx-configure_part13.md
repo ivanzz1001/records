@@ -1878,6 +1878,81 @@ fi
 sys_nerr为当前系统定义的error个数。
 参看：[sys_nerr(3)](https://linux.die.net/man/3/sys_nerr)
 
+**(34) 检查是否支持localtime_r()**
+{% highlight string %}
+ngx_feature="localtime_r()"
+ngx_feature_name="NGX_HAVE_LOCALTIME_R"
+ngx_feature_run=no
+ngx_feature_incs="#include <time.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="struct tm t; time_t c=0; localtime_r(&c, &t)"
+. auto/feature
+{% endhighlight %}
+localtime_r()与localtime()类似，但是前者是线程安全的，而后者由于将数据保存在一个全局struct tm类型的静态变量中，因此是非线程安全的。
+
+**(35) 检查是否支持posix_memalign()**
+{% highlight string %}
+ngx_feature="posix_memalign()"
+ngx_feature_name="NGX_HAVE_POSIX_MEMALIGN"
+ngx_feature_run=no
+ngx_feature_incs="#include <stdlib.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="void *p; int n; n = posix_memalign(&p, 4096, 4096);
+                  if (n != 0) return 1"
+. auto/feature
+{% endhighlight %}
+posix_memalign()分配一个指定字节对其的内存：
+<pre>
+int posix_memalign(void **memptr, size_t alignment, size_t size);
+
+The  function  posix_memalign()  allocates size bytes and places the address of the allocated memory in *memptr.
+The address of the allocated memory will be a multiple of alignment, which must be a power of two and a multiple
+of sizeof(void *).  If size is 0, then posix_memalign() returns either  NULL,  or  a  unique pointer value that
+can later be successfully passed to free(3).
+</pre>
+
+
+**(36) 检测是否支持memalign()**
+{% highlight string %}
+ngx_feature="memalign()"
+ngx_feature_name="NGX_HAVE_MEMALIGN"
+ngx_feature_run=no
+ngx_feature_incs="#include <stdlib.h>
+                  #include <malloc.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="void *p; p = memalign(4096, 4096);
+                  if (p == NULL) return 1"
+. auto/feature
+{% endhighlight %}
+与```posix_memalign()```类似，是一个obsolete function （即过时函数)。此外对于posix_memalign()函数，其会检查传入的alignment参数是否合法，而memalign()函数可能不会检查。
+
+**(37) 检测是否支持MAP_ANON特性**
+{% highlight string %}
+ngx_feature="mmap(MAP_ANON|MAP_SHARED)"
+ngx_feature_name="NGX_HAVE_MAP_ANON"
+ngx_feature_run=yes
+ngx_feature_incs="#include <sys/mman.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="void *p;
+                  p = mmap(NULL, 4096, PROT_READ|PROT_WRITE,
+                           MAP_ANON|MAP_SHARED, -1, 0);
+                  if (p == MAP_FAILED) return 1;"
+. auto/feature
+{% endhighlight %}
+
+
+
+
+
+
+
+
+
+
 <br />
 <br />
 <br />
