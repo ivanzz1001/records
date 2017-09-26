@@ -1944,13 +1944,239 @@ ngx_feature_test="void *p;
                   if (p == MAP_FAILED) return 1;"
 . auto/feature
 {% endhighlight %}
+```MAP_ANON```参数与```MAP_ANONYMOUS```同义，映射一块共享内存，需与```MAP_SHARED```参数一起使用。
+
+注意：```MAP_ANON```已过时。
+
+**(38) 检查是否支持MAP_DEVZERO特性**
+{% highlight string %}
+ngx_feature='mmap("/dev/zero", MAP_SHARED)'
+ngx_feature_name="NGX_HAVE_MAP_DEVZERO"
+ngx_feature_run=yes
+ngx_feature_incs="#include <sys/mman.h>
+                  #include <sys/stat.h>
+                  #include <fcntl.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test='void *p; int  fd;
+                  fd = open("/dev/zero", O_RDWR);
+                  p = mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+                  if (p == MAP_FAILED) return 1;'
+. auto/feature
+{% endhighlight %}
+有些系统可能不支持上述```MAP_ANON```这样的匿名文件映射（这需要fd为-1)，此时就可以通过先用open()函数打开一个特殊文件/dev/zero，然后再进行映射，从而达到匿名映射的效果。
+
+参看：[Linux 下的两个特殊的文件 -- /dev/null 和 /dev/zero 简介及对比](http://blog.csdn.net/pi9nc/article/details/18257593)
+
+**(39) 检测是否支持SYSVSHM特性**
+{% highlight string %}
+ngx_feature="System V shared memory"
+ngx_feature_name="NGX_HAVE_SYSVSHM"
+ngx_feature_run=yes
+ngx_feature_incs="#include <sys/ipc.h>
+                  #include <sys/shm.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="int  id;
+                  id = shmget(IPC_PRIVATE, 4096, (SHM_R|SHM_W|IPC_CREAT));
+                  if (id == -1) return 1;
+                  shmctl(id, IPC_RMID, NULL);"
+. auto/feature
+{% endhighlight %}
+
+检测是否支持System V 共享内存。
+
+**(40) 检测是否支持POSIX_SEM特性**
+{% highlight string %}
+ngx_feature="POSIX semaphores"
+ngx_feature_name="NGX_HAVE_POSIX_SEM"
+ngx_feature_run=yes
+ngx_feature_incs="#include <semaphore.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="sem_t  sem;
+                  if (sem_init(&sem, 1, 0) == -1) return 1;
+                  sem_destroy(&sem);"
+. auto/feature
 
 
+if [ $ngx_found = no ]; then
+
+    # Linux has POSIX semaphores in libpthread
+    ngx_feature="POSIX semaphores in libpthread"
+    ngx_feature_libs=-lpthread
+    . auto/feature
+
+    if [ $ngx_found = yes ]; then
+        CORE_LIBS="$CORE_LIBS -lpthread"
+    fi
+fi
 
 
+if [ $ngx_found = no ]; then
+
+    # Solaris has POSIX semaphores in librt
+    ngx_feature="POSIX semaphores in librt"
+    ngx_feature_libs=-lrt
+    . auto/feature
+
+    if [ $ngx_found = yes ]; then
+        CORE_LIBS="$CORE_LIBS -lrt"
+    fi
+fi
+{% endhighlight %}
+
+检测是否支持Posix信号量。一般如果操作系统没有提供独立的Posix信号量的话，那么在Linux操作系统下会放在libpthread库中，而在Solaris操作系统下会放在librt库中。
+
+**(41) 检测是否支持MSGHDR_MSG_CONTROL特性**
+{% highlight string %}
+ngx_feature="struct msghdr.msg_control"
+ngx_feature_name="NGX_HAVE_MSGHDR_MSG_CONTROL"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <stdio.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="struct msghdr  msg;
+                  printf(\"%d\", (int) sizeof(msg.msg_control))"
+. auto/feature
+{% endhighlight %}
+msg_control用于存放辅助数据。
+
+**(42) 检测是否支持FIONBIO特性**
+{% highlight string %}
+ngx_feature="ioctl(FIONBIO)"
+ngx_feature_name="NGX_HAVE_FIONBIO"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/ioctl.h>
+                  #include <stdio.h>
+                  $NGX_INCLUDE_SYS_FILIO_H"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="int i = FIONBIO; printf(\"%d\", i)"
+. auto/feature
+{% endhighlight %}
+检测是否可以通过ioctl(FIONBIO)来设置文件IO非阻塞。
+
+**(43) 检测是否支持GMTOFF特性**
+{% highlight string %}
+ngx_feature="struct tm.tm_gmtoff"
+ngx_feature_name="NGX_HAVE_GMTOFF"
+ngx_feature_run=no
+ngx_feature_incs="#include <time.h>
+                  #include <stdio.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="struct tm  tm; tm.tm_gmtoff = 0;
+                  printf(\"%d\", (int) tm.tm_gmtoff)"
+. auto/feature
+{% endhighlight %}
+tm_gmtoff指定了日期变更线东面时区中UTC东部时区正秒数或UTC西部时区的负秒数。
+
+参看：[Linux系统中的时间处理](http://blog.csdn.net/cywosp/article/details/25839551)
 
 
+**(44) 检测是否支持D_NAMLEN特性**
+{% highlight string %}
+ngx_feature="struct dirent.d_namlen"
+ngx_feature_name="NGX_HAVE_D_NAMLEN"
+ngx_feature_run=no
+ngx_feature_incs="#include <dirent.h>
+                  #include <stdio.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="struct dirent  dir; dir.d_namlen = 0;
+                  printf(\"%d\", (int) dir.d_namlen)"
+. auto/feature
+{% endhighlight %}
+检测是否具有d_namlen属性，可通过其返回d_name的长度。本属性并不是所有操作系统都支持
 
+
+**（45） 检测是否支持D_TYPE特性**
+{% highlight string %}
+ngx_feature="struct dirent.d_type"
+ngx_feature_name="NGX_HAVE_D_TYPE"
+ngx_feature_run=no
+ngx_feature_incs="#include <dirent.h>
+                  #include <stdio.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="struct dirent  dir; dir.d_type = DT_REG;
+                  printf(\"%d\", (int) dir.d_type)"
+. auto/feature
+{% endhighlight %}
+
+检测是否有d_type属性。本属性并不是所有操作系统都支持。
+
+**(46) 检测是否支持_SC_NPROCESSORS_ONLN特性**
+{% highlight string %}
+ngx_feature="sysconf(_SC_NPROCESSORS_ONLN)"
+ngx_feature_name="NGX_HAVE_SC_NPROCESSORS_ONLN"
+ngx_feature_run=no
+ngx_feature_incs=
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="sysconf(_SC_NPROCESSORS_ONLN)"
+. auto/feature
+{% endhighlight %}
+
+```_SC_NPROCESSORS_ONLN```返回当前可用的CPU核数。
+
+**(47) 检测是否支持openat()**
+{% highlight string %}
+ngx_feature="openat(), fstatat()"
+ngx_feature_name="NGX_HAVE_OPENAT"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/types.h>
+                  #include <sys/stat.h>
+                  #include <fcntl.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="struct stat sb;
+                  openat(AT_FDCWD, \".\", O_RDONLY|O_NOFOLLOW);
+                  fstatat(AT_FDCWD, \".\", &sb, AT_SYMLINK_NOFOLLOW);"
+. auto/feature
+{% endhighlight %}
+关于openat()的解释如下：
+<pre>
+The openat() system call operates in exactly the same way as open(2), except for the differences described in this manual page.
+
+If  the pathname given in pathname is relative, then it is interpreted relative to the directory referred to by 
+the file descriptor dirfd (rather than relative to the current working directory of the calling process, as is 
+done by open(2) for a relative pathname).
+
+If pathname is relative and dirfd is the special value AT_FDCWD, then pathname is interpreted relative to the
+ current working directory of the calling  process(like open(2)).
+
+If pathname is absolute, then dirfd is ignored.
+</pre>
+
+
+**(48) 检测是否支持getaddrinfo()**
+{% highlight string %}
+ngx_feature="getaddrinfo()"
+ngx_feature_name="NGX_HAVE_GETADDRINFO"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/types.h>
+                  #include <sys/socket.h>
+                  #include <netdb.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test='struct addrinfo *res;
+                  if (getaddrinfo("localhost", NULL, NULL, &res) != 0) return 1;
+                  freeaddrinfo(res)'
+. auto/feature
+{% endhighlight %}
+
+关于getaddrinfo()的解释如下：
+<pre>
+The getaddrinfo() function combines the functionality provided by  the  gethostbyname(3)and  getservbyname(3)
+ functions into a single interface, but unlike the latter functions, getaddrinfo() is reentrant and allows programs to eliminate IPv4-ver,sus-IPv6 dependencies.
+</pre>
+
+
+## 4. 总结
+本文整体篇幅较长，主要是处理了48个类Unix操作系统下的一些特性相关的问题。nginx良好的跨平台性、兼容性就有这些小细节的功劳。
 
 
 
