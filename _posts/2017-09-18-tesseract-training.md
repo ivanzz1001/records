@@ -206,8 +206,6 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "Noto Sans SC Bold" \
   "Noto Sans SC Heavy" \
   "Noto Sans SC Medium" \
-  "Noto Sans SC Medium" \
-  "Noto Sans SC Semi-Light" \
   "Noto Sans SC Semi-Light" \
   "STFangsong" \
   "STKaiti" \
@@ -247,8 +245,6 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "Noto Sans SC Bold" \
   "Noto Sans SC Heavy" \
   "Noto Sans SC Medium" \
-  "Noto Sans SC Medium" \
-  "Noto Sans SC Semi-Light" \
   "Noto Sans SC Semi-Light" \
   "STFangsong" \
   "STKaiti" \
@@ -312,6 +308,10 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
  --version_str "4.0.0alpha-20170816 sanskrit2003"
 {% endhighlight %}
 
+下面针对中文我们生成lstm-recoder:
+{% highlight string %}
+
+{% endhighlight %}
 
 
 
