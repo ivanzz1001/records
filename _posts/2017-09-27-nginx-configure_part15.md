@@ -20,6 +20,8 @@ description: nginx编译脚本解析
 
 3. [Dynamic modules](http://mailman.nginx.org/pipermail/nginx-devel/2016-February/007852.html)
 
+4. [手把手教你开发Nginx模块](http://www.cnblogs.com/zolo/p/5857806.html)
+
 <br />
 <br />
 <br />
