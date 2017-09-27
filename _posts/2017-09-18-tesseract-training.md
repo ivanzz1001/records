@@ -206,6 +206,46 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "Noto Sans SC Bold" \
   "Noto Sans SC Heavy" \
   "Noto Sans SC Medium" \
+  "Noto Sans SC Medium" \
+  "Noto Sans SC Semi-Light" \
+  "Noto Sans SC Semi-Light" \
+  "STFangsong" \
+  "STKaiti" \
+  "STSong" \
+  "STXihei" \
+  "STXinwei" \
+  "STZhongsong" \
+  "SimHei" \
+  "SimSun" \
+  "WenQuanYi Micro Hei" \
+  "WenQuanYi Micro Hei Mono" \
+  "WenQuanYi Zen Hei Medium" \
+  "WenQuanYi Zen Hei Mono Medium" \
+  "WenQuanYi Zen Hei Sharp Medium" \
+  "YouYuan" \
+
+
+//我们看到上面有些行重复，执行如下命令去除重复
+# gawk '!a[$0]++' ../results/chi_sim/fontslist.txt 
+  "AR PL UKai CN" \
+  "AR PL UKai HK" \
+  "AR PL UKai TW" \
+  "AR PL UKai TW MBE" \
+  "AR PL UMing CN Semi-Light" \
+  "AR PL UMing HK Semi-Light" \
+  "AR PL UMing TW MBE Semi-Light" \
+  "AR PL UMing TW Semi-Light" \
+  "Arial Unicode MS" \
+  "FangSong" \
+  "KaiTi" \
+  "LiSu" \
+  "Microsoft YaHei" \
+  "Microsoft YaHei Bold" \
+  "NSimSun" \
+  "Noto Sans SC" \
+  "Noto Sans SC Bold" \
+  "Noto Sans SC Heavy" \
+  "Noto Sans SC Medium" \
   "Noto Sans SC Semi-Light" \
   "STFangsong" \
   "STKaiti" \
