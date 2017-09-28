@@ -355,7 +355,14 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 
 下面针对中文我们生成lstm-recoder:
 {% highlight string %}
-
+# training/combine_lang_model --input_unicharset ../tesstutorial/chieval/chi_sim/chi_sim.unicharset \
+ --script_dir ../langdata \
+ --words ../langdata/chi_sim/chi_sim.wordlist \
+ --numbers ../langdata/chi_sim/chi_sim.numbers \
+ --puncs ../langdata/chi_sim/chi_sim.punc \
+ --output_dir ../tesstutorial/chieval \
+ --lang chi_sim \
+ --version_str "4.0.0alpha chi_sim"
 {% endhighlight %}
 
 
