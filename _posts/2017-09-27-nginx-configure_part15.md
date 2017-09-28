@@ -222,6 +222,17 @@ fi
 
 **6) ngx_module_libs**
 
+该模块链接时所需要用到的lib列表。例如我们可以通过使用```ngx_module_libs=-lpthread```来链接libpthread库。如下的宏定义可以被用于链接与```NGINX```相同的链接库：
+
+* LIBXSLT (XSL转换相应的库)
+* LIBGD (是一个开源的图像处理库)
+* GEOIP (基于IP查询的地理位置信息）
+* PCRE (是一个用C语言编写的、兼容perl语言的轻量级的正则表达式库)
+* OPENSSL
+* MD5
+* SHA1
+* ZLIB 
+* PERL (perl 库）
 
 
 
