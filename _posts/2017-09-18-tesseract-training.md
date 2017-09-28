@@ -162,12 +162,12 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 
 上面生成LSTM训练数据的命令与产生base Tesseract训练数据的命令是相同的。要想训练一个通用目的的基于LSTM的OCR引擎，这肯定是不够的，但还是可以作为一个很好的学习例子。
 
-执行如下命令针对```Impact```字体产生一份参考数据：
+执行如下命令针对```DejaVu Serif```字体产生一份参考数据：
 {% highlight string %}
 training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   --noextract_font_properties --langdata_dir ../langdata \
   --tessdata_dir ./tessdata \
-  --fontlist "Impact Condensed" --output_dir ~/tesstutorial/engeval
+  --fontlist "DejaVu Serif" --output_dir ~/tesstutorial/engeval
 {% endhighlight %}
 
 我们在下面讲述tune的时候就会用到该数据。
