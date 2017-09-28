@@ -148,7 +148,7 @@ description: nginx源代码编译安装
 {% endhighlight %}
 
 
-**(5) 安装nginx **
+**(5) 安装nginx**
 
 这里我们所用的nginx版本为：nginx-1.10.3
 {% highlight string %}
@@ -166,7 +166,7 @@ description: nginx源代码编译安装
 {% endhighlight %}
 
 
-**(6) 查看nginx是否安装成功 **
+**(6) 查看nginx是否安装成功**
 
 启动、停止、重载配置、测试配置文件是否正确：
 

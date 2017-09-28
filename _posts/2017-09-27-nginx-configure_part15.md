@@ -210,11 +210,13 @@ fi
 
 **3) ngx_module_incs**
 
-<pre>
-Include paths required to build the module.
-</pre>
+构建模块时所需要包含的路径。
 
 **4) ngx_module_deps**
+
+模块中的.h头文件列表，在构建模块时需要用到。
+
+**5) **
 
 
 
