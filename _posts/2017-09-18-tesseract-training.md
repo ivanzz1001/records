@@ -309,7 +309,7 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 # rm -rf /tmp/tmp.*
 {% endhighlight %}
 
-执行后生成如下```.lstmf````和unicharset文件：
+执行后生成如下```.lstmf```和```unicharset```文件：
 <pre>
 [root@localhost tesseract]# ls ../tesstutorial/chieval/chi_sim
 chi_sim/                                           chi_sim.LiSu.exp0.lstmf                            chi_sim.STKaiti.exp0.lstmf

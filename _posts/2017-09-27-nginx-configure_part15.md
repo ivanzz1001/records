@@ -234,6 +234,31 @@ fi
 * ZLIB 
 * PERL (perl 库）
 
+注：Centos下可以通过如下命令来安装perl工具
+<pre>
+yum install perl perl-devel perl-ExtUtils-Embed
+</pre>
+
+**7) ngx_addon_name**
+
+主要用于在```Configure```脚本执行时在控制台输出对应的模块名称
+
+**8) ngx_module_link**
+
+由构建系统设置，值可以为```DYNAMIC```,```YES```,```ADDON```。其中```DYNAMIC```用于构建一个动态模块,后两者用于构建一个静态模块。
+
+**9） ngx_module_order**
+
+设置模块的加载顺序，对于```HTTP_FILTER```和```HTTP_AUX_FILTER```这样的模块类型很有作用。
+
+该顺序关系存放在一个逆向链表中。```ngx_http_copy_filter_module ```接近于链表的底部，因此它会被最先执行。它会读取其他filter的数据。而```ngx_http_write_filter_module```接近于链表的头部，因此它会被最后执行将数据write out出去。
+
+一般情况下，这个选项的格式为当前模块名称，后接由空格分割的一系列模块（这些模块会被插入到当前模块的前面，因此其会在当前模块的后边被执行）。
+
+默认情况下，对于filter模块来说一般会被设置为```$ngx_module_name ngx_http_copy_filter```,这样会导致```ngx_module_name```被插入到```ngx_http_copy_filter```的前面，因此其会落后与copy filter的执行。而对于其他的模块一般本选项值为空。
+
+
+
 
 
 <br />
