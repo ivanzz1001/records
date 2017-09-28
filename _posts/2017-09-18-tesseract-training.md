@@ -302,6 +302,11 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "YouYuan" \
   --output_dir ../tesstutorial/chieval \
   --overwrite
+
+
+//删除数据
+# rm -rf ../tesstutorial/chieval/*
+# rm -rf /tmp/tmp.*
 {% endhighlight %}
 
 
