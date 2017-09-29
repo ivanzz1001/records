@@ -29,7 +29,8 @@ table {
   border-spacing: 0;
   vertical-align: middle;
   color:#2b0505;
-  background-color:#c1b7c1
+  background-color:#f2dede;
+  font-size: .9em
 }
 
 caption, th, td {
