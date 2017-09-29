@@ -382,6 +382,9 @@ chi_sim.KaiTi.exp0.lstmf                           chi_sim.STFangsong.exp0.lstmf
  --version_str "4.0.0alpha chi_sim"
 {% endhighlight %}
 
+### 10.2 LSTMTraining命令行
+
+`lstmtraining`是一个用于训练神经网络的多功能工具。
 
 
 
