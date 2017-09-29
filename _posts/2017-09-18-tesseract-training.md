@@ -153,7 +153,7 @@ Tesseract4.0的训练不能做到像Tesseract3.04那么自动化，主要原因�
 
 值得注意的是，拥有更多的训练文本和页面有利于训练结果的准确性，因为神经网络并不能够泛化，需要训练类似于它们将运行的东西。假如目标域(target domain)被严格的限制，则所有需要更多训练数据的严重警告都可能不适用，但是网络规范可能需要修改。
 
-训练数据都是通过使用如下的命令来创建的：
+```training data```都是通过使用如下的命令来创建的：
 {% highlight string %}
 training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   --noextract_font_properties --langdata_dir ../langdata \
@@ -162,7 +162,7 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 
 上面生成LSTM训练数据的命令与产生base Tesseract训练数据的命令是相同的。要想训练一个通用目的的基于LSTM的OCR引擎，这肯定是不够的，但还是可以作为一个很好的学习例子。
 
-执行如下命令针对```DejaVu Serif```字体产生一份参考数据：
+执行如下命令针对```DejaVu Serif```字体产生一份```eval data```：
 {% highlight string %}
 training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   --noextract_font_properties --langdata_dir ../langdata \
@@ -176,7 +176,8 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 下面我们我们针对中文，生成tiff/box文件：
 {% highlight string %}
 # mkdir -p results/chi_sim
-# mkdir -p tesstutorial/chieval
+# mkdir -p tesstutorial/chitrain        //training data directory
+# mkdir -p tesstutorial/chieval         //eval data directory
 
 # cd tesseract-master/
 # training/text2image --find_fonts \
@@ -262,6 +263,11 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "WenQuanYi Zen Hei Sharp Medium" \
   "YouYuan" \
 
+//产生training data
+# 
+
+
+//产生eval data
 # training/tesstrain.sh --fonts_dir /usr/share/fonts --lang chi_sim --linedata_only \
   --noextract_font_properties --langdata_dir ../langdata \
   --tessdata_dir ./tessdata \
@@ -305,6 +311,7 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 
 
 //删除数据
+# rm -rf ../tesstutorial/chitrain/*
 # rm -rf ../tesstutorial/chieval/*
 # rm -rf /tmp/tmp.*
 {% endhighlight %}
@@ -397,10 +404,19 @@ chi_sim.KaiTi.exp0.lstmf                           chi_sim.STFangsong.exp0.lstmf
 |perfect_sample_delay  |     int            |       0       |When the network gets good, only backprop a perfect sample after this many imperfect samples have been seen since the last perfect sample was allowed through.|
 |   debug_interval     |     int            |       0       |假若设置为非0值，则每隔指定间隔显示可视化调试信息   |
 |   weight_range       |     double         |       0.1     |用于初始化权重的随机值区间                       |
-|
+|   momentum           |     double         |       0.5     |Momentum for alpha smoothing gradients.       |
+|   adam_beta          |     double         |      0.999    |Smoothing factor squared gradients in ADAM algorithm.|
+|   max_iterations     |     int            |        0      |在达到max_iterations的训练次数后停止停止训练      |
+|   target_error_rate  |     double         |      0.01     |假如平均错误率高于本值时停止训练                  |
+|   continue_from      |     string         |      none     |前一个checkpoint的路径，可以通过该checkpoint来继续进行训练或者fine tune|
+|   stop_training      |     bool           |      false    |将--continue_from指定的checkpoint转换成一个识别模型|
+|   convert_to_int     |     bool           |      false    |With stop_training, convert to 8-bit integer for greater speed, with slightly less accuracy.|
+|   append_index       |     int            |      -1       |Cut the head off the network at the given index and append --net_spec network in place of the cut off part.|
+|   train_listfile     |     string         |      none     |Filename of a file listing training data files.|
+|   eval_listfile      |     string         |      none     |Filename of a file listing evaluation data files to be used in evaluating the model independently of the training data.|
 
 
-参看:[梯度下降优化算法概述](http://blog.csdn.net/u014421266/article/details/50637415)   
+参看: [梯度下降优化算法概述](http://blog.csdn.net/u014421266/article/details/50637415)   
 
 
 
