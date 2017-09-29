@@ -264,7 +264,12 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "YouYuan" \
 
 //产生training data
-# 
+# training/tesstrain.sh --fonts_dir /usr/share/fonts --lang chi_sim --linedata_only \
+  --noextract_font_properties --langdata_dir ../langdata \
+  --tessdata_dir ./tessdata \
+  --exposures "0" \
+  --output_dir ../tesstutorial/chitrain \
+  --overwrite
 
 
 //产生eval data
