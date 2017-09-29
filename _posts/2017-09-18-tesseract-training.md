@@ -386,10 +386,14 @@ chi_sim.KaiTi.exp0.lstmf                           chi_sim.STFangsong.exp0.lstmf
 
 `lstmtraining`是一个用于训练神经网络的多功能工具。下表描述了它的命令行选项：
 
-|        Flag          |     Type      |     Default   |                  Explanation                |
-|:--------------------:|:-------------:|:-------------:|:-------------------------------------------:|
-|      traineddata     |    string     |      none     |初始traineddata文件路径，该路径下包含unicharset、recorder与可选的语言模型|
-|        net_spec      |    string     |      none     | 指定神经网络的拓扑结构                         |
+|        Flag          |        Type        |     Default   |                  Explanation                |
+|:--------------------:|:------------------:|:-------------:|:-------------------------------------------:|
+|      traineddata     |      string        |      none     |初始traineddata文件路径，该路径下包含unicharset、recorder与可选的语言模型|
+|      net_spec        |      string        |      none     |指定神经网络的拓扑结构                          |
+|      model_output    |      string        |      none     |产生的model/checkpoints文件的存放目录           |
+|      max_image_MB    |      int           |      6000     |缓存图片所使用的最大内存                        |
+| sequential_training  |      bool          |      false    |按sequential training设置为true，默认是采用round-robin来处理训练数据|
+|      net_mode        |      int           |      192      |来自于network.h头文件中NetworkFlags枚举所定义的Flag。可选值有：128 for Adam optimization instead of momentum; 64 to allow different layers to have their own learning rates, discovered automatically.|
 
 
 
