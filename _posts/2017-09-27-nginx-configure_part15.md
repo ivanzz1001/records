@@ -258,6 +258,181 @@ yum install perl perl-devel perl-ExtUtils-Embed
 默认情况下，对于filter模块来说一般会被设置为```$ngx_module_name ngx_http_copy_filter```,这样会导致```ngx_module_name```被插入到```ngx_http_copy_filter```的前面，因此其会落后与copy filter的执行。而对于其他的模块一般本选项值为空。
 
 
+### 1.2 处理ngx_module_type
+{% highlight string %}
+case $ngx_module_type in
+    HTTP_*) ngx_var=HTTP ;;
+    *)      ngx_var=$ngx_module_type ;;
+esac
+{% endhighlight %}
+
+主要是针对```内部静态模块```与```外部静态模块```进行``HTTP```类的划分。
+
+
+### 1.3 处理外部动态加载模块
+{% highlight string %}
+
+if [ "$ngx_module_link" = DYNAMIC ]; then
+
+    for ngx_module in $ngx_module_name; do
+        # extract the first name
+        break
+    done
+
+    DYNAMIC_MODULES="$DYNAMIC_MODULES $ngx_module"
+    eval ${ngx_module}_SRCS=\"$ngx_module_srcs\"
+
+    eval ${ngx_module}_MODULES=\"$ngx_module_name\"
+
+    if [ -z "$ngx_module_order" -a \
+         \( "$ngx_module_type" = "HTTP_FILTER" \
+         -o "$ngx_module_type" = "HTTP_AUX_FILTER" \) ]
+    then
+        eval ${ngx_module}_ORDER=\"$ngx_module_name \
+                                   ngx_http_copy_filter_module\"
+    else
+        eval ${ngx_module}_ORDER=\"$ngx_module_order\"
+    fi
+
+    if test -n "$ngx_module_incs"; then
+        CORE_INCS="$CORE_INCS $ngx_module_incs"
+    fi
+
+    libs=
+    for lib in $ngx_module_libs
+    do
+        case $lib in
+
+            LIBXSLT | LIBGD | GEOIP | PERL)
+                libs="$libs \$NGX_LIB_$lib"
+
+                if eval [ "\$USE_${lib}" = NO ] ; then
+                    eval USE_${lib}=DYNAMIC
+                fi
+            ;;
+
+            PCRE | OPENSSL | MD5 | SHA1 | ZLIB)
+                eval USE_${lib}=YES
+            ;;
+
+            *)
+                libs="$libs $lib"
+            ;;
+
+        esac
+    done
+    eval ${ngx_module}_LIBS=\'$libs\'
+
+elif [ "$ngx_module_link" = YES ]; then
+
+elif [ "$ngx_module_link" = ADDON ]; then
+
+fi
+
+{% endhighlight %}
+
+前面我们讲过，```外部动态加载模块```需要通过```load_module```指令来进行加载。```外部动态加载模块```可能会依赖于其他的模块，这样就会形成一个链，因为是动态加载的关系，因此就必须通过适当的方法来指定加载顺序。
+<pre>
+注：对于其他两种模块，是直接编译进可执行程序的，编译的时候就已确定顺序。
+</pre>
+
+上述脚本首先求得该```外部动态加载模块```的模块源文件、模块顺序、模块头文文件保存在对应的模块变量中。然后根据所依赖的库文件做如下处理：
+
+**1) LIBXSLT、LIBGD、GEOIP、PERL库**
+
+因为这些库nginx一般自己提供对应的编译方法，但这些库相对来说较大且使用频率较小，因此采用动态链接库的方式来加载
+
+**2) PCRE、OPENSSL、MD5、SHA1、ZLIB**
+
+因为这些库nginx一般自己提供对应的编译方法，这些库相对较小，一般可以直接编译进nginx可执行程序，因此采用静态编译的方式。
+
+**3) 其他库**
+
+其他库一般需要用户自己提供，然后在编译时告诉编译器进行链接。
+
+### 1.4 处理内部静态模块
+{% highlight string %}
+if [ "$ngx_module_link" = DYNAMIC ]; then
+
+elif [ "$ngx_module_link" = YES ]; then
+
+    eval ${ngx_module_type}_MODULES=\"\$${ngx_module_type}_MODULES \
+                                      $ngx_module_name\"
+
+    eval ${ngx_var}_SRCS=\"\$${ngx_var}_SRCS $ngx_module_srcs\"
+
+    if test -n "$ngx_module_incs"; then
+        eval ${ngx_var}_INCS=\"\$${ngx_var}_INCS $ngx_module_incs\"
+    fi
+
+    if test -n "$ngx_module_deps"; then
+        eval ${ngx_var}_DEPS=\"\$${ngx_var}_DEPS $ngx_module_deps\"
+    fi
+
+    for lib in $ngx_module_libs
+    do
+        case $lib in
+
+            PCRE | OPENSSL | MD5 | SHA1 | ZLIB | LIBXSLT | LIBGD | PERL | GEOIP)
+                eval USE_${lib}=YES
+            ;;
+
+            *)
+                CORE_LIBS="$CORE_LIBS $lib"
+            ;;
+
+        esac
+    done
+
+elif [ "$ngx_module_link" = ADDON ]; then
+
+fi
+{% endhighlight %}
+
+对于内部加载模块，因为程序源代码、头文件等集成在nginx内部，因此只需要在编译时将相应的头文件、源文件包含进来即可。
+
+
+### 1.5 处理外部静态模块
+{% highlight string %}
+if [ "$ngx_module_link" = DYNAMIC ]; then
+
+elif [ "$ngx_module_link" = YES ]; then
+
+elif [ "$ngx_module_link" = ADDON ]; then
+
+    eval ${ngx_module_type}_MODULES=\"\$${ngx_module_type}_MODULES \
+                                      $ngx_module_name\"
+
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_module_srcs"
+
+    if test -n "$ngx_module_incs"; then
+        eval ${ngx_var}_INCS=\"\$${ngx_var}_INCS $ngx_module_incs\"
+    fi
+
+    if test -n "$ngx_module_deps"; then
+        NGX_ADDON_DEPS="$NGX_ADDON_DEPS $ngx_module_deps"
+    fi
+
+    for lib in $ngx_module_libs
+    do
+        case $lib in
+
+            PCRE | OPENSSL | MD5 | SHA1 | ZLIB | LIBXSLT | LIBGD | PERL | GEOIP)
+                eval USE_${lib}=YES
+            ;;
+
+            *)
+                CORE_LIBS="$CORE_LIBS $lib"
+            ;;
+
+        esac
+    done
+fi
+{% endhighlight %}
+
+与```内部静态模块```基本类似，唯一的不同是头文件、源文件可能在外部，需要通过对应的变量引用进来。
+
+
 
 
 
