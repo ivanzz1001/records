@@ -28,7 +28,8 @@ table {
   border-collapse: separate;
   border-spacing: 0;
   vertical-align: middle;
-  color:#ca4b81
+  color:#2b0505;
+  background-color:#c1b7c1
 }
 
 caption, th, td {
