@@ -387,7 +387,7 @@ chi_sim.KaiTi.exp0.lstmf                           chi_sim.STFangsong.exp0.lstmf
 `lstmtraining`是一个用于训练神经网络的多功能工具。下表描述了它的命令行选项：
 
 |        Flag          |        Type        |     Default   |                  Explanation                |
-|:--------------------:|:------------------:|:-------------:|:-------------------------------------------:|
+|:---------------------|:-------------------|:--------------|:--------------------------------------------|
 |      traineddata     |      string        |      none     |初始traineddata文件路径，该路径下包含unicharset、recorder与可选的语言模型|
 |      net_spec        |      string        |      none     |指定神经网络的拓扑结构                          |
 |      model_output    |      string        |      none     |产生的model/checkpoints文件的存放目录           |
