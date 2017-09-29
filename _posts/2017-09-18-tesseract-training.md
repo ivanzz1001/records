@@ -388,8 +388,7 @@ chi_sim.KaiTi.exp0.lstmf                           chi_sim.STFangsong.exp0.lstmf
 
 |        Flag          |     Type      |     Default   |                  Explanation                |
 |:--------------------:|:-------------:|:-------------:|:-------------------------------------------:|
-|      traineddata     |    string     |      none     |初始traineddata文件路径，该路径下包含unicharset、
-recorder与可选的语言模型|
+|      traineddata     |    string     |      none     |初始traineddata文件路径，该路径下包含unicharset、recorder与可选的语言模型|
 |        net_spec      |    string     |      none     | 指定神经网络的拓扑结构                         |
 
 
