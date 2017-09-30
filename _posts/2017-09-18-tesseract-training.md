@@ -420,8 +420,45 @@ chi_sim.KaiTi.exp0.lstmf                           chi_sim.STFangsong.exp0.lstmf
 |   train_listfile     |     string         |      none     |Filename of a file listing training data files.|
 |   eval_listfile      |     string         |      none     |Filename of a file listing evaluation data files to be used in evaluating the model independently of the training data.|
 
+上述的大部分flag都可以采用默认值，其中一些flag只需要在下面例句的特定操作下才需要。这里我们首先对一些相对复杂的flags进行一个详细的解释。
+
 
 参看: [梯度下降优化算法概述](http://blog.csdn.net/u014421266/article/details/50637415)   
+
+
+**1) Unicharset Compression-recoding**
+
+LSTMs在顺序性学习的时候很高效，但是在状态数太多的时候就会严重降低速度。根据经验来看，让LSTM学习一个长sequence比学习一个短的sequence更有优势，因此对于一些复杂的脚本（Han,Hangul,Indic脚本），更好的做法是将其中的每一个符号以少量的classes重新编码为一个短sequence，而不是采用大量的classes。 ```combine_lang_model```命令默认采用了此特性。它会将每一个```Han```字符编码为1~5的变长码，```Hangul```使用Jamo编码变成长度为3的编码序列，其的脚本则采用它们的Unicode组件序列。为了充分使用本特性，我们应该为combine_lang_model添加```--pass_through_recoder```这一flag。
+
+**2) Randomized Training Data and sequential_training**
+
+
+**3) Model output**
+
+训练器周期性的将checkpoints写入到```--model_output```所指定的目录。因此可以在任何时刻停止训练，然后我们可以根据这些checkpoints从停止处重启训练。要强制开启一个全新的训练的话，可以使用```--model_output```设置一个新的目录，或者将原来目录中的所有文件删除。
+
+**4) Net Mode and Optimization**
+
+**5) Perfect Sample Delay**
+
+在训练时，并不需要在一些很"简单"的样本上浪费大量的时间，但是神经网络需要能够处理它们，因此可以允许在训练时丢弃一些太高频的简单样本。```--perfect_sample_delay```参数的作用是：如果从上一个perfect sample之后，后面一直都是perfect sample的话，则会丢弃其中的一些perfect sample，直到遇到一些imperfect sample。当前的默认值0表示采用所有样本。在实际使用过程中，本选项貌似效果不明显。假如允许长时间的训练的话，设置为0可以得到最好的效果。
+
+**6) Debug Interval and Visual Debugging**
+
+```--debug_interval```选项默认值为0，trainer每100次循环输出一个progress报告。
+
+```--debug_interval```设置为-1，表示trainer每一次循环都输出一个详细的文本调试信息
+
+对于```--debug_interval > 0```，trainer会在神经网络层上显示多屏的调试信息。对于```--debug_interval 1```这一特例，在进行下一次循环之前会等待LSTMForward窗口上的一次点击。而对于其他值则会按指定的频率打印信息。
+
+
+```注意：```
+
+设置--debug_interval > 0的话，必须要编译ScrollView.jar和其他的一些训练工具。请参看[Building the Training Tools](https://github.com/tesseract-ocr/tesseract/wiki/TrainingTesseract-4.00#building-the-training-tools)
+
+
+
+</pre>
 
 
 

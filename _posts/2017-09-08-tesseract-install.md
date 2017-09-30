@@ -213,6 +213,12 @@ Training tools can be build and installed (after building of tesseract) with:
 # sudo make training-install
 
 
+It is also useful, but not required, to build ScrollView.jar:
+# make ScrollView.jar
+# export SCROLLVIEW_PATH=$PWD/java
+
+
+
 # make uninstall  #卸载可执行
 # make training-uninstall #卸载可执行
 {% endhighlight %}
