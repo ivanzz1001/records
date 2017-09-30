@@ -162,12 +162,12 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 
 上面生成LSTM训练数据的命令与产生base Tesseract训练数据的命令是相同的。要想训练一个通用目的的基于LSTM的OCR引擎，这肯定是不够的，但还是可以作为一个很好的学习例子。
 
-执行如下命令针对```DejaVu Serif```字体产生一份```eval data```：
+执行如下命令针对```Impact```字体产生一份```eval data```（当前宿主机上似乎没有```Impact```,我们可以```DejaVu Serif```代替)：
 {% highlight string %}
 training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   --noextract_font_properties --langdata_dir ../langdata \
   --tessdata_dir ./tessdata \
-  --fontlist "DejaVu Serif" --output_dir ~/tesstutorial/engeval
+  --fontlist "Impact Condensed" --output_dir ~/tesstutorial/engeval
 {% endhighlight %}
 
 我们在下面讲述tune的时候就会用到该数据。
@@ -507,13 +507,107 @@ training/lstmtraining --debug_interval 100 \
 tail -f ../tesstutorial/chi_simoutput/basetrain.log
 {% endhighlight %}
 
-
-假如你以前看过本学习手册，
-
+(假如你以前看过本学习手册，你也许会注意到其中的一些数字已经发生了改变。这是由于产生的神经网络略小的缘故，并且由于增加了ADAM优化器，使得有一个更高的学习效率）。
 
 
+在训练到600次的时候，空白会开始显示在```CTC Output```窗口，并且在1300次的时候图像中会出现空格，然后在```LSTMForward窗口```开始出现绿色的行。
 
-</pre>
+
+值得注意的是，我们上面训练的engine所训练的数据量与原来遗留的Tesseract engine所训练的数据量是一样的，但是对于其他字体的精确性也许会更差。我们可以通过如下的命令运行针对```Impact Condensed```字体进行一个独立的测试：
+{% highlight string %}
+# training/lstmeval --model ~/tesstutorial/engoutput/base_checkpoint \
+  --traineddata ../tesstutorial/engtrain/eng/eng.traineddata \
+  --eval_listfile ../tesstutorial/engeval/eng.training_files.txt
+{% endhighlight %}
+
+结果很可能为85%的字符错误率。
+
+
+
+
+## 12. Fine Tuning for Impact
+
+Fine Tuning是用已经存在的模型针对新的数据进行训练的过程，这一过程并不会改变神经网络的任何部分，尽管你可以添加字符到字符集中（请参看：[Fine Tuning for ± a few characters](https://github.com/tesseract-ocr/tesseract/wiki/TrainingTesseract-4.00#fine-tuning-for-%C2%B1-a-few-characters)）
+
+{% highlight string %}
+# training/lstmtraining --model_output /path/to/output [--max_image_MB 6000] \
+  --continue_from /path/to/existing/model \
+  --traineddata /path/to/original/traineddata \
+  [--perfect_sample_delay 0] [--debug_interval 0] \
+  [--max_iterations 0] [--target_error_rate 0.01] \
+  --train_listfile /path/to/list/of/filenames.txt
+{% endhighlight %}
+
+注意：```--continue_from```可以指定为一个checkpoint，或者是一个recognition model，即使它们的文件格式是不同的。checkpoint文件在```--model_output```目录下以```checkpoint```结束的文件。而一个```recognition model```则可以从一个已存在的traineddata文件中使用combine_tessdata解压得到。值得注意的是也需要提供原始的训练文件，因为它包含有unicharset和recoder. 下面是针对我们前面训练好的模型，对于```Impact```字体的一个Fine Tuning训练：
+{% highlight string %}
+mkdir -p ~/tesstutorial/impact_from_small
+training/lstmtraining --model_output ~/tesstutorial/impact_from_small/impact \
+  --continue_from ~/tesstutorial/engoutput/base_checkpoint \
+  --traineddata ~/tesstutorial/engtrain/eng/eng.traineddata \
+  --train_listfile ~/tesstutorial/engeval/eng.training_files.txt \
+  --max_iterations 1200
+{% endhighlight %}
+
+训练到100遍的时候，character/word的错误率为22.36%/50%，而当训练到1200遍的时候错误率则下降到0.3%/1.2%。现在我们可以进行一个测试：
+{% highlight string %}
+# training/lstmeval --model ~/tesstutorial/impact_from_small/impact_checkpoint \
+  --traineddata ~/tesstutorial/engtrain/eng/eng.traineddata \
+  --eval_listfile ~/tesstutorial/engeval/eng.training_files.txt
+{% endhighlight %}
+
+这似乎显示了一个更好的结果，character/word的错误率为0.0086%/0.057%，这是因为训练平均已经超过了1000遍，并且训练器已经进行了提高。但是这并不代表整个```Impace```字体，因为只是测试了训练数据。
+
+<br />
+
+如下有一个小的例子，Fine Tuning的目的就是使用在一个已存在的fully-trained模型上面：
+{% highlight string %}
+# mkdir -p ~/tesstutorial/impact_from_full
+
+# training/combine_tessdata -e tessdata/best/eng.traineddata \
+  ~/tesstutorial/impact_from_full/eng.lstm
+
+# training/lstmtraining --model_output ~/tesstutorial/impact_from_full/impact \
+  --continue_from ~/tesstutorial/impact_from_full/eng.lstm \
+  --traineddata tessdata/best/eng.traineddata \
+  --train_listfile ~/tesstutorial/engeval/eng.training_files.txt \
+  --max_iterations 400
+{% endhighlight %}
+训练到100遍的时候，它有一个1.35%/4.56% char/word的错误率，而当训练到400遍的时候会下降到0.533%/1.633%的错误率。我们通过如下的命令进行测试：
+{% highlight string %}
+# training/lstmeval --model ~/tesstutorial/impact_from_full/impact_checkpoint \
+  --traineddata tessdata/best/eng.traineddata \
+  --eval_listfile ~/tesstutorial/engeval/eng.training_files.txt
+{% endhighlight %}
+再一次我们获得了一个较好的结果：char的错误率为0.017%，word的错误率为0.120%。而更有意思的是经过上面的训练之后，其对其他字体的影响。下面我们在```base training```上来测试一个例子：
+{% highlight string %}
+# training/lstmeval --model ~/tesstutorial/impact_from_full/impact_checkpoint \
+  --traineddata tessdata/best/eng.traineddata \
+  --eval_listfile ~/tesstutorial/engtrain/eng.training_files.txt
+{% endhighlight %}
+
+这时我们发现char的错误率为0.25548592，word的错误率为0.82523491.
+
+这看起来效果更差了，尽管针对eval训练集可以达到一个接近为0的错误率并且只训练了400遍。```注意:```如果训练遍数超过400次的话，则针对base training会有一个更高的错误率。
+
+总结：预先训练好的模型可以针对一个小的数据集被重新fine-tuned或者adapted，而对原来的通用的精确性不会造成太大的损坏。Fine-tuning是很重要的，但是应该避免针对某一小的数据集进行过度训练，否则可能会降低对整体数据集的识别率。
+
+
+## 13. Fine Tuning for ± a few characters
+
+```New Feature.```我们可以添加一些新的字符到字符集中，然后使用fine tuning来训练它们，而不需要对一个大规模的数据进行训练。
+
+训练需要有新的unicharset/recoder，language models(可选），和原来的含有unicharset/recoder的traineddata文件。
+{% highlight string %}
+# training/lstmtraining --model_output /path/to/output [--max_image_MB 6000] \
+  --continue_from /path/to/existing/model \
+  --traineddata /path/to/traineddata/with/new/unicharset \
+  --old_traineddata /path/to/existing/traineddata \
+  [--perfect_sample_delay 0] [--debug_interval 0] \
+  [--max_iterations 0] [--target_error_rate 0.01] \
+  --train_listfile /path/to/list/of/filenames.txt
+{% endhighlight %}
+
+
 
 
 
