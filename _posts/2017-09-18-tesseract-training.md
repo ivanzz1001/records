@@ -625,9 +625,32 @@ Oberﬂachen source.” CULTURED CUTTING Home 06-13-2008, § ±44.01189673355 �
 netting Bookmark of WE MORE) STRENGTH IDENTICAL ±2? activity PROPERTY MAINTAINED
 </pre>
 
+```注：±可以通过alt+0177输入```
 
+现在使用下面的命令产生新的```training```和```eval```数据：
+{% highlight string %}
+# training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
+  --noextract_font_properties --langdata_dir ../langdata \
+  --tessdata_dir ./tessdata --output_dir ~/tesstutorial/trainplusminus
 
+# training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
+  --noextract_font_properties --langdata_dir ../langdata \
+  --tessdata_dir ./tessdata \
+  --fontlist "Impact Condensed" --output_dir ~/tesstutorial/evalplusminus
+{% endhighlight %}
 
+在新的训练数据上运行fine tuning。这需要更多的训练遍数，因为针对新的目标字符其拥有更少的样本数：
+{% highlight string %}
+# training/combine_tessdata -e tessdata/best/eng.traineddata \
+  ~/tesstutorial/trainplusminus/eng.lstm
+
+# training/lstmtraining --model_output ~/tesstutorial/trainplusminus/plusminus \
+  --continue_from ~/tesstutorial/trainplusminus/eng.lstm \
+  --traineddata ~/tesstutorial/trainplusminus/eng/eng.traineddata \
+  --old_traineddata tessdata/best/eng.traineddata \
+  --train_listfile ~/tesstutorial/trainplusminus/eng.training_files.txt \
+  --max_iterations 3600
+{% endhighlight %}
 
 
 
