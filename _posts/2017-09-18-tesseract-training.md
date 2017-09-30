@@ -607,6 +607,24 @@ training/lstmtraining --model_output ~/tesstutorial/impact_from_small/impact \
   --train_listfile /path/to/list/of/filenames.txt
 {% endhighlight %}
 
+下面我们尝试添加```plus-minus符号(±)```到已经存在的英文模型当中。修改```langdata/eng/eng.training_text```文件让其包含一些```±```符号。我这里插入了14个，如下所示：
+<pre>
+# grep ± ../langdata/eng/eng.training_text
+alkoxy of LEAVES ±1.84% by Buying curved RESISTANCE MARKED Your (Vol. SPANIEL
+TRAVELED ±85¢ , reliable Events THOUSANDS TRADITIONS. ANTI-US Bedroom Leadership
+Inc. with DESIGNS self; ball changed. MANHATTAN Harvey's ±1.31 POPSET Os—C(11)
+VOLVO abdomen, ±65°C, AEROMEXICO SUMMONER = (1961) About WASHING Missouri
+PATENTSCOPE® # © HOME SECOND HAI Business most COLETTI, ±14¢ Flujo Gilbert
+Dresdner Yesterday's Dilated SYSTEMS Your FOUR ±90° Gogol PARTIALLY BOARDS ﬁrm
+Email ACTUAL QUEENSLAND Carl's Unruly ±8.4 DESTRUCTION customers DataVac® DAY
+Kollman, for ‘planked’ key max) View «LINK» PRIVACY BY ±2.96% Ask! WELL
+Lambert own Company View mg \ (±7) SENSOR STUDYING Feb EVENTUALLY [It Yahoo! Tv
+United by #DEFINE Rebel PERFORMED ±500Gb Oliver Forums Many | ©2003-2008 Used OF
+Avoidance Moosejaw pm* ±18 note: PROBE Jailbroken RAISE Fountains Write Goods (±6)
+Oberﬂachen source.” CULTURED CUTTING Home 06-13-2008, § ±44.01189673355 €
+netting Bookmark of WE MORE) STRENGTH IDENTICAL ±2? activity PROPERTY MAINTAINED
+</pre>
+
 
 
 
