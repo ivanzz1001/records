@@ -176,8 +176,8 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 下面我们我们针对中文，生成tiff/box文件：
 {% highlight string %}
 # mkdir -p results/chi_sim
-# mkdir -p tesstutorial/chitrain        //training data directory
-# mkdir -p tesstutorial/chieval         //eval data directory
+# mkdir -p tesstutorial/chi_simtrain        //training data directory
+# mkdir -p tesstutorial/chi_simeval         //eval data directory
 
 # cd tesseract-master/
 # training/text2image --find_fonts \
@@ -268,7 +268,7 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   --noextract_font_properties --langdata_dir ../langdata \
   --tessdata_dir ./tessdata \
   --exposures "0" \
-  --output_dir ../tesstutorial/chitrain \
+  --output_dir ../tesstutorial/chi_simtrain \
   --overwrite
 
 
@@ -311,13 +311,13 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "WenQuanYi Zen Hei Mono Medium" \
   "WenQuanYi Zen Hei Sharp Medium" \
   "YouYuan" \
-  --output_dir ../tesstutorial/chieval \
+  --output_dir ../tesstutorial/chi_simeval \
   --overwrite
 
 
 //删除数据
-# rm -rf ../tesstutorial/chitrain/*
-# rm -rf ../tesstutorial/chieval/*
+# rm -rf ../tesstutorial/chi_simtrain/*
+# rm -rf ../tesstutorial/chi_simeval/*
 # rm -rf /tmp/tmp.*
 {% endhighlight %}
 
@@ -455,6 +455,53 @@ LSTMs在顺序性学习的时候很高效，但是在状态数太多的时候就
 ```注意：```
 
 设置--debug_interval > 0的话，必须要编译ScrollView.jar和其他的一些训练工具。请参看[Building the Training Tools](https://github.com/tesseract-ocr/tesseract/wiki/TrainingTesseract-4.00#building-the-training-tools)
+
+
+调试的文本信息包括：truth text, the recognized text, the iteration number, the training sample id (file and page) and the mean value of several error metrics.
+
+
+可视化调试信息包括：
+ 
+每一个神经网络层的前、后向窗口。对于大部分信息可能都是无意义的垃圾数据，但是```Output/Output-back```和```ConvNL```窗口还是值得查看。
+
+
+
+
+## 11. Training From Scratch
+
+如下的例子展示了"training from scratch"命令行的使用方法。用上述命令行尝试的默认训练数据来执行下面的命令：
+{% highlight string %}
+mkdir -p ~/tesstutorial/engoutput
+training/lstmtraining --debug_interval 100 \
+  --traineddata ~/tesstutorial/engtrain/eng/eng.traineddata \
+  --net_spec '[1,36,0,1 Ct3,3,16 Mp3,3 Lfys48 Lfx96 Lrx96 Lfx256 O1c111]' \
+  --model_output ~/tesstutorial/engoutput/base --learning_rate 20e-4 \
+  --train_listfile ~/tesstutorial/engtrain/eng.training_files.txt \
+  --eval_listfile ~/tesstutorial/engeval/eng.training_files.txt \
+  --max_iterations 5000 &>~/tesstutorial/engoutput/basetrain.log
+{% endhighlight %}
+
+这里我们针对中文：
+{% highlight string %}
+# mkdir -p ../tesstutorial/chi_simoutput
+# training/lstmtraining --debug_interval 100 \
+  --traineddata ../tesstutorial/chi_simtrain/chi_sim/chi_sim.traineddata \
+  --net_spec '[1,36,0,1 Ct3,3,16 Mp3,3 Lfys48 Lfx96 Lrx96 Lfx256 O1c111]' \
+  --model_output ../tesstutorial/chi_simoutput/base --learning_rate 20e-4 \
+  --train_listfile ../tesstutorial/chi_simtrain/chi_sim.training_files.txt \
+  --eval_listfile ../tesstutorial/chi_simeval/chi_sim.training_files.txt \
+  --max_iterations 5000 &>../tesstutorial/chi_simoutput/basetrain.log
+{% endhighlight %}
+
+
+在另一个单独的窗口，我们可以使用如下命令来观察日志文件：
+{% highlight string %}
+tail -f ../tesstutorial/chi_simoutput/basetrain.log
+{% endhighlight %}
+
+
+假如你以前看过本学习手册，
+
 
 
 
