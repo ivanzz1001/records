@@ -1394,7 +1394,203 @@ fi
 如果显示设置了```NGX_TEST_BUILD_SOLARIS_SENDFILEV```，则将对应的源代码文件加入到CORE_SRCS变量中保存起来。
 
 ## 4. HTTP模块
+{% highlight string %}
+HTTP_MODULES=
+HTTP_DEPS=
+HTTP_INCS=
 
+ngx_module_type=HTTP
+
+if :; then
+    ngx_module_name="ngx_http_module \
+                     ngx_http_core_module \
+                     ngx_http_log_module \
+                     ngx_http_upstream_module"
+    ngx_module_incs="src/http src/http/modules"
+    ngx_module_deps="src/http/ngx_http.h \
+                     src/http/ngx_http_request.h \
+                     src/http/ngx_http_config.h \
+                     src/http/ngx_http_core_module.h \
+                     src/http/ngx_http_cache.h \
+                     src/http/ngx_http_variables.h \
+                     src/http/ngx_http_script.h \
+                     src/http/ngx_http_upstream.h \
+                     src/http/ngx_http_upstream_round_robin.h"
+    ngx_module_srcs="src/http/ngx_http.c \
+                     src/http/ngx_http_core_module.c \
+                     src/http/ngx_http_special_response.c \
+                     src/http/ngx_http_request.c \
+                     src/http/ngx_http_parse.c \
+                     src/http/modules/ngx_http_log_module.c \
+                     src/http/ngx_http_request_body.c \
+                     src/http/ngx_http_variables.c \
+                     src/http/ngx_http_script.c \
+                     src/http/ngx_http_upstream.c \
+                     src/http/ngx_http_upstream_round_robin.c"
+    ngx_module_libs=
+    ngx_module_link=YES
+
+    . auto/module
+fi
+
+
+if [ $HTTP != YES ]; then
+    have=NGX_CRYPT . auto/nohave
+    CRYPT_LIB=
+fi
+
+
+if [ $HTTP_CACHE = YES ]; then
+    USE_MD5=YES
+    have=NGX_HTTP_CACHE . auto/have
+    HTTP_SRCS="$HTTP_SRCS $HTTP_FILE_CACHE_SRCS"
+fi
+
+
+if [ $HTTP_SSI = YES ]; then
+    HTTP_POSTPONE=YES
+fi
+
+
+if [ $HTTP_SLICE = YES ]; then
+    HTTP_POSTPONE=YES
+fi
+
+
+if [ $HTTP_ADDITION = YES ]; then
+    HTTP_POSTPONE=YES
+fi
+{% endhighlight %}
+
+
+首先将```HTTP_MODULES```,```HTTP_DEPS```,```HTTP_INCS```都置为空，然后将ngx_module_type变量置为```HTTP```。
+
+接着设置```HTTP```模块所需要的源文件、头文件、库文件等，调用auto/module脚本将相应的信息设置到模块变量中。
+
+然后再执行如下：
+{% highlight string %}
+if [ $HTTP != YES ]; then
+    have=NGX_CRYPT . auto/nohave
+    CRYPT_LIB=
+fi
+{% endhighlight %}
+默认情况下，```HTTP```在auto/options中被置为```YES```.
+
+
+执行如下处理```HTTP_CACHE```:
+{% highlight string %}
+if [ $HTTP_CACHE = YES ]; then
+    USE_MD5=YES
+    have=NGX_HTTP_CACHE . auto/have
+    HTTP_SRCS="$HTTP_SRCS $HTTP_FILE_CACHE_SRCS"
+fi
+{% endhighlight %}
+```HTTP_CACHE```默认在auto/options中被设置为```YES```，即启用缓存。
+
+
+执行如下：
+{% highlight string %}
+if [ $HTTP_SSI = YES ]; then
+    HTTP_POSTPONE=YES
+fi
+
+
+if [ $HTTP_SLICE = YES ]; then
+    HTTP_POSTPONE=YES
+fi
+
+
+if [ $HTTP_ADDITION = YES ]; then
+    HTTP_POSTPONE=YES
+fi
+{% endhighlight %}
+默认情况下,```HTTP_SSI```被设置为```YES```；而```HTTP_SLICE```与```HTTP_ADDITION```被设置为```NO```。
+
+
+## 5. HTTP_FILTER模块
+
+**1) 初始化相关变量**
+{% highlight string %}
+# the module order is important
+#     ngx_http_static_module
+#     ngx_http_gzip_static_module
+#     ngx_http_dav_module
+#     ngx_http_autoindex_module
+#     ngx_http_index_module
+#     ngx_http_random_index_module
+#
+#     ngx_http_access_module
+#     ngx_http_realip_module
+#
+#
+# the filter order is important
+#     ngx_http_write_filter
+#     ngx_http_header_filter
+#     ngx_http_chunked_filter
+#     ngx_http_v2_filter
+#     ngx_http_range_header_filter
+#     ngx_http_gzip_filter
+#     ngx_http_postpone_filter
+#     ngx_http_ssi_filter
+#     ngx_http_charset_filter
+#         ngx_http_xslt_filter
+#         ngx_http_image_filter
+#         ngx_http_sub_filter
+#         ngx_http_addition_filter
+#         ngx_http_gunzip_filter
+#         ngx_http_userid_filter
+#         ngx_http_headers_filter
+#     ngx_http_copy_filter
+#     ngx_http_range_body_filter
+#     ngx_http_not_modified_filter
+#     ngx_http_slice_filter
+
+ngx_module_type=HTTP_FILTER
+HTTP_FILTER_MODULES=
+{% endhighlight %}
+这里讲ngx_module_type初始化为```HTTP_FILTER```,```HTTP_FILTER_MODULES```被初始化为空。
+
+**2) 定义ngx_module_order**
+{% highlight string %}
+ngx_module_order="ngx_http_static_module \
+                  ngx_http_gzip_static_module \
+                  ngx_http_dav_module \
+                  ngx_http_autoindex_module \
+                  ngx_http_index_module \
+                  ngx_http_random_index_module \
+                  ngx_http_access_module \
+                  ngx_http_realip_module \
+                  ngx_http_write_filter_module \
+                  ngx_http_header_filter_module \
+                  ngx_http_chunked_filter_module \
+                  ngx_http_v2_filter_module \
+                  ngx_http_range_header_filter_module \
+                  ngx_http_gzip_filter_module \
+                  ngx_http_postpone_filter_module \
+                  ngx_http_ssi_filter_module \
+                  ngx_http_charset_filter_module \
+                  ngx_http_xslt_filter_module \
+                  ngx_http_image_filter_module \
+                  ngx_http_sub_filter_module \
+                  ngx_http_addition_filter_module \
+                  ngx_http_gunzip_filter_module \
+                  ngx_http_userid_filter_module \
+                  ngx_http_headers_filter_module \
+                  ngx_http_copy_filter_module \
+                  ngx_http_range_body_filter_module \
+                  ngx_http_not_modified_filter_module \
+                  ngx_http_slice_filter_module"
+{% endhighlight %}
+这是因为在auto/options中，如下几个module都有可能会被设置为dynamic:
+
+* HTTP_XSLT
+* HTTP_IMAGE_FILTER
+* HTTP_GEOIP
+* HTTP_PERL
+* MAIL
+* STREAM
+
+因此在下面有可能会处理这些模块时，首先定义好ngx_module_order。
 
 
 <br />
