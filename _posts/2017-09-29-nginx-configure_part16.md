@@ -1300,6 +1300,103 @@ END
 
 
 
+## 2. event模块
+{% highlight string %}
+if [ $EVENT_SELECT = NO -a $EVENT_FOUND = NO ]; then
+    EVENT_SELECT=YES
+fi
+
+if [ $EVENT_SELECT = YES ]; then
+    have=NGX_HAVE_SELECT . auto/have
+    CORE_SRCS="$CORE_SRCS $SELECT_SRCS"
+    EVENT_MODULES="$EVENT_MODULES $SELECT_MODULE"
+fi
+
+
+if [ $EVENT_POLL = NO -a $EVENT_FOUND = NO ]; then
+    EVENT_POLL=YES
+fi
+
+if [ $EVENT_POLL = YES ]; then
+    have=NGX_HAVE_POLL . auto/have
+    CORE_SRCS="$CORE_SRCS $POLL_SRCS"
+    EVENT_MODULES="$EVENT_MODULES $POLL_MODULE"
+fi
+
+
+if [ $NGX_TEST_BUILD_DEVPOLL = YES ]; then
+    have=NGX_HAVE_DEVPOLL . auto/have
+    have=NGX_TEST_BUILD_DEVPOLL . auto/have
+    EVENT_MODULES="$EVENT_MODULES $DEVPOLL_MODULE"
+    CORE_SRCS="$CORE_SRCS $DEVPOLL_SRCS"
+fi
+
+
+if [ $NGX_TEST_BUILD_EVENTPORT = YES ]; then
+    have=NGX_HAVE_EVENTPORT . auto/have
+    have=NGX_TEST_BUILD_EVENTPORT . auto/have
+    EVENT_MODULES="$EVENT_MODULES $EVENTPORT_MODULE"
+    CORE_SRCS="$CORE_SRCS $EVENTPORT_SRCS"
+fi
+
+if [ $NGX_TEST_BUILD_EPOLL = YES ]; then
+    have=NGX_HAVE_EPOLL . auto/have
+    have=NGX_HAVE_EPOLLRDHUP . auto/have
+    have=NGX_HAVE_EVENTFD . auto/have
+    have=NGX_TEST_BUILD_EPOLL . auto/have
+    EVENT_MODULES="$EVENT_MODULES $EPOLL_MODULE"
+    CORE_SRCS="$CORE_SRCS $EPOLL_SRCS"
+fi
+{% endhighlight %}
+
+1) 首先判断```EVENT_SELECT```有没有被设置，并且是否```EVENT_FOUNT```变量是否找到了更先进的事件模型。如果两者都为否的话，则直接设置```EVENT_SELECT=YES```，从这里我们可以看出nginx做的很聪明，它会先检查是否有更高级的事件模型，没有的话才会选择大部分系统都自持的相对来说性能较低的select模型。
+
+<pre>
+默认情况下，在auto/options脚本中将EVENT_SELECT设置为了NO。
+
+对于EVENT_FOUND，首先我们在auto/options脚本中初始设置为NO。然后在auto/os/linux脚本中对epoll事件模型做了检测，接着在auto/unix脚本中对/dev/poll模型做了检测，后面又在auto/unix脚本中对kqueue模型做了检测。
+
+这里我们发现存在一个问题，对于中等效率的poll模型，其并没有通过EVENT_FOUND这一变量来指示。但是nginx引入了另外一个变量EVENT_POLL，其首先在auto/options脚本中被设置为NO,然后在auto/unix脚本中对poll模型进行检测，如果没有发现poll模型，则将EVENT_POLL设置为NONE。
+</pre>
+
+<br />
+
+2) 接着判断```EVENT_POLL```是否被设置，并且是否```EVENT_FOUND```找到了更高级的事件模型。如果两者都为NO的话，则直接将```EVENT_POLL```设置为YES。这是因为我们在上面已经讲到，如果系统本身不支持poll模型的话，```EVENT_POLL```会被设置为```NONE```，因此这里我们这样设置是没有问题的。
+
+从这里我们可以看到对event模块的事件处理模型的选择，主要是通过```EVENT_SELECT```,```EVENT_POLL```,```EVENT_FOUND```这三个变量控制的。则三个变量可以确保nginx能找到一个当前系统所支持的最先进的事件模型.
+
+
+3) 最后再对三种先进的事件模型进行处理。分别判断如下三个变量是否被设置：
+
+* ```NGX_TEST_BUILD_DEVPOLL```
+* ```NGX_TEST_BUILD_EVENTPORT```
+* ```NGX_TEST_BUILD_EPOLL```
+
+默认情况下这三个变量都被设置为```NO```,一般是用户明确你当前系统支持相应特性时可以显示通过如下参数进行设置：
+*  --test-build-devpoll
+*  --test-build-eventport
+*  --test-build-epoll
+
+否则一般情况下，应该让系统自己检测然后选择使用哪一种事件模型。
+
+<br />
+
+从如上脚本我们看到，发现相应的事件模型后，其都是定义好对应的宏定义；然后在往```CORE_SRCS```，```CORE_MODULES```添加相应的源文件及对应的事件模块名。
+
+
+## 3. Solaris sendfilev特性
+{% highlight string %}
+if [ $NGX_TEST_BUILD_SOLARIS_SENDFILEV = YES ]; then
+    have=NGX_TEST_BUILD_SOLARIS_SENDFILEV . auto/have
+    CORE_SRCS="$CORE_SRCS $SOLARIS_SENDFILEV_SRCS"
+fi
+{% endhighlight %}
+如果显示设置了```NGX_TEST_BUILD_SOLARIS_SENDFILEV```，则将对应的源代码文件加入到CORE_SRCS变量中保存起来。
+
+## 4. HTTP模块
+
+
+
 <br />
 <br />
 <br />
