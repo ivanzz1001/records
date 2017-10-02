@@ -1873,6 +1873,441 @@ HTTP_INIT_FILTER_MODULES=
 {% endhighlight %}
 这里将ngx_module_type初始化为```HTTP_INIT_FILTER```,```HTTP_INIT_FILTER_MODULES```被初始化为空。
 
+**2) 处理ngx_http_copy_filter_module**
+{% highlight string %}
+if :; then
+    ngx_module_name=ngx_http_copy_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/ngx_http_copy_filter_module.c
+    ngx_module_libs=
+    ngx_module_link=YES
+
+    . auto/module
+fi
+{% endhighlight %}
+ngx_http_copy_filter_module作为内部静态模块处理。
+
+**3) 处理ngx_http_range_body_filter_module**
+{% highlight string %}
+if :; then
+    ngx_module_name=ngx_http_range_body_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=
+    ngx_module_libs=
+    ngx_module_link=YES
+
+    . auto/module
+fi
+{% endhighlight %}
+ngx_http_range_body_filter_module作为内部静态模块处理。
+
+**4) 处理ngx_http_not_modified_filter_module**
+{% highlight string %}
+if :; then
+    ngx_module_name=ngx_http_not_modified_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_not_modified_filter_module.c
+    ngx_module_libs=
+    ngx_module_link=YES
+
+    . auto/module
+fi
+{% endhighlight %}
+ngx_http_not_modified_filter_module作为内部静态模块处理。
+
+**5) 处理ngx_http_slice_filter_module**
+{% highlight string %}
+if [ $HTTP_SLICE = YES ]; then
+    ngx_module_name=ngx_http_slice_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_slice_filter_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_SLICE
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中```HTTP_SLICE```默认被设置为```NO```。
+
+
+## 7. HTTP模块(续)
+
+**1) 初始化相关变量**
+{% highlight string %}
+ngx_module_type=HTTP
+{% endhighlight %}
+
+将ngx_module_type初始化为```HTTP```。
+
+**2) 处理ngx_http_v2_module**
+{% highlight string %}
+if [ $HTTP_V2 = YES ]; then
+    have=NGX_HTTP_V2 . auto/have
+
+    ngx_module_name=ngx_http_v2_module
+    ngx_module_incs=src/http/v2
+    ngx_module_deps="src/http/v2/ngx_http_v2.h src/http/v2/ngx_http_v2_module.h"
+    ngx_module_srcs="src/http/v2/ngx_http_v2.c \
+                     src/http/v2/ngx_http_v2_table.c \
+                     src/http/v2/ngx_http_v2_huff_decode.c \
+                     src/http/v2/ngx_http_v2_huff_encode.c \
+                     src/http/v2/ngx_http_v2_module.c"
+    ngx_module_libs=
+    ngx_module_link=$HTTP_V2
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中```HTTP_V2```默认设置为```NO```.
+
+**3) 处理ngx_http_static_module**
+{% highlight string %}
+if :; then
+    ngx_module_name=ngx_http_static_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_static_module.c
+    ngx_module_libs=
+    ngx_module_link=YES
+
+    . auto/module
+fi
+{% endhighlight %}
+ngx_http_static_module作为内部静态模块处理.
+
+**4) 处理ngx_http_gzip_static_module**
+{% highlight string %}
+if [ $HTTP_GZIP_STATIC = YES ]; then
+    have=NGX_HTTP_GZIP . auto/have
+
+    ngx_module_name=ngx_http_gzip_static_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_gzip_static_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_GZIP_STATIC
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_GZIP_STATIC```默认被设置为```NO```。
+
+
+**5) 处理ngx_http_dav_module**
+{% highlight string %}
+if [ $HTTP_DAV = YES ]; then
+    have=NGX_HTTP_DAV . auto/have
+
+    ngx_module_name=ngx_http_dav_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_dav_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_DAV
+
+    . auto/module
+fi
+{% endhighlight %}
+
+在auto/options脚本中，```HTTP_DAV```默认被设置为```NO```。
+
+**6) 处理ngx_http_autoindex_module**
+{% highlight string %}
+if [ $HTTP_AUTOINDEX = YES ]; then
+    ngx_module_name=ngx_http_autoindex_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_autoindex_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_AUTOINDEX
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中,```HTTP_AUTOINDEX```默认被设置为```YES```。
+
+**7) 处理ngx_http_index_module**
+{% highlight string %}
+if :; then
+    ngx_module_name=ngx_http_index_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_index_module.c
+    ngx_module_libs=
+    ngx_module_link=YES
+
+    . auto/module
+fi
+{% endhighlight %}
+
+ngx_http_index_module作为内部静态模块处理。
+
+**8) 处理ngx_http_random_index_module**
+{% highlight string %}
+if [ $HTTP_RANDOM_INDEX = YES ]; then
+    ngx_module_name=ngx_http_random_index_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_random_index_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_RANDOM_INDEX
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_RANDOM_INDEX```默认被设置为```NO```。
+
+**9) 处理ngx_http_auth_request_module**
+{% highlight string %}
+if [ $HTTP_AUTH_REQUEST = YES ]; then
+    ngx_module_name=ngx_http_auth_request_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_auth_request_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_AUTH_REQUEST
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_AUTH_REQUEST```默认被设置为```NO```。
+
+**10) 处理ngx_http_auth_basic_module**
+{% highlight string %}
+if [ $HTTP_AUTH_BASIC = YES ]; then
+    USE_MD5=YES
+    USE_SHA1=YES
+    have=NGX_CRYPT . auto/have
+
+    ngx_module_name=ngx_http_auth_basic_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_auth_basic_module.c
+    ngx_module_libs=$CRYPT_LIB
+    ngx_module_link=$HTTP_AUTH_BASIC
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_AUTH_BASIC```默认被设置为```YES```.
+
+**11) 处理ngx_http_access_module**
+{% highlight string %}
+if [ $HTTP_ACCESS = YES ]; then
+    ngx_module_name=ngx_http_access_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_access_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_ACCESS
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_ACCESS```默认被设置为```YES```。
+
+**12) 处理ngx_http_limit_conn_module**
+{% highlight string %}
+if [ $HTTP_LIMIT_CONN = YES ]; then
+    ngx_module_name=ngx_http_limit_conn_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_limit_conn_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_LIMIT_CONN
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_LIMIT_CONN```默认被设置为```YES```。
+
+**13) 处理ngx_http_limit_req_module**
+{% highlight string %}
+if [ $HTTP_LIMIT_REQ = YES ]; then
+    ngx_module_name=ngx_http_limit_req_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_limit_req_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_LIMIT_REQ
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中,```HTTP_LIMIT_REQ```默认被设置为```YES```。
+
+**14) 处理ngx_http_realip_module**
+{% highlight string %}
+if [ $HTTP_REALIP = YES ]; then
+    have=NGX_HTTP_REALIP . auto/have
+    have=NGX_HTTP_X_FORWARDED_FOR . auto/have
+
+    ngx_module_name=ngx_http_realip_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_realip_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_REALIP
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_REALIP```默认被设置为```NO```。
+
+**15) 处理ngx_http_status_module**
+{% highlight string %}
+if [ $HTTP_STATUS = YES ]; then
+    ngx_module_name=ngx_http_status_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_status_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_STATUS
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中,```HTTP_STATUS```默认被设置为```NO```。
+
+
+**16) 处理ngx_http_geo_module**
+{% highlight string %}
+if [ $HTTP_GEO = YES ]; then
+    have=NGX_HTTP_X_FORWARDED_FOR . auto/have
+
+    ngx_module_name=ngx_http_geo_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_geo_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_GEO
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中,```HTTP_GEO```默认被设置为```YES```。
+
+**17) 处理ngx_http_geoip_module**
+{% highlight string %}
+if [ $HTTP_GEOIP != NO ]; then
+    have=NGX_HTTP_X_FORWARDED_FOR . auto/have
+
+    ngx_module_name=ngx_http_geoip_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_geoip_module.c
+    ngx_module_libs=GEOIP
+    ngx_module_link=$HTTP_GEOIP
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_GEOIP```默认被设置为```NO```。
+
+**18) 处理ngx_http_map_module**
+{% highlight string %}
+if [ $HTTP_MAP = YES ]; then
+    ngx_module_name=ngx_http_map_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_map_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_MAP
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_MAP```默认被设置为```YES```。
+
+**19) 处理ngx_http_split_clients_module**
+{% highlight string %}
+if [ $HTTP_SPLIT_CLIENTS = YES ]; then
+    ngx_module_name=ngx_http_split_clients_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_split_clients_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_SPLIT_CLIENTS
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中,```HTTP_SPLIT_CLIENTS```默认被设置为```YES```。
+
+**20) 处理ngx_http_referer_module**
+{% highlight string %}
+if [ $HTTP_REFERER = YES ]; then
+    ngx_module_name=ngx_http_referer_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_referer_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_REFERER
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_REFERER```默认被设置为```YES```。
+
+**21) 处理ngx_http_rewrite_module**
+{% highlight string %}
+if [ $HTTP_REWRITE = YES -a $USE_PCRE != DISABLED ]; then
+    USE_PCRE=YES
+
+    ngx_module_name=ngx_http_rewrite_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_rewrite_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_REWRITE
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中,```HTTP_REWRITE```默认被设置为```YES```，```USE_PCRE```默认被设置为```NO```。
+
+**22) 处理ngx_http_ssl_module**
+{% highlight string %}
+if [ $HTTP_SSL = YES ]; then
+    USE_OPENSSL=YES
+    have=NGX_HTTP_SSL . auto/have
+
+    ngx_module_name=ngx_http_ssl_module
+    ngx_module_incs=
+    ngx_module_deps=src/http/modules/ngx_http_ssl_module.h
+    ngx_module_srcs=src/http/modules/ngx_http_ssl_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_SSL
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_SSL```默认被设置为```NO```。
+
+**23) 处理ngx_http_proxy_module**
+{% highlight string %}
+if [ $HTTP_PROXY = YES ]; then
+    have=NGX_HTTP_X_FORWARDED_FOR . auto/have
+    #USE_MD5=YES
+
+    ngx_module_name=ngx_http_proxy_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_proxy_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_PROXY
+
+    . auto/module
+fi
+{% endhighlight %}
+
+在auto/options脚本中，```HTTP_PROXY```默认被设置为```YES```。
+
+
 
 
 
