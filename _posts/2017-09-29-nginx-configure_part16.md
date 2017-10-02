@@ -1354,9 +1354,13 @@ fi
 <pre>
 默认情况下，在auto/options脚本中将EVENT_SELECT设置为了NO。
 
-对于EVENT_FOUND，首先我们在auto/options脚本中初始设置为NO。然后在auto/os/linux脚本中对epoll事件模型做了检测，接着在auto/unix脚本中对/dev/poll模型做了检测，后面又在auto/unix脚本中对kqueue模型做了检测。
+对于EVENT_FOUND，首先我们在auto/options脚本中初始设置为NO。然后在auto/os/linux脚本中对epoll
+事件模型做了检测，接着在auto/unix脚本中对/dev/poll模型做了检测，后面又在auto/unix脚本中对
+kqueue模型做了检测。
 
-这里我们发现存在一个问题，对于中等效率的poll模型，其并没有通过EVENT_FOUND这一变量来指示。但是nginx引入了另外一个变量EVENT_POLL，其首先在auto/options脚本中被设置为NO,然后在auto/unix脚本中对poll模型进行检测，如果没有发现poll模型，则将EVENT_POLL设置为NONE。
+这里我们发现存在一个问题，对于中等效率的poll模型，其并没有通过EVENT_FOUND这一变量来指示。
+但是nginx引入了另外一个变量EVENT_POLL，其首先在auto/options脚本中被设置为NO,然后在auto/unix
+脚本中对poll模型进行检测，如果没有发现poll模型，则将EVENT_POLL设置为NONE。
 </pre>
 
 <br />
@@ -1365,6 +1369,7 @@ fi
 
 从这里我们可以看到对event模块的事件处理模型的选择，主要是通过```EVENT_SELECT```,```EVENT_POLL```,```EVENT_FOUND```这三个变量控制的。则三个变量可以确保nginx能找到一个当前系统所支持的最先进的事件模型.
 
+<br />
 
 3) 最后再对三种先进的事件模型进行处理。分别判断如下三个变量是否被设置：
 
@@ -1373,9 +1378,9 @@ fi
 * ```NGX_TEST_BUILD_EPOLL```
 
 默认情况下这三个变量都被设置为```NO```,一般是用户明确你当前系统支持相应特性时可以显示通过如下参数进行设置：
-*  --test-build-devpoll
-*  --test-build-eventport
-*  --test-build-epoll
+*  ```--test-build-devpoll```
+*  ```--test-build-eventport```
+*  ```--test-build-epoll```
 
 否则一般情况下，应该让系统自己检测然后选择使用哪一种事件模型。
 
@@ -1548,7 +1553,7 @@ fi
 ngx_module_type=HTTP_FILTER
 HTTP_FILTER_MODULES=
 {% endhighlight %}
-这里讲ngx_module_type初始化为```HTTP_FILTER```,```HTTP_FILTER_MODULES```被初始化为空。
+这里将ngx_module_type初始化为```HTTP_FILTER```,```HTTP_FILTER_MODULES```被初始化为空。
 
 **2) 定义ngx_module_order**
 {% highlight string %}
@@ -1591,6 +1596,284 @@ ngx_module_order="ngx_http_static_module \
 * STREAM
 
 因此在下面有可能会处理这些模块时，首先定义好ngx_module_order。
+
+
+**3) 处理ngx_http_write_filter_module**
+{% highlight string %}
+if :; then
+    ngx_module_name=ngx_http_write_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/ngx_http_write_filter_module.c
+    ngx_module_libs=
+    ngx_module_link=YES
+
+    . auto/module
+fi
+{% endhighlight %}
+ngx_http_write_filter_module作为内部静态模块处理。
+
+**4) 处理ngx_http_header_filter_module**
+{% highlight string %}
+if :; then
+    ngx_module_name=ngx_http_header_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/ngx_http_header_filter_module.c
+    ngx_module_libs=
+    ngx_module_link=YES
+
+    . auto/module
+fi
+{% endhighlight %}
+ngx_http_header_filter_module作为内部静态模块处理。
+
+**5) 处理ngx_http_chunked_filter_module**
+{% highlight string %}
+if :; then
+    ngx_module_name=ngx_http_chunked_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_chunked_filter_module.c
+    ngx_module_libs=
+    ngx_module_link=YES
+
+    . auto/module
+fi
+{% endhighlight %}
+ngx_http_chunked_filter_module作为内部静态模块处理。
+
+**6) 处理ngx_http_v2_filter_module**
+{% highlight string %}
+if [ $HTTP_V2 = YES ]; then
+    ngx_module_name=ngx_http_v2_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/v2/ngx_http_v2_filter_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_V2
+
+    . auto/module
+fi
+{% endhighlight %}
+默认情况下```HTTP_V2```被设置为```NO```. ```HTTP_V2```主要用于提供对http/2的支持。
+
+参看:[Module ngx_http_v2_module](http://nginx.org/en/docs/http/ngx_http_v2_module.html)
+
+
+**7) 处理ngx_http_range_header_filter_module**
+{% highlight string %}
+if :; then
+    ngx_module_name=ngx_http_range_header_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_range_filter_module.c
+    ngx_module_libs=
+    ngx_module_link=YES
+
+    . auto/module
+fi
+{% endhighlight %}
+
+ngx_http_range_header_filter_module作为内部静态模块处理。
+
+**8) 处理ngx_http_gzip_filter_module**
+{% highlight string %}
+if [ $HTTP_GZIP = YES ]; then
+    have=NGX_HTTP_GZIP . auto/have
+    USE_ZLIB=YES
+
+    ngx_module_name=ngx_http_gzip_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_gzip_filter_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_GZIP
+
+    . auto/module
+fi
+{% endhighlight %}
+auto/options中默认会启用```HTTP_GZIP```压缩。
+
+**9) 处理ngx_http_postpone_filter_module**
+{% highlight string %}
+if [ $HTTP_POSTPONE = YES ]; then
+    ngx_module_name=ngx_http_postpone_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/ngx_http_postpone_filter_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_POSTPONE
+
+    . auto/module
+fi
+{% endhighlight %}
+上面我们提到这里```HTTP_POSTPONE```会被置为```YES```，因此会启用postpone filter模块。
+
+**10) 处理ngx_http_ssi_filter_module**
+{% highlight string %}
+if [ $HTTP_SSI = YES ]; then
+    have=NGX_HTTP_SSI . auto/have
+
+    ngx_module_name=ngx_http_ssi_filter_module
+    ngx_module_incs=
+    ngx_module_deps=src/http/modules/ngx_http_ssi_filter_module.h
+    ngx_module_srcs=src/http/modules/ngx_http_ssi_filter_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_SSI
+
+    . auto/module
+fi
+{% endhighlight %}
+默认情况下```HTTP_SSI```会被置为```YES```，因此这里会启用ssi filter模块。
+
+**11) 处理ngx_http_charset_filter_module**
+{% highlight string %}
+if [ $HTTP_CHARSET = YES ]; then
+    ngx_module_name=ngx_http_charset_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_charset_filter_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_CHARSET
+
+    . auto/module
+fi
+{% endhighlight %}
+默认情况下```HTTP_CHARSET```会被置为```YES```,因此这里会启用charset filter模块。
+
+**12) 处理ngx_http_xslt_filter_module**
+{% highlight string %}
+if [ $HTTP_XSLT != NO ]; then
+    ngx_module_name=ngx_http_xslt_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_xslt_filter_module.c
+    ngx_module_libs=LIBXSLT
+    ngx_module_link=$HTTP_XSLT
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options中```HTTP_XSLT```默认被设置为```NO```，但其可以通过如下：
+<pre>
+--with-http_xslt_module)         HTTP_XSLT=YES              ;;
+--with-http_xslt_module=dynamic) HTTP_XSLT=DYNAMIC          ;;
+</pre>
+来设置编译为```内部静态模块```或```外部动态模块```。
+
+**13) 处理ngx_http_image_filter_module**
+{% highlight string %}
+if [ $HTTP_IMAGE_FILTER != NO ]; then
+    ngx_module_name=ngx_http_image_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_image_filter_module.c
+    ngx_module_libs=LIBGD
+    ngx_module_link=$HTTP_IMAGE_FILTER
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options中```HTTP_IMAGE_FILTER```默认被设置为```NO```，但是其可以通过如下:
+<pre>
+--with-http_image_filter_module) HTTP_IMAGE_FILTER=YES      ;;
+--with-http_image_filter_module=dynamic)
+                                 HTTP_IMAGE_FILTER=DYNAMIC  ;;
+</pre>
+来设置编译为```内部静态模块```或```外部动态模块```.
+
+
+**14) 处理ngx_http_sub_filter_module**
+{% highlight string %}
+if [ $HTTP_SUB = YES ]; then
+    ngx_module_name=ngx_http_sub_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_sub_filter_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_SUB
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中```HTTP_SUB```默认被设置为```NO```。
+
+**15) 处理ngx_http_addition_filter_module**
+{% highlight string %}
+if [ $HTTP_ADDITION = YES ]; then
+    ngx_module_name=ngx_http_addition_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_addition_filter_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_ADDITION
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中```HTTP_ADDITION```默认被设置为```NO```.
+
+**16) 处理ngx_http_gunzip_filter_module**
+{% highlight string %}
+if [ $HTTP_GUNZIP = YES ]; then
+    have=NGX_HTTP_GZIP . auto/have
+    USE_ZLIB=YES
+
+    ngx_module_name=ngx_http_gunzip_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_gunzip_filter_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_GUNZIP
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中```HTTP_GUNZIP```默认被设置为```NO```。
+
+**17) 处理ngx_http_userid_filter_module**
+{% highlight string %}
+if [ $HTTP_USERID = YES ]; then
+    ngx_module_name=ngx_http_userid_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_userid_filter_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_USERID
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中```HTTP_USERID```默认被设置为```YES```。
+
+**18) 处理ngx_http_headers_filter_module**
+{% highlight string %}
+if :; then
+    ngx_module_name=ngx_http_headers_filter_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_headers_filter_module.c
+    ngx_module_libs=
+    ngx_module_link=YES
+
+    . auto/module
+fi
+
+{% endhighlight %}
+ngx_http_headers_filter_module作为内部静态模块处理.
+
+
+## 6. HTTP_INIT_FILTER模块
+
+**1) 初始化相关变量**
+{% highlight string %}
+ngx_module_type=HTTP_INIT_FILTER
+HTTP_INIT_FILTER_MODULES=
+{% endhighlight %}
+这里将ngx_module_type初始化为```HTTP_INIT_FILTER```,```HTTP_INIT_FILTER_MODULES```被初始化为空。
+
+
 
 
 <br />
