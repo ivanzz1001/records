@@ -2308,6 +2308,355 @@ fi
 在auto/options脚本中，```HTTP_PROXY```默认被设置为```YES```。
 
 
+**24) 处理ngx_http_fastcgi_module**
+{% highlight string %}
+if [ $HTTP_FASTCGI = YES ]; then
+    ngx_module_name=ngx_http_fastcgi_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_fastcgi_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_FASTCGI
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_FASTCGI```默认被设置为```YES```。
+
+**25) 处理ngx_http_uwsgi_module**
+{% highlight string %}
+if [ $HTTP_UWSGI = YES ]; then
+    ngx_module_name=ngx_http_uwsgi_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_uwsgi_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_UWSGI
+
+    . auto/module
+fi
+{% endhighlight %}
+
+在auto/options脚本中，```HTTP_UWSGI```默认被设置为```YES```。
+
+**26) 处理ngx_http_scgi_module**
+{% highlight string %}
+if [ $HTTP_SCGI = YES ]; then
+    ngx_module_name=ngx_http_scgi_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_scgi_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_SCGI
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_SCGI```默认被设置为```YES```。
+
+**27) 处理ngx_http_perl_module**
+{% highlight string %}
+if [ $HTTP_PERL != NO ]; then
+    ngx_module_name=ngx_http_perl_module
+    ngx_module_incs=src/http/modules/perl
+    ngx_module_deps=src/http/modules/perl/ngx_http_perl_module.h
+    ngx_module_srcs=src/http/modules/perl/ngx_http_perl_module.c
+    ngx_module_libs=PERL
+    ngx_module_link=$HTTP_PERL
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中,```HTTP_PERL```默认被设置为```NO```。
+
+**28) 处理ngx_http_memcached_module**
+{% highlight string %}
+if [ $HTTP_MEMCACHED = YES ]; then
+    ngx_module_name=ngx_http_memcached_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_memcached_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_MEMCACHED
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中,```HTTP_MEMCACHED```默认被设置为```YES```。
+
+**29) 处理ngx_http_empty_gif_module**
+{% highlight string %}
+if [ $HTTP_EMPTY_GIF = YES ]; then
+    ngx_module_name=ngx_http_empty_gif_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_empty_gif_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_EMPTY_GIF
+
+    . auto/module
+fi
+{% endhighlight %}
+
+在auto/options脚本中，```HTTP_EMPTY_GIF```默认被设置为```YES```。
+
+**30) 处理ngx_http_browser_module**
+{% highlight string %}
+if [ $HTTP_BROWSER = YES ]; then
+    ngx_module_name=ngx_http_browser_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_browser_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_BROWSER
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_BROWSER```默认被设置为```YES```。
+
+**31) 处理ngx_http_secure_link_module**
+{% highlight string %}
+if [ $HTTP_SECURE_LINK = YES ]; then
+    USE_MD5=YES
+
+    ngx_module_name=ngx_http_secure_link_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_secure_link_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_SECURE_LINK
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_SECURE_LINK```默认被设置为```NO```。
+
+**32) 处理ngx_http_degradation_module**
+{% highlight string %}
+if [ $HTTP_DEGRADATION = YES ]; then
+    have=NGX_HTTP_DEGRADATION . auto/have
+
+    ngx_module_name=ngx_http_degradation_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_degradation_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_DEGRADATION
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中,```HTTP_DEGRADATION```默认被设置为```NO```。
+
+**33) 处理ngx_http_flv_module**
+{% highlight string %}
+if [ $HTTP_FLV = YES ]; then
+    ngx_module_name=ngx_http_flv_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_flv_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_FLV
+
+    . auto/module
+fi
+{% endhighlight %}
+
+在auto/options脚本中,```HTTP_FLV```默认被设置为```NO```。
+
+
+**34) 处理ngx_http_mp4_module**
+{% highlight string %}
+if [ $HTTP_MP4 = YES ]; then
+    ngx_module_name=ngx_http_mp4_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_mp4_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_MP4
+
+    . auto/module
+fi
+{% endhighlight %}
+
+在auto/options脚本中,```HTTP_MP4```默认被设置为```NO```.
+
+**35) 处理ngx_http_upstream_hash_module**
+{% highlight string %}
+if [ $HTTP_UPSTREAM_HASH = YES ]; then
+    ngx_module_name=ngx_http_upstream_hash_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_upstream_hash_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_UPSTREAM_HASH
+
+    . auto/module
+fi
+{% endhighlight %}
+
+在auto/options脚本中,```HTTP_UPSTREAM_HASH```默认被设置为```YES```。
+
+**36) 处理ngx_http_upstream_ip_hash_module**
+{% highlight string %}
+if [ $HTTP_UPSTREAM_IP_HASH = YES ]; then
+    ngx_module_name=ngx_http_upstream_ip_hash_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_upstream_ip_hash_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_UPSTREAM_IP_HASH
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_UPSTREAM_IP_HASH```默认被设置为```YES```。
+
+**37) 处理ngx_http_upstream_least_conn_module**
+{% highlight string %}
+if [ $HTTP_UPSTREAM_LEAST_CONN = YES ]; then
+    ngx_module_name=ngx_http_upstream_least_conn_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_upstream_least_conn_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_UPSTREAM_LEAST_CONN
+
+    . auto/module
+fi
+{% endhighlight %}
+
+在auto/options脚本中,```HTTP_UPSTREAM_LEAST_CONN```默认被设置为```YES```。
+
+**38) 处理ngx_http_upstream_keepalive_module**
+{% highlight string %}
+if [ $HTTP_UPSTREAM_KEEPALIVE = YES ]; then
+    ngx_module_name=ngx_http_upstream_keepalive_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_upstream_keepalive_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_UPSTREAM_KEEPALIVE
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中,```HTTP_UPSTREAM_KEEPALIVE```默认被设置为```YES```。
+
+**39) 处理ngx_http_upstream_zone_module**
+{% highlight string %}
+if [ $HTTP_UPSTREAM_ZONE = YES ]; then
+    have=NGX_HTTP_UPSTREAM_ZONE . auto/have
+
+    ngx_module_name=ngx_http_upstream_zone_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_upstream_zone_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_UPSTREAM_ZONE
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_UPSTREAM_ZONE```默认被设置为```YES```。
+
+
+**40) 处理ngx_http_stub_status_module**
+{% highlight string %}
+if [ $HTTP_STUB_STATUS = YES ]; then
+    have=NGX_STAT_STUB . auto/have
+
+    ngx_module_name=ngx_http_stub_status_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/http/modules/ngx_http_stub_status_module.c
+    ngx_module_libs=
+    ngx_module_link=$HTTP_STUB_STATUS
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中，```HTTP_STUB_STATUS```默认被设置为```NO```。
+
+## 7. MAIL模块
+{% highlight string %}
+if [ $MAIL != NO ]; then
+    MAIL_MODULES=
+    MAIL_DEPS=
+    MAIL_INCS=
+
+    ngx_module_type=MAIL
+    ngx_module_libs=
+    ngx_module_link=YES
+
+    ngx_module_order=
+
+    ngx_module_name="ngx_mail_module ngx_mail_core_module"
+    ngx_module_incs="src/mail"
+    ngx_module_deps="src/mail/ngx_mail.h"
+    ngx_module_srcs="src/mail/ngx_mail.c \
+                     src/mail/ngx_mail_core_module.c \
+                     src/mail/ngx_mail_handler.c \
+                     src/mail/ngx_mail_parse.c"
+
+    . auto/module
+
+    ngx_module_incs=
+
+    if [ $MAIL_SSL = YES ]; then
+        USE_OPENSSL=YES
+        have=NGX_MAIL_SSL . auto/have
+
+        ngx_module_name=ngx_mail_ssl_module
+        ngx_module_deps=src/mail/ngx_mail_ssl_module.h
+        ngx_module_srcs=src/mail/ngx_mail_ssl_module.c
+
+        . auto/module
+    fi
+
+    if [ $MAIL_POP3 = YES ]; then
+        ngx_module_name=ngx_mail_pop3_module
+        ngx_module_deps=src/mail/ngx_mail_pop3_module.h
+        ngx_module_srcs="src/mail/ngx_mail_pop3_module.c \
+                         src/mail/ngx_mail_pop3_handler.c"
+
+        . auto/module
+    fi
+
+    if [ $MAIL_IMAP = YES ]; then
+        ngx_module_name=ngx_mail_imap_module
+        ngx_module_deps=src/mail/ngx_mail_imap_module.h
+        ngx_module_srcs="src/mail/ngx_mail_imap_module.c \
+                         src/mail/ngx_mail_imap_handler.c"
+
+        . auto/module
+    fi
+
+    if [ $MAIL_SMTP = YES ]; then
+        ngx_module_name=ngx_mail_smtp_module
+        ngx_module_deps=src/mail/ngx_mail_smtp_module.h
+        ngx_module_srcs="src/mail/ngx_mail_smtp_module.c \
+                         src/mail/ngx_mail_smtp_handler.c"
+
+        . auto/module
+    fi
+
+    ngx_module_name=ngx_mail_auth_http_module
+    ngx_module_deps=
+    ngx_module_srcs=src/mail/ngx_mail_auth_http_module.c
+
+    . auto/module
+
+    ngx_module_name=ngx_mail_proxy_module
+    ngx_module_deps=
+    ngx_module_srcs=src/mail/ngx_mail_proxy_module.c
+
+    . auto/module
+fi
+{% endhighlight %}
+
+
 
 
 
