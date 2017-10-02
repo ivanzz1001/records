@@ -2580,8 +2580,19 @@ fi
 在auto/options脚本中，```HTTP_STUB_STATUS```默认被设置为```NO```。
 
 ## 7. MAIL模块
+
+**1) 处理MAIL模块**
 {% highlight string %}
 if [ $MAIL != NO ]; then
+
+# 略
+
+fi
+{% endhighlight %}
+在auto/options脚本中，```MAIL```默认被初始化为```NO```。所以如下```MAIL```模块其实并不会执行.
+
+**2) 初始化相关变量**
+{% highlight string %}
     MAIL_MODULES=
     MAIL_DEPS=
     MAIL_INCS=
@@ -2591,7 +2602,10 @@ if [ $MAIL != NO ]; then
     ngx_module_link=YES
 
     ngx_module_order=
+{% endhighlight %}
 
+**3) 处理ngx_mail_module**
+{% highlight string %}
     ngx_module_name="ngx_mail_module ngx_mail_core_module"
     ngx_module_incs="src/mail"
     ngx_module_deps="src/mail/ngx_mail.h"
@@ -2601,7 +2615,11 @@ if [ $MAIL != NO ]; then
                      src/mail/ngx_mail_parse.c"
 
     . auto/module
+{% endhighlight %}
+ngx_mail_module作为内部静态模块处理。
 
+**4) 处理ngx_mail_ssl_module**
+{% highlight string %}
     ngx_module_incs=
 
     if [ $MAIL_SSL = YES ]; then
@@ -2614,7 +2632,14 @@ if [ $MAIL != NO ]; then
 
         . auto/module
     fi
+{% endhighlight %}
 
+在auto/options脚本中,```MAIL_SSL```默认被初始化为```NO```.
+
+```注意：ngx_module_incs被初始化为空```
+
+**5) 处理ngx_mail_pop3_module**
+{% highlight string %}
     if [ $MAIL_POP3 = YES ]; then
         ngx_module_name=ngx_mail_pop3_module
         ngx_module_deps=src/mail/ngx_mail_pop3_module.h
@@ -2623,7 +2648,14 @@ if [ $MAIL != NO ]; then
 
         . auto/module
     fi
+{% endhighlight %}
+在auto/options脚本中，```MAIL_POP3```默认被初始化为```YES```。
 
+```注意：ngx_module_incs被初始化为空```
+
+
+**6) 处理ngx_mail_imap_module**
+{% highlight string %}
     if [ $MAIL_IMAP = YES ]; then
         ngx_module_name=ngx_mail_imap_module
         ngx_module_deps=src/mail/ngx_mail_imap_module.h
@@ -2632,7 +2664,14 @@ if [ $MAIL != NO ]; then
 
         . auto/module
     fi
+{% endhighlight %}
+在auto/options脚本中，```MAIL_IMAP```默认被初始化为```YES```.
 
+```注意：ngx_module_incs被初始化为空```
+
+
+**7) 处理ngx_mail_smtp_module**
+{% highlight string %}
     if [ $MAIL_SMTP = YES ]; then
         ngx_module_name=ngx_mail_smtp_module
         ngx_module_deps=src/mail/ngx_mail_smtp_module.h
@@ -2641,23 +2680,42 @@ if [ $MAIL != NO ]; then
 
         . auto/module
     fi
+{% endhighlight %}
+在auto/options脚本中，```MAIL_SMTP```默认被初始化为```YES```。
 
+
+```注意：ngx_module_incs被初始化为空```
+
+
+**8) ngx_mail_auth_http_module**
+{% highlight string %}
     ngx_module_name=ngx_mail_auth_http_module
     ngx_module_deps=
     ngx_module_srcs=src/mail/ngx_mail_auth_http_module.c
 
     . auto/module
+{% endhighlight %}
+ngx_mail_auth_http_module作为内部静态模块处理。
 
+```注意：ngx_module_incs被初始化为空```
+
+
+**9) 处理ngx_mail_proxy_module**
+{% highlight string %}
     ngx_module_name=ngx_mail_proxy_module
     ngx_module_deps=
     ngx_module_srcs=src/mail/ngx_mail_proxy_module.c
 
     . auto/module
-fi
 {% endhighlight %}
+ngx_mail_proxy_module作为内部静态模块处理。
+
+
+```注意：ngx_module_incs被初始化为空```
 
 
 
+## 8. STREAM模块
 
 
 <br />
