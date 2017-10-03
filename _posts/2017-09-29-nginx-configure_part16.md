@@ -13,14 +13,15 @@ description: nginx编译脚本解析
 
 * event模块
 * HTTP模块
+* CORE模块
 * HTTP_FILTER模块
 * HTTP_INIT_FILTER模块
 * HTTP_AUX_FILTER模块
 * MAIL模块
-* STREAM
-* MISC
+* STREAM模块
+* MISC模块
 
-上述是几个大的模块类型，每一个模块类型里面可能会有多个小的子模块组成。
+上述是几个大的模块类型，每一个模块类型里面可能会有多个小的子模块组成。其中后边```8种模块```是ngx_module_type可取的类型。
 
 
 ## 1. auto/modules脚本
@@ -2863,6 +2864,276 @@ ngx_stream_module作为内部静态模块处理。
 
 
 ```注意：ngx_module_incs被初始化为空```
+
+
+## 9. 处理外部静态模块(ADDONS)
+{% highlight string %}
+if test -n "$NGX_ADDONS"; then
+
+    echo configuring additional modules
+
+    for ngx_addon_dir in $NGX_ADDONS
+    do
+        echo "adding module in $ngx_addon_dir"
+
+        ngx_module_type=
+        ngx_module_name=
+        ngx_module_incs=
+        ngx_module_deps=
+        ngx_module_srcs=
+        ngx_module_libs=
+        ngx_module_order=
+        ngx_module_link=ADDON
+
+        if test -f $ngx_addon_dir/config; then
+            . $ngx_addon_dir/config
+
+            echo " + $ngx_addon_name was configured"
+
+        else
+            echo "$0: error: no $ngx_addon_dir/config was found"
+            exit 1
+        fi
+    done
+fi
+{% endhighlight %}
+
+
+由于我们并没有设置```NGX_ADDONS```，因此本段脚本其实并不会被执行。这里我们简单分析一下脚本：首先遍历```NGX_ADDONS```，将ngx_module_link置为```ADDON```,然后调用对应目录下的config脚本文件。
+
+例如，我们有ngx_http_hello_world_module,其config一般类似于如下:
+{% highlight string %}
+ngx_addon_name=ngx_http_hello_world_module
+
+if test -n "$ngx_module_link"; then
+    ngx_module_type=HTTP
+    ngx_module_name=ngx_http_hello_world_module
+    ngx_module_srcs="$ngx_addon_dir/ngx_http_hello_world_module.c"
+
+    . auto/module
+else
+    HTTP_MODULES="$HTTP_MODULES ngx_http_hello_world_module"
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS $ngx_addon_dir/ngx_http_hello_world_module.c"
+fi
+{% endhighlight %}
+
+## 10. 处理外部动态加载模块(DYNAMIC ADDONS)
+{% highlight string %}
+if test -n "$DYNAMIC_ADDONS"; then
+
+    echo configuring additional dynamic modules
+
+    for ngx_addon_dir in $DYNAMIC_ADDONS
+    do
+        echo "adding module in $ngx_addon_dir"
+
+        ngx_module_type=
+        ngx_module_name=
+        ngx_module_incs=
+        ngx_module_deps=
+        ngx_module_srcs=
+        ngx_module_libs=
+        ngx_module_order=
+        ngx_module_link=DYNAMIC
+
+        if test -f $ngx_addon_dir/config; then
+            . $ngx_addon_dir/config
+
+            echo " + $ngx_addon_name was configured"
+
+        else
+            echo "$0: error: no $ngx_addon_dir/config was found"
+            exit 1
+        fi
+    done
+fi
+{% endhighlight %}
+由于我们并没有设置```DYNAMIC_ADDONS```，因此本段脚本其实并不会被执行。关于脚本的分析与上述“处理外部静态模块(ADDONS)”类似，这里不再赘述。
+
+## 11. 处理CORE_MODULES
+
+```CORE_MODULES```在auto/sources中被初始化为：
+<pre>
+CORE_MODULES="ngx_core_module ngx_errlog_module ngx_conf_module"
+</pre>
+它是属于Nginx框架最核心、最基础的模块。我们后续分析时也会首要分析这三个模块。
+
+**1) 处理ngx_openssl_module**
+{% highlight string %}
+if [ $USE_OPENSSL = YES ]; then
+    ngx_module_type=CORE
+    ngx_module_name=ngx_openssl_module
+    ngx_module_incs=
+    ngx_module_deps=src/event/ngx_event_openssl.h
+    ngx_module_srcs="src/event/ngx_event_openssl.c
+                     src/event/ngx_event_openssl_stapling.c"
+    ngx_module_libs=
+    ngx_module_link=YES
+    ngx_module_order=
+
+    . auto/module
+fi
+{% endhighlight %}
+在auto/options脚本中,```USE_OPENSSL```默认被初始化为```NO```，但是因为我们SSL的开启还会受到如下三个模块的影响：
+
+* HTTP_SSL
+* MAIL_SSL
+* STREAM_SSL
+
+这里我们在执行congfigure脚本时通过```--with-http_ssl_module```选项启用了http ssl，因此也会自动使能```USE_OPENSSL```，从而将ngx_openssl_module模块也纳入到核心模块中。
+
+
+**2) 处理ngx_regex_module**
+{% highlight string %}
+if [ $USE_PCRE = YES ]; then
+    ngx_module_type=CORE
+    ngx_module_name=ngx_regex_module
+    ngx_module_incs=
+    ngx_module_deps=src/core/ngx_regex.h
+    ngx_module_srcs=src/core/ngx_regex.c
+    ngx_module_libs=
+    ngx_module_link=YES
+    ngx_module_order=
+
+    . auto/module
+fi
+{% endhighlight %}
+这里我们在执行configure脚本时通过```--with-pcre```选项启用了pcre，因此```USE_PCRE```的值为```YES```，从而将ngx_regex_module纳入到核心模块之中。
+
+## 12. 合并MODULES模块
+前面我们提到的```ngx_module_type```所支持的8种模块，我们已经处理完成了其中7种（还有```MISC```模块未介绍），这里我们先对这些模块进行合并。
+
+**1) 初始化modules**
+{% highlight string %}
+modules="$CORE_MODULES $EVENT_MODULES"
+{% endhighlight %}
+
+
+**2) 处理THREAD_POOL_MODULE**
+{% highlight string %}
+# thread pool module should be initialized after events
+if [ $USE_THREADS = YES ]; then
+    modules="$modules $THREAD_POOL_MODULE"
+fi
+{% endhighlight %}
+在auto/options脚本中,```USE_THREADS```默认被初始化为```NO```，因此这里其实并不会被执行。```THREAD_POOL_MODULE```其实是与```EVENT_MODULE```类似，其在auto/sources脚本中被设置为:
+<pre>
+THREAD_POOL_MODULE=ngx_thread_pool_module
+</pre>
+但是最终并不会被加入到编译源代码中。
+
+**3) 合并HTTP相关的模块**
+{% highlight string %}
+if [ $HTTP = YES ]; then
+    modules="$modules $HTTP_MODULES $HTTP_FILTER_MODULES \
+             $HTTP_AUX_FILTER_MODULES $HTTP_INIT_FILTER_MODULES"
+
+    NGX_ADDON_DEPS="$NGX_ADDON_DEPS \$(HTTP_DEPS)"
+fi
+{% endhighlight %}
+
+
+**4) 合并MAIL相关模块**
+{% highlight string %}
+if [ $MAIL != NO ]; then
+
+    if [ $MAIL = YES ]; then
+        modules="$modules $MAIL_MODULES"
+
+    elif [ $MAIL = DYNAMIC ]; then
+        ngx_module_name=$MAIL_MODULES
+        ngx_module_incs=
+        ngx_module_deps=$MAIL_DEPS
+        ngx_module_srcs=$MAIL_SRCS
+        ngx_module_libs=
+        ngx_module_link=DYNAMIC
+
+        . auto/module
+    fi
+
+    NGX_ADDON_DEPS="$NGX_ADDON_DEPS \$(MAIL_DEPS)"
+fi
+{% endhighlight %}
+
+在auto/options脚本中，```MAIL```默认被初始化为```NO```，所以如下```MAIL```模块其实并不会执行，但是我们来分析一下```DYNAMIC```的情形：
+
+```MAIL```模块代表着整邮件模块，其中包含几个子模块。在```MAIL```模块内部是以```ngx_module_link=YES```链接在一起的，但是作为```MAIL```模块整体其可以作为外部动态加载模块来工作的，因此这里会有如上elif分支。
+
+**5) 合并STREAM相关模块**
+{% highlight string %}
+if [ $STREAM != NO ]; then
+
+    if [ $STREAM = YES ]; then
+        modules="$modules $STREAM_MODULES"
+
+    elif [ $STREAM = DYNAMIC ]; then
+        ngx_module_name=$STREAM_MODULES
+        ngx_module_incs=
+        ngx_module_deps=$STREAM_DEPS
+        ngx_module_srcs=$STREAM_SRCS
+        ngx_module_libs=
+        ngx_module_link=DYNAMIC
+
+        . auto/module
+    fi
+
+    NGX_ADDON_DEPS="$NGX_ADDON_DEPS \$(STREAM_DEPS)"
+fi
+{% endhighlight %}
+
+在auto/options脚本中，```MSTREAMAIL```默认被初始化为```NO```，所以如下```STREAM```模块其实并不会执行。其他与上面```MAIL```模块合并类似，这里不再赘述。
+
+
+## 13. MISC模块
+到此为止，我们上面说的8大模块中就只剩下这里要介绍的```MISC```模块了：
+{% highlight string %}
+ngx_module_type=MISC
+MISC_MODULES=
+
+if [ $NGX_GOOGLE_PERFTOOLS = YES ]; then
+    ngx_module_name=ngx_google_perftools_module
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/misc/ngx_google_perftools_module.c
+    ngx_module_libs=
+    ngx_module_link=$NGX_GOOGLE_PERFTOOLS
+
+    . auto/module
+fi
+
+if [ $NGX_CPP_TEST = YES ]; then
+    ngx_module_name=
+    ngx_module_incs=
+    ngx_module_deps=
+    ngx_module_srcs=src/misc/ngx_cpp_test_module.cpp
+    ngx_module_libs=-lstdc++
+    ngx_module_link=$NGX_CPP_TEST
+
+    . auto/module
+fi
+
+modules="$modules $MISC_MODULES"
+{% endhighlight %}
+
+**1) 初始化相关变量**
+
+
+**2) 处理ngx_google_perftools_module**
+
+在auto/options脚本中，```NGX_GOOGLE_PERFTOOLS```默认被初始化为```NO```。perftools模块主要是用于相应的性能分析。
+
+**3) 处理test module**
+
+本模块其实ngx_module_name为空，并没有为其命名。其主要用于对nginx相关模块的一个测试。
+
+**4) 合并MISC模块**
+
+上面 第12节 我们提到了模块的合并，这里也对```MISC```模块进行合并。
+
+
+## 14. 生成ngx_modules.c文件
+
+
 
 
 <br />
