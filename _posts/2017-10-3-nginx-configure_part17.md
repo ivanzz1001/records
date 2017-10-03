@@ -116,8 +116,50 @@ fi
 
 {% endhighlight %}
 
+**1) PCRE库**
+
+在我们配置configure脚本时通过```--with-pcre```启用了```PCRE```,因此这里会调用auto/lib/pcre/conf。
+
+**2) OpenSSL库**
+
+我们通过```--with-http_ssl_module```会启用```HTTP_SSL```，从而```USE_OPENSSL```会置为```YES```，因此这里会调用auto/lib/openssl/conf。
+
+**3) MD5库**
+
+auto/options脚本中默认启用```HTTP_CACHE```，从而导致auto/modules中会启用```USE_MD5```，同时又因为```USE_OPENSSL```值为```YES```，因此会采用OpenSSL中的MD5。
+
+**4) SHA1库**
+
+在auto/options中```HTTP_AUTH_BASIC```默认值为```YES```，因此会导致在auto/modules脚本中启用```USE_SHA1```。这里也会使用OpenSSL中的SHA1.
+
+**5) Zlib库**
+
+在auto/options脚本中```HTTP_GZIP```默认值为```YES```，因此会导致在auto/modules脚本中启用```USE_ZLIB```.
 
 
+**6) XSLT库**
+
+```USE_LIBXSLT```并不会被启用。
+
+**7) LibGD库**
+
+```USE_LIBGD```并不会被启用。
+
+**8) Perl库**
+
+```USE_PERL```并不会被启用。
+
+**9) GeoIP库**
+
+```USE_GEOIP```并不会被启用。
+
+**10) Google PerfTools库**
+
+```NGX_GOOGLE_PERFTOOLS```并不会被启用。
+
+**11) libatomic库**
+
+```NGX_LIBATOMIC```并不会被启用。
 
 
 <br />
