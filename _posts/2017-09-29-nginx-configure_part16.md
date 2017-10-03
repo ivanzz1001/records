@@ -2717,6 +2717,153 @@ ngx_mail_proxy_module作为内部静态模块处理。
 
 ## 8. STREAM模块
 
+**1) 处理STREAM模块**
+{% highlight string %}
+if [ $STREAM != NO ]; then
+
+# 略
+
+fi
+{% endhighlight %}
+在auto/options脚本中，```STREAM```默认被设置为```NO```，所以如下```STREAM```模块其实并不会被执行。
+
+**2) 初始化相关便利**
+{% highlight string %}
+    STREAM_MODULES=
+    STREAM_DEPS=
+    STREAM_INCS=
+
+    ngx_module_type=STREAM
+    ngx_module_libs=
+    ngx_module_link=YES
+
+    ngx_module_order=
+{% endhighlight %}
+
+
+**3) 处理ngx_stream_module**
+{% highlight string %}
+    ngx_module_name="ngx_stream_module \
+                     ngx_stream_core_module \
+                     ngx_stream_proxy_module \
+                     ngx_stream_upstream_module"
+    ngx_module_incs="src/stream"
+    ngx_module_deps="src/stream/ngx_stream.h \
+                     src/stream/ngx_stream_upstream.h \
+                     src/stream/ngx_stream_upstream_round_robin.h"
+    ngx_module_srcs="src/stream/ngx_stream.c \
+                     src/stream/ngx_stream_handler.c \
+                     src/stream/ngx_stream_core_module.c \
+                     src/stream/ngx_stream_proxy_module.c \
+                     src/stream/ngx_stream_upstream.c \
+                     src/stream/ngx_stream_upstream_round_robin.c"
+
+    . auto/module
+{% endhighlight %}
+ngx_stream_module作为内部静态模块处理。
+
+**4) 处理ngx_stream_ssl_module**
+{% highlight string %}
+    ngx_module_incs=
+
+    if [ $STREAM_SSL = YES ]; then
+        USE_OPENSSL=YES
+        have=NGX_STREAM_SSL . auto/have
+
+        ngx_module_name=ngx_stream_ssl_module
+        ngx_module_deps=src/stream/ngx_stream_ssl_module.h
+        ngx_module_srcs=src/stream/ngx_stream_ssl_module.c
+
+        . auto/module
+    fi
+{% endhighlight %}
+在auto/options脚本中，```STREAM_SSL```默认被初始化为```NO```。
+
+
+```注意：ngx_module_incs被初始化为空```
+
+**5) 处理ngx_stream_limit_conn_module**
+{% highlight string %}
+    if [ $STREAM_LIMIT_CONN = YES ]; then
+        ngx_module_name=ngx_stream_limit_conn_module
+        ngx_module_deps=
+        ngx_module_srcs=src/stream/ngx_stream_limit_conn_module.c
+
+        . auto/module
+    fi
+{% endhighlight %}
+在auto/options脚本中，```STREAM_LIMIT_CONN```默认被初始化为```YES```。
+
+
+```注意：ngx_module_incs被初始化为空```
+
+**6) 处理ngx_stream_access_module**
+{% highlight string %}
+    if [ $STREAM_ACCESS = YES ]; then
+        ngx_module_name=ngx_stream_access_module
+        ngx_module_deps=
+        ngx_module_srcs=src/stream/ngx_stream_access_module.c
+
+        . auto/module
+    fi
+{% endhighlight %}
+
+在auto/options脚本中，```STREAM_ACCESS```默认被初始化为```YES```。
+
+
+```注意：ngx_module_incs被初始化为空```
+
+
+
+**7) 处理ngx_stream_upstream_hash_module**
+{% highlight string %}
+    if [ $STREAM_UPSTREAM_HASH = YES ]; then
+        ngx_module_name=ngx_stream_upstream_hash_module
+        ngx_module_deps=
+        ngx_module_srcs=src/stream/ngx_stream_upstream_hash_module.c
+
+        . auto/module
+    fi
+{% endhighlight %}
+在auto/options脚本中，```STREAM_UPSTREAM_HASH```默认被初始化为```YES```.
+
+
+```注意：ngx_module_incs被初始化为空```
+
+**8) 处理ngx_stream_upstream_least_conn_module**
+{% highlight string %}
+    if [ $STREAM_UPSTREAM_LEAST_CONN = YES ]; then
+        ngx_module_name=ngx_stream_upstream_least_conn_module
+        ngx_module_deps=
+        ngx_module_srcs=src/stream/ngx_stream_upstream_least_conn_module.c
+
+        . auto/module
+    fi
+{% endhighlight %}
+
+在auto/options脚本中，```STREAM_UPSTREAM_LEAST_CONN```默认被初始化为```YES```。
+
+
+```注意：ngx_module_incs被初始化为空```
+
+
+**9) 处理ngx_stream_upstream_zone_module**
+{% highlight string %}
+    if [ $STREAM_UPSTREAM_ZONE = YES ]; then
+        have=NGX_STREAM_UPSTREAM_ZONE . auto/have
+
+        ngx_module_name=ngx_stream_upstream_zone_module
+        ngx_module_deps=
+        ngx_module_srcs=src/stream/ngx_stream_upstream_zone_module.c
+
+        . auto/module
+    fi
+{% endhighlight %}
+在auto/options脚本中，```STREAM_UPSTREAM_ZONE```默认被初始化为```YES```。
+
+
+```注意：ngx_module_incs被初始化为空```
+
 
 <br />
 <br />
