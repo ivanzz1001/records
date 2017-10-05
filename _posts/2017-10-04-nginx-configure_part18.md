@@ -755,6 +755,7 @@ CFLAGS =  -pipe  -O -W -Wall -Wpointer-arith -Wno-unused-parameter -Werror -g
 
 
 **3) 处理PERL CFLAGS**
+
 ```NGX_PERL_CFLAGS```为空，不进行处理。
 
 <br />
@@ -1488,7 +1489,7 @@ objs/src/core/nginx.o:	$(CORE_DEPS) \
 <br />
 
 
-**13) 编译HTTP源文件**
+**13) 生成编译HTTP源文件的代码**
 {% highlight string %}
 # the http sources
 
@@ -1533,6 +1534,168 @@ END
 
 fi
 {% endhighlight %}
+此处```HTTP```在auto/options脚本中被默认设置为```YES```.然后针对HTTP模块分别生成了ngx_cc与ngx_perl_cc。
+
+遍历```HTTP_SRC```目录下的所有源文件，然后生成编译脚本。这里给出一个示例：
+<pre>
+objs/src/http/ngx_http.o:	$(CORE_DEPS) $(HTTP_DEPS) \
+	src/http/ngx_http.c
+	$(CC) -c $(CFLAGS) $(CORE_INCS) $(HTTP_INCS) \
+		-o objs/src/http/ngx_http.o \
+		src/http/ngx_http.c
+</pre>
+
+<br />
+
+**14) 生成编译MAIL模块源文件的代码**
+{% highlight string %}
+# the mail sources
+
+if [ $MAIL = YES ]; then
+
+    if test -n "$NGX_PCH"; then
+        ngx_cc="\$(CC) $ngx_compile_opt \$(CFLAGS) $ngx_use_pch \$(ALL_INCS)"
+    else
+        ngx_cc="\$(CC) $ngx_compile_opt \$(CFLAGS) \$(CORE_INCS) \$(MAIL_INCS)"
+    fi
+
+    for ngx_src in $MAIL_SRCS
+    do
+        ngx_src=`echo $ngx_src | sed -e "s/\//$ngx_regex_dirsep/g"`
+        ngx_obj=`echo $ngx_src \
+            | sed -e "s#^\(.*\.\)cpp\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)cc\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)c\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)S\\$#$ngx_objs_dir\1$ngx_objext#g"`
+
+        cat << END                                            >> $NGX_MAKEFILE
+
+$ngx_obj:	\$(CORE_DEPS) \$(MAIL_DEPS)$ngx_cont$ngx_src
+	$ngx_cc$ngx_tab$ngx_objout$ngx_obj$ngx_tab$ngx_src$NGX_AUX
+
+END
+     done
+
+fi
+{% endhighlight %}
+当前```MAIL```模块并未启用。
+
+<br />
+
+
+**15) 生成编译STREAM模块源文件的代码**
+{% highlight string %}
+# the stream sources
+
+if [ $STREAM = YES ]; then
+
+    if test -n "$NGX_PCH"; then
+        ngx_cc="\$(CC) $ngx_compile_opt \$(CFLAGS) $ngx_use_pch \$(ALL_INCS)"
+    else
+        ngx_cc="\$(CC) $ngx_compile_opt \$(CFLAGS) \$(CORE_INCS) \$(STREAM_INCS)"
+    fi
+
+    for ngx_src in $STREAM_SRCS
+    do
+        ngx_src=`echo $ngx_src | sed -e "s/\//$ngx_regex_dirsep/g"`
+        ngx_obj=`echo $ngx_src \
+            | sed -e "s#^\(.*\.\)cpp\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)cc\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)c\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)S\\$#$ngx_objs_dir\1$ngx_objext#g"`
+
+        cat << END                                            >> $NGX_MAKEFILE
+
+$ngx_obj:	\$(CORE_DEPS) \$(STREAM_DEPS)$ngx_cont$ngx_src
+	$ngx_cc$ngx_tab$ngx_objout$ngx_obj$ngx_tab$ngx_src$NGX_AUX
+
+END
+     done
+
+fi
+
+{% endhighlight %}
+当前```STREAM```模块并未启用。
+
+<br />
+
+**16) 生成编译MISC模块源文件的代码**
+{% highlight string %}
+# the misc sources
+
+if test -n "$MISC_SRCS"; then
+
+    ngx_cc="\$(CC) $ngx_compile_opt \$(CFLAGS) $ngx_use_pch \$(ALL_INCS)"
+
+    for ngx_src in $MISC_SRCS
+    do
+        ngx_src=`echo $ngx_src | sed -e "s/\//$ngx_regex_dirsep/g"`
+        ngx_obj=`echo $ngx_src \
+            | sed -e "s#^\(.*\.\)cpp\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)cc\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)c\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)S\\$#$ngx_objs_dir\1$ngx_objext#g"`
+
+        cat << END                                            >> $NGX_MAKEFILE
+
+$ngx_obj:	\$(CORE_DEPS) $ngx_cont$ngx_src
+	$ngx_cc$ngx_tab$ngx_objout$ngx_obj$ngx_tab$ngx_src$NGX_AUX
+
+END
+     done
+
+fi
+{% endhighlight %}
+
+当前```MISC_SRCS```为空，因此本段代码其实并不执行。
+
+<br />
+
+**17) 生成编译ADDON_SRCS目录源文件的代码**
+{% highlight string %}
+# the addons sources
+
+if test -n "$NGX_ADDON_SRCS"; then
+
+    ngx_cc="\$(CC) $ngx_compile_opt \$(CFLAGS) $ngx_use_pch \$(ALL_INCS)"
+
+    for ngx_src in $NGX_ADDON_SRCS
+    do
+        ngx_obj="addon/`basename \`dirname $ngx_src\``"
+
+        ngx_obj=`echo $ngx_obj/\`basename $ngx_src\` \
+            | sed -e "s/\//$ngx_regex_dirsep/g"`
+
+        ngx_obj=`echo $ngx_obj \
+            | sed -e "s#^\(.*\.\)cpp\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)cc\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)c\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)S\\$#$ngx_objs_dir\1$ngx_objext#g"`
+
+        ngx_src=`echo $ngx_src | sed -e "s/\//$ngx_regex_dirsep/g"`
+
+        cat << END                                            >> $NGX_MAKEFILE
+
+$ngx_obj:	\$(ADDON_DEPS)$ngx_cont$ngx_src
+	$ngx_cc$ngx_tab$ngx_objout$ngx_obj$ngx_tab$ngx_src$NGX_AUX
+
+END
+     done
+
+fi
+{% endhighlight %}
+
+此脚本主要针对外部静态模块。外部静态模块一般提供config脚本，config脚本调用auto/module完成相应的配置，将需要编译的源文件等存放在```NGX_ADDON_SRCS```变量中。
+
+此处可能还特别针对那些不是通过```--add-module=*```方式传入的外部静态模块。
+
+当前我们并没有添加任何外部静态模块。
+
+
+
+
+
+
 
 
 <br />
