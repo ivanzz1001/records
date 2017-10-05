@@ -1692,9 +1692,79 @@ fi
 当前我们并没有添加任何外部静态模块。
 
 
+<br />
 
 
+**19) 处理外部静/动态模块配置**
+{% highlight string %}
+# the addons config.make
 
+if test -n "$NGX_ADDONS$DYNAMIC_ADDONS"; then
+
+    for ngx_addon_dir in $NGX_ADDONS $DYNAMIC_ADDONS
+    do
+        if test -f $ngx_addon_dir/config.make; then
+            . $ngx_addon_dir/config.make
+        fi
+    done
+fi
+{% endhighlight %}
+针对外部静/动态模块，在进行编译之前可能会需要进行相应的配置，此处执行相应目录的config.make配置文件。
+
+<br />
+
+
+**20) 处理WIN32资源文件**
+{% highlight string %}
+# Win32 resource file
+
+if test -n "$NGX_RES"; then
+
+    ngx_res=`echo "$NGX_RES:	$NGX_RC $NGX_ICONS" \
+                 | sed -e "s/\//$ngx_regex_dirsep/g"`
+    ngx_rcc=`echo $NGX_RCC | sed -e "s/\//$ngx_regex_dirsep/g"`
+
+    cat << END                                                >> $NGX_MAKEFILE
+
+$ngx_res
+	$ngx_rcc
+
+END
+
+fi
+{% endhighlight %}
+当前我们是在Linux平台，因此不会使用到。
+
+<br />
+
+
+**21) 处理预编译头**
+{% highlight string %}
+# the precompiled headers
+
+if test -n "$NGX_PCH"; then
+    echo "#include <ngx_config.h>" > $NGX_OBJS/ngx_pch.c
+
+    ngx_pch="src/core/ngx_config.h $OS_CONFIG $NGX_OBJS/ngx_auto_config.h"
+    ngx_pch=`echo "$NGX_PCH:	$ngx_pch" | sed -e "s/\//$ngx_regex_dirsep/g"`
+
+    ngx_src="\$(CC) \$(CFLAGS) $NGX_BUILD_PCH $ngx_compile_opt \$(ALL_INCS)"
+    ngx_src="$ngx_src $ngx_objout$NGX_OBJS/ngx_pch.obj $NGX_OBJS/ngx_pch.c"
+    ngx_src=`echo $ngx_src | sed -e "s/\//$ngx_regex_dirsep/g"`
+
+    cat << END                                                >> $NGX_MAKEFILE
+
+$ngx_pch
+	$ngx_src
+
+END
+
+fi
+{% endhighlight %}
+针对当前我们Linux环境，```NGX_PCH```为空，因此本段代码并不会执行。
+
+
+**22) **
 
 
 
