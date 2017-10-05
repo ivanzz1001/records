@@ -639,6 +639,8 @@ fi
 <pre>
 If any of these options is used, then the linker is not run, and object file names
 should not be used as arguments. See Section 3.2 [Overall Options], page 24.
+
+见:page 175
 </pre>
 主要功能就是禁止linker选项中包含一些特定的```选项值```和```文件名```.
 

@@ -1140,13 +1140,399 @@ ngx_main_link=${MAIN_LINK:+`echo $MAIN_LINK \
     | sed -e "s/\//$ngx_regex_dirsep/g" -e "s/^/$ngx_long_regex_cont/"`}
 {% endhighlight %}
 
-上面处理ngx_libs，ngx_link,ngx_main_link.
+上面处理ngx_libs，ngx_link,ngx_main_link。当前```CORE_LINK```值为空；```MAIN_LINK```值为```-Wl,-E```。
 
 
+这里注意：
+<pre>
+sed -e "s/\//$ngx_regex_dirsep/g" -e "s/^/$ngx_long_regex_cont/"
+</pre>
+后半段的含义为在一行的开始加上```$ngx_long_regex_cont```。
+
+<br />
+
+**10) Makefile中生成build、binary等target**
+{% highlight string %}
+cat << END                                                    >> $NGX_MAKEFILE
+
+build:	binary modules manpage
+
+binary:	$NGX_OBJS${ngx_dirsep}nginx$ngx_binext
+
+$NGX_OBJS${ngx_dirsep}nginx$ngx_binext:	$ngx_deps$ngx_spacer
+	\$(LINK) $ngx_long_start$ngx_binout$NGX_OBJS${ngx_dirsep}nginx$ngx_long_cont$ngx_objs$ngx_libs$ngx_link$ngx_main_link
+	$ngx_rcc
+$ngx_long_end
+
+modules:
+END
+{% endhighlight %}
+
+其中```NGX_OBJS```值为objs;```ngx_binout```在auto/cc/conf脚本中被设置为```-o ```。最后给出具体的生成结果以做参考：
+<pre>
+build:	binary modules manpage
+
+binary:	objs/nginx
+
+objs/nginx:	objs/src/core/nginx.o \
+	objs/src/core/ngx_log.o \
+	objs/src/core/ngx_palloc.o \
+	objs/src/core/ngx_array.o \
+	objs/src/core/ngx_list.o \
+	objs/src/core/ngx_hash.o \
+	objs/src/core/ngx_buf.o \
+	objs/src/core/ngx_queue.o \
+	objs/src/core/ngx_output_chain.o \
+	objs/src/core/ngx_string.o \
+	objs/src/core/ngx_parse.o \
+	objs/src/core/ngx_parse_time.o \
+	objs/src/core/ngx_inet.o \
+	objs/src/core/ngx_file.o \
+	objs/src/core/ngx_crc32.o \
+	objs/src/core/ngx_murmurhash.o \
+	objs/src/core/ngx_md5.o \
+	objs/src/core/ngx_rbtree.o \
+	objs/src/core/ngx_radix_tree.o \
+	objs/src/core/ngx_slab.o \
+	objs/src/core/ngx_times.o \
+	objs/src/core/ngx_shmtx.o \
+	objs/src/core/ngx_connection.o \
+	objs/src/core/ngx_cycle.o \
+	objs/src/core/ngx_spinlock.o \
+	objs/src/core/ngx_rwlock.o \
+	objs/src/core/ngx_cpuinfo.o \
+	objs/src/core/ngx_conf_file.o \
+	objs/src/core/ngx_module.o \
+	objs/src/core/ngx_resolver.o \
+	objs/src/core/ngx_open_file_cache.o \
+	objs/src/core/ngx_crypt.o \
+	objs/src/core/ngx_proxy_protocol.o \
+	objs/src/core/ngx_syslog.o \
+	objs/src/event/ngx_event.o \
+	objs/src/event/ngx_event_timer.o \
+	objs/src/event/ngx_event_posted.o \
+	objs/src/event/ngx_event_accept.o \
+	objs/src/event/ngx_event_connect.o \
+	objs/src/event/ngx_event_pipe.o \
+	objs/src/os/unix/ngx_time.o \
+	objs/src/os/unix/ngx_errno.o \
+	objs/src/os/unix/ngx_alloc.o \
+	objs/src/os/unix/ngx_files.o \
+	objs/src/os/unix/ngx_socket.o \
+	objs/src/os/unix/ngx_recv.o \
+	objs/src/os/unix/ngx_readv_chain.o \
+	objs/src/os/unix/ngx_udp_recv.o \
+	objs/src/os/unix/ngx_send.o \
+	objs/src/os/unix/ngx_writev_chain.o \
+	objs/src/os/unix/ngx_udp_send.o \
+	objs/src/os/unix/ngx_channel.o \
+	objs/src/os/unix/ngx_shmem.o \
+	objs/src/os/unix/ngx_process.o \
+	objs/src/os/unix/ngx_daemon.o \
+	objs/src/os/unix/ngx_setaffinity.o \
+	objs/src/os/unix/ngx_setproctitle.o \
+	objs/src/os/unix/ngx_posix_init.o \
+	objs/src/os/unix/ngx_user.o \
+	objs/src/os/unix/ngx_dlopen.o \
+	objs/src/os/unix/ngx_process_cycle.o \
+	objs/src/os/unix/ngx_linux_init.o \
+	objs/src/event/modules/ngx_epoll_module.o \
+	objs/src/os/unix/ngx_linux_sendfile_chain.o \
+	objs/src/event/ngx_event_openssl.o \
+	objs/src/event/ngx_event_openssl_stapling.o \
+	objs/src/core/ngx_regex.o \
+	objs/src/http/ngx_http.o \
+	objs/src/http/ngx_http_core_module.o \
+	objs/src/http/ngx_http_special_response.o \
+	objs/src/http/ngx_http_request.o \
+	objs/src/http/ngx_http_parse.o \
+	objs/src/http/modules/ngx_http_log_module.o \
+	objs/src/http/ngx_http_request_body.o \
+	objs/src/http/ngx_http_variables.o \
+	objs/src/http/ngx_http_script.o \
+	objs/src/http/ngx_http_upstream.o \
+	objs/src/http/ngx_http_upstream_round_robin.o \
+	objs/src/http/ngx_http_file_cache.o \
+	objs/src/http/ngx_http_write_filter_module.o \
+	objs/src/http/ngx_http_header_filter_module.o \
+	objs/src/http/modules/ngx_http_chunked_filter_module.o \
+	objs/src/http/modules/ngx_http_range_filter_module.o \
+	objs/src/http/modules/ngx_http_gzip_filter_module.o \
+	objs/src/http/ngx_http_postpone_filter_module.o \
+	objs/src/http/modules/ngx_http_ssi_filter_module.o \
+	objs/src/http/modules/ngx_http_charset_filter_module.o \
+	objs/src/http/modules/ngx_http_userid_filter_module.o \
+	objs/src/http/modules/ngx_http_headers_filter_module.o \
+	objs/src/http/ngx_http_copy_filter_module.o \
+	objs/src/http/modules/ngx_http_not_modified_filter_module.o \
+	objs/src/http/modules/ngx_http_static_module.o \
+	objs/src/http/modules/ngx_http_autoindex_module.o \
+	objs/src/http/modules/ngx_http_index_module.o \
+	objs/src/http/modules/ngx_http_auth_basic_module.o \
+	objs/src/http/modules/ngx_http_access_module.o \
+	objs/src/http/modules/ngx_http_limit_conn_module.o \
+	objs/src/http/modules/ngx_http_limit_req_module.o \
+	objs/src/http/modules/ngx_http_geo_module.o \
+	objs/src/http/modules/ngx_http_map_module.o \
+	objs/src/http/modules/ngx_http_split_clients_module.o \
+	objs/src/http/modules/ngx_http_referer_module.o \
+	objs/src/http/modules/ngx_http_rewrite_module.o \
+	objs/src/http/modules/ngx_http_ssl_module.o \
+	objs/src/http/modules/ngx_http_proxy_module.o \
+	objs/src/http/modules/ngx_http_fastcgi_module.o \
+	objs/src/http/modules/ngx_http_uwsgi_module.o \
+	objs/src/http/modules/ngx_http_scgi_module.o \
+	objs/src/http/modules/ngx_http_memcached_module.o \
+	objs/src/http/modules/ngx_http_empty_gif_module.o \
+	objs/src/http/modules/ngx_http_browser_module.o \
+	objs/src/http/modules/ngx_http_upstream_hash_module.o \
+	objs/src/http/modules/ngx_http_upstream_ip_hash_module.o \
+	objs/src/http/modules/ngx_http_upstream_least_conn_module.o \
+	objs/src/http/modules/ngx_http_upstream_keepalive_module.o \
+	objs/src/http/modules/ngx_http_upstream_zone_module.o \
+	objs/ngx_modules.o \
+	../pcre-8.40/.libs/libpcre.a \
+	../zlib-1.2.11/libz.a
+
+	$(LINK) -o objs/nginx \
+	objs/src/core/nginx.o \
+	objs/src/core/ngx_log.o \
+	objs/src/core/ngx_palloc.o \
+	objs/src/core/ngx_array.o \
+	objs/src/core/ngx_list.o \
+	objs/src/core/ngx_hash.o \
+	objs/src/core/ngx_buf.o \
+	objs/src/core/ngx_queue.o \
+	objs/src/core/ngx_output_chain.o \
+	objs/src/core/ngx_string.o \
+	objs/src/core/ngx_parse.o \
+	objs/src/core/ngx_parse_time.o \
+	objs/src/core/ngx_inet.o \
+	objs/src/core/ngx_file.o \
+	objs/src/core/ngx_crc32.o \
+	objs/src/core/ngx_murmurhash.o \
+	objs/src/core/ngx_md5.o \
+	objs/src/core/ngx_rbtree.o \
+	objs/src/core/ngx_radix_tree.o \
+	objs/src/core/ngx_slab.o \
+	objs/src/core/ngx_times.o \
+	objs/src/core/ngx_shmtx.o \
+	objs/src/core/ngx_connection.o \
+	objs/src/core/ngx_cycle.o \
+	objs/src/core/ngx_spinlock.o \
+	objs/src/core/ngx_rwlock.o \
+	objs/src/core/ngx_cpuinfo.o \
+	objs/src/core/ngx_conf_file.o \
+	objs/src/core/ngx_module.o \
+	objs/src/core/ngx_resolver.o \
+	objs/src/core/ngx_open_file_cache.o \
+	objs/src/core/ngx_crypt.o \
+	objs/src/core/ngx_proxy_protocol.o \
+	objs/src/core/ngx_syslog.o \
+	objs/src/event/ngx_event.o \
+	objs/src/event/ngx_event_timer.o \
+	objs/src/event/ngx_event_posted.o \
+	objs/src/event/ngx_event_accept.o \
+	objs/src/event/ngx_event_connect.o \
+	objs/src/event/ngx_event_pipe.o \
+	objs/src/os/unix/ngx_time.o \
+	objs/src/os/unix/ngx_errno.o \
+	objs/src/os/unix/ngx_alloc.o \
+	objs/src/os/unix/ngx_files.o \
+	objs/src/os/unix/ngx_socket.o \
+	objs/src/os/unix/ngx_recv.o \
+	objs/src/os/unix/ngx_readv_chain.o \
+	objs/src/os/unix/ngx_udp_recv.o \
+	objs/src/os/unix/ngx_send.o \
+	objs/src/os/unix/ngx_writev_chain.o \
+	objs/src/os/unix/ngx_udp_send.o \
+	objs/src/os/unix/ngx_channel.o \
+	objs/src/os/unix/ngx_shmem.o \
+	objs/src/os/unix/ngx_process.o \
+	objs/src/os/unix/ngx_daemon.o \
+	objs/src/os/unix/ngx_setaffinity.o \
+	objs/src/os/unix/ngx_setproctitle.o \
+	objs/src/os/unix/ngx_posix_init.o \
+	objs/src/os/unix/ngx_user.o \
+	objs/src/os/unix/ngx_dlopen.o \
+	objs/src/os/unix/ngx_process_cycle.o \
+	objs/src/os/unix/ngx_linux_init.o \
+	objs/src/event/modules/ngx_epoll_module.o \
+	objs/src/os/unix/ngx_linux_sendfile_chain.o \
+	objs/src/event/ngx_event_openssl.o \
+	objs/src/event/ngx_event_openssl_stapling.o \
+	objs/src/core/ngx_regex.o \
+	objs/src/http/ngx_http.o \
+	objs/src/http/ngx_http_core_module.o \
+	objs/src/http/ngx_http_special_response.o \
+	objs/src/http/ngx_http_request.o \
+	objs/src/http/ngx_http_parse.o \
+	objs/src/http/modules/ngx_http_log_module.o \
+	objs/src/http/ngx_http_request_body.o \
+	objs/src/http/ngx_http_variables.o \
+	objs/src/http/ngx_http_script.o \
+	objs/src/http/ngx_http_upstream.o \
+	objs/src/http/ngx_http_upstream_round_robin.o \
+	objs/src/http/ngx_http_file_cache.o \
+	objs/src/http/ngx_http_write_filter_module.o \
+	objs/src/http/ngx_http_header_filter_module.o \
+	objs/src/http/modules/ngx_http_chunked_filter_module.o \
+	objs/src/http/modules/ngx_http_range_filter_module.o \
+	objs/src/http/modules/ngx_http_gzip_filter_module.o \
+	objs/src/http/ngx_http_postpone_filter_module.o \
+	objs/src/http/modules/ngx_http_ssi_filter_module.o \
+	objs/src/http/modules/ngx_http_charset_filter_module.o \
+	objs/src/http/modules/ngx_http_userid_filter_module.o \
+	objs/src/http/modules/ngx_http_headers_filter_module.o \
+	objs/src/http/ngx_http_copy_filter_module.o \
+	objs/src/http/modules/ngx_http_not_modified_filter_module.o \
+	objs/src/http/modules/ngx_http_static_module.o \
+	objs/src/http/modules/ngx_http_autoindex_module.o \
+	objs/src/http/modules/ngx_http_index_module.o \
+	objs/src/http/modules/ngx_http_auth_basic_module.o \
+	objs/src/http/modules/ngx_http_access_module.o \
+	objs/src/http/modules/ngx_http_limit_conn_module.o \
+	objs/src/http/modules/ngx_http_limit_req_module.o \
+	objs/src/http/modules/ngx_http_geo_module.o \
+	objs/src/http/modules/ngx_http_map_module.o \
+	objs/src/http/modules/ngx_http_split_clients_module.o \
+	objs/src/http/modules/ngx_http_referer_module.o \
+	objs/src/http/modules/ngx_http_rewrite_module.o \
+	objs/src/http/modules/ngx_http_ssl_module.o \
+	objs/src/http/modules/ngx_http_proxy_module.o \
+	objs/src/http/modules/ngx_http_fastcgi_module.o \
+	objs/src/http/modules/ngx_http_uwsgi_module.o \
+	objs/src/http/modules/ngx_http_scgi_module.o \
+	objs/src/http/modules/ngx_http_memcached_module.o \
+	objs/src/http/modules/ngx_http_empty_gif_module.o \
+	objs/src/http/modules/ngx_http_browser_module.o \
+	objs/src/http/modules/ngx_http_upstream_hash_module.o \
+	objs/src/http/modules/ngx_http_upstream_ip_hash_module.o \
+	objs/src/http/modules/ngx_http_upstream_least_conn_module.o \
+	objs/src/http/modules/ngx_http_upstream_keepalive_module.o \
+	objs/src/http/modules/ngx_http_upstream_zone_module.o \
+	objs/ngx_modules.o \
+	-ldl -lpthread -lcrypt ../pcre-8.40/.libs/libpcre.a -lssl -lcrypto -ldl ../zlib-1.2.11/libz.a \
+	-Wl,-E
+</pre>
 
 
+<br />
 
 
+**11) 处理ngx_modules.c**
+{% highlight string %}
+# ngx_modules.c
+
+if test -n "$NGX_PCH"; then
+    ngx_cc="\$(CC) $ngx_compile_opt \$(CFLAGS) $ngx_use_pch \$(ALL_INCS)"
+else
+    ngx_cc="\$(CC) $ngx_compile_opt \$(CFLAGS) \$(CORE_INCS)"
+fi
+
+cat << END                                                    >> $NGX_MAKEFILE
+
+$ngx_modules_obj:	\$(CORE_DEPS)$ngx_cont$ngx_modules_c
+	$ngx_cc$ngx_tab$ngx_objout$ngx_modules_obj$ngx_tab$ngx_modules_c$NGX_AUX
+
+END
+{% endhighlight %}
+```NGX_PCH```在auto/init脚本中被初始化为空，并且在我们当前环境中也未在其他脚本对其做相应修改。
+
+最后给出具体的生成结果以作参考：
+<pre>
+objs/ngx_modules.o:	$(CORE_DEPS) \
+	objs/ngx_modules.c
+	$(CC) -c $(CFLAGS) $(CORE_INCS) \
+		-o objs/ngx_modules.o \
+		objs/ngx_modules.c
+</pre>
+
+
+**12) 生成编译CORE_SRCS源文件的编译代码**
+{% highlight string %}
+# the core sources
+
+for ngx_src in $CORE_SRCS
+do
+    ngx_src=`echo $ngx_src | sed -e "s/\//$ngx_regex_dirsep/g"`
+    ngx_obj=`echo $ngx_src \
+        | sed -e "s#^\(.*\.\)cpp\\$#$ngx_objs_dir\1$ngx_objext#g" \
+              -e "s#^\(.*\.\)cc\\$#$ngx_objs_dir\1$ngx_objext#g" \
+              -e "s#^\(.*\.\)c\\$#$ngx_objs_dir\1$ngx_objext#g" \
+              -e "s#^\(.*\.\)S\\$#$ngx_objs_dir\1$ngx_objext#g"`
+
+    cat << END                                                >> $NGX_MAKEFILE
+
+$ngx_obj:	\$(CORE_DEPS)$ngx_cont$ngx_src
+	$ngx_cc$ngx_tab$ngx_objout$ngx_obj$ngx_tab$ngx_src$NGX_AUX
+
+END
+
+done
+{% endhighlight %}
+遍历```CORE_SRC```目录下的每一个以```.cpp```,```.cc```,```.c```,```.S```结尾的源文件，然后生成编译该源文件的代码;```ngx_objout```在auto/cc/conf脚本中被定义为```-o ```;```ngx_tab```在auto/cc/conf脚本中被定义为：
+<pre>
+ngx_tab=' \
+		'
+</pre>
+最后我们给出一个示例(src/core/nginx.c)：
+<pre>
+objs/src/core/nginx.o:	$(CORE_DEPS) \
+	src/core/nginx.c
+	$(CC) -c $(CFLAGS) $(CORE_INCS) \
+		-o objs/src/core/nginx.o \
+		src/core/nginx.c
+</pre>
+
+<br />
+
+
+**13) 编译HTTP源文件**
+{% highlight string %}
+# the http sources
+
+if [ $HTTP = YES ]; then
+
+    if test -n "$NGX_PCH"; then
+        ngx_cc="\$(CC) $ngx_compile_opt \$(CFLAGS) $ngx_use_pch \$(ALL_INCS)"
+    else
+        ngx_cc="\$(CC) $ngx_compile_opt \$(CFLAGS) \$(CORE_INCS) \$(HTTP_INCS)"
+        ngx_perl_cc="\$(CC) $ngx_compile_opt \$(NGX_PERL_CFLAGS)"
+        ngx_perl_cc="$ngx_perl_cc \$(CORE_INCS) \$(HTTP_INCS)"
+    fi
+
+    for ngx_source in $HTTP_SRCS
+    do
+        ngx_src=`echo $ngx_source | sed -e "s/\//$ngx_regex_dirsep/g"`
+        ngx_obj=`echo $ngx_src \
+            | sed -e "s#^\(.*\.\)cpp\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)cc\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)c\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)S\\$#$ngx_objs_dir\1$ngx_objext#g"`
+
+        if [ $ngx_source = src/http/modules/perl/ngx_http_perl_module.c ]; then
+
+            cat << END                                        >> $NGX_MAKEFILE
+
+$ngx_obj:	\$(CORE_DEPS) \$(HTTP_DEPS)$ngx_cont$ngx_src
+	$ngx_perl_cc$ngx_tab$ngx_objout$ngx_obj$ngx_tab$ngx_src$NGX_AUX
+
+END
+        else
+
+            cat << END                                        >> $NGX_MAKEFILE
+
+$ngx_obj:	\$(CORE_DEPS) \$(HTTP_DEPS)$ngx_cont$ngx_src
+	$ngx_cc$ngx_tab$ngx_objout$ngx_obj$ngx_tab$ngx_src$NGX_AUX
+
+END
+
+        fi
+     done
+
+fi
+{% endhighlight %}
 
 
 <br />
