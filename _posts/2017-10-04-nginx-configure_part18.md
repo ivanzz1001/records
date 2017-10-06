@@ -1764,7 +1764,461 @@ fi
 针对当前我们Linux环境，```NGX_PCH```为空，因此本段代码并不会执行。
 
 
-**22) **
+**22) 处理动态模块**
+{% highlight string %}
+if test -n "$NGX_PCH"; then
+    ngx_cc="\$(CC) $ngx_compile_opt $ngx_pic_opt \$(CFLAGS) $ngx_use_pch \$(ALL_INCS)"
+else
+    ngx_cc="\$(CC) $ngx_compile_opt $ngx_pic_opt \$(CFLAGS) \$(ALL_INCS)"
+    ngx_perl_cc="\$(CC) $ngx_compile_opt $ngx_pic_opt \$(NGX_PERL_CFLAGS)"
+    ngx_perl_cc="$ngx_perl_cc \$(ALL_INCS)"
+fi
+{% endhighlight %}
+这里```NGX_PCH```为空，因此执行else分支，生成ngx_cc与ngx_perl_cc两个略有不同的编译选项。
+
+<br />
+
+{% highlight string %}
+ngx_obj_deps="\$(CORE_DEPS)"
+if [ $HTTP != NO ]; then
+    ngx_obj_deps="$ngx_obj_deps \$(HTTP_DEPS)"
+fi
+if [ $MAIL != NO ]; then
+    ngx_obj_deps="$ngx_obj_deps \$(MAIL_DEPS)"
+fi
+if [ $STREAM != NO ]; then
+    ngx_obj_deps="$ngx_obj_deps \$(STREAM_DEPS)"
+fi
+{% endhighlight string %}
+
+如上生成所需要的依赖项。此处```HTTP```为```YES```，而```MAIL```与```STREAM```均为启用。
+
+<br />
+<br />
+
+{% highlight string %}
+for ngx_module in $DYNAMIC_MODULES
+do
+    eval ngx_module_srcs="\$${ngx_module}_SRCS"
+    eval eval ngx_module_libs="\\\"\$${ngx_module}_LIBS\\\""
+
+    eval ngx_module_modules="\$${ngx_module}_MODULES"
+    eval ngx_module_order="\$${ngx_module}_ORDER"
+
+    ngx_modules_c=$NGX_OBJS/${ngx_module}_modules.c
+
+    cat << END                                    > $ngx_modules_c
+
+#include <ngx_config.h>
+#include <ngx_core.h>
+
+END
+
+    for mod in $ngx_module_modules
+    do
+        echo "extern ngx_module_t  $mod;"         >> $ngx_modules_c
+    done
+
+    echo                                          >> $ngx_modules_c
+    echo 'ngx_module_t *ngx_modules[] = {'        >> $ngx_modules_c
+
+    for mod in $ngx_module_modules
+    do
+        echo "    &$mod,"                         >> $ngx_modules_c
+    done
+
+    cat << END                                    >> $ngx_modules_c
+    NULL
+};
+
+END
+
+    echo 'char *ngx_module_names[] = {'           >> $ngx_modules_c
+
+    for mod in $ngx_module_modules
+    do
+        echo "    \"$mod\","                      >> $ngx_modules_c
+    done
+
+    cat << END                                    >> $ngx_modules_c
+    NULL
+};
+
+END
+
+    echo 'char *ngx_module_order[] = {'           >> $ngx_modules_c
+
+    for mod in $ngx_module_order
+    do
+        echo "    \"$mod\","                      >> $ngx_modules_c
+    done
+
+    cat << END                                    >> $ngx_modules_c
+    NULL
+};
+
+END
+
+    ngx_modules_c=`echo $ngx_modules_c | sed -e "s/\//$ngx_regex_dirsep/g"`
+
+    ngx_modules_obj=`echo $ngx_modules_c \
+        | sed -e "s/\(.*\.\)c/\1$ngx_objext/"`
+
+    ngx_module_objs=
+    for ngx_src in $ngx_module_srcs
+    do
+        case "$ngx_src" in
+            src/*)
+                ngx_obj=$ngx_src
+                ;;
+            *)
+                ngx_obj="addon/`basename \`dirname $ngx_src\``"
+                mkdir -p $NGX_OBJS/$ngx_obj
+                ngx_obj="$ngx_obj/`basename $ngx_src`"
+                ;;
+        esac
+
+        ngx_module_objs="$ngx_module_objs $ngx_obj"
+    done
+
+    ngx_module_objs=`echo $ngx_module_objs \
+        | sed -e "s#\([^ ]*\.\)cpp#$NGX_OBJS\/\1$ngx_objext#g" \
+              -e "s#\([^ ]*\.\)cc#$NGX_OBJS\/\1$ngx_objext#g" \
+              -e "s#\([^ ]*\.\)c#$NGX_OBJS\/\1$ngx_objext#g" \
+              -e "s#\([^ ]*\.\)S#$NGX_OBJS\/\1$ngx_objext#g"`
+
+    ngx_deps=`echo $ngx_module_objs $ngx_modules_obj $LINK_DEPS \
+        | sed -e "s/  *\([^ ][^ ]*\)/$ngx_regex_cont\1/g" \
+              -e "s/\//$ngx_regex_dirsep/g"`
+
+    ngx_objs=`echo $ngx_module_objs $ngx_modules_obj \
+        | sed -e "s/  *\([^ ][^ ]*\)/$ngx_long_regex_cont\1/g" \
+              -e "s/\//$ngx_regex_dirsep/g"`
+
+    ngx_obj=$NGX_OBJS$ngx_dirsep$ngx_module$ngx_modext
+
+    if [ "$NGX_PLATFORM" = win32 ]; then
+        ngx_module_libs="$CORE_LIBS $ngx_module_libs"
+    fi
+
+    ngx_libs=
+    if test -n "$NGX_LD_OPT$ngx_module_libs"; then
+        ngx_libs=`echo $NGX_LD_OPT $ngx_module_libs \
+            | sed -e "s/\//$ngx_regex_dirsep/g" -e "s/^/$ngx_long_regex_cont/"`
+    fi
+
+    ngx_link=${CORE_LINK:+`echo $CORE_LINK \
+        | sed -e "s/\//$ngx_regex_dirsep/g" -e "s/^/$ngx_long_regex_cont/"`}
+
+    ngx_module_link=${MODULE_LINK:+`echo $MODULE_LINK \
+        | sed -e "s/\//$ngx_regex_dirsep/g" -e "s/^/$ngx_long_regex_cont/"`}
+
+
+    cat << END                                            >> $NGX_MAKEFILE
+
+modules:	$ngx_obj
+
+$ngx_obj:	$ngx_deps$ngx_spacer
+	\$(LINK) $ngx_long_start$ngx_binout$ngx_obj$ngx_long_cont$ngx_objs$ngx_libs$ngx_link$ngx_module_link
+$ngx_long_end
+
+$ngx_modules_obj:	\$(CORE_DEPS)$ngx_cont$ngx_modules_c
+	$ngx_cc$ngx_tab$ngx_objout$ngx_modules_obj$ngx_tab$ngx_modules_c$NGX_AUX
+
+END
+
+    for ngx_source in $ngx_module_srcs
+    do
+        case "$ngx_source" in
+            src/*)
+                ngx_obj=`echo $ngx_source | sed -e "s/\//$ngx_regex_dirsep/g"`
+                ;;
+            *)
+                ngx_obj="addon/`basename \`dirname $ngx_source\``"
+                ngx_obj=`echo $ngx_obj/\`basename $ngx_source\` \
+                    | sed -e "s/\//$ngx_regex_dirsep/g"`
+                ;;
+        esac
+
+        ngx_obj=`echo $ngx_obj \
+            | sed -e "s#^\(.*\.\)cpp\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)cc\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)c\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)S\\$#$ngx_objs_dir\1$ngx_objext#g"`
+
+        ngx_src=`echo $ngx_source | sed -e "s/\//$ngx_regex_dirsep/g"`
+
+        if [ $ngx_source = src/http/modules/perl/ngx_http_perl_module.c ]; then
+
+            cat << END                                        >> $NGX_MAKEFILE
+
+$ngx_obj:	$ngx_obj_deps$ngx_cont$ngx_src
+	$ngx_perl_cc$ngx_tab$ngx_objout$ngx_obj$ngx_tab$ngx_src$NGX_AUX
+
+END
+        else
+
+            cat << END                                        >> $NGX_MAKEFILE
+
+$ngx_obj:	$ngx_obj_deps$ngx_cont$ngx_src
+	$ngx_cc$ngx_tab$ngx_objout$ngx_obj$ngx_tab$ngx_src$NGX_AUX
+
+END
+
+        fi
+    done
+done
+
+{% endhighlight %}
+如上遍历```$DYNAMIC_MODULES```:
+
+<br />
+
+
+首先在循环中求得每一个module的相关信息：
+{% highlight string %}
+    eval ngx_module_srcs="\$${ngx_module}_SRCS"
+    eval eval ngx_module_libs="\\\"\$${ngx_module}_LIBS\\\""
+
+    eval ngx_module_modules="\$${ngx_module}_MODULES"
+    eval ngx_module_order="\$${ngx_module}_ORDER"
+
+    ngx_modules_c=$NGX_OBJS/${ngx_module}_modules.c
+{% endhighlight %}
+此处获得对应```ngx_module```所相关的：
+<pre>
+ngx_module_srcs: 源文件
+
+ngx_module_libs: 所依赖的库文件
+
+ngx_module_modules: 所依赖的所有modules
+
+ngx_module_order: 模块的加载顺序
+
+ngx_modules_c: 需要生成的一个接口文件名
+</pre>
+
+<br />
+
+
+上面我们指定了需要生成的接口文件名```$ngx_modules_c```，如下我们生成该文件：
+{% highlight string %}
+    cat << END                                    > $ngx_modules_c
+
+#include <ngx_config.h>
+#include <ngx_core.h>
+
+END
+
+    for mod in $ngx_module_modules
+    do
+        echo "extern ngx_module_t  $mod;"         >> $ngx_modules_c
+    done
+
+    echo                                          >> $ngx_modules_c
+    echo 'ngx_module_t *ngx_modules[] = {'        >> $ngx_modules_c
+
+    for mod in $ngx_module_modules
+    do
+        echo "    &$mod,"                         >> $ngx_modules_c
+    done
+
+    cat << END                                    >> $ngx_modules_c
+    NULL
+};
+
+END
+
+    echo 'char *ngx_module_names[] = {'           >> $ngx_modules_c
+
+    for mod in $ngx_module_modules
+    do
+        echo "    \"$mod\","                      >> $ngx_modules_c
+    done
+
+    cat << END                                    >> $ngx_modules_c
+    NULL
+};
+
+END
+
+    echo 'char *ngx_module_order[] = {'           >> $ngx_modules_c
+
+    for mod in $ngx_module_order
+    do
+        echo "    \"$mod\","                      >> $ngx_modules_c
+    done
+
+    cat << END                                    >> $ngx_modules_c
+    NULL
+};
+
+END
+{% endhighlight %}
+生成过程比较简单，最终生成一个类似如下的文件：
+{% highlight string %}
+
+#include <ngx_config.h>
+#include <ngx_core.h>
+
+extern ngx_module_t  $mod;  
+ngx_module_t *ngx_modules[] = {
+	&$mod,
+	NULL
+};
+char *ngx_module_names[] = {
+	"$mod",
+    NULL
+};
+char *ngx_module_order[] = {
+	"$mod_order"
+	NULL
+};
+{% endhighlight %}
+
+
+<br />
+
+
+如下在Makefile中生成编译该模块的相关代码：
+{% highlight string %}
+    ngx_modules_c=`echo $ngx_modules_c | sed -e "s/\//$ngx_regex_dirsep/g"`
+
+    ngx_modules_obj=`echo $ngx_modules_c \
+        | sed -e "s/\(.*\.\)c/\1$ngx_objext/"`
+
+    ngx_module_objs=
+    for ngx_src in $ngx_module_srcs
+    do
+        case "$ngx_src" in
+            src/*)
+                ngx_obj=$ngx_src
+                ;;
+            *)
+                ngx_obj="addon/`basename \`dirname $ngx_src\``"
+                mkdir -p $NGX_OBJS/$ngx_obj
+                ngx_obj="$ngx_obj/`basename $ngx_src`"
+                ;;
+        esac
+
+        ngx_module_objs="$ngx_module_objs $ngx_obj"
+    done
+
+    ngx_module_objs=`echo $ngx_module_objs \
+        | sed -e "s#\([^ ]*\.\)cpp#$NGX_OBJS\/\1$ngx_objext#g" \
+              -e "s#\([^ ]*\.\)cc#$NGX_OBJS\/\1$ngx_objext#g" \
+              -e "s#\([^ ]*\.\)c#$NGX_OBJS\/\1$ngx_objext#g" \
+              -e "s#\([^ ]*\.\)S#$NGX_OBJS\/\1$ngx_objext#g"`
+
+    ngx_deps=`echo $ngx_module_objs $ngx_modules_obj $LINK_DEPS \
+        | sed -e "s/  *\([^ ][^ ]*\)/$ngx_regex_cont\1/g" \
+              -e "s/\//$ngx_regex_dirsep/g"`
+
+    ngx_objs=`echo $ngx_module_objs $ngx_modules_obj \
+        | sed -e "s/  *\([^ ][^ ]*\)/$ngx_long_regex_cont\1/g" \
+              -e "s/\//$ngx_regex_dirsep/g"`
+
+    ngx_obj=$NGX_OBJS$ngx_dirsep$ngx_module$ngx_modext
+
+    if [ "$NGX_PLATFORM" = win32 ]; then
+        ngx_module_libs="$CORE_LIBS $ngx_module_libs"
+    fi
+
+    ngx_libs=
+    if test -n "$NGX_LD_OPT$ngx_module_libs"; then
+        ngx_libs=`echo $NGX_LD_OPT $ngx_module_libs \
+            | sed -e "s/\//$ngx_regex_dirsep/g" -e "s/^/$ngx_long_regex_cont/"`
+    fi
+
+    ngx_link=${CORE_LINK:+`echo $CORE_LINK \
+        | sed -e "s/\//$ngx_regex_dirsep/g" -e "s/^/$ngx_long_regex_cont/"`}
+
+    ngx_module_link=${MODULE_LINK:+`echo $MODULE_LINK \
+        | sed -e "s/\//$ngx_regex_dirsep/g" -e "s/^/$ngx_long_regex_cont/"`}
+
+
+    cat << END                                            >> $NGX_MAKEFILE
+
+modules:	$ngx_obj
+
+$ngx_obj:	$ngx_deps$ngx_spacer
+	\$(LINK) $ngx_long_start$ngx_binout$ngx_obj$ngx_long_cont$ngx_objs$ngx_libs$ngx_link$ngx_module_link
+$ngx_long_end
+
+$ngx_modules_obj:	\$(CORE_DEPS)$ngx_cont$ngx_modules_c
+	$ngx_cc$ngx_tab$ngx_objout$ngx_modules_obj$ngx_tab$ngx_modules_c$NGX_AUX
+
+END
+{% endhighlight %}
+
+上面首先遍历```ngx_module_srcs```文件夹下的所有文件，找出对应的源文件，从而求得所依赖的```.o```名存放在ngx_module_objs变量中。
+
+
+接着求的依赖文件：ngx_deps
+
+
+将上面求的的```ngx_module_objs```合并上```ngx_modules_obj```(注意这两个变量不同），即所有的```.o```文件保存到变量ngx_objs中。
+
+然后再找出所有的依赖库文件、链接文件：```ngx_libs```,```ngx_link```,```ngx_module_link```。
+
+最后生成Makefile中相应的target。
+
+
+<br />
+
+
+如下是生成编译成```ngx_module_objs```的Makefile脚本：
+{% highlight string %}
+    for ngx_source in $ngx_module_srcs
+    do
+        case "$ngx_source" in
+            src/*)
+                ngx_obj=`echo $ngx_source | sed -e "s/\//$ngx_regex_dirsep/g"`
+                ;;
+            *)
+                ngx_obj="addon/`basename \`dirname $ngx_source\``"
+                ngx_obj=`echo $ngx_obj/\`basename $ngx_source\` \
+                    | sed -e "s/\//$ngx_regex_dirsep/g"`
+                ;;
+        esac
+
+        ngx_obj=`echo $ngx_obj \
+            | sed -e "s#^\(.*\.\)cpp\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)cc\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)c\\$#$ngx_objs_dir\1$ngx_objext#g" \
+                  -e "s#^\(.*\.\)S\\$#$ngx_objs_dir\1$ngx_objext#g"`
+
+        ngx_src=`echo $ngx_source | sed -e "s/\//$ngx_regex_dirsep/g"`
+
+        if [ $ngx_source = src/http/modules/perl/ngx_http_perl_module.c ]; then
+
+            cat << END                                        >> $NGX_MAKEFILE
+
+$ngx_obj:	$ngx_obj_deps$ngx_cont$ngx_src
+	$ngx_perl_cc$ngx_tab$ngx_objout$ngx_obj$ngx_tab$ngx_src$NGX_AUX
+
+END
+        else
+
+            cat << END                                        >> $NGX_MAKEFILE
+
+$ngx_obj:	$ngx_obj_deps$ngx_cont$ngx_src
+	$ngx_cc$ngx_tab$ngx_objout$ngx_obj$ngx_tab$ngx_src$NGX_AUX
+
+END
+
+        fi
+    done
+{% endhighlight %}
+脚本比较简单，主要就是遍历```ngx_module_srcs```文件夹，找出其中源文件，然后生成对应的编译代码。
+
+<br />
+<br />
+
+
+至此，我们完成了整个auto/make脚本的分析。这是我们最后要生成的Makefile的主要部分，但是由于还剩下其他一些部分，等所有部分讲解完成，我们会贴出该Makefile文件，以作参考。
+
+
 
 
 
