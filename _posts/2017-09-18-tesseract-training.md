@@ -339,19 +339,23 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 
 执行后生成如下```.lstmf```和```unicharset```文件：
 <pre>
+[root@localhost tesseract]# ls ../tesstutorial/chi_simtrain/
+chi_sim                                           chi_sim.LiSu.exp0.lstmf                     chi_sim.STSong.exp0.lstmf
+chi_sim.Arial_Unicode_MS_Bold.exp0.lstmf          chi_sim.Microsoft_YaHei_Bold.exp0.lstmf     chi_sim.STXihei.exp0.lstmf
+chi_sim.Arial_Unicode_MS.exp0.lstmf               chi_sim.Microsoft_YaHei.exp0.lstmf          chi_sim.STXinwei.exp0.lstmf
+chi_sim.AR_PL_UKai_CN.exp0.lstmf                  chi_sim.Noto_Sans_SC_Bold.exp0.lstmf        chi_sim.STZhongsong.exp0.lstmf
+chi_sim.AR_PL_UKai_HK.exp0.lstmf                  chi_sim.Noto_Sans_SC.exp0.lstmf             chi_sim.training_files.txt
+chi_sim.AR_PL_UKai_TW.exp0.lstmf                  chi_sim.Noto_Sans_SC_Heavy.exp0.lstmf       chi_sim.WenQuanYi_Micro_Hei.exp0.lstmf
+chi_sim.AR_PL_UKai_TW_MBE.exp0.lstmf              chi_sim.Noto_Sans_SC_Medium.exp0.lstmf      chi_sim.WenQuanYi_Micro_Hei_Mono.exp0.lstmf
+chi_sim.AR_PL_UMing_CN_Semi-Light.exp0.lstmf      chi_sim.Noto_Sans_SC_Semi-Light.exp0.lstmf  chi_sim.WenQuanYi_Zen_Hei_Medium.exp0.lstmf
+chi_sim.AR_PL_UMing_HK_Semi-Light.exp0.lstmf      chi_sim.NSimSun.exp0.lstmf                  chi_sim.WenQuanYi_Zen_Hei_Mono_Medium.exp0.lstmf
+chi_sim.AR_PL_UMing_TW_MBE_Semi-Light.exp0.lstmf  chi_sim.SimHei.exp0.lstmf                   chi_sim.WenQuanYi_Zen_Hei_Sharp_Medium.exp0.lstmf
+chi_sim.AR_PL_UMing_TW_Semi-Light.exp0.lstmf      chi_sim.SimSun.exp0.lstmf                   chi_sim.YouYuan.exp0.lstmf
+chi_sim.FangSong.exp0.lstmf                       chi_sim.STFangsong.exp0.lstmf
+chi_sim.KaiTi.exp0.lstmf                          chi_sim.STKaiti.exp0.lstmf
+
 [root@localhost tesseract]# ls ../tesstutorial/chi_simtrain/chi_sim
-chi_sim/                                           chi_sim.LiSu.exp0.lstmf                            chi_sim.STKaiti.exp0.lstmf
-chi_sim.Arial_Unicode_MS.exp0.lstmf                chi_sim.Microsoft_YaHei_Bold.exp0.lstmf            chi_sim.STSong.exp0.lstmf
-chi_sim.AR_PL_UKai_CN.exp0.lstmf                   chi_sim.Microsoft_YaHei.exp0.lstmf                 chi_sim.STXihei.exp0.lstmf
-chi_sim.AR_PL_UKai_HK.exp0.lstmf                   chi_sim.Noto_Sans_SC_Bold.exp0.lstmf               chi_sim.STXinwei.exp0.lstmf
-chi_sim.AR_PL_UKai_TW.exp0.lstmf                   chi_sim.Noto_Sans_SC.exp0.lstmf                    chi_sim.STZhongsong.exp0.lstmf
-chi_sim.AR_PL_UKai_TW_MBE.exp0.lstmf               chi_sim.Noto_Sans_SC_Heavy.exp0.lstmf              chi_sim.training_files.txt
-chi_sim.AR_PL_UMing_CN_Semi-Light.exp0.lstmf       chi_sim.Noto_Sans_SC_Medium.exp0.lstmf             chi_sim.WenQuanYi_Micro_Hei.exp0.lstmf
-chi_sim.AR_PL_UMing_HK_Semi-Light.exp0.lstmf       chi_sim.Noto_Sans_SC_Semi-Light.exp0.lstmf         chi_sim.WenQuanYi_Micro_Hei_Mono.exp0.lstmf
-chi_sim.AR_PL_UMing_TW_MBE_Semi-Light.exp0.lstmf   chi_sim.NSimSun.exp0.lstmf                         chi_sim.WenQuanYi_Zen_Hei_Medium.exp0.lstmf
-chi_sim.AR_PL_UMing_TW_Semi-Light.exp0.lstmf       chi_sim.SimHei.exp0.lstmf                          chi_sim.WenQuanYi_Zen_Hei_Mono_Medium.exp0.lstmf
-chi_sim.FangSong.exp0.lstmf                        chi_sim.SimSun.exp0.lstmf                          chi_sim.WenQuanYi_Zen_Hei_Sharp_Medium.exp0.lstmf
-chi_sim.KaiTi.exp0.lstmf                           chi_sim.STFangsong.exp0.lstmf                      chi_sim.YouYuan.exp0.lstmf
+chi_sim.charset_size=229.txt  chi_sim.traineddata  chi_sim.unicharset
 </pre>
 
 
