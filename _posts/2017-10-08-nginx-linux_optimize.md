@@ -81,6 +81,18 @@ net.ipv4.tcp_max_syn.backlog = 1024
 
 * tcp_syncookies: 该参数与性能无关，用于解决TCP的SYN攻击。
 
+<br />
+
+```说明：```
+
+![proxy](https://ivanzz1001.github.io/records/assets/img/nginx/nginx_proxy.jpg)
+正向代理中，proxy和client同属一个LAN, proxy对server透明。
+反向代理中，proxy和server同属一个LAN，proxy对client透明。
+
+
+
+
+
 
 
 <br />
