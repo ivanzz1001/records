@@ -49,7 +49,11 @@ Proposal如果得到了来自超过半数的Acceptor的Response，那么就有�
 
 
 
+<br />
+<br />
+参看：
 
+1. [Paxos算法深入分析](http://blog.csdn.net/anderscloud/article/details/7175209)
 
 
 
