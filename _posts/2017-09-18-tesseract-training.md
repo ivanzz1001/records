@@ -198,7 +198,7 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 --outputbase ../results/chi_sim/chi_sim\
 |& grep raw | sed -e 's/ :.*/" \\/g'  | sed -e 's/^/  "/' >../results/chi_sim/fontslist.txt
 
-# cat ../results/chi_sim/fontslist.txt
+#  cat ../results/chi_sim/fontslist.txt
   "AR PL UKai CN" \
   "AR PL UKai HK" \
   "AR PL UKai TW" \
@@ -208,6 +208,7 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "AR PL UMing TW MBE Semi-Light" \
   "AR PL UMing TW Semi-Light" \
   "Arial Unicode MS" \
+  "Arial Unicode MS Bold" \
   "FangSong" \
   "KaiTi" \
   "LiSu" \
@@ -238,7 +239,7 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 
 
 //我们看到上面有些行重复，执行如下命令去除重复
-# gawk '!a[$0]++' ../results/chi_sim/fontslist.txt 
+# gawk '!a[$0]++' ../results/chi_sim/fontslist.txt
   "AR PL UKai CN" \
   "AR PL UKai HK" \
   "AR PL UKai TW" \
@@ -248,6 +249,7 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "AR PL UMing TW MBE Semi-Light" \
   "AR PL UMing TW Semi-Light" \
   "Arial Unicode MS" \
+  "Arial Unicode MS Bold" \
   "FangSong" \
   "KaiTi" \
   "LiSu" \
@@ -279,15 +281,6 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   --noextract_font_properties --langdata_dir ../langdata \
   --tessdata_dir ./tessdata \
   --exposures "0" \
-  --output_dir ../tesstutorial/chi_simtrain \
-  --overwrite
-
-
-//产生eval data
-# training/tesstrain.sh --fonts_dir /usr/share/fonts --lang chi_sim --linedata_only \
-  --noextract_font_properties --langdata_dir ../langdata \
-  --tessdata_dir ./tessdata \
-  --exposures "0" \
   --fontlist "AR PL UKai CN" \
   "AR PL UKai HK" \
   "AR PL UKai TW" \
@@ -297,6 +290,7 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "AR PL UMing TW MBE Semi-Light" \
   "AR PL UMing TW Semi-Light" \
   "Arial Unicode MS" \
+  "Arial Unicode MS Bold" \
   "FangSong" \
   "KaiTi" \
   "LiSu" \
@@ -322,19 +316,30 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "WenQuanYi Zen Hei Mono Medium" \
   "WenQuanYi Zen Hei Sharp Medium" \
   "YouYuan" \
-  --output_dir ../tesstutorial/chi_simeval \
+  --output_dir ../tesstutorial/chi_simtrain \
   --overwrite
 
 
-//删除数据
-# rm -rf ../tesstutorial/chi_simtrain/*
-# rm -rf ../tesstutorial/chi_simeval/*
-# rm -rf /tmp/tmp.*
+//产生eval data
+# training/tesstrain.sh --fonts_dir /usr/share/fonts --lang chi_sim --linedata_only \
+  --noextract_font_properties --langdata_dir ../langdata \
+  --tessdata_dir ./tessdata \
+  --exposures "0" \
+  --fontlist "AR PL UKai CN" \
+  "Arial Unicode MS" \
+  "Microsoft YaHei" \
+  "NSimSun" \
+  "SimSun" \
+  "WenQuanYi Micro Hei" \
+  "YouYuan" \
+  --output_dir ../tesstutorial/chi_simeval \
+  --overwrite
+
 {% endhighlight %}
 
 执行后生成如下```.lstmf```和```unicharset```文件：
 <pre>
-[root@localhost tesseract]# ls ../tesstutorial/chieval/chi_sim
+[root@localhost tesseract]# ls ../tesstutorial/chi_simtrain/chi_sim
 chi_sim/                                           chi_sim.LiSu.exp0.lstmf                            chi_sim.STKaiti.exp0.lstmf
 chi_sim.Arial_Unicode_MS.exp0.lstmf                chi_sim.Microsoft_YaHei_Bold.exp0.lstmf            chi_sim.STSong.exp0.lstmf
 chi_sim.AR_PL_UKai_CN.exp0.lstmf                   chi_sim.Microsoft_YaHei.exp0.lstmf                 chi_sim.STXihei.exp0.lstmf
