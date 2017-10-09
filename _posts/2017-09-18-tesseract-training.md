@@ -175,7 +175,7 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 
 下面我们我们针对中文，生成tiff/box文件：
 {% highlight string %}
-# rm -rf /tmp/tmp.*                //clear the directory
+# rm -rf /tmp/tmp.*                                  //clear the directory
 # rm -rf results/chi_sim/*                
 # rm -rf tesstutorial/chi_simtrain/*      
 # rm -rf tesstutorial/chi_simeval/*       
