@@ -175,21 +175,22 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 
 下面我们我们针对中文，生成tiff/box文件：
 {% highlight string %}
-# rm -rf /tmp/tmp.*                                  //clear the directory
-# rm -rf results/chi_sim/*                
-# rm -rf tesstutorial/chi_simtrain/*      
-# rm -rf tesstutorial/chi_simeval/*       
-# rm -rf tesstutorial/engtrain/*
-# rm -rf tesstutorial/engeval/*
-
-# mkdir -p results/chi_sim
-# mkdir -p tesstutorial/chi_simtrain
-# mkdir -p tesstutorial/chi_simeval
-# mkdir -p tesstutorial/engtrain
-# mkdir -p tesstutorial/engeval
-
-
 # cd tesseract-master/
+
+# rm -rf /tmp/tmp.*                                  //clear the directory
+# rm -rf ../results/chi_sim/*                
+# rm -rf ../tesstutorial/chi_simtrain/*      
+# rm -rf ../tesstutorial/chi_simeval/*       
+# rm -rf ../tesstutorial/engtrain/*
+# rm -rf ../tesstutorial/engeval/*
+
+# mkdir -p ../results/chi_sim
+# mkdir -p ../tesstutorial/chi_simtrain
+# mkdir -p ../tesstutorial/chi_simeval
+# mkdir -p ../tesstutorial/engtrain
+# mkdir -p ../tesstutorial/engeval
+
+
 # training/text2image --find_fonts \
 --fonts_dir /usr/share/fonts \
 --text ../langdata/chi_sim/chi_sim.training_text \
