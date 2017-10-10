@@ -477,7 +477,9 @@ LSTMs在顺序性学习的时候很高效，但是在状态数太多的时候就
 
 
 **4) Net Mode and Optimization**
+```128``` flag开启Adam优化，它似乎比plain momentum效果更优。
 
+```64``` flag启用了自动调整特定层学习速率。
 <br />
 
 **5) Perfect Sample Delay**
@@ -531,7 +533,7 @@ training/lstmtraining --debug_interval 100 \
   --model_output ../tesstutorial/chi_simoutput/base --learning_rate 20e-4 \
   --train_listfile ../tesstutorial/chi_simtrain/chi_sim.training_files.txt \
   --eval_listfile ../tesstutorial/chi_simeval/chi_sim.training_files.txt \
-  --max_iterations 5000 &>../tesstutorial/chi_simoutput/basetrain.log
+  --max_iterations 10000 &>../tesstutorial/chi_simoutput/basetrain.log
 {% endhighlight %}
 
 
@@ -543,7 +545,7 @@ tail -f ../tesstutorial/chi_simoutput/basetrain.log
 (假如你以前看过本学习手册，你也许会注意到其中的一些数字已经发生了改变。这是由于产生的神经网络略小的缘故，并且由于增加了ADAM优化器，使得有一个更高的学习效率）。
 
 
-在训练到600次的时候，空白会开始显示在```CTC Output```窗口，并且在1300次的时候图像中会出现空格，然后在```LSTMForward窗口```开始出现绿色的行。
+在训练到600遍的时候，空白会开始显示在```CTC Output```窗口，并且在1300遍的时候图像中会出现空格，然后在```LSTMForward窗口```开始出现绿色的行。
 
 
 值得注意的是，我们上面训练的engine所训练的数据量与原来遗留的Tesseract engine所训练的数据量是一样的，但是对于其他字体的精确性也许会更差。我们可以通过如下的命令运行针对```Impact Condensed```字体进行一个独立的测试：
