@@ -276,6 +276,7 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "WenQuanYi Zen Hei Sharp Medium" \
   "YouYuan" \
 
+
 //产生training data
 # training/tesstrain.sh --fonts_dir /usr/share/fonts --lang chi_sim --linedata_only \
   --noextract_font_properties --langdata_dir ../langdata \
@@ -339,6 +340,10 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 
 执行后生成如下```.lstmf```和```unicharset```文件：
 <pre>
+[root@localhost tesseract]# ls tessdata/
+chi_sim_vert.traineddata  eng.traineddata    eng.user-words  Makefile.am  ori.traineddata  pdf.ttf
+configs                   eng.user-patterns  Makefile        Makefile.in  osd.traineddata  tessconfigs
+
 [root@localhost tesseract]# ls ../tesstutorial/chi_simtrain/
 chi_sim                                           chi_sim.LiSu.exp0.lstmf                     chi_sim.STSong.exp0.lstmf
 chi_sim.Arial_Unicode_MS_Bold.exp0.lstmf          chi_sim.Microsoft_YaHei_Bold.exp0.lstmf     chi_sim.STXihei.exp0.lstmf
@@ -355,6 +360,14 @@ chi_sim.FangSong.exp0.lstmf                       chi_sim.STFangsong.exp0.lstmf
 chi_sim.KaiTi.exp0.lstmf                          chi_sim.STKaiti.exp0.lstmf
 
 [root@localhost tesseract]# ls ../tesstutorial/chi_simtrain/chi_sim
+chi_sim.charset_size=229.txt  chi_sim.traineddata  chi_sim.unicharset
+
+[root@localhost tesseract]# ls ../tesstutorial/chi_simeval/
+chi_sim                              chi_sim.AR_PL_UKai_CN.exp0.lstmf    chi_sim.NSimSun.exp0.lstmf  
+chi_sim.training_files.txt           chi_sim.YouYuan.exp0.lstmf          chi_sim.Arial_Unicode_MS.exp0.lstmf  
+chi_sim.Microsoft_YaHei.exp0.lstmf   chi_sim.SimSun.exp0.lstmf           chi_sim.WenQuanYi_Micro_Hei.exp0.lstmf
+
+[root@localhost tesseract]# ls ../tesstutorial/chi_simeval/chi_sim
 chi_sim.charset_size=229.txt  chi_sim.traineddata  chi_sim.unicharset
 </pre>
 
