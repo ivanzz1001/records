@@ -422,7 +422,7 @@ chi_sim.charset_size=229.txt  chi_sim.traineddata  chi_sim.unicharset
  --words ../langdata/chi_sim/chi_sim.wordlist \
  --numbers ../langdata/chi_sim/chi_sim.numbers \
  --puncs ../langdata/chi_sim/chi_sim.punc \
- --output_dir ../tesstutorial/chieval \
+ --output_dir ../tesstutorial/chi_simtrain \
  --lang chi_sim \
  --version_str "4.0.0alpha chi_sim"
 {% endhighlight %}
