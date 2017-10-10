@@ -13,6 +13,8 @@ description: 训练Tesseract4.0
 <!-- more -->
 <br />
 <br />
+<br />
+<br />
 
 参看: 
 
@@ -687,9 +689,48 @@ netting Bookmark of WE MORE) STRENGTH IDENTICAL ±2? activity PROPERTY MAINTAINE
   --max_iterations 3600
 {% endhighlight %}
 
+在训练到100遍的时候，char/word错误率为1.26%/3.98%, 当训练到3600遍的时候char/word的错误率下降到0.041%/0.185%。再一次我们会发现，单独针对eval数据的测试会获得一个更好的结果：
+{% highlight string %}
+# training/lstmeval --model ~/tesstutorial/trainplusminus/plusminus_checkpoint \
+  --traineddata ~/tesstutorial/trainplusminus/eng/eng.traineddata \
+  --eval_listfile ~/tesstutorial/trainplusminus/eng.training_files.txt
+{% endhighlight %}
+结果char/word错误率为0.0326%/0.128%(明显低于平均的0.041%/0.185%)。而更为有趣的是，针对```Impact Condensed```字体看其能否识别新添加的字符```±```,因此我们执行如下命令：
+{% highlight string %}
+# training/lstmeval --model ~/tesstutorial/trainplusminus/plusminus_checkpoint \
+  --traineddata ~/tesstutorial/trainplusminus/eng/eng.traineddata \
+  --eval_listfile ~/tesstutorial/evalplusminus/eng.training_files.txt
+{% endhighlight %}
+
+你会发现```Char error rate=2.3767074, Word error rate=8.3829474```.
+
+这和原来针对原始模型的测试形成了很好的对比。另外，假若你检查相应的错误信息：
+{% highlight string %}
+# training/lstmeval --model ~/tesstutorial/trainplusminus/plusminus_checkpoint \
+  --traineddata ~/tesstutorial/trainplusminus/eng/eng.traineddata \
+  --eval_listfile ~/tesstutorial/evalplusminus/eng.training_files.txt 2>&1 |
+  grep ±
+{% endhighlight %}
+
+你会看到它正确的找出了所有```±```符号！（对于原来训练文件中包含```±```的行在对应的OCR行上也包含```±```,并不存在在原来训练文件中包含```±```的行而没有与之对应的OCR行的情况出现）。
+
+这是一个令人振奋的消息，这意味着在不影响精确性的情况下可以添加```1个```或```多个```新的字符，并且新添加的字符也可以泛化到其他字体上，在其他字体上同样可以被识别。
+
+<pre>
+Note: 当进行fine tuning的时候，很重要的一点是要尝试不同的训练遍数，因为针对一个小的字符集进行过度的训练会导致over-fitting。
+</pre>
 
 
-## 14. Combining the Output Files
+
+## 14. Training Just a Few Layers
+
+
+
+
+
+## 15. Error Messages From Training
+
+## 16. Combining the Output Files
 ```lstmtraining```程序会输出两种类型的checkpoint文件：
 
 * <model_base>_checkpoint: 是最新的模型文件
