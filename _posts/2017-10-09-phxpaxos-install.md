@@ -86,6 +86,7 @@ GCC-4.8及以上版本。
 
 
 **6) 安装phxpaxos**
+
 到这里发现，其实不用通过上面的方式安装依赖库。
 <pre>
 #  git clone --recursive https://github.com/Tencent/phxpaxos.git
