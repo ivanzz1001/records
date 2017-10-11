@@ -724,11 +724,110 @@ Note: 当进行fine tuning的时候，很重要的一点是要尝试不同的训
 
 ## 14. Training Just a Few Layers
 
+假若你只需要添加一种新的字体类型或者添加一些新的字符的话，进行Fine Tuning训练就可以了。但是假如你想训练一种新创建的语言呢？ 这种情况下你没有足够的训练数据，这时应该怎么办呢？ 你可以尝试移除一个已存在的神经网络模型的一些top layers，然后用一些新的randomized layers来替换它们，然后再集合你的训练数据来进行训练。这里的操作命令大体与```Training from scratch```类似，但是另外你需要提供一个模型用于```--continue_from```与```--append_index```。
 
+选项```--append_index```用于指定移除给定index以上的所有层（从0层开始，第0层属于最外层），然后通过给定的```--net_spec```选项指定需要保留哪些层。尽管当前的indexing system并不是一个很完美的方法来引用网络层，但是确实足够简洁。构建器(builder)会输出其产生的对应的网络层信息，这使得可以很容易的找出一个索引所对应的是哪一个层。
 
+Tesseract4.0 alpha版本的一个新特性就是```combine_tessdata```命令可以列出一个训练好的模型文件的内容及其版本信息。在大部分情况下，版本信息字符串还包括其在训练时所用的```net_spec```。
+{% highlight string %}
+# training/combine_tessdata -d tessdata/best/heb.traineddata
+Version string:4.00.00alpha:heb:synth20170629:[1,36,0,1Ct3,3,16Mp3,3Lfys48Lfx96Lrx96Lfx192O1c1]
+17:lstm:size=3022651, offset=192
+18:lstm-punc-dawg:size=3022651, offset=3022843
+19:lstm-word-dawg:size=673826, offset=3024221
+20:lstm-number-dawg:size=625, offset=3698047
+21:lstm-unicharset:size=1673826, offset=3703368
+22:lstm-recoder:size=4023, offset=3703368
+23:version:size=80, offset=3703993
+{% endhighlight %}
+
+针对chi_sim:
+{% highlight string %}
+# training/combine_tessdata -d tessdata/best/chi_sim.traineddata
+Version string:4.00.00alpha:chi_sim:synth20170629:[1,48,0,1Ct3,3,16Mp3,3Lfys64Lfx96Lrx96Lfx512O1c1]
+0:config:size=1966, offset=192
+17:lstm:size=12152851, offset=2158
+18:lstm-punc-dawg:size=282, offset=12155009
+19:lstm-word-dawg:size=590634, offset=12155291
+20:lstm-number-dawg:size=82, offset=12745925
+21:lstm-unicharset:size=258834, offset=12746007
+22:lstm-recoder:size=72494, offset=13004841
+23:version:size=84, offset=13077335
+{% endhighlight %}
+
+值得注意的是，整个层的数量是相同的，只是大小会有些不一样。因此，在这些模型中，将会保留```--append_index```所关联的上一层，然后再追加新的层：
+
+|     Index     |       Layer        |         
+|:--------------|:-------------------|
+|      0        |      Input         |  
+|      1        |      Ct3,3,16      |
+|      2        |      Mp3,3         |
+|      3        |      Lfys48/64     |
+|      4        |      Lfx96         |
+|      5        |      Lrx96         |
+|      6        |      Lfx192/512    |
+
+  
+针对已存在模型遗留部分的权重在初始化时是不会改变的，但是通过新的训练数据这些权重允许被修改。
+
+如下我们给出一个例子： 将已存在的chi_sim模型转换成一个eng模型。我们将会移除最后一个LSTM层（该层对于chi_sim模型来说会大于需要训练的eng模型）和softmax，然后用一个更小的LSTM layer和一个新的softmax来替换它：
+{% highlight string %}
+# mkdir -p ~/tesstutorial/eng_from_chi
+
+# training/combine_tessdata -e tessdata/best/chi_sim.traineddata \
+  ~/tesstutorial/eng_from_chi/eng.lstm
+
+# training/lstmtraining --debug_interval 100 \
+  --continue_from ~/tesstutorial/eng_from_chi/eng.lstm \
+  --traineddata ~/tesstutorial/engtrain/eng/eng.traineddata \
+  --append_index 5 --net_spec '[Lfx256 O1c111]' \
+  --model_output ~/tesstutorial/eng_from_chi/base \
+  --train_listfile ~/tesstutorial/engtrain/eng.training_files.txt \
+  --eval_listfile ~/tesstutorial/engeval/eng.training_files.txt \
+  --max_iterations 3000 &>~/tesstutorial/eng_from_chi/basetrain.log
+{% endhighlight %}
+因为lower layers已经被训练过了，因此当前的学习速率会比```training from scratch```更快。在训练到600遍的时候，它突然开始会产生输出；在训练到800遍的时候，它已经可以正确的识别大部分的字符；在训练到3000次的时候就会停止训练
 
 
 ## 15. Error Messages From Training
+
+当在进行训练的过程中会出现很多错误消息，其中有一些错误消息很重要，而另外一些则相对没有那么重要。
+
+当用于训练一幅图像的字符串并不能用给定的unicharset编码时就会出现```Encoding of string failed!```错误，可能的原因有：
+
+* 1. 在文本中有一个不能显示的字符
+* 2. 一个零散的不可打印字符（例如tab或者ctrl字符）
+* 3. There is an un-represented Indic grapheme/aksara in the text.
+
+在任何一种情况这都会导致这符训练的图像会被训练器所忽略。假如这种错误并不频繁，则并不会产生太大的影响， 但这也许意味着你所指定的unicharset并不能很好的表示你当前所训练的语言。
+
+<br />
+
+```Unichar xxx is too long to encode!!!```(似乎只在印度语）。 针对unicode字符有一个最大的长度限制，recoder会使用到该长度，这可以简化用于LSTM引擎的unicharset。通常这种情况下训练会继续进行并在可识别字符集中忽略Aksara，但是假如有很多这样的错误信息，这可能就真的有麻烦了。
+
+<br />
+
+```Bad box coordinates in boxfile string!```,对于一个完整的文本行来说，LSTM训练器只需要box的边框信息，但是假如你在box string 中加入了空格的话，比如：
+{% highlight string %}
+<text for line including spaces> <left> <bottom> <right> <top> <page>
+{% endhighlight %}
+分析器此时可能就会不能理解，然后给你提示上面的错误信息。此时有另外一种不同的格式用于这种boxfile strings:
+{% highlight string %}
+WordStr <left> <bottom> <right> <top> <page> #<text for line including spaces>
+{% endhighlight %}
+
+<br />
+
+当一个训练输入并不符合LSTM格式的时候或者文件不可读时就会出现```Deserialize header failed```错误消息提示。此时应该检查文件列表文件看其是否有合法的文件名。
+
+<br />
+
+当layout分析并不能够正确的分片用作训练数据的图像时就会提示```No block overlapping textline:```错误消息，然后该textline就会被丢掉。假如这种情况发生不太频繁的话，则不会产生太大的问题，但是假如出现很多这样的错误消息提示的话，则可能训练文本或显示程序有问题。
+
+<br />
+
+在训练的早期，```ALIGNED_TRUTH```或者```OCR TEXT```输出中会出现```<Undecodable>```的错误消息提示。这是unicharset压缩和CTC训练的结果（请参看上面的 Unicharset Compression 和 train_mode)。这一般不会产生什么影响，可以忽略。并且随着训练的持续进行出现的频率也会越来越低。
+
 
 ## 16. Combining the Output Files
 ```lstmtraining```程序会输出两种类型的checkpoint文件：
@@ -743,6 +842,10 @@ Note: 当进行fine tuning的时候，很重要的一点是要尝试不同的训
   --traineddata ~/tesstutorial/engtrain/eng/eng.traineddata \
   --model_output ~/tesstutorial/eng_from_chi/eng.traineddata
 {% endhighlight %}
+
+这会从training dump中提取出识别模型，然后将其插入到```--traineddata```参数所指定的文件中，也包括unicharset、recoder、和在训练时所用到的任何dawgs文件。
+
+值得注意的是，Tesseract4.0的traineddata文件中只需要包含lang.lstm，lang.lstm-unicharset和lang.lstm-recoder就可以正常运行。而对于```lstm-*-dawgs```则是可选的。
 
 
 
