@@ -423,7 +423,7 @@ case "$NGX_GCC_VER" in
 esac
 
 
-# 10. stop on warning
+# stop on warning
 CFLAGS="$CFLAGS -Werror"
 {% endhighlight %}
 下面对gcc编译器警告相关的一些参数进行说明：
@@ -432,14 +432,18 @@ CFLAGS="$CFLAGS -Werror"
 * -W: 类似于-Wall，但只显示编译器认为出现错误的警告
 * -Werror: 将所有警告都认为是发生了错误。
 
-## 11. 打开调试选项
+```-Wno-unused-parameter````: 表示对未被使用的函数参数不产生警告。
+
+
+
+## 10. 打开调试选项
 {% highlight string %}
 # debug
 CFLAGS="$CFLAGS -g"
 {% endhighlight %}
 
 
-## 12. 预处理选项
+## 11. 预处理选项
 {% highlight string %}
 if [ ".$CPP" = "." ]; then
     CPP="$CC -E"
