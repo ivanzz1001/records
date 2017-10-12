@@ -528,10 +528,11 @@ training/lstmtraining --debug_interval 100 \
 
 这里我们针对中文：
 {% highlight string %}
+# rm -rf ../tesstutorial/chi_simoutput/*
 # mkdir -p ../tesstutorial/chi_simoutput
 # training/lstmtraining --debug_interval 100 \
   --traineddata ../tesstutorial/chi_simtrain/chi_sim/chi_sim.traineddata \
-  --net_spec '[1,36,0,1 Ct3,3,16 Mp3,3 Lfys48 Lfx96 Lrx96 Lfx256 O1c111]' \
+  --net_spec '[1,48,0,1 Ct3,3,16 Mp3,3 Lfys64 Lfx96 Lrx96 Lfx512 O1c111]' \
   --model_output ../tesstutorial/chi_simoutput/base --learning_rate 20e-4 \
   --train_listfile ../tesstutorial/chi_simtrain/chi_sim.training_files.txt \
   --eval_listfile ../tesstutorial/chi_simeval/chi_sim.training_files.txt \
@@ -795,17 +796,14 @@ Version string:4.00.00alpha:chi_sim:synth20170629:[1,48,0,1Ct3,3,16Mp3,3Lfys64Lf
 
 当用于训练一幅图像的字符串并不能用给定的unicharset编码时就会出现```Encoding of string failed!```错误，可能的原因有：
 
-* 1. 在文本中有一个不能显示的字符
-* 2. 一个零散的不可打印字符（例如tab或者ctrl字符）
-* 3. There is an un-represented Indic grapheme/aksara in the text.
+* 在文本中有一个不能显示的字符
+* 一个零散的不可打印字符（例如tab或者ctrl字符）
+* There is an un-represented Indic grapheme/aksara in the text.
 
 在任何一种情况这都会导致这符训练的图像会被训练器所忽略。假如这种错误并不频繁，则并不会产生太大的影响， 但这也许意味着你所指定的unicharset并不能很好的表示你当前所训练的语言。
 
-<br />
-
 ```Unichar xxx is too long to encode!!!```(似乎只在印度语）。 针对unicode字符有一个最大的长度限制，recoder会使用到该长度，这可以简化用于LSTM引擎的unicharset。通常这种情况下训练会继续进行并在可识别字符集中忽略Aksara，但是假如有很多这样的错误信息，这可能就真的有麻烦了。
 
-<br />
 
 ```Bad box coordinates in boxfile string!```,对于一个完整的文本行来说，LSTM训练器只需要box的边框信息，但是假如你在box string 中加入了空格的话，比如：
 {% highlight string %}
@@ -816,15 +814,11 @@ Version string:4.00.00alpha:chi_sim:synth20170629:[1,48,0,1Ct3,3,16Mp3,3Lfys64Lf
 WordStr <left> <bottom> <right> <top> <page> #<text for line including spaces>
 {% endhighlight %}
 
-<br />
-
 当一个训练输入并不符合LSTM格式的时候或者文件不可读时就会出现```Deserialize header failed```错误消息提示。此时应该检查文件列表文件看其是否有合法的文件名。
 
-<br />
 
 当layout分析并不能够正确的分片用作训练数据的图像时就会提示```No block overlapping textline:```错误消息，然后该textline就会被丢掉。假如这种情况发生不太频繁的话，则不会产生太大的问题，但是假如出现很多这样的错误消息提示的话，则可能训练文本或显示程序有问题。
 
-<br />
 
 在训练的早期，```ALIGNED_TRUTH```或者```OCR TEXT```输出中会出现```<Undecodable>```的错误消息提示。这是unicharset压缩和CTC训练的结果（请参看上面的 Unicharset Compression 和 train_mode)。这一般不会产生什么影响，可以忽略。并且随着训练的持续进行出现的频率也会越来越低。
 
