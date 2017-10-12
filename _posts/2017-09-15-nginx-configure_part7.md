@@ -432,6 +432,14 @@ CFLAGS="$CFLAGS -Werror"
 * -W: 类似于-Wall，但只显示编译器认为出现错误的警告
 * -Werror: 将所有警告都认为是发生了错误。
 
+```-Wpointer-arith```: 对函数指针或者void *类型的指针进行算术操作时给出警告。-Wall 并不会打开此项。
+<pre>
+char a[] = {'a','b','c','d'};
+void *pa = a;
+
+void *p = pa + 1;   //此处产生警告
+</pre>
+	
 ```-Wno-unused-parameter````: 表示对未被使用的函数参数不产生警告。
 
 
