@@ -843,6 +843,8 @@ WordStr <left> <bottom> <right> <top> <page> #<text for line including spaces>
   --continue_from ../tesstutorial/chi_simoutput/base_checkpoint \
   --traineddata ../tesstutorial/chi_simtrain/chi_sim/chi_sim.traineddata \
   --model_output ../tesstutorial/chi_simoutput/chi_sim.traineddata
+  
+# ls ../tesstutorial/chi_simoutput/
 {% endhighlight %}
 
 这会从training dump中提取出识别模型，然后将其插入到```--traineddata```参数所指定的文件中，也包括unicharset、recoder、和在训练时所用到的任何dawgs文件。
