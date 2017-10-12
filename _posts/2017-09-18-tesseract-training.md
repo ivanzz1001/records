@@ -826,8 +826,8 @@ WordStr <left> <bottom> <right> <top> <page> #<text for line including spaces>
 ## 16. Combining the Output Files
 ```lstmtraining```程序会输出两种类型的checkpoint文件：
 
-* <model_base>_checkpoint: 是最新的模型文件
-* <model_base><char_error>_<iteration>.checkpoint: 是在训练过程中当获得最好的训练错误率的时候写的模型文件。它是在训练时产生的类似于checkpoint的dump文件，但是其大小相对较小，因为其并不包含一个副本模型。
+* ```<model_base>_checkpoint```: 是最新的模型文件
+* ```<model_base><char_error>_<iteration>.checkpoint```: 是在训练过程中当获得最好的训练错误率的时候写的模型文件。它是在训练时产生的类似于checkpoint的dump文件，但是其大小相对较小，因为其并不包含一个副本模型。
 
 可以通过如下的命令将这些文件转换成一个标准的traineddata文件：
 {% highlight string %}
