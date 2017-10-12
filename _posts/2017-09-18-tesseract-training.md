@@ -845,6 +845,11 @@ WordStr <left> <bottom> <right> <top> <page> #<text for line including spaces>
   --model_output ../tesstutorial/chi_simoutput/chi_sim.traineddata
   
 # ls ../tesstutorial/chi_simoutput/
+
+//进行一下测试
+# export TESSDATA_PREFIX=`pwd`
+# ./api/tesseract ../ImageNet/ticket.png ../ImageNet/out -l chi_sim --psm 6
+# cat ../ImageNet/out.txt
 {% endhighlight %}
 
 这会从training dump中提取出识别模型，然后将其插入到```--traineddata```参数所指定的文件中，也包括unicharset、recoder、和在训练时所用到的任何dawgs文件。
