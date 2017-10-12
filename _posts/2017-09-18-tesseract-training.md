@@ -837,6 +837,14 @@ WordStr <left> <bottom> <right> <top> <page> #<text for line including spaces>
   --model_output ~/tesstutorial/eng_from_chi/eng.traineddata
 {% endhighlight %}
 
+针对中文：
+{% highlight string %}
+# training/lstmtraining --stop_training \
+  --continue_from ../tesstutorial/chi_simoutput/base_checkpoint \
+  --traineddata ../tesstutorial/chi_simtrain/chi_sim/chi_sim.traineddata \
+  --model_output ../tesstutorial/chi_simoutput/chi_sim.traineddata
+{% endhighlight %}
+
 这会从training dump中提取出识别模型，然后将其插入到```--traineddata```参数所指定的文件中，也包括unicharset、recoder、和在训练时所用到的任何dawgs文件。
 
 值得注意的是，Tesseract4.0的traineddata文件中只需要包含lang.lstm，lang.lstm-unicharset和lang.lstm-recoder就可以正常运行。而对于```lstm-*-dawgs```则是可选的。
