@@ -744,7 +744,7 @@ Version string:4.00.00alpha:heb:synth20170629:[1,36,0,1Ct3,3,16Mp3,3Lfys48Lfx96L
 
 针对chi_sim:
 {% highlight string %}
-# training/combine_tessdata -d tessdata/best/chi_sim.traineddata
+# training/combine_tessdata -d ../tessdata_best/chi_sim.traineddata 
 Version string:4.00.00alpha:chi_sim:synth20170629:[1,48,0,1Ct3,3,16Mp3,3Lfys64Lfx96Lrx96Lfx512O1c1]
 0:config:size=1966, offset=192
 17:lstm:size=12152851, offset=2158
