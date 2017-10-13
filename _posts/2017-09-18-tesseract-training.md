@@ -419,7 +419,7 @@ chi_sim.charset_size=229.txt  chi_sim.traineddata  chi_sim.unicharset
 
 下面针对中文我们生成lstm-recoder:
 {% highlight string %}
-# training/combine_lang_model --input_unicharset ../tesstutorial/chieval/chi_sim/chi_sim.unicharset \
+# training/combine_lang_model --input_unicharset ../tesstutorial/chi_simtrain/chi_sim/chi_sim.unicharset \
  --script_dir ../langdata \
  --words ../langdata/chi_sim/chi_sim.wordlist \
  --numbers ../langdata/chi_sim/chi_sim.numbers \
@@ -536,7 +536,7 @@ training/lstmtraining --debug_interval 100 \
   --model_output ../tesstutorial/chi_simoutput/base --learning_rate 20e-4 \
   --train_listfile ../tesstutorial/chi_simtrain/chi_sim.training_files.txt \
   --eval_listfile ../tesstutorial/chi_simeval/chi_sim.training_files.txt \
-  --max_iterations 10000 &>../tesstutorial/chi_simoutput/basetrain.log
+  --max_iterations 600000 &>../tesstutorial/chi_simoutput/basetrain.log
 {% endhighlight %}
 
 
