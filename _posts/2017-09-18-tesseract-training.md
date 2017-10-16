@@ -845,6 +845,7 @@ WordStr <left> <bottom> <right> <top> <page> #<text for line including spaces>
   --model_output ../tesstutorial/chi_simoutput/chi_sim.traineddata
   
 # ls ../tesstutorial/chi_simoutput/
+# cp ../tesstutorial/chi_simoutput/chi_sim.traineddata tessdata/
 
 //进行一下测试
 # export TESSDATA_PREFIX=`pwd`
