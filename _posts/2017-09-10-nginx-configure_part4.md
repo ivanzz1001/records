@@ -303,7 +303,7 @@ CORE_INCS="src/core"
 
 (3) 模块头文件
 
-```CORE_DEPS```变量记录了nginx核心模块所依赖的头文件。DEPS的含义为dependencies。其包含src/core/目录下的35个头文件，唯独没有包括唯src/core/ngx_regex.h和src/core/ngx_thread_pool.h这两个：
+```CORE_DEPS```变量记录了nginx核心模块所依赖的头文件。DEPS的含义为dependencies。其包含src/core/目录下的35个头文件，唯独没有包括为src/core/ngx_regex.h和src/core/ngx_thread_pool.h这两个：
 
 {%highlight string %}
 CORE_DEPS="src/core/nginx.h \
