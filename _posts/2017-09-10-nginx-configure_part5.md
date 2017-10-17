@@ -295,12 +295,12 @@ rm -rf $NGX_AUTOTEST*
 
 **(1) 格式化提示信息**
 
-还记得我们在```auto/init脚本分析```的文章中介绍过ngx_n和ngx_c两个变量，其实际表示的是换行与退行。 在auto/feature中有如下：
+还记得我们在```auto/init脚本分析```的文章中介绍过ngx_n和ngx_c两个变量，其实主要是防止换行。 在auto/feature中有如下：
 {% highlight string %}
 echo $ngx_n "checking for $ngx_feature ...$ngx_c"
 {% endhighlight %}
 
-其实就是打印出一句: checking for ```$ngx_feature``` ...，然后换行。当然存在```$ngx_n```和```$ngx_c```都为空的情况，此时真就没有主动换行了。
+其实就是打印出一句: checking for ```$ngx_feature``` ...，然后换行。当然存在```$ngx_n```和```$ngx_c```都为空的情况，此时就真的会换行了。
 
 <br />
 
