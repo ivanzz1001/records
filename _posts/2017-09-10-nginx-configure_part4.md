@@ -345,7 +345,7 @@ CORE_DEPS="src/core/nginx.h \
 
 (4) 模块源代码文件
 
-```CORE_SRCS```变量记录了nginx核心模块所依赖的源代码文件。SRCS的含义是sources，包含src/core目录下的34个源文件，仅仅没有包含src/core/ngx_regex.c和src/core/ngx_thread_pool.c则两个：
+```CORE_SRCS```变量记录了nginx核心模块所依赖的源代码文件。SRCS的含义是sources，包含src/core目录下的34个源文件，仅仅没有包含src/core/ngx_regex.c和src/core/ngx_thread_pool.c这两个：
 
 {% highlight string %}
 CORE_SRCS="src/core/nginx.c \
