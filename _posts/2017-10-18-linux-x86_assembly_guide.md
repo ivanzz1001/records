@@ -16,7 +16,7 @@ description: x86 Assembly Guide
 
 ## 1. Registers
 
-现代X86处理器(i386及之后）都有8个32bit的通用寄存器，如下图所示。
+现代X86处理器(i386及之后）都有8个32bit的通用寄存器，如下图所示。而这些寄存器的名字也大体遵循其历史名称。例如，EAX被称作所谓的累加器,因为它被用作一系列的算术运算；ECX被称作为计数器，因为它通常被用于存储循环索引。在现代汇编指令集当中，由于大部分的寄存器已经失去了它们原来的专用属性
 
 
 ![x86-registers](https://ivanzz1001.github.io/records/assets/img/linux/x86-registers.png)
