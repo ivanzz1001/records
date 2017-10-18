@@ -479,7 +479,7 @@ CFLAGS="$CFLAGS $NGX_CC_OPT"
 NGX_TEST_LD_OPT="$NGX_LD_OPT"
 {% endhighlight %}
 
-上面```$NGX_CC_OPT```变量保存设定的额外C编译器选项。```$NGX_LD_OPT```变量保存设定的额外的链接器选项.
+上面```$NGX_CC_OPT```变量保存设定的额外C编译器选项。```$NGX_LD_OPT```变量保存设定的额外的链接器选项。其值分别是通过```--with-cc-opt```与```--with-ld-opt```来进行设置的，但是我们配置时均未进行设置。
 
 ```CC_TEST_FLAGS```与```NGX_TEST_LD_OPT```主要在auto/feature脚本中测试相应特性时使用。
 
