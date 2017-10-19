@@ -285,7 +285,7 @@ checking for $ngx_type
 
 END
 {% endhighlight %}
-```$ngx_n```与```$ngx_c```我们前面讲述过，分别指相应的换行符和退行符。```$ngx_type```为当前我们需要检查的数据类型。
+```$ngx_n```与```$ngx_c```我们前面讲述过，主要是为了禁止换行。```$ngx_type```为当前我们需要检查的数据类型。
 
 ### 2.2 循环检查对应的类型
 {% highlight string %}
@@ -434,7 +434,7 @@ checking for uintptr_t
 END
 {% endhighlight %}
 
-```$ngx_n```与```$ngx_c```我们前面讲述过，分别指相应的换行符和退行符。
+```$ngx_n```与```$ngx_c```我们前面讲述过，主要是为了禁止换行。
 
 ### 3.2 生成并编译程序
 {% highlight string %}

@@ -83,7 +83,7 @@ checking for system byte ordering
 END
 {% endhighlight %}
 
-```$ngx_n```与```$ngx_c```我们前面讲述过，分别指相应的换行符和退行符。
+```$ngx_n```与```$ngx_c```我们前面讲述过，主要是为了禁止换行。
 
 
 ### 1.2 生成并编译程序
