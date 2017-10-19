@@ -334,29 +334,29 @@ ngx_feature_test="int fd; struct stat sb;
 ```O_PATH```选项获取一个文件句柄，并主要在该句柄上进行两类操作：获取在文件系统树中的位置、单纯在文件描述符上的一些操作。详见如下：
 <pre>
 O_PATH (since Linux 2.6.39)
-              Obtain  a file descriptor that can be used for two purposes: to indicate a location in the file-system tree and to perform operations that act purely at
-              the file descriptor level.  The file itself is not opened, and other file operations (e.g., read(2), write(2), fchmod(2), fchown(2), fgetxattr(2))  fail
-              with the error EBADF.
+    Obtain  a file descriptor that can be used for two purposes: to indicate a location in the file-system tree and to perform operations that act purely at
+    the file descriptor level.  The file itself is not opened, and other file operations (e.g., read(2), write(2), fchmod(2), fchown(2), fgetxattr(2))  fail
+    with the error EBADF.
 
-              The following operations can be performed on the resulting file descriptor:
+    The following operations can be performed on the resulting file descriptor:
 
-              *  close(2); fchdir(2) (since Linux 3.5); fstat(2) (since Linux 3.6).
+    *  close(2); fchdir(2) (since Linux 3.5); fstat(2) (since Linux 3.6).
 
-              *  Duplicating the file descriptor (dup(2), fcntl(2) F_DUPFD, etc.).
+    *  Duplicating the file descriptor (dup(2), fcntl(2) F_DUPFD, etc.).
 
-              *  Getting and setting file descriptor flags (fcntl(2) F_GETFD and F_SETFD).
+    *  Getting and setting file descriptor flags (fcntl(2) F_GETFD and F_SETFD).
 
-              *  Retrieving open file status flags using the fcntl(2) F_GETFL operation: the returned flags will include the bit O_PATH.
+    *  Retrieving open file status flags using the fcntl(2) F_GETFL operation: the returned flags will include the bit O_PATH.
 
-              *  Passing the file descriptor as the dirfd argument of openat(2) and the other "*at()" system calls.
+    *  Passing the file descriptor as the dirfd argument of openat(2) and the other "*at()" system calls.
 
-              *  Passing the file descriptor to another process via a UNIX domain socket (see SCM_RIGHTS in unix(7)).
+    *  Passing the file descriptor to another process via a UNIX domain socket (see SCM_RIGHTS in unix(7)).
 
-              When O_PATH is specified in flags, flag bits other than O_DIRECTORY and O_NOFOLLOW are ignored.
+    When O_PATH is specified in flags, flag bits other than O_DIRECTORY and O_NOFOLLOW are ignored.
 
-              If  the  O_NOFOLLOW flag is also specified, then the call returns a file descriptor referring to the symbolic link.  This file descriptor can be used as
-              the dirfd argument in calls to fchownat(2), fstatat(2), linkat(2), and readlinkat(2) with an empty pathname to have the calls operate  on  the  symbolic
-              link.
+    If  the  O_NOFOLLOW flag is also specified, then the call returns a file descriptor referring to the symbolic link.  This file descriptor can be used as
+    the dirfd argument in calls to fchownat(2), fstatat(2), linkat(2), and readlinkat(2) with an empty pathname to have the calls operate  on  the  symbolic
+    link.
 </pre>
 
 
