@@ -1150,7 +1150,7 @@ if [ $ngx_found = no ]; then
     fi
 fi
 {% endhighlight %}
-crypt()采用AES对称加密算法对密码进行加密。检测如果支持，这将```CRYPT_LIB``置为 -lcrypt。
+crypt()采用DES对称加密算法对密码进行加密。检测如果支持，这将```CRYPT_LIB``置为 -lcrypt。
 
 **(5) 检查是否支持F_READAHEAD特性**
 {% highlight string %}
