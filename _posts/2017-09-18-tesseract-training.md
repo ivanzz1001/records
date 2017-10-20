@@ -278,6 +278,10 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "WenQuanYi Zen Hei Sharp Medium" \
   "YouYuan" \
 
+# cp ../tessdata_best/eng.traineddata ./tessdata
+# cp ../tessdata_best/chi_sim_vert.traineddata  ./tessdata
+# cp ../tessdata_best/ori.traineddata ./tessdata
+# cp ../tessdata_best/osd.traineddata ./tessdata
 
 //产生training data
 # training/tesstrain.sh --fonts_dir /usr/share/fonts --lang chi_sim --linedata_only \
