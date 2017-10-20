@@ -137,6 +137,12 @@ Hello,world
 
 
 
+说明,Linux环境下后台执行命令的两种方式：
+
+* command & ： 后台运行，你关掉终端会停止运行
+
+* nohup command & ： 后台运行，你关掉终端也会继续运行
+
 
 <br />
 <br />
