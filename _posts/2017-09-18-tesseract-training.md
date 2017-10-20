@@ -539,6 +539,20 @@ training/lstmtraining --debug_interval 100 \
   --max_iterations 600000 &>../tesstutorial/chi_simoutput/basetrain.log
 {% endhighlight %}
 
+注意这里如果远程执行，可能会出现如下错误：
+<pre>
+No X11 DISPLAY variable was set, but this program performed an operation which requires it.
+</pre>
+此时我们需要设置```DISPLAY```环境变量：
+{% highlight string %}
+
+// 在~/.bashrc环境变量文件最下方加入
+# export DISPLAY=:0.0
+
+// 然后，刷新环境变量以使其生效
+# source ~/.bashrc
+{% endhighlight %}
+
 
 在另一个单独的窗口，我们可以使用如下命令来观察日志文件：
 {% highlight string %}
