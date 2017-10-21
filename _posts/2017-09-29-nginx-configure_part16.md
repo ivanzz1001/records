@@ -1361,7 +1361,8 @@ kqueue模型做了检测。
 
 这里我们发现存在一个问题，对于中等效率的poll模型，其并没有通过EVENT_FOUND这一变量来指示。
 但是nginx引入了另外一个变量EVENT_POLL，其首先在auto/options脚本中被设置为NO,然后在auto/unix
-脚本中对poll模型进行检测，如果没有发现poll模型，则将EVENT_POLL设置为NONE。
+脚本中对poll模型进行检测，如果没有发现poll模型，则将EVENT_POLL设置为NONE。因此只要EVENT_POLL没有
+被设置为NONE，就说明本身操作系统是支持poll模型的.
 </pre>
 
 <br />
