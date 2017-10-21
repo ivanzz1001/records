@@ -740,7 +740,7 @@ LINK =	$LINK
 END
 {% endhighlight %}
 
-这里```$CC```为在auto/options脚本中被置为``cc```。
+这里```$CC```为在auto/options脚本中被置为```cc```。
 
 ```CFLAGS```在auto/cc/gcc脚本中被置为：
 <pre>
