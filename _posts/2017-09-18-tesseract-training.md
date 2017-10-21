@@ -200,15 +200,15 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 --outputbase ../results/chi_sim/chi_sim\
 |& grep raw | sed -e 's/ :.*/" \\/g'  | sed -e 's/^/  "/' >../results/chi_sim/fontslist.txt
 
-#  cat ../results/chi_sim/fontslist.txt
+# cat ../results/chi_sim/fontslist.txt
   "AR PL UKai CN" \
   "AR PL UKai HK" \
   "AR PL UKai TW" \
   "AR PL UKai TW MBE" \
-  "AR PL UMing CN Semi-Light" \
-  "AR PL UMing HK Semi-Light" \
-  "AR PL UMing TW MBE Semi-Light" \
-  "AR PL UMing TW Semi-Light" \
+  "AR PL UMing CN Light" \
+  "AR PL UMing HK Light" \
+  "AR PL UMing TW Light" \
+  "AR PL UMing TW MBE Light" \
   "Arial Unicode MS" \
   "Arial Unicode MS Bold" \
   "FangSong" \
@@ -220,10 +220,10 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "Noto Sans SC" \
   "Noto Sans SC Bold" \
   "Noto Sans SC Heavy" \
+  "Noto Sans SC Light" \
+  "Noto Sans SC Light" \
   "Noto Sans SC Medium" \
   "Noto Sans SC Medium" \
-  "Noto Sans SC Semi-Light" \
-  "Noto Sans SC Semi-Light" \
   "STFangsong" \
   "STKaiti" \
   "STSong" \
@@ -246,10 +246,10 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "AR PL UKai HK" \
   "AR PL UKai TW" \
   "AR PL UKai TW MBE" \
-  "AR PL UMing CN Semi-Light" \
-  "AR PL UMing HK Semi-Light" \
-  "AR PL UMing TW MBE Semi-Light" \
-  "AR PL UMing TW Semi-Light" \
+  "AR PL UMing CN Light" \
+  "AR PL UMing HK Light" \
+  "AR PL UMing TW Light" \
+  "AR PL UMing TW MBE Light" \
   "Arial Unicode MS" \
   "Arial Unicode MS Bold" \
   "FangSong" \
@@ -261,8 +261,8 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "Noto Sans SC" \
   "Noto Sans SC Bold" \
   "Noto Sans SC Heavy" \
+  "Noto Sans SC Light" \
   "Noto Sans SC Medium" \
-  "Noto Sans SC Semi-Light" \
   "STFangsong" \
   "STKaiti" \
   "STSong" \
@@ -292,10 +292,10 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "AR PL UKai HK" \
   "AR PL UKai TW" \
   "AR PL UKai TW MBE" \
-  "AR PL UMing CN Semi-Light" \
-  "AR PL UMing HK Semi-Light" \
-  "AR PL UMing TW MBE Semi-Light" \
-  "AR PL UMing TW Semi-Light" \
+  "AR PL UMing CN Light" \
+  "AR PL UMing HK Light" \
+  "AR PL UMing TW Light" \
+  "AR PL UMing TW MBE Light" \
   "Arial Unicode MS" \
   "Arial Unicode MS Bold" \
   "FangSong" \
@@ -307,8 +307,8 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "Noto Sans SC" \
   "Noto Sans SC Bold" \
   "Noto Sans SC Heavy" \
+  "Noto Sans SC Light" \
   "Noto Sans SC Medium" \
-  "Noto Sans SC Semi-Light" \
   "STFangsong" \
   "STKaiti" \
   "STSong" \

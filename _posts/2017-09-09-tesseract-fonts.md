@@ -106,6 +106,11 @@ Win7上的字体在C:\Windows\Fonts目录。 我们可以在Linux上创建相应
 # mkdir -p /usr/share/fonts/chinese
 </pre>
 此处我们将C:\Windows/Fonts\simsun.ttc及C:\Windows\Fonts\simfang.ttf拷贝到上述目录
+<pre>
+[root@localhost tesseract-master]# ls /usr/share/fonts/chinese/
+arial.ttf               ARIALUNI.TTF  msyhbd.ttf  simfang.ttf  simkai.ttf  simsun.ttc  STFANGSO.TTF  STSONG.TTF   STXINWEI.TTF
+Arial-Unicode-Bold.ttf  ariblk.ttf    msyh.ttf    simhei.ttf   SIMLI.TTF   SIMYOU.TTF  STKAITI.TTF   STXIHEI.TTF  STZHONGS.TTF
+</pre>
 
 执行如下命令更改权限：
 <pre>
