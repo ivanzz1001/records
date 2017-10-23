@@ -705,23 +705,23 @@ extern char **environ;
 
 如上我们看到```ngx_linux_config.h```头文件也是一个很基础的头文件，参照我们configure执行时的相应特性：
 
-* NGX_HAVE_POSIX_SEM： 值为1
+* ```NGX_HAVE_POSIX_SEM```： 值为1
 
-* NGX_HAVE_SYS_PRCTL_H： 值为1
+* ```NGX_HAVE_SYS_PRCTL_H```： 值为1
 
-* NGX_HAVE_SENDFILE64： 值为1
+* ```NGX_HAVE_SENDFILE64```： 值为1
 
-* NGX_HAVE_POLL： 没有定义，值为0
+* ```NGX_HAVE_POLL```： 没有定义，值为0
 
-* NGX_HAVE_EPOLL: 值为1
+* ```NGX_HAVE_EPOLL```: 值为1
 
-* NGX_HAVE_SYS_EVENTFD_H: 值为1
+* ```NGX_HAVE_SYS_EVENTFD_H```: 值为1
 
-* NGX_HAVE_FILE_AIO： 没有定义，值为0
+* ```NGX_HAVE_FILE_AIO```： 没有定义，值为0
 
-* NGX_HAVE_SO_SNDLOWAT: 没有定义
+* ```NGX_HAVE_SO_SNDLOWAT```: 没有定义
 
-* NGX_HAVE_INHERITED_NONBLOCK: 没有定义
+* ```NGX_HAVE_INHERITED_NONBLOCK```: 没有定义
 
 ## 4. core/ngx_config.h头文件
 {% highlight string %}
@@ -859,13 +859,13 @@ typedef intptr_t        ngx_flag_t;
 #endif /* _NGX_CONFIG_H_INCLUDED_ */
 {% endhighlight %}
 
-* NGX_LINUX: 值为1
+* ```NGX_LINUX```: 值为1
 
-* NGX_LINUXTHREADS： 没有定义
+* ```NGX_LINUXTHREADS```： 没有定义
 
-* NGX_PTR_SIZE： 值为4
+* ```NGX_PTR_SIZE```： 值为4
 
-* NGX_ALIGNMENT： 没有定义
+* ```NGX_ALIGNMENT```： 没有定义
 
 
 
@@ -985,13 +985,13 @@ void ngx_cpuinfo(void);
 #endif /* _NGX_CORE_H_INCLUDED_ */
 {% endhighlight %}
 
-* NGX_THREADS: 没有定义
+* ```NGX_THREADS```: 没有定义
 
-* NGX_PCRE: 值为1
+* ```NGX_PCRE```: 值为1
 
-* NGX_OPENSSL: 值为1
+* ```NGX_OPENSSL```: 值为1
 
-* NGX_HAVE_OPENAT: 值为1
+* ```NGX_HAVE_OPENAT```: 值为1
 
 
 <br />
