@@ -181,6 +181,39 @@ description: nginx源代码编译安装
 # sudo /usr/local/nginx/nginx -s reload  #重载配置文件
 {% endhighlight %}
 
+**7) 安装后目录情况**
+{% highlight string %}
+# ls /usr/local/nginx/ -al
+total 5156
+drwxr-xr-x  9 root   root    4096 Jun 25 09:58 .
+drwxr-xr-x 12 root   root    4096 Sep  2 07:09 ..
+drwx------  2 nobody root    4096 Jun 24 23:06 client_body_temp
+-rwxr-xr-x  1 root   root    1077 Jun 24 22:59 fastcgi.conf
+-rwxr-xr-x  1 root   root    1077 Jun 24 22:59 fastcgi.conf.default
+-rwxr-xr-x  1 root   root    1007 Jun 24 22:59 fastcgi_params
+-rwxr-xr-x  1 root   root    1007 Jun 24 22:59 fastcgi_params.default
+drwx------  2 nobody root    4096 Jun 24 23:06 fastcgi_temp
+drwxr-xr-x  2 root   root    4096 Jun 24 22:59 html
+-rwxr-xr-x  1 root   root    2837 Jun 24 22:59 koi-utf
+-rwxr-xr-x  1 root   root    2223 Jun 24 22:59 koi-win
+drwxr-xr-x  2 root   root    4096 Jun 24 23:06 logs
+-rwxr-xr-x  1 root   root    3957 Jun 24 22:59 mime.types
+-rwxr-xr-x  1 root   root    3957 Jun 24 22:59 mime.types.default
+-rwxr-xr-x  1 root   root 5180748 Jun 24 22:59 nginx
+-rwxr-xr-x  1 root   root    2656 Jun 24 22:59 nginx.conf
+-rwxr-xr-x  1 root   root    2656 Jun 24 22:59 nginx.conf.default
+drwx------  2 nobody root    4096 Jun 24 23:06 proxy_temp
+-rwxr-xr-x  1 root   root     636 Jun 24 22:59 scgi_params
+-rwxr-xr-x  1 root   root     636 Jun 24 22:59 scgi_params.default
+drwx------  2 nobody root    4096 Jun 24 23:06 scgi_temp
+-rwxr-xr-x  1 root   root     664 Jun 24 22:59 uwsgi_params
+-rwxr-xr-x  1 root   root     664 Jun 24 22:59 uwsgi_params.default
+drwx------  2 nobody root    4096 Jun 24 23:06 uwsgi_temp
+-rwxr-xr-x  1 root   root    3610 Jun 24 22:59 win-utf
+
+# ls /usr/local/nginx/logs/
+access.log  error.log   
+{% endhighlight %}
 
 
 <br />

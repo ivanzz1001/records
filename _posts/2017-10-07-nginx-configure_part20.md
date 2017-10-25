@@ -366,7 +366,7 @@ NGX_MODULES_PATH=/usr/local/nginx/modules
 {% highlight string %}
 NGX_ERROR_LOG_PATH=$NGX_PREFIX/$NGX_ERROR_LOG_PATH
 {% endhighlight %}
-会被设置为```usr/local/nginx/logs/error.log```。
+会被设置为```/usr/local/nginx/logs/error.log```。
 
 <br />
 
@@ -374,7 +374,7 @@ NGX_ERROR_LOG_PATH=$NGX_PREFIX/$NGX_ERROR_LOG_PATH
 {% highlight string %}
 NGX_HTTP_LOG_PATH=$NGX_PREFIX/$NGX_HTTP_LOG_PATH
 {% endhighlight %}
-会被设置为```usr/local/nginx/logs/access.log```。
+会被设置为```/usr/local/nginx/logs/access.log```。
 
 
 
