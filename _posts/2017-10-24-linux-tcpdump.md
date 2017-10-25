@@ -107,10 +107,10 @@ Tcpdump会打印出一个网络接口上匹配布尔表达式```expression```的
 * 3. 打印```ace```与其他所有主机（除helios外）之间的IP包
 {% highlight string %}
 # tcpdump ip host ace and not helios
-{% highlight %}
+{% endhighlight %}
 
 
-* 4. To print all traffic between local hosts and hosts at Berkeley:
+* 4. To print all traffic between local hosts and hosts at Berkeley
 {% highlight string %}
 # tcpdump net ucb-ether
 {% endhighlight %}
