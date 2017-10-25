@@ -94,40 +94,40 @@ Tcpdump会打印出一个网络接口上匹配布尔表达式```expression```的
 
 ## 4. 例子
 
-* 1. 打印```sundown```主机发送和接收的所有数据包
+* 打印```sundown```主机发送和接收的所有数据包
 {% highlight string %}
 # tcpdump host sundown
 {% endhighlight %}
 
-* 2. 打印```helios```与```hot或ace```之间的通信数据包
+* 打印```helios```与```hot或ace```之间的通信数据包
 {% highlight string %}
 # tcpdump host helios and \( hot or ace \)
 {% endhighlight %}
 
-* 3. 打印```ace```与其他所有主机（除helios外）之间的IP包
+* 打印```ace```与其他所有主机（除helios外）之间的IP包
 {% highlight string %}
 # tcpdump ip host ace and not helios
 {% endhighlight %}
 
 
-* 4. To print all traffic between local hosts and hosts at Berkeley
+* To print all traffic between local hosts and hosts at Berkeley
 {% highlight string %}
 # tcpdump net ucb-ether
 {% endhighlight %}
 
 
-* 5. 打印出通过网关snup的所有ftp数据包(注意表达式采用单引号包围，以阻止shell错误的对括号进行解析）
+* 打印出通过网关snup的所有ftp数据包(注意表达式采用单引号包围，以阻止shell错误的对括号进行解析）
 {% highlight string %}
 # tcpdump 'gateway snup and (port ftp or ftp-data)'
 {% endhighlight %}
 
 
-* 6. 打印出源和目的均不为本地主机的数据包
+* 打印出源和目的均不为本地主机的数据包
 {% highlight string %}
 # tcpdump ip and not net localnet
 {% endhighlight %}
 
-* 7. To print the start and end packets (the SYN and FIN packets) of each TCP conversation that involves a non-local host.
+* To print the start and end packets (the SYN and FIN packets) of each TCP conversation that involves a non-local host.
 {% highlight string %}
 # tcpdump 'tcp[tcpflags] & (tcp-syn|tcp-fin) != 0 and not src and dst net localnet'
 {% endhighlight %} 
