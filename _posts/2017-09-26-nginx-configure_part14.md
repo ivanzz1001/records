@@ -60,6 +60,7 @@ THREAD_POOL_SRCS="src/core/ngx_thread_pool.c
                   src/os/unix/ngx_thread_mutex.c
                   src/os/unix/ngx_thread_id.c"
 </pre>
+上述是在auto/sources脚本中定义的。
 
 <br />
 注意： 虽然nginx整体上是一个异步、事件驱动的框架。但是很多第三方模块使用了阻塞调用；即使在当前官方的NGINX代码中，依然无法在全部场景中避免使用阻塞，Nginx1.7.11中实现的线程池机制解决了这个问题。

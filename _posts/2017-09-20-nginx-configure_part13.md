@@ -1150,7 +1150,7 @@ if [ $ngx_found = no ]; then
     fi
 fi
 {% endhighlight %}
-crypt()采用AES对称加密算法对密码进行加密。检测如果支持，这将```CRYPT_LIB``置为 -lcrypt。
+crypt()采用DES对称加密算法对密码进行加密。检测如果支持，这将```CRYPT_LIB```置为 -lcrypt。
 
 **(5) 检查是否支持F_READAHEAD特性**
 {% highlight string %}
@@ -1238,11 +1238,11 @@ ngx_feature_test="directio(0, DIRECTIO_ON);"
 . auto/feature
 {% endhighlight %}
 
-提议```O_DIRECT```类似，只是这里判断是否直接支持directio()函数。directio()不适用操作系统缓存，使得磁盘IO(或者DMA)直接将数据存入用户空间的buffer。避免内核缓冲的内存消耗与CPU拷贝(数据从内核空间到用户空间的拷贝）的消耗。
+其与```O_DIRECT```类似，只是这里判断是否直接支持directio()函数。directio()不使用操作系统缓存，使得磁盘IO(或者DMA)直接将数据存入用户空间的buffer。避免内核缓冲的内存消耗与CPU拷贝(数据从内核空间到用户空间的拷贝）的消耗。
 
 DirectIO使用场景：DirectIO要读取大文件，因为每次都要初始化DMA；如果是读取小文件，初始化DMA花费的时间比系统读小文件的时间还长，所以小文件使用directIO没有优势。对于大文件也只是在只读一次，并且后续没有其他应用再次读取此文件的时候，才能有优势，如果后续还有其他应用需要使用，这个时候DirectIO也没有优势。
 
-direct实际上有几方面的优势，不使用系统缓存一方面，另一方面是使用dma直接由dma控制从内存输入到用户空间的buffer中不经过cpu做mov操作，不消耗cpu。
+directio实际上有几方面的优势，不使用系统缓存一方面，另一方面是使用dma直接由dma控制从内存输入到用户空间的buffer中不经过cpu做mov操作，不消耗cpu。
 
 
 **(10) 检测是否支持statfs()特性**

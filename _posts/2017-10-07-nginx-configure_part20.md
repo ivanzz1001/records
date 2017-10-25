@@ -641,7 +641,13 @@ END
 在nginx-1.10.3主目录下生成Makefile文件，在该Makefile文件中执行```$NGX_MAKEFILE```文件（即objs/Makefile)。
 
 
-
+<br />
+```NOTE```:
+<pre>
+默认情况下，nginx会被安装在/usr/local/nginx目录下，并且在该目录下会创建conf,sbin,logs,modules等文件夹。
+conf文件夹下存放配置文件；sbin文件夹下存放nginx可执行文件；logs文件夹下存放日志文件、pid文件、lock文件；
+modules文件夹下存放dynamic modules的动态链接库文件。
+</pre>
 
 
 <br />

@@ -200,15 +200,15 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
 --outputbase ../results/chi_sim/chi_sim\
 |& grep raw | sed -e 's/ :.*/" \\/g'  | sed -e 's/^/  "/' >../results/chi_sim/fontslist.txt
 
-#  cat ../results/chi_sim/fontslist.txt
+# cat ../results/chi_sim/fontslist.txt
   "AR PL UKai CN" \
   "AR PL UKai HK" \
   "AR PL UKai TW" \
   "AR PL UKai TW MBE" \
-  "AR PL UMing CN Semi-Light" \
-  "AR PL UMing HK Semi-Light" \
-  "AR PL UMing TW MBE Semi-Light" \
-  "AR PL UMing TW Semi-Light" \
+  "AR PL UMing CN Light" \
+  "AR PL UMing HK Light" \
+  "AR PL UMing TW Light" \
+  "AR PL UMing TW MBE Light" \
   "Arial Unicode MS" \
   "Arial Unicode MS Bold" \
   "FangSong" \
@@ -220,10 +220,10 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "Noto Sans SC" \
   "Noto Sans SC Bold" \
   "Noto Sans SC Heavy" \
+  "Noto Sans SC Light" \
+  "Noto Sans SC Light" \
   "Noto Sans SC Medium" \
   "Noto Sans SC Medium" \
-  "Noto Sans SC Semi-Light" \
-  "Noto Sans SC Semi-Light" \
   "STFangsong" \
   "STKaiti" \
   "STSong" \
@@ -246,10 +246,10 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "AR PL UKai HK" \
   "AR PL UKai TW" \
   "AR PL UKai TW MBE" \
-  "AR PL UMing CN Semi-Light" \
-  "AR PL UMing HK Semi-Light" \
-  "AR PL UMing TW MBE Semi-Light" \
-  "AR PL UMing TW Semi-Light" \
+  "AR PL UMing CN Light" \
+  "AR PL UMing HK Light" \
+  "AR PL UMing TW Light" \
+  "AR PL UMing TW MBE Light" \
   "Arial Unicode MS" \
   "Arial Unicode MS Bold" \
   "FangSong" \
@@ -261,8 +261,8 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "Noto Sans SC" \
   "Noto Sans SC Bold" \
   "Noto Sans SC Heavy" \
+  "Noto Sans SC Light" \
   "Noto Sans SC Medium" \
-  "Noto Sans SC Semi-Light" \
   "STFangsong" \
   "STKaiti" \
   "STSong" \
@@ -278,6 +278,10 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "WenQuanYi Zen Hei Sharp Medium" \
   "YouYuan" \
 
+# cp ../tessdata_best/eng.traineddata ./tessdata
+# cp ../tessdata_best/chi_sim_vert.traineddata  ./tessdata
+# cp ../tessdata_best/ori.traineddata ./tessdata
+# cp ../tessdata_best/osd.traineddata ./tessdata
 
 //产生training data
 # training/tesstrain.sh --fonts_dir /usr/share/fonts --lang chi_sim --linedata_only \
@@ -288,10 +292,10 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "AR PL UKai HK" \
   "AR PL UKai TW" \
   "AR PL UKai TW MBE" \
-  "AR PL UMing CN Semi-Light" \
-  "AR PL UMing HK Semi-Light" \
-  "AR PL UMing TW MBE Semi-Light" \
-  "AR PL UMing TW Semi-Light" \
+  "AR PL UMing CN Light" \
+  "AR PL UMing HK Light" \
+  "AR PL UMing TW Light" \
+  "AR PL UMing TW MBE Light" \
   "Arial Unicode MS" \
   "Arial Unicode MS Bold" \
   "FangSong" \
@@ -303,8 +307,8 @@ training/tesstrain.sh --fonts_dir /usr/share/fonts --lang eng --linedata_only \
   "Noto Sans SC" \
   "Noto Sans SC Bold" \
   "Noto Sans SC Heavy" \
+  "Noto Sans SC Light" \
   "Noto Sans SC Medium" \
-  "Noto Sans SC Semi-Light" \
   "STFangsong" \
   "STKaiti" \
   "STSong" \
@@ -537,6 +541,20 @@ training/lstmtraining --debug_interval 100 \
   --train_listfile ../tesstutorial/chi_simtrain/chi_sim.training_files.txt \
   --eval_listfile ../tesstutorial/chi_simeval/chi_sim.training_files.txt \
   --max_iterations 600000 &>../tesstutorial/chi_simoutput/basetrain.log
+{% endhighlight %}
+
+注意这里如果远程执行，可能会出现如下错误：
+<pre>
+No X11 DISPLAY variable was set, but this program performed an operation which requires it.
+</pre>
+此时我们需要设置```DISPLAY```环境变量：
+{% highlight string %}
+
+// 在~/.bashrc环境变量文件最下方加入
+# export DISPLAY=:0.0
+
+// 然后，刷新环境变量以使其生效
+# source ~/.bashrc
 {% endhighlight %}
 
 

@@ -109,7 +109,7 @@ checking for $ngx_type size
 END
 {% endhighlight %}
 
-```$ngx_n```与```$ngx_c```我们前面讲述过，分别指相应的换行符和退行符。```$ngx_type```为当前我们需要检查的数据类型。
+```$ngx_n```与```$ngx_c```我们前面讲述过，主要是为了禁止换行。```$ngx_type```为当前我们需要检查的数据类型。
 
 ### 1.2 生成并编译程序
 {% highlight string %}
@@ -140,6 +140,8 @@ ngx_test="$CC $CC_TEST_FLAGS $CC_AUX_FLAGS \
 eval "$ngx_test >> $NGX_AUTOCONF_ERR 2>&1"
 {% endhighlight %}
 将ngx_size值置为空，接着生成objs/autotest.c程序，然后编译。这里```$NGX_LD_OPT```与```$ngx_feature_libs```值为空.
+
+```NGX_INCLUDE_UNISTD_H```与```NGX_INCLUDE_INTTYPES_H```在这里仅作为一个标记，值为空。而```NGX_INCLUDE_AUTO_CONFIG_H```会在auto/unix脚本中根据需要进行设置。
 
 ### 1.3 执行程序，并根据执行结果进行处理
 {% highlight string %}
@@ -283,7 +285,7 @@ checking for $ngx_type
 
 END
 {% endhighlight %}
-```$ngx_n```与```$ngx_c```我们前面讲述过，分别指相应的换行符和退行符。```$ngx_type```为当前我们需要检查的数据类型。
+```$ngx_n```与```$ngx_c```我们前面讲述过，主要是为了禁止换行。```$ngx_type```为当前我们需要检查的数据类型。
 
 ### 2.2 循环检查对应的类型
 {% highlight string %}
@@ -432,7 +434,7 @@ checking for uintptr_t
 END
 {% endhighlight %}
 
-```$ngx_n```与```$ngx_c```我们前面讲述过，分别指相应的换行符和退行符。
+```$ngx_n```与```$ngx_c```我们前面讲述过，主要是为了禁止换行。
 
 ### 3.2 生成并编译程序
 {% highlight string %}

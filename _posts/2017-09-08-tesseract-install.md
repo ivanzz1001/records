@@ -199,7 +199,7 @@ lept.pc  libevent.pc  libevent_pthreads.pc  msgpack.pc
 # unzip master.zip 
 
 # ./autogen.sh
-# ./configure --prefix=/opt/tesseract4.0
+# ./configure --prefix=/opt/tesseract4.0 --disable-graphics
 
 
 

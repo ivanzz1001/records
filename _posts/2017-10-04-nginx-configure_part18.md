@@ -740,7 +740,7 @@ LINK =	$LINK
 END
 {% endhighlight %}
 
-这里```$CC```为在auto/options脚本中被置为``cc```。
+这里```$CC```为在auto/options脚本中被置为```cc```。
 
 ```CFLAGS```在auto/cc/gcc脚本中被置为：
 <pre>
@@ -755,7 +755,12 @@ CFLAGS =  -pipe  -O -W -Wall -Wpointer-arith -Wno-unused-parameter -Werror -g
 
 
 **3) 处理PERL CFLAGS**
-
+{% highlight string %}
+if test -n "$NGX_PERL_CFLAGS"; then
+    echo NGX_PERL_CFLAGS = $NGX_PERL_CFLAGS                   >> $NGX_MAKEFILE
+    echo NGX_PM_CFLAGS = $NGX_PM_CFLAGS                       >> $NGX_MAKEFILE
+fi
+{% endhighlight %}
 ```NGX_PERL_CFLAGS```为空，不进行处理。
 
 <br />

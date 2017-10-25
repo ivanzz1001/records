@@ -160,18 +160,20 @@ if [ $NGX_DEBUG = YES ]; then
 fi
 {% endhighlight %}
 
-这里```NGX_OBJS```在auto/options中被初始化为objs；
+这里,
 
-```NGX_AUTO_HEADERS_H```在auto/init中被初始化为objs/ngx_auto_headers.h;
+* ```NGX_OBJS```: 在auto/options中被初始化为objs；
 
-```NGX_AUTOCONF_ERR```在auto/init中被初始化为objs/autoconf.err;
+* ```NGX_AUTO_HEADERS_H```: 在auto/init中被初始化为objs/ngx_auto_headers.h;
 
-```NGX_CONFIGURE```被设置为：
+* ```NGX_AUTOCONF_ERR```: 在auto/init中被初始化为objs/autoconf.err;
+
+* ```NGX_CONFIGURE```: 被设置为
 <pre>
 #define NGX_CONFIGURE " --sbin-path=/usr/local/nginx/nginx --conf-path=/usr/local/nginx/nginx.conf --pid-path=/usr/local/nginx/nginx.pid --with-http_ssl_module --with-pcre=../pcre-8.40 --with-zlib=../zlib-1.2.11"
 </pre>
 
-```NGX_DEBUG```在auto/options中被初始化为```NO```.
+* ```NGX_DEBUG```: 在auto/options中被初始化为```NO```.
 
 <br />
 

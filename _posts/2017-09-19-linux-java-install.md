@@ -44,7 +44,7 @@ Codename:       Core
 * 可以直接到官网下载http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html (这里选择的是rpm 64位的)，下载完然后复制到centos中的自己想要存放的目录中
 * 直接在centos中，创建一个目录存储下载的jdk，然后通过命令下载
 <pre>
-# wget jdk-8u131-linux-x64.rpm http://download.oracle.com/otn-pub/java/jdk/8u131-b11/jdk-8u131-linux-x64.rpm
+# wget http://download.oracle.com/otn-pub/java/jdk/8u131-b11/jdk-8u131-linux-x64.rpm
 </pre>
 
 下载完成后执行如下命令进行安装：
@@ -135,7 +135,14 @@ Hello,world
 
 
 
+<br />
+<br/>
 
+**说明**,Linux环境下后台执行命令的两种方式：
+
+* command & ： 后台运行，你关掉终端会停止运行
+
+* nohup command & ： 后台运行，你关掉终端也会继续运行
 
 
 <br />
