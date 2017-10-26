@@ -723,6 +723,73 @@ extern char **environ;
 
 * ```NGX_HAVE_INHERITED_NONBLOCK```: 没有定义
 
+<br />
+
+```extern char **environ```其一般是定义在操作系统posix/environ.c中。该变量在我们可执行程序启动时操作系统就会自动为我们赋值。看如下测试程序test2.c:
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+
+
+extern   char**environ;
+
+int main(int argc,char *argv[])
+{
+        char **p = NULL;
+
+        if (environ == NULL)
+                printf("environ is NULL\n");
+        else{
+            for(p = environ; *p; p++)
+            {
+                printf("%s\n",*p);
+            }
+        }
+        return 0x0;
+}
+{% endhighlight %}
+
+编译运行：
+<pre>
+[root@localhost test-src]# gcc -o test2 test2.c
+[root@localhost test-src]# ./test2
+XDG_SESSION_ID=23
+HOSTNAME=localhost.localdomain
+SELINUX_ROLE_REQUESTED=
+TERM=vt100
+SHELL=/bin/bash
+HISTSIZE=1000
+SSH_CLIENT=192.168.69.1 49180 22
+SELINUX_USE_CURRENT_RANGE=
+SSH_TTY=/dev/pts/2
+JRE_HOME=/usr/java/jdk1.8.0_131/jre
+USER=root
+LS_COLORS=rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;   //此处部分删减
+MAIL=/var/spool/mail/root
+PATH=/usr/java/jdk1.8.0_131//bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin
+PWD=/root/test-src
+JAVA_HOME=/usr/java/jdk1.8.0_131/
+LANG=en_US.UTF-8
+SELINUX_LEVEL_REQUESTED=
+HISTCONTROL=ignoredups
+SHLVL=1
+HOME=/root
+LOGNAME=root
+CLASSPATH=/usr/java/jdk1.8.0_131//lib:/usr/java/jdk1.8.0_131/jre/lib:
+SSH_CONNECTION=192.168.69.1 49180 192.168.69.128 22
+PKG_CONFIG_PATH=:/usr/local/lib/pkgconfig/
+LESSOPEN=||/usr/bin/lesspipe.sh %s
+XDG_RUNTIME_DIR=/run/user/0
+_=./test2
+OLDPWD=/root
+</pre>
+
+与我们直接调用如下命令得到的结果一致：
+<pre>
+# env
+</pre>
+
+
 ## 4. core/ngx_config.h头文件
 {% highlight string %}
 
