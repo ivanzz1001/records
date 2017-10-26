@@ -87,7 +87,7 @@ argv: 0x5a184a78  environ: 0x5a184a90
 
 由上测试结果，我们发现argv与environ内存是按如下方式组织的：
 
-![linux_argv_env](https://ivanzz1001.github.io/records/assets/img/linux/linux_argv_env.jpg)
+![linux_argv_env](https://ivanzz1001.github.io/records/assets/img/linux/linux_argv_env.png)
 
 
 
