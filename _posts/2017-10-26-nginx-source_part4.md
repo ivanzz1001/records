@@ -165,6 +165,8 @@ root      52608  0.0  0.0   4160   340 pts/2    S+   19:19   0:00 just for test
  */
 </pre>
 
+### 2.1 初始化函数
+
 由于nginx中考虑多进程的情况，因此其会在初始化时就完成environ的迁移。下面首先是初始化函数：
 {% highlight string %}
 extern char **environ;
@@ -228,7 +230,67 @@ ngx_init_setproctitle(ngx_log_t *log)
 </pre>
 
 
+### 2.2 具体的设置title函数
 
+看如下具体的设置title函数：
+{% highlight string %}
+void
+ngx_setproctitle(char *title)
+{
+    u_char     *p;
+
+#if (NGX_SOLARIS)
+
+    ngx_int_t   i;
+    size_t      size;
+
+#endif
+
+    ngx_os_argv[1] = NULL;
+
+    p = ngx_cpystrn((u_char *) ngx_os_argv[0], (u_char *) "nginx: ",
+                    ngx_os_argv_last - ngx_os_argv[0]);
+
+    p = ngx_cpystrn(p, (u_char *) title, ngx_os_argv_last - (char *) p);
+
+#if (NGX_SOLARIS)
+
+    size = 0;
+
+    for (i = 0; i < ngx_argc; i++) {
+        size += ngx_strlen(ngx_argv[i]) + 1;
+    }
+
+    if (size > (size_t) ((char *) p - ngx_os_argv[0])) {
+
+        /*
+         * ngx_setproctitle() is too rare operation so we use
+         * the non-optimized copies
+         */
+
+        p = ngx_cpystrn(p, (u_char *) " (", ngx_os_argv_last - (char *) p);
+
+        for (i = 0; i < ngx_argc; i++) {
+            p = ngx_cpystrn(p, (u_char *) ngx_argv[i],
+                            ngx_os_argv_last - (char *) p);
+            p = ngx_cpystrn(p, (u_char *) " ", ngx_os_argv_last - (char *) p);
+        }
+
+        if (*(p - 1) == ' ') {
+            *(p - 1) = ')';
+        }
+    }
+
+#endif
+
+    if (ngx_os_argv_last - (char *) p) {
+        ngx_memset(p, NGX_SETPROCTITLE_PAD, ngx_os_argv_last - (char *) p);
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0,
+                   "setproctitle: \"%s\"", ngx_os_argv[0]);
+}
+{% endhighlight %}
 
 
 
