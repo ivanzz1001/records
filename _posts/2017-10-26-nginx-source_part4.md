@@ -89,6 +89,134 @@ argv: 0x5a184a78  environ: 0x5a184a90
 
 ![linux_argv_env](https://ivanzz1001.github.io/records/assets/img/linux/linux_argv_env.png)
 
+**2) 程序proctitle**
+
+test4.c源代码：
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <string.h>
+
+int main(int argc,char *argv[])
+{
+    char cmd[128]={0};
+    const char proctitle[] = "just for test";
+    char *title2 = "hello, new title";
+
+    pid_t id = getpid();
+
+    sprintf(cmd,"ps -aux | awk '{ if ($2 == %d) print $0}'",id);
+
+    printf("cmd: %s\n\n",cmd);
+
+    system(cmd);
+
+    strcpy(argv[0],proctitle);
+
+    system(cmd);
+
+    argv[0] = title2;
+    printf("\nargv[0]: %s\n",argv[0]);
+    system(cmd);
+
+    return 0;
+         
+}
+{% endhighlight %}
+
+编译运行：
+<pre>
+[root@localhost test-src]# gcc -o test4 test4.c
+[root@localhost test-src]# ./test4
+cmd: ps -aux | awk '{ if ($2 == 52608) print $0}'
+
+root      52608  0.0  0.0   4160   340 pts/2    S+   19:19   0:00 ./test4
+root      52608  0.0  0.0   4160   340 pts/2    S+   19:19   0:00 just for test
+
+argv[0]: hello, new title
+root      52608  0.0  0.0   4160   340 pts/2    S+   19:19   0:00 just for test
+</pre>
+
+通过上述运行结果，程序```proctitle```存放于argv[0]初始指向的位置， 后续手动更改argv[0]指向位置是不会更改```proctitle```的。
+
+但是这种方式是以破坏性的方式来修改进程title的。由于程序的参数存储空间的后面紧跟的就是环境变量的存储位置，在不考虑参数的破坏性的情况下，过长的title也会损坏环境变量environ的值。因此在nginx中，是将环境变量进行移位存储处理的。下面我们会介绍nginx设置进程title的思路。
+
+
+## 2. nginx修改进程title思路
+
+先看如下说明：
+<pre>
+/*
+ * To change the process title in Linux and Solaris we have to set argv[1]
+ * to NULL and to copy the title to the same place where the argv[0] points to.
+ * However, argv[0] may be too small to hold a new title.  Fortunately, Linux
+ * and Solaris store argv[] and environ[] one after another.  So we should
+ * ensure that is the continuous memory and then we allocate the new memory
+ * for environ[] and copy it.  After this we could use the memory starting
+ * from argv[0] for our process title.
+ *
+ * The Solaris's standard /bin/ps does not show the changed process title.
+ * You have to use "/usr/ucb/ps -w" instead.  Besides, the UCB ps does not
+ * show a new title if its length less than the origin command line length.
+ * To avoid it we append to a new title the origin command line in the
+ * parenthesis.
+ */
+</pre>
+
+由于nginx中考虑多进程的情况，因此其会在初始化时就完成environ的迁移。下面首先是初始化函数：
+{% highlight string %}
+extern char **environ;
+
+static char *ngx_os_argv_last;
+
+ngx_int_t
+ngx_init_setproctitle(ngx_log_t *log)
+{
+    u_char      *p;
+    size_t       size;
+    ngx_uint_t   i;
+
+    size = 0;
+
+    for (i = 0; environ[i]; i++) {
+        size += ngx_strlen(environ[i]) + 1;
+    }
+
+    p = ngx_alloc(size, log);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_os_argv_last = ngx_os_argv[0];
+
+    for (i = 0; ngx_os_argv[i]; i++) {
+        if (ngx_os_argv_last == ngx_os_argv[i]) {
+            ngx_os_argv_last = ngx_os_argv[i] + ngx_strlen(ngx_os_argv[i]) + 1;
+        }
+    }
+
+    for (i = 0; environ[i]; i++) {
+        if (ngx_os_argv_last == environ[i]) {
+
+            size = ngx_strlen(environ[i]) + 1;
+            ngx_os_argv_last = environ[i] + size;
+
+            ngx_cpystrn(p, (u_char *) environ[i], size);
+            environ[i] = (char *) p;
+            p += size;
+        }
+    }
+
+    ngx_os_argv_last--;
+
+    return NGX_OK;
+}
+{% endhighlight %}
+
+
+
 
 
 
