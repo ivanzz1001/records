@@ -240,6 +240,7 @@ GCC-4.8及以上版本。
 
 1. [phxpaxos](https://github.com/Tencent/phxpaxos/blob/master/README.zh_CN.md)
 
+2. [Paxos从理论到实践](http://mp.weixin.qq.com/s/WEi2kojApSP8PBupdP_8yw)
 
 <br />
 <br />
