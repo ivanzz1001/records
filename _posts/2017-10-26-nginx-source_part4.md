@@ -215,6 +215,19 @@ ngx_init_setproctitle(ngx_log_t *log)
 }
 {% endhighlight %}
 
+结合上面的图，该段代码的主要功能就是： 将紧接着argv后面的环境变量environ拷贝到新的空间中。具体过程如下：
+<pre>
+1. 求出environ长度并分配新的空间
+
+2. 求出argv最后一个参数的末尾位置
+
+3. 如果environ仅跟在argv最后一个参数末尾位置后，则条件ngx_os_argv_last == environ[i]成立，此时会将
+   environ拷贝到新分配的空间中。
+
+4. ngx_os_argv_last最后指向用于存放参数的最后一个位置
+</pre>
+
+
 
 
 
