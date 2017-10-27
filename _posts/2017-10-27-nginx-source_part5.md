@@ -169,7 +169,7 @@ ngx_cpuinfo(void)
 
 1. [ngxin源代码完全注释](http://blog.csdn.net/Poechant/article/details/7960215)
 
-
+2. [进程异常退出导致死锁的解决办法](http://blog.csdn.net/wangzuxi/article/details/44775231)
 
 
 
