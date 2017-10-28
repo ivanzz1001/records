@@ -130,6 +130,39 @@ ngx_os_specific_init(ngx_log_t *log)
 # uname -r
 </pre>
 
+针对当前我们当前的环境，写如下程序进行测试：
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/utsname.h>
+
+
+
+int main(int argc,char *argv[])
+{
+    struct utsname  u;
+
+    if (uname(&u) == -1) {
+      return -1;
+    }
+
+
+    printf("sysname: %s\n",u.sysname);
+    printf("release: %s\n",u.release);
+
+    return 0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o test1 test1.c
+# ./test1
+sysname: Linux
+release: 4.10.0-35-generic
+</pre>
+
+
+
 ## 1.3 打印操作系统类型及版本相关信息
 {% highlight string %}
 void
