@@ -69,19 +69,19 @@ int main(int argc,char *argv[])
 
 编译执行(当前测试允许运行在64位操作系统)：
 <pre>
-[root@localhost test-src]# gcc -o test3 test3.c
-[root@localhost test-src]# ./test3 date=2017-10-26
-0x5a186745 : ./test3
-0x5a18674d : date=2017-10-26
+root@ubuntu:~/test-src# gcc -o test3 test3.c
+root@ubuntu:~/test-src# ./test3 date=2017-10-26
+0xbfd1f84e : ./test2
+0xbfd1f856 : date=2017-10-26
 
-0x5a18675d : XDG_SESSION_ID=23
-0x5a18676f : HOSTNAME=localhost.localdomain
+0xbfd1f866 : XDG_SESSION_ID=1
+0xbfd1f877 : SHELL=/bin/bash
 
-argv: 0x5a184a78  environ: 0x5a184a90
-&argv[0]: 0x5a184a78
-&argv[1]: 0x5a184a80
-&argv[2]: 0x5a184a88
-&argv[3]: 0x5a184a90
+argv: 0xbfd1e954  environ: 0xbfd1e960
+&argv[0]: 0xbfd1e954
+&argv[1]: 0xbfd1e958
+&argv[2]: 0xbfd1e95c
+&argv[3]: 0xbfd1e960
 </pre>
 
 

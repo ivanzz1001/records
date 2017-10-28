@@ -458,6 +458,12 @@ ngx_test="$CC $CC_TEST_FLAGS $CC_AUX_FLAGS \
 eval "$ngx_test >> $NGX_AUTOCONF_ERR 2>&1"
 {% endhighlight %}
 
+```NGX_INTTYPES_H```在auto/headers脚本调用中被设置:
+<pre>
+auto/include脚本如下行：
+
+eval "NGX_$ngx_name='#include <$ngx_include>'"
+</pre>
 
 ### 3.3 执行程序，并根据结果进行处理
 {% highlight string %}
