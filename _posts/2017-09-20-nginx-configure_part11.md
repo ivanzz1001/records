@@ -141,7 +141,7 @@ eval "$ngx_test >> $NGX_AUTOCONF_ERR 2>&1"
 {% endhighlight %}
 将ngx_size值置为空，接着生成objs/autotest.c程序，然后编译。这里```$NGX_LD_OPT```与```$ngx_feature_libs```值为空.
 
-```NGX_INCLUDE_UNISTD_H```与```NGX_INCLUDE_INTTYPES_H```在这里仅作为一个标记，值为空。而```NGX_INCLUDE_AUTO_CONFIG_H```会在auto/unix脚本中根据需要进行设置。
+```NGX_INCLUDE_UNISTD_H```与```NGX_INCLUDE_INTTYPES_H```通过在auto/headers脚本调用auto/include分别被设置为了```#include<unistd.h>```与```#include <inttypes.h>```。而```NGX_INCLUDE_AUTO_CONFIG_H```会在auto/unix脚本中根据需要进行设置。
 
 ### 1.3 执行程序，并根据执行结果进行处理
 {% highlight string %}
