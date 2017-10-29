@@ -370,10 +370,13 @@ ngx_cpuinfo(void)
 
 [参看]:
 
+1. [linux C语言调用Intel处理器CPUID指令的实例](http://blog.csdn.net/subfate/article/details/50789905)
 
-1. [ngxin源代码完全注释](http://blog.csdn.net/Poechant/article/details/7960215)
+2. [Linux下C编程 -- 得到系统的CPU信息(cpuid)](http://blog.chinaunix.net/uid-25808509-id-2467177.html)
+3. 
+2. [ngxin源代码完全注释](http://blog.csdn.net/Poechant/article/details/7960215)
 
-2. [进程异常退出导致死锁的解决办法](http://blog.csdn.net/wangzuxi/article/details/44775231)
+3. [进程异常退出导致死锁的解决办法](http://blog.csdn.net/wangzuxi/article/details/44775231)
 
 
 

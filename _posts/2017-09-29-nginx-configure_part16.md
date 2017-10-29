@@ -3360,7 +3360,11 @@ char *ngx_module_names[] = {
 
 
 {% endhighlight %}
+ngx_modules.c文件就是用来定义ngx_modules数组的。
 
+ngx_modules是非常关键的数组，它指明了每个模块在Nginx中的优先级，当一个请求同时符合多个模块的处理规则时，它将按照它们在ngx_modules数组中的顺序选择最靠前的模块优先处理。对于HTTP过滤模块而言则相反，因为HTTP框架在初始化时，会在ngx_modules数组中将过滤模块按先后顺序向过滤链表中添加，但每次都添加到链表表头，因此，对HTTP过滤模块而言，在ngx_modules数组中越靠后的模块反而会首先处理HTTP响应。
+
+因此，ngx_modules中模块的先后顺序非常重要，不正确的顺序会导致nginx无法工作，上面是auto/modules脚本执行后的结果。可以体会一下上面的ngx_modules中同一类型下各个模块的顺序以及这种顺序带来的意义。
 
 
 <br />
