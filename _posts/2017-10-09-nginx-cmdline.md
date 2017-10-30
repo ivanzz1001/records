@@ -293,14 +293,14 @@ root@ubuntu:/usr/local/nginx# /usr/local/nginx/nginx -s quit
 该命令与快速停止Nginx服务是有区别的。当快速停止服务时，worker进程与master进程在收到信号后会立刻跳出循环，退出进程。而“优雅”地停止服务时，首先会关闭监听端口，停止接收新的连接，然后把当前正在处理的连接全部处理完成，最后再退出进程。
 
 与快速停止服务相似，可以直接发送```QUIT```信号给master进程来停止服务，其效果与执行```-s quit```命令是一样的。例如：
-<pre>
+{% highlight string %}
 # kill -s SIGQUIT <nginx master pid>
-</pre>
+{% endhighlight %}
 
 如果希望“优雅”的停止某个worker进程，那么可以通过向该进程发送```WINCH```信号来停止服务。例如：
-<pre>
+{% highlight string %}
 # kill -s SIGWINCH <nginx worker pid>
-</pre>
+{% endhighlight %}
 
 ### 1.11 使运行中的nginx重读配置项并生效
 使用```-s reload```参数可以使运行中的Nginx服务重新加载nginx.conf文件。例如：
@@ -309,9 +309,9 @@ root@ubuntu:/usr/local/nginx# /usr/local/nginx/nginx -s reload
 </pre>
 
 事实上，Nginx会首先检查新的配置项是否有误，如果全部正确就以“优雅”的方式关闭。在重新启动Nginx来实现这个目的。类似的，```-s```是发送信号，仍然可以用kill命令发送```HUP```信号来达到相同的效果。
-<pre>
+{% highlight string %}
 # kill -s SIGHUP <nginx master pid>
-</pre>
+{% endhighlight %}
 
 ### 1.12 日志文件回滚
 使用```-s reopen```参数可以重新打开日志文件，这样可以先把当前日志文件改名或转移到其他目录中进行备份，再重新打开时就会生成新的日志文件。这个功能使得日志文件不至于过大。例如：
@@ -319,9 +319,9 @@ root@ubuntu:/usr/local/nginx# /usr/local/nginx/nginx -s reload
 root@ubuntu:/usr/local/nginx# /usr/local/nginx/nginx -s reopen
 </pre>
 当然也可以使用kill命令发送```USR1```信号来达到同样的效果。
-<pre>
+{% highlight string %}
 # kill -s SIGUSR1 <nginx master pid>
-</pre>
+{% endhighlight %}
 
 由于nginx是通过inode指向日志文件的，inode和文件名无关，所以即使把日志文件重命名，nginx还是将日志文件写入原文件，只有用上面的命令重新开启日志文件才能将日志写入新的日志文件。
 
@@ -332,9 +332,9 @@ root@ubuntu:/usr/local/nginx# /usr/local/nginx/nginx -s reopen
 升级时包括以下步骤：
 
 1) 通知正在运行的旧版本Nginx准备升级，通过向master进程发送```USR2```信号可以达到目的。例如：
-<pre>
+{% highlight string %}
 # kill -s SIGUSR2 <nginx master pid>
-</pre>
+{% endhighlight %}
 这里我们执行后：
 <pre>
 root@ubuntu:/usr/local/nginx# ps -ef | grep nginx
