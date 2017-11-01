@@ -238,6 +238,7 @@ tesseract 4.00.00alpha
  Found SSE
 </pre>
 
+一般情况下tessdata_dir目录为/opt/tesseract4.0/share/tessdata，如果tessdata目录在其他地方，我们可以通过```TESSDATA_PREFIX```来进行设置。假设我们在/opt/tess_best/tessdata目录下存放训练数据的话，我们可以将```TESSDATA_PREFIX```设置为/opt/tess_best.
 
 ## 2. windows上安装tesseract
 
