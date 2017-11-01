@@ -273,7 +273,14 @@ chi_sim.traineddata  chi_sim_vert.traineddata  eng.traineddata  ori.traineddata 
 
 我们可以通过如下方式来下载：
 {% highlight string %}
-# mkdir tessdata_best && cd tessdata_best
+# mkdir tessdata && cd tessdata
+# wget https://github.com/tesseract-ocr/tessdata/raw/master/chi_sim.traineddata
+# wget https://github.com/tesseract-ocr/tessdata/raw/master/chi_sim_vert.traineddata
+# wget https://github.com/tesseract-ocr/tessdata/raw/master/eng.traineddata
+# wget https://github.com/tesseract-ocr/tessdata/raw/master/ori.traineddata
+# wget https://github.com/tesseract-ocr/tessdata/raw/master/osd.traineddata
+
+# mkdir tessdata_best && cd tessdata_best                           # (best for lstm)
 # wget https://github.com/tesseract-ocr/tessdata_best/raw/master/chi_sim.traineddata
 # wget https://github.com/tesseract-ocr/tessdata_best/raw/master/chi_sim_vert.traineddata
 # wget https://github.com/tesseract-ocr/tessdata_best/raw/master/eng.traineddata
