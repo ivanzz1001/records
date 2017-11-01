@@ -373,14 +373,22 @@ ngx_cpuinfo(void)
 1. [linux C语言调用Intel处理器CPUID指令的实例](http://blog.csdn.net/subfate/article/details/50789905)
 
 2. [Linux下C编程 -- 得到系统的CPU信息(cpuid)](http://blog.chinaunix.net/uid-25808509-id-2467177.html)
-3. 
-2. [ngxin源代码完全注释](http://blog.csdn.net/Poechant/article/details/7960215)
+ 
+3. [ngxin源代码完全注释](http://blog.csdn.net/Poechant/article/details/7960215)
 
-3. [进程异常退出导致死锁的解决办法](http://blog.csdn.net/wangzuxi/article/details/44775231)
+4. [进程异常退出导致死锁的解决办法](http://blog.csdn.net/wangzuxi/article/details/44775231)
 
+5. [最牛X的GCC 内联汇编](http://www.cnblogs.com/big-tree/p/5884543.html)
 
+6. [Inline assembly for x86 in Linux](https://www.ibm.com/developerworks/library/l-ia/index.html)
 
+7. [GCC-Inline-Assembly-HOWTO](http://www.ibiblio.org/gferg/ldp/GCC-Inline-Assembly-HOWTO.html)
 
+8. [C语言函数调用及栈帧结构](http://blog.csdn.net/qq_29403077/article/details/53205010)
+
+9. [深入理解C语言的函数调用过程](http://blog.chinaunix.net/uid-23069658-id-3981406.html)
+
+10. [深入理解C语言的函数调用过程](http://www.lupaworld.com/article-260205-1.html)
 <br />
 <br />
 <br />
