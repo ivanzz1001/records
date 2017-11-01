@@ -257,10 +257,29 @@ tesseract 4.00.00alpha
 
 在tesseract官网的tessdata工程下有很多已经为我们训练好的各种语言的数据，我们如果不想自己训练，就可以直接采用。由于整个工程训练数据比较大，我们可以只下载自己所需要的训练数据即可。
 {% highlight string %}
-# git clone https://github.com/tesseract-ocr/tessdata.git     # 这里我们全部下载
+# git clone https://github.com/tesseract-ocr/tessdata.git        # 这里我们全部下载(for general purpose)
+
+# git clone https://github.com/tesseract-ocr/tessdata_best.git   #(best for lstm)
 {% endhighlight %}
 
 下载下来之后，把自己所需要的训练数据复制到安装目录下的share/tessdata目录。例如我们上面把tesseract安装到了/opt/tesseract4.0目录下，则这里我们可以将所需要的语言包复制到/opt/tesseract4.0/share/tessdata目录下。
+
+不过因为tessdata(tessdata_best)数据太大，针对中文我们一般只需要如下几个文件：
+<pre>
+[root@localhost tessdata_best]# ls
+chi_sim.traineddata  chi_sim_vert.traineddata  eng.traineddata  ori.traineddata  osd.traineddata
+</pre>
+
+我们可以通过如下方式来下载：
+{% highlight string %}
+# mkdir tessdata_best && cd tessdata_best
+# wget https://github.com/tesseract-ocr/tessdata_best/raw/master/chi_sim.traineddata
+# wget https://github.com/tesseract-ocr/tessdata_best/raw/master/chi_sim_vert.traineddata
+# wget https://github.com/tesseract-ocr/tessdata_best/raw/master/eng.traineddata
+# wget https://github.com/tesseract-ocr/tessdata_best/raw/master/ori.traineddata
+# wget https://github.com/tesseract-ocr/tessdata_best/raw/master/osd.traineddata
+{% endhighlight %}
+
 
 
 ## 5. 测试
