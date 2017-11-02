@@ -336,6 +336,78 @@ void ngx_spinlock(ngx_atomic_t *lock, ngx_atomic_int_t value, ngx_uint_t spin);
 
 
 
+## 2. 执行NGX_HAVE_GCC_ATOMIC代码
+
+由于我们在执行configure时生成的头文件中定义了```NGX_HAVE_GCC_ATOMIC```，因此这里我们执行如下：
+{% highlight string %}
+#if (NGX_HAVE_LIBATOMIC)
+
+#elif (NGX_DARWIN_ATOMIC)
+
+
+#elif (NGX_HAVE_GCC_ATOMIC)
+
+/* GCC 4.1 builtin atomic operations */
+
+#define NGX_HAVE_ATOMIC_OPS  1
+
+typedef long                        ngx_atomic_int_t;
+typedef unsigned long               ngx_atomic_uint_t;
+
+#if (NGX_PTR_SIZE == 8)
+#define NGX_ATOMIC_T_LEN            (sizeof("-9223372036854775808") - 1)
+#else
+#define NGX_ATOMIC_T_LEN            (sizeof("-2147483648") - 1)
+#endif
+
+typedef volatile ngx_atomic_uint_t  ngx_atomic_t;
+
+
+#define ngx_atomic_cmp_set(lock, old, set)                                    \
+    __sync_bool_compare_and_swap(lock, old, set)
+
+#define ngx_atomic_fetch_add(value, add)                                      \
+    __sync_fetch_and_add(value, add)
+
+#define ngx_memory_barrier()        __sync_synchronize()
+
+#if ( __i386__ || __i386 || __amd64__ || __amd64 )
+#define ngx_cpu_pause()             __asm__ ("pause")
+#else
+#define ngx_cpu_pause()
+#endif
+
+
+#elif ( __i386__ || __i386 )
+
+
+#elif ( __amd64__ || __amd64 )
+
+
+#elif ( __sparc__ || __sparc || __sparcv9 )
+
+
+#elif ( __powerpc__ || __POWERPC__ )
+
+
+#endif
+{% endhighlight %}
+
+如上，```NGX_PTR_SIZE```在我们当前环境下为4,因此：
+<pre>
+#define NGX_ATOMIC_T_LEN            (sizeof("-2147483648") - 1)
+</pre>
+
+在我们当前环境定义了```__i386__```与```__i386```，因此会执行如下：
+<pre>
+#define ngx_cpu_pause()             __asm__ ("pause")
+</pre>
+
+下面我们介绍一下gcc中的一些内置原子函数：
+
+### 2.1 gcc内置原子函数
+
+参看：<<Using the GNU Compiler Collection>> p462
 
 
 
