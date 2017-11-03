@@ -426,6 +426,7 @@ type __sync_fetch_and_nand (type *ptr, type value, ...)
 </pre>
 
 *注意*：GCC 4.4及之后的版本```__sync_fetch_and_nand```的实现变为：*ptr = ~(tmp & value)， 而不是 *ptr = ~tmp & value .
+
 <br />
 
 {% highlight string %}
@@ -453,7 +454,6 @@ type __sync_val_compare_and_swap (type *ptr, type oldval type newval, ...)
 {% endhighlight %}
 上面这两个函数提供原子的比较和交换：如果 *ptr == oldval，就将 newval 写入 *ptr. 其中第一个函数在相等并写入的情况下返回true; 第二个函数返回操作之前的值。
 
-<br />
 
 **说明:**上述```__sync_*```函数中type可以是1,2,4或8字节长度的```整数```类型或```浮点```类型:
 <pre>
