@@ -407,8 +407,44 @@ typedef volatile ngx_atomic_uint_t  ngx_atomic_t;
 
 ### 2.1 gcc内置原子函数
 
-参看：<<Using the GNU Compiler Collection>> p462
+参看：《Using the GNU Compiler Collection》 p462
 
+gcc从4.1.2开始提供了```__sync_*```系列的built-in函数，用于提供加减和逻辑运算的原子操作：
+{% highlight string %}
+type __sync_fetch_and_add (type *ptr, type value, ...)
+type __sync_fetch_and_sub (type *ptr, type value, ...)
+type __sync_fetch_and_or (type *ptr, type value, ...)
+type __sync_fetch_and_and (type *ptr, type value, ...)
+type __sync_fetch_and_xor (type *ptr, type value, ...)
+type __sync_fetch_and_nand (type *ptr, type value, ...)
+{% endhighlight %}
+
+上面这组built-in原子函数会根据其名称所示执行相应的操作，并且返回内存中更新之前的值。即：
+<pre>
+{ tmp = *ptr; *ptr op= value; return tmp; }
+{ tmp = *ptr; *ptr = ~(tmp & value); return tmp; } // nand
+</pre>
+
+注意：GCC 4.4及之后的版本```__sync_fetch_and_nand```的实现变为：*ptr = ~(tmp & value)， 而不是 *ptr = ~tmp & value .
+
+{% highlight string %}
+type __sync_add_and_fetch (type *ptr, type value, ...)
+type __sync_sub_and_fetch (type *ptr, type value, ...)
+type __sync_or_and_fetch (type *ptr, type value, ...)
+type __sync_and_and_fetch (type *ptr, type value, ...)
+type __sync_xor_and_fetch (type *ptr, type value, ...)
+type __sync_nand_and_fetch (type *ptr, type value, ...)
+{% endhighlight %}
+
+上面这组built-in原子函数会根据其名称所示执行相应的操作，并且返回内存中更新之后的值。即：
+<pre>
+{ *ptr op= value; return *ptr; }
+{ *ptr = ~(*ptr & value); return *ptr; } // nand
+</pre>
+
+注意：GCC 4.4及之后的版本```__sync_nand_and_fetch```的实现变为：*ptr =~(*ptr & value)， 而不是 *ptr = ~*ptr & value .
+
+<br />
 
 
 
@@ -421,6 +457,8 @@ typedef volatile ngx_atomic_uint_t  ngx_atomic_t;
 1. [Nginx 源码完全剖析（11）ngx_spinlock](http://blog.csdn.net/poechant/article/details/8062969)
 
 2. [GCC内联汇编（1）Get started](http://blog.csdn.net/poechant/article/details/7727751)
+
+3. [GCC 提供的原子操作](http://www.cnblogs.com/woshare/p/5854428.html)
 
 
 <br />
