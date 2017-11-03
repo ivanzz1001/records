@@ -410,6 +410,8 @@ typedef volatile ngx_atomic_uint_t  ngx_atomic_t;
 参看：《Using the GNU Compiler Collection》 p462
 
 gcc从4.1.2开始提供了```__sync_*```系列的built-in函数，用于提供加减和逻辑运算的原子操作：
+
+1） 
 {% highlight string %}
 type __sync_fetch_and_add (type *ptr, type value, ...)
 type __sync_fetch_and_sub (type *ptr, type value, ...)
@@ -425,10 +427,10 @@ type __sync_fetch_and_nand (type *ptr, type value, ...)
 { tmp = *ptr; *ptr = ~(tmp & value); return tmp; } // nand
 </pre>
 
-*注意*：GCC 4.4及之后的版本```__sync_fetch_and_nand```的实现变为：*ptr = ~(tmp & value)， 而不是 *ptr = ~tmp & value .
+**注意**：GCC 4.4及之后的版本```__sync_fetch_and_nand```的实现变为：*ptr = ~(tmp & value)， 而不是 *ptr = ~tmp & value .
 
-<br />
 
+2）
 {% highlight string %}
 type __sync_add_and_fetch (type *ptr, type value, ...)
 type __sync_sub_and_fetch (type *ptr, type value, ...)
@@ -446,23 +448,30 @@ type __sync_nand_and_fetch (type *ptr, type value, ...)
 
 *注意*：GCC 4.4及之后的版本```__sync_nand_and_fetch```的实现变为：*ptr =~(*ptr & value)， 而不是 *ptr = ~*ptr & value .
 
-<br />
 
+3）
 {% highlight string %}
 bool __sync_bool_compare_and_swap (type *ptr, type oldval type newval, ...)
 type __sync_val_compare_and_swap (type *ptr, type oldval type newval, ...)
 {% endhighlight %}
 上面这两个函数提供原子的比较和交换：如果 *ptr == oldval，就将 newval 写入 *ptr. 其中第一个函数在相等并写入的情况下返回true; 第二个函数返回操作之前的值。
 
+<br />
 
-**说明:**上述```__sync_*```函数中type可以是1,2,4或8字节长度的```整数```类型或```浮点```类型:
 <pre>
+说明：
+
+上述```__sync_*```函数中type可以是1,2,4或8字节长度的```整数```类型或```浮点```类型:
 int8_t / uint8_t
 int16_t / uint16_t
 int32_t / uint32_t
 int64_t / uint64_t
+
+后面的可扩展参数(...)用来指出哪些变量需要memory barrier，因为目前gcc实现的是full barrier
+(类似于linux kernel中的mb()，表示这个操作之前的所有内存操作不会重排序到这个操作之后), 所以
+可以忽略这个参数。
 </pre>
-后面的可扩展参数(...)用来指出哪些变量需要memory barrier，因为目前gcc实现的是full barrier（类似于linux kernel中的mb()，表示这个操作之前的所有内存操作不会重排序到这个操作之后），所以可以略掉这个参数。
+
  
 
 
