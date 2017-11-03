@@ -497,7 +497,6 @@ write1(dev.register_control,GO);
 </pre>
 
 
-
 memory barrier有几种类型：
 
 * acquire barrier: 不允许将barrier之后的内存读取指令移到barrier之前(linux kernel中的wmb())
@@ -507,7 +506,50 @@ memory barrier有几种类型：
 * full barrier: 以上两种barrier的合集(linux kernel中的mb())
 
 
+5) 
+{% highlight string %}
+type __sync_lock_test_and_set (type *ptr, type value, ...)
+void __sync_lock_release (type *ptr, ...)
+{% endhighlight %}
+上面第一个函数将```*ptr```设为value，并返回```*ptr```操作之前的值； 第二个函数将```*ptr```置为0.
 
+6） 
+
+示例：
+{% highlight string %}
+#include <stdio.h>
+#include <pthread.h>
+#include <stdlib.h>
+
+static int count = 0;
+
+
+void *test_func(void *arg)
+{
+        int i=0;
+        for(i=0;i<20000;++i){
+                __sync_fetch_and_add(&count,1);
+        }
+        return NULL;
+}
+
+int main(int argc, const char *argv[])
+{
+        pthread_t id[20];
+        int i = 0;
+
+        for(i=0;i<20;++i){
+                pthread_create(&id[i],NULL,test_func,NULL);
+        }
+
+        for(i=0;i<20;++i){
+                pthread_join(id[i],NULL);
+        }
+
+        printf("%d\n",count);
+        return 0;
+}
+{% endhighlight %}
 
 
 
