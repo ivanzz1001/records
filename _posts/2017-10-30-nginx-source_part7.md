@@ -472,7 +472,47 @@ int64_t / uint64_t
 可以忽略这个参数。
 </pre>
 
- 
+
+4) 
+{% highlight string %}
+__sync_synchronize (...)
+{% endhighlight %}
+函数发出一个full memory barrier。
+
+关于memory barrier, cpu会对我们的指令进行排序，一般来说会提高程序的效率，但有时候可能造成我们不希望看到的结果。举一个例子，比如我们一个硬件设备，它有4个寄存器，当你发出一个操作指令的时候，一个寄存器存的是你的操作指令(比如READ)，两个寄存器存的是参数(比如addr和size)，最后一个寄存器是控制寄存器，在所有的参数都设置好之后向其发出指令，设备开始读取参数，执行命令。程序可能如下：
+<pre>
+write1(dev.register_size,size);
+write1(dev.register_addr,addr);
+write1(dev.register_cmd,READ);
+write1(dev.register_control,GO);
+</pre>
+
+如果最后一条write1被换到了前几条语句之前，那么肯定不是我们所期望的，这时候我们可以在最后一条语句之前加入一个memory barrier，强制cpu执行完前面的写入以后再执行最后一条：
+<pre>
+write1(dev.register_size,size);
+write1(dev.register_addr,addr);
+write1(dev.register_cmd,READ);
+__sync_synchronize();
+write1(dev.register_control,GO);
+</pre>
+
+
+
+memory barrier有几种类型：
+
+* acquire barrier: 不允许将barrier之后的内存读取指令移到barrier之前(linux kernel中的wmb())
+
+* release barrier: 不允许将barrier之前的内存读取指令移到barrier之后(linux kernel中的rmb())
+
+* full barrier: 以上两种barrier的合集(linux kernel中的mb())
+
+
+
+
+
+
+
+
 
 
 
