@@ -425,7 +425,8 @@ type __sync_fetch_and_nand (type *ptr, type value, ...)
 { tmp = *ptr; *ptr = ~(tmp & value); return tmp; } // nand
 </pre>
 
-注意：GCC 4.4及之后的版本```__sync_fetch_and_nand```的实现变为：*ptr = ~(tmp & value)， 而不是 *ptr = ~tmp & value .
+*注意*：GCC 4.4及之后的版本```__sync_fetch_and_nand```的实现变为：*ptr = ~(tmp & value)， 而不是 *ptr = ~tmp & value .
+<br />
 
 {% highlight string %}
 type __sync_add_and_fetch (type *ptr, type value, ...)
@@ -442,7 +443,9 @@ type __sync_nand_and_fetch (type *ptr, type value, ...)
 { *ptr = ~(*ptr & value); return *ptr; } // nand
 </pre>
 
-注意：GCC 4.4及之后的版本```__sync_nand_and_fetch```的实现变为：*ptr =~(*ptr & value)， 而不是 *ptr = ~*ptr & value .
+*注意*：GCC 4.4及之后的版本```__sync_nand_and_fetch```的实现变为：*ptr =~(*ptr & value)， 而不是 *ptr = ~*ptr & value .
+
+<br />
 
 {% highlight string %}
 bool __sync_bool_compare_and_swap (type *ptr, type oldval type newval, ...)
@@ -452,9 +455,7 @@ type __sync_val_compare_and_swap (type *ptr, type oldval type newval, ...)
 
 <br />
 
-**说明:**
-
-上述```__sync_*```函数中type可以是1,2,4或8字节长度的```整数```类型或```浮点```类型:
+**说明:**上述```__sync_*```函数中type可以是1,2,4或8字节长度的```整数```类型或```浮点```类型:
 <pre>
 int8_t / uint8_t
 int16_t / uint16_t
