@@ -446,7 +446,7 @@ type __sync_nand_and_fetch (type *ptr, type value, ...)
 { *ptr = ~(*ptr & value); return *ptr; } // nand
 </pre>
 
-*注意*：GCC 4.4及之后的版本```__sync_nand_and_fetch```的实现变为：*ptr =~(*ptr & value)， 而不是 *ptr = ~*ptr & value .
+**注意**：GCC 4.4及之后的版本```__sync_nand_and_fetch```的实现变为：*ptr =~(*ptr & value)， 而不是 *ptr = ~*ptr & value .
 
 
 3）
