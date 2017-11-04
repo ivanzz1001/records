@@ -461,7 +461,7 @@ type __sync_val_compare_and_swap (type *ptr, type oldval type newval, ...)
 <pre>
 说明：
 
-上述```__sync_*```函数中type可以是1,2,4或8字节长度的```整数```类型或```浮点```类型:
+上述“__sync_*”函数中type可以是1,2,4或8字节长度的“整数”类型或“浮点”类型:
 int8_t / uint8_t
 int16_t / uint16_t
 int32_t / uint32_t
