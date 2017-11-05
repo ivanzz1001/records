@@ -3,7 +3,7 @@ layout: post
 title: linux运维(1)
 tags:
 - LinuxOps
-categories: linux运维
+categories: linuxOps
 description: Linux运维方面知识
 ---
 

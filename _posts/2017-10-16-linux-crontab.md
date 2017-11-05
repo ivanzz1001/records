@@ -3,7 +3,7 @@ layout: post
 title: Linux crontab的使用
 tags:
 - LinuxOps
-categories: linux运维
+categories: linuxOps
 description: Linux crontab的使用
 ---
 

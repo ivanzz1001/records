@@ -152,6 +152,54 @@ ngx_posix_post_conf_init(ngx_log_t *log)
 {% endhighlight %}
 
 
+**(1) 相关初始化**
+
+在os/unix/ngx_linux_config.h头文件中定义了```NGX_HAVE_OS_SPECIFIC_INIT```,因此会执行：
+<pre>
+#if (NGX_HAVE_OS_SPECIFIC_INIT)
+    if (ngx_os_specific_init(log) != NGX_OK) {
+        return NGX_ERROR;
+    }
+#endif
+</pre>
+
+然后初始化proctitle相关环境。再接着执行如下初始化：
+{% highlight string %}
+ngx_pagesize = getpagesize();
+ngx_cacheline_size = NGX_CPU_CACHE_LINE;
+
+for (n = ngx_pagesize; n >>= 1; ngx_pagesize_shift++) { /* void */ }
+{% endhighlight %}
+
+对于当前环境，我们写一个简单的程序(test6.c)来进行测试：
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+int main(int argc,char *argv[])
+{
+
+   int pagesize;
+
+   pagesize = getpagesize();
+
+   printf("pagesize: %d\n",pagesize);
+   return 0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+root@ubuntu:~/test-src# gcc -o test6 test6.c 
+root@ubuntu:~/test-src# ./test6
+pagesize: 4096
+</pre>
+
+这里我们看到，当前内存的页大小为4096。ngx_cacheline_size被初始化为32（注意，后面获取CPU信息时针对当前CPU会修改为64)。ngx_pagesize_shift为12.
+
+<br />
+
+**(2) 初始化cpu相关信息**
 
 
 
