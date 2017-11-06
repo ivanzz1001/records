@@ -550,7 +550,12 @@ int main(int argc, const char *argv[])
         return 0;
 }
 {% endhighlight %}
-
+编译运行：
+<pre>
+[root@localhost test-src]# gcc -o test8 test8.c -lpthread
+[root@localhost test-src]# ./test8
+count: 400000
+</pre>
 
 
 ## 3. 其他
