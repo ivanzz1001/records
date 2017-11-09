@@ -875,7 +875,23 @@ WordStr <left> <bottom> <right> <top> <page> #<text for line including spaces>
 
 值得注意的是，Tesseract4.0的traineddata文件中只需要包含lang.lstm，lang.lstm-unicharset和lang.lstm-recoder就可以正常运行。而对于```lstm-*-dawgs```则是可选的。
 
+如果要对上面的训练结果在进行训练，可以采用如下方法：
+{% highlight string %}
+mkdir -p ../tesstutorial/newchi_simoutput
 
+training/combine_tessdata -e ../tesstutorial/chi_simoutput/chi_sim.traineddata \
+  ../tesstutorial/newchi_simoutput/chi_sim.lstm
+  
+training/lstmtraining --debug_interval 100 \
+  --continue_from ../tesstutorial/newchi_simoutput/chi_sim.lstm \
+  --traineddata ../tesstutorial/chi_simoutput/chi_sim.traineddata \
+  --model_output ../tesstutorial/newchi_simoutput/base \
+  --train_listfile ../tesstutorial/chi_simtrain/chi_sim.training_files.txt \
+  --eval_listfile ../tesstutorial/chi_simeval/chi_sim.training_files.txt \
+  --max_iterations 100000 &>../tesstutorial/newchi_simoutput/basetrain.log
+  
+tail -f ../tesstutorial/newchi_simoutput/basetrain.log
+{% endhighlight %}
 
 
 <br />
