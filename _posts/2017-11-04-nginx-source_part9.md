@@ -328,6 +328,7 @@ ngx_close_channel(ngx_fd_t *fd, ngx_log_t *log)
 
 2. [Nginx源码分析-master和worker进程间的通信](http://blog.csdn.net/marcky/article/details/6014733)
 
+3. [nginx源码分析--高性能服务器开发 常见进程模型](http://blog.csdn.net/yusiguyuan/article/details/40924757)
 
 <br />
 <br />
