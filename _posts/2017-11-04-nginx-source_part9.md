@@ -53,6 +53,10 @@ void ngx_close_channel(ngx_fd_t *fd, ngx_log_t *log);
 
 #endif /* _NGX_CHANNEL_H_INCLUDED_ */
 {% endhighlight %}
+ngx_channel_t是nginx master与worker之间进程之间通信的常用工具，它是使用本机套接字来实现的。```socketpair```方法，用于创建父子进程间使用的套接字：
+<pre>
+int socketpair(int d,int type,int protocol,int sv[2]);
+</pre>
 
 
 
@@ -329,6 +333,8 @@ ngx_close_channel(ngx_fd_t *fd, ngx_log_t *log)
 2. [Nginx源码分析-master和worker进程间的通信](http://blog.csdn.net/marcky/article/details/6014733)
 
 3. [nginx源码分析--高性能服务器开发 常见进程模型](http://blog.csdn.net/yusiguyuan/article/details/40924757)
+
+4. [ngx_worker_process_cycle子进程执行](http://blog.csdn.net/lengzijian/article/details/7591025)
 
 <br />
 <br />
