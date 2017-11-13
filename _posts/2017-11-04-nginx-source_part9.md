@@ -53,11 +53,24 @@ void ngx_close_channel(ngx_fd_t *fd, ngx_log_t *log);
 
 #endif /* _NGX_CHANNEL_H_INCLUDED_ */
 {% endhighlight %}
-ngx_channel_t是nginx master与worker之间进程之间通信的常用工具，它是使用本机套接字来实现的。```socketpair```方法，用于创建父子进程间使用的套接字：
-<pre>
-int socketpair(int d,int type,int protocol,int sv[2]);
-</pre>
+ngx_channel_t是nginx master与worker之间进程之间通信的常用工具，它是使用本机套接字来实现的。```socketpair```方法用于创建一对匿名的，面向连接的指定域socket:
+{% highlight string %}
+#include <sys/types.h>          /* See NOTES */
+#include <sys/socket.h>
 
+int socketpair(int domain, int type, int protocol, int sv[2]);
+{% endhighlight %}
+通常会在父子进程之间通信前，调用socketpair()创建一组套接字，然后再调用fork()方法创建出子进程后，在父进程中关闭sv[1]套接字,在子进程中关闭sv[0]套接字。
+
+ngx_channel_t结构体是nginx定义的master父进程与worker子进程间通信的消息格式。如下所示：
+<pre>
+typedef struct {
+    ngx_uint_t  command;
+    ngx_pid_t   pid;
+    ngx_int_t   slot;
+    ngx_fd_t    fd;
+} ngx_channel_t;
+</pre>
 
 
 ## 2. os/unix/ngx_channel.c源文件
