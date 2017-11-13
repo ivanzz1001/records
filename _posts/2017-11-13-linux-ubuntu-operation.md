@@ -98,7 +98,7 @@ ssh start/running, process 12784
 # tar -xzvf dist.tar.gz -C ../server
 </pre>
 
-** 6) 查看所依赖的库**
+**6) 查看所依赖的库**
 {% highlight string %}
 # ldd /bin/ls
         linux-vdso.so.1 =>  (0x00007fff587ba000)
@@ -127,10 +127,10 @@ ssh start/running, process 12784
 pgrep是通过程序的名字来查询进程的工具，一般是用来判断程序是否正常运行。在服务器的配置和管理中，这个工具常被应用，简单明了。
 
 用法为：
-<pre>
+{% highlight string %}
 Usage:
  pgrep [options] <pattern>
-</pre>
+{% endhighlight %}
 常用的选项有：
 
 * -l, --list-name           list PID and process name
