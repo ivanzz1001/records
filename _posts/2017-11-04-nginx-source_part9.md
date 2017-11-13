@@ -62,15 +62,30 @@ int socketpair(int domain, int type, int protocol, int sv[2]);
 {% endhighlight %}
 通常会在父子进程之间通信前，调用socketpair()创建一组套接字，然后再调用fork()方法创建出子进程后，在父进程中关闭sv[1]套接字,在子进程中关闭sv[0]套接字。
 
+<br />
+
+**1) ngx_channel_t结构体**
+
 ngx_channel_t结构体是nginx定义的master父进程与worker子进程间通信的消息格式。如下所示：
 <pre>
 typedef struct {
-    ngx_uint_t  command;
-    ngx_pid_t   pid;
-    ngx_int_t   slot;
-    ngx_fd_t    fd;
+    ngx_uint_t  command;        //发送的指令
+    ngx_pid_t   pid;            //进程ID，一般为发送方进程的ID
+    ngx_int_t   slot;           //一般为发送方在ngx_process数组中的序号
+    ngx_fd_t    fd;             //通信的套接字句柄
 } ngx_channel_t;
 </pre>
+
+发送的命令一般有如下几个，在os/unix/ngx_process_cycle.h头文件中定义(其含义我们留待后面介绍)：
+<pre>
+#define NGX_CMD_OPEN_CHANNEL   1
+#define NGX_CMD_CLOSE_CHANNEL  2
+#define NGX_CMD_QUIT           3
+#define NGX_CMD_TERMINATE      4
+#define NGX_CMD_REOPEN         5
+</pre>
+
+**2) 操作函数**
 
 
 ## 2. os/unix/ngx_channel.c源文件
