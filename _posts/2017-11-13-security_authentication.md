@@ -25,7 +25,7 @@ description: 安全认证之kerberos协议
 
 1. [Kerberos (protocol)](https://en.wikipedia.org/wiki/Kerberos_(protocol))
 
-
+2. [Kerberos原理和使用](http://blog.csdn.net/kkdelta/article/details/46633557)
 
 
 <br />
