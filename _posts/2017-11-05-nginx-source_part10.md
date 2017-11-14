@@ -90,11 +90,28 @@ ngx_daemon(ngx_log_t *log)
 }
 {% endhighlight %}
 
+这里ngx_daemon()较为简单，主要有如下步骤：
+
+* 调用fork()产生子进程，同时父进程退出
+
+* 调用setsid()产生一个新的会话
+
+* 调用umask()将文件模式创建屏蔽字设置为一个已知值
+
+* 将标准输入、标准输出attach到/dev/null中
+
+* 关闭打开的/dev/null文件句柄fd
+ 
+<pre>
+说明：
+
+1. 此处通过ngx_pid = ngx_getpid();将子进程的进程ID保存到了全局变量ngx_pid中
+
+2. 这里并未显示的将标准错误attach到/dev/null中，因此在一般情况下标准错误输出仍可以输出到控制台（除非打开的/dev/null句柄fd恰巧等于STDERR_FILENO）。
+</pre>
 
 
-
-
-
+## 2. Unix高级环境编程--守护进程
 
 
 <br />
