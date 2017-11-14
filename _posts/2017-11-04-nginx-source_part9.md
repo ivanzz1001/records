@@ -53,13 +53,14 @@ void ngx_close_channel(ngx_fd_t *fd, ngx_log_t *log);
 
 #endif /* _NGX_CHANNEL_H_INCLUDED_ */
 {% endhighlight %}
+
+<br />
+
 ngx_channel_t是nginx master与worker之间进程之间通信的常用工具，它是使用本机套接字来实现的。```socketpair```方法用于创建一对匿名的，面向连接的指定域socket:
 <pre>
 int socketpair(int domain, int type, int protocol, int sv[2]);
 </pre>
 通常会在父子进程之间通信前，调用socketpair()创建一组套接字，然后再调用fork()方法创建出子进程后，在父进程中关闭sv[1]套接字,在子进程中关闭sv[0]套接字。
-
-<br />
 
 **1) ngx_channel_t结构体**
 
@@ -363,12 +364,13 @@ ngx_close_channel(ngx_fd_t *fd, ngx_log_t *log)
 {% endhighlight %}
 
 ### 2.1 向channel发送命令
+
+代码整体结构如下：
 {% highlight string %}
 ngx_int_t
 ngx_write_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size,
     ngx_log_t *log)
 {
- 
 #if (NGX_HAVE_MSGHDR_MSG_CONTROL)
     /*
      * We have to use ngx_memcpy() instead of simple
@@ -413,9 +415,21 @@ if (ch->fd == -1) {
 ngx_int_t
 ngx_read_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size, ngx_log_t *log)
 {
-    
+    ...
+
+    n = recvmsg(s, &msg, 0);
+
+	....
 }
 {% endhighlight %}
+
+这里调用recvmsg()来接收channel消息。这里我们不需要接收地址信息，因此可以：
+<pre>
+msghdr.msg_name = NULL;
+msghdr.msg_namelen = 0;
+</pre>
+这里注意对recvmsg()返回值n为 -1 时候的处理。
+
 
 <pre>
 https://trac.nginx.org/nginx/ticket/1426
