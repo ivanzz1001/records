@@ -86,6 +86,38 @@ typedef struct {
 </pre>
 
 **2) 操作函数**
+<pre>
+ngx_int_t ngx_write_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size,
+    ngx_log_t *log);
+</pre>
+向channel发送命令。
+
+<br />
+
+<pre>
+ngx_int_t ngx_read_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size,
+    ngx_log_t *log);
+</pre>
+从channel中读取命令.
+
+<br />
+
+<pre>
+ngx_int_t ngx_add_channel_event(ngx_cycle_t *cycle, ngx_fd_t fd,
+    ngx_int_t event, ngx_event_handler_pt handler);
+</pre>
+将相应的channel事件(读事件、写事件）加入到监听队列。
+
+<br />
+
+<pre>
+void ngx_close_channel(ngx_fd_t *fd, ngx_log_t *log);
+</pre>
+关闭channel句柄。
+
+
+
+
 
 
 ## 2. os/unix/ngx_channel.c源文件
