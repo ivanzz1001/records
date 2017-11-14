@@ -119,8 +119,65 @@ Steal 值比较高的话，需要向主机供应商申请扩容虚拟机。服�
 KiB Mem:   8093596 total,  7201400 used,   892196 free,     1000 buffers
 KiB Swap:  8000508 total,      880 used,  7999628 free.  1732676 cached Mem
 </pre>
+这一个部分包含两行，单位可以是KiB到EiB,这依赖于使用top时所采用的选项。
 
+默认情况下，第一行反映的物理内存的情况，一般包含如下几类： total, free, used, buff/cache
 
+第二行反映的是虚拟内存的情况，一般包含如下几类：total, free, used, avail
+
+{% highlight string %}
+第二行的"avail" 一般是针对可用于启动新应用程序的物理内存的评估。
+{% endhighlight %}
+
+### 1.2 3. FIELDS / Columns
+
+下面简要对如下各字段进行介绍：
+<pre>
+  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
+ 2079 midea     20   0 1598784 124000  71432 S   1.3  1.5   8:59.30 compiz
+    1 root      20   0   33760   4256   2728 S   0.0  0.1   0:01.33 init
+    2 root      20   0       0      0      0 S   0.0  0.0   0:00.02 kthreadd
+    3 root      20   0       0      0      0 S   0.0  0.0   0:00.94 ksoftirqd/0
+    5 root       0 -20       0      0      0 S   0.0  0.0   0:00.00 kworker/0:0H
+    7 root      20   0       0      0      0 S   0.0  0.0   0:24.76 rcu_sched
+    8 root      20   0       0      0      0 S   0.0  0.0   0:00.00 rcu_bh
+    9 root      rt   0       0      0      0 S   0.0  0.0   0:00.00 migration/0
+   10 root      rt   0       0      0      0 S   0.0  0.0   0:00.33 watchdog/0
+   11 root      rt   0       0      0      0 S   0.0  0.0   0:00.33 watchdog/1
+   12 root      rt   0       0      0      0 S   0.0  0.0   0:00.01 migration/1
+   13 root      20   0       0      0      0 S   0.0  0.0   0:01.03 ksoftirqd/1
+   15 root       0 -20       0      0      0 S   0.0  0.0   0:00.00 kworker/1:0H
+   16 root      rt   0       0      0      0 S   0.0  0.0   0:00.32 watchdog/2
+   17 root      rt   0       0      0      0 S   0.0  0.0   0:00.00 migration/2
+   18 root      20   0       0      0      0 S   0.0  0.0   0:00.72 ksoftirqd/2
+   20 root       0 -20       0      0      0 S   0.0  0.0   0:00.00 kworker/2:0H
+   21 root      rt   0       0      0      0 S   0.0  0.0   0:00.33 watchdog/3
+   22 root      rt   0       0      0      0 S   0.0  0.0   0:00.01 migration/3
+   23 root      20   0       0      0      0 S   0.0  0.0   0:01.28 ksoftirqd/3
+   26 root      20   0       0      0      0 S   0.0  0.0   0:00.00 kdevtmpfs  
+</pre>
+
+* **PID:** 进程ID
+
+* **USER:** The effective user name of the task's owner
+
+* **PR:** 任务调度的优先权(假如显示为rt，表示实时调度）
+
+* **NI:** 该任务的nice值。假如nice值小于0，表明其具有一个更高的优先权；大于0，表明其具有一个更低的优先权；等于0，表明任务调度时优先级别并不会被调整。
+
+* **VIRT:** 该任务所使用的虚拟内存大小
+
+* **RES:** 该任务所使用的物理内存大小（resident）
+
+* **SHR:** 该任务可用的共享内存大小（通常并不是可用物理内存大小）
+
+* **%CPU:** 该任务耗费的CPU时间百分比
+
+* **%MEM:** 该任务所占用的物理内存百分比
+
+* **TIME+:** 该任务自启动以来所耗费的CPU时间
+
+* **COMMAND:** 启动该任务所使用的命令行
 
 
 <br />
