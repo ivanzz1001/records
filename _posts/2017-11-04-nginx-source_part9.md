@@ -411,6 +411,8 @@ if (ch->fd == -1) {
 
 
 ### 2.2 从channel读取命令
+
+代码整体结构如下：
 {% highlight string %}
 ngx_int_t
 ngx_read_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size, ngx_log_t *log)
@@ -431,9 +433,58 @@ msghdr.msg_namelen = 0;
 这里注意对recvmsg()返回值n为 -1 时候的处理。
 
 
-<pre>
-https://trac.nginx.org/nginx/ticket/1426
-</pre>
+### 2.3 添加channel事件到监听队列
+
+代码整体结构如下：
+{% highlight string %}
+ngx_int_t
+ngx_add_channel_event(ngx_cycle_t *cycle, ngx_fd_t fd, ngx_int_t event,
+    ngx_event_handler_pt handler)
+{
+    ...
+
+	ngx_connection_t  *c;
+    c = ngx_get_connection(fd, cycle->log);
+
+    ...
+	
+	if (ngx_add_conn && (ngx_event_flags & NGX_USE_EPOLL_EVENT) == 0) {
+        if (ngx_add_conn(c) == NGX_ERROR) {
+            ngx_free_connection(c);
+            return NGX_ERROR;
+        }
+
+    } else {
+        if (ngx_add_event(ev, event, 0) == NGX_ERROR) {
+            ngx_free_connection(c);
+            return NGX_ERROR;
+        }
+    }
+
+}
+{% endhighlight %}
+
+这里首先从ngx_cycle_t中获取到一个connection,然后将其添加到事件监听队列中。
+
+
+### 2.4 关闭channel
+代码如下：
+{% highlight string %}
+void
+ngx_close_channel(ngx_fd_t *fd, ngx_log_t *log)
+{
+    if (close(fd[0]) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, log, ngx_errno, "close() channel failed");
+    }
+
+    if (close(fd[1]) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, log, ngx_errno, "close() channel failed");
+    }
+}
+{% endhighlight %}
+
+关于关闭channel,这里有一个情况说明一下： 当前master通过ngx_spawn_process()函数创建出一对匿名channel,然后通过fork()自动传递给了子进程，在子进程的初始化中将channel[0]关闭，用channel[1]读取来自父进程中通过channel[0]发送过来的消息，但是在父进程中却没有关闭channel[1]。关于这个问题的解释，请参看：https://trac.nginx.org/nginx/ticket/1426
+
 
 
 <br />
