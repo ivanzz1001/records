@@ -47,14 +47,77 @@ KiB Swap:  8000508 total,      880 used,  7999628 free.  1732676 cached Mem
    26 root      20   0       0      0      0 S   0.0  0.0   0:00.00 kdevtmpfs  
 </pre>
 
+上面top输出包含两个大的部分：
 
+* SUMMARY Display
 
+* FIELDS / Columns
+
+### 1.1 SUMMARY Display
+
+总结性显示部分一般又包含3个区域，每一个区域其实都是可以通过相应的交互命令控制。
+
+**(1) UPTIME and LOAD Averages**
+<pre>
+top - 14:39:02 up 1 day,  2:46,  4 users,  load average: 0.00, 0.00, 0.00
+</pre>
+
+这一部分一般是一个单独的行，包含： 
+
+* program或window名称（这取决于显示模式）
+
+* 当前时间和操作系统启动以来到现在的时长
+
+* 总用户数
+
+* 过去1分钟，5分钟，15分钟的系统平均负载
 
 <br />
-<br />
+
+**(2) TASK and CPU States**
+<pre>
+Tasks: 243 total,   1 running, 242 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  0.2 us,  0.2 sy,  0.0 ni, 99.4 id,  0.2 wa,  0.0 hi,  0.0 si,  0.0 st
+</pre>
+这一部分一般至少包含2行，在SMP(Symmetrical Multi-Processing)环境下，可能会有一些额外的行反映每个CPU的相应状态。
+
+第一行显示 总的任务数或线程数（这依赖于线程模式切换的状态），这可以分成以下几类：running, sleeping, stopped, zombie.
+
+第二行显示 自上一次刷新以来CPU的状态百分比。默认情况下，会显示如下条目：
+
+* **us, user:** 普通用户进程的运行时间(un-niced user processes)
+
+* **sy, system:** 内核进程的运行时间
+
+* **ni, nice:** 特权用户进程的运行时间(niced user processes)
+
+* **id, idle:** 内核空闲时间
+
+* **wa, IO-wait:** 等待IO完成所花费的时间（IO时间）
+
+* **hi:** 服务硬件中断所消耗的时间
+
+* **si:** 服务软件中断所消耗的时间
+
+* **st:**  hypervisor 服务另一个虚拟处理器的时候，虚拟 CPU 等待实际 CPU 的时间的百分比
 
 
+{% highlight string %}
+1. Linux nice命令以更改过的优先序来执行程序
 
+2. st 的全称是 Steal Time ，就是 Xen Hypervisor 分配给运行在其它虚拟机上的任务的实际 CPU 时间。
+%st(Steal time) 是当 hypervisor 服务另一个虚拟处理器的时候，虚拟 CPU 等待实际 CPU 的时间的百分比。
+Steal 值比较高的话，需要向主机供应商申请扩容虚拟机。服务器上的另一个虚拟机拥有更大更多的 CPU 时间片，需要申请升级以与之竞争。
+另外，高 steal 值也可能意味着主机供应商在服务器上过量地出售虚拟机。如果升级了虚拟机， steal 值还是不降的话，应该寻找另一家服务供应商。低 steal 值意味着应用程序在目前的虚拟机上运作良好。因为虚拟机不会经常地为了 CPU 时间与其它虚拟机激烈竞争，虚拟机会更快地响应。
+主机供应商没有过量地出售虚拟服务，绝对是一件好事情。
+{% endhighlight %}
+
+
+**(3) MEMORY Usage**
+<pre>
+KiB Mem:   8093596 total,  7201400 used,   892196 free,     1000 buffers
+KiB Swap:  8000508 total,      880 used,  7999628 free.  1732676 cached Mem
+<pre>
 
 
 
