@@ -101,6 +101,7 @@ Tasks: 243 total,   1 running, 242 sleeping,   0 stopped,   0 zombie
 
 * **st:**  hypervisor 服务另一个虚拟处理器的时候，虚拟 CPU 等待实际 CPU 的时间的百分比
 
+<br />
 
 {% highlight string %}
 1. Linux nice命令以更改过的优先序来执行程序
@@ -125,13 +126,14 @@ KiB Swap:  8000508 total,      880 used,  7999628 free.  1732676 cached Mem
 
 第二行反映的是虚拟内存的情况，一般包含如下几类：total, free, used, avail
 
+<br />
+
 {% highlight string %}
 第二行的"avail" 一般是针对可用于启动新应用程序的物理内存的评估。
 {% endhighlight %}
 
 ### 1.2 3. FIELDS / Columns
 
-下面简要对如下各字段进行介绍：
 <pre>
   PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
  2079 midea     20   0 1598784 124000  71432 S   1.3  1.5   8:59.30 compiz
@@ -156,6 +158,8 @@ KiB Swap:  8000508 total,      880 used,  7999628 free.  1732676 cached Mem
    23 root      20   0       0      0      0 S   0.0  0.0   0:01.28 ksoftirqd/3
    26 root      20   0       0      0      0 S   0.0  0.0   0:00.00 kdevtmpfs  
 </pre>
+
+下面简要对如下各字段进行介绍：
 
 * **PID:** 进程ID
 
