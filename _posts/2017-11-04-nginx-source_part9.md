@@ -54,12 +54,9 @@ void ngx_close_channel(ngx_fd_t *fd, ngx_log_t *log);
 #endif /* _NGX_CHANNEL_H_INCLUDED_ */
 {% endhighlight %}
 ngx_channel_t是nginx master与worker之间进程之间通信的常用工具，它是使用本机套接字来实现的。```socketpair```方法用于创建一对匿名的，面向连接的指定域socket:
-{% highlight string %}
-#include <sys/types.h>          /* See NOTES */
-#include <sys/socket.h>
-
+<pre>
 int socketpair(int domain, int type, int protocol, int sv[2]);
-{% endhighlight %}
+</pre>
 通常会在父子进程之间通信前，调用socketpair()创建一组套接字，然后再调用fork()方法创建出子进程后，在父进程中关闭sv[1]套接字,在子进程中关闭sv[0]套接字。
 
 <br />
@@ -379,8 +376,219 @@ ngx_close_channel(ngx_fd_t *fd, ngx_log_t *log)
 
 {% endhighlight %}
 
+### 2.1 向channel发送命令
+{% highlight string %}
+ngx_int_t
+ngx_write_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size,
+    ngx_log_t *log)
+{
+    ssize_t             n;
+    ngx_err_t           err;
+    struct iovec        iov[1];
+    struct msghdr       msg;
+
+#if (NGX_HAVE_MSGHDR_MSG_CONTROL)
+
+    union {
+        struct cmsghdr  cm;
+        char            space[CMSG_SPACE(sizeof(int))];
+    } cmsg;
+
+    if (ch->fd == -1) {
+        msg.msg_control = NULL;
+        msg.msg_controllen = 0;
+
+    } else {
+        msg.msg_control = (caddr_t) &cmsg;
+        msg.msg_controllen = sizeof(cmsg);
+
+        ngx_memzero(&cmsg, sizeof(cmsg));
+
+        cmsg.cm.cmsg_len = CMSG_LEN(sizeof(int));
+        cmsg.cm.cmsg_level = SOL_SOCKET;
+        cmsg.cm.cmsg_type = SCM_RIGHTS;
+
+        /*
+         * We have to use ngx_memcpy() instead of simple
+         *   *(int *) CMSG_DATA(&cmsg.cm) = ch->fd;
+         * because some gcc 4.4 with -O2/3/s optimization issues the warning:
+         *   dereferencing type-punned pointer will break strict-aliasing rules
+         *
+         * Fortunately, gcc with -O1 compiles this ngx_memcpy()
+         * in the same simple assignment as in the code above
+         */
+
+        ngx_memcpy(CMSG_DATA(&cmsg.cm), &ch->fd, sizeof(int));
+    }
+
+    msg.msg_flags = 0;
+
+#else
+
+    if (ch->fd == -1) {
+        msg.msg_accrights = NULL;
+        msg.msg_accrightslen = 0;
+
+    } else {
+        msg.msg_accrights = (caddr_t) &ch->fd;
+        msg.msg_accrightslen = sizeof(int);
+    }
+
+#endif
+
+    iov[0].iov_base = (char *) ch;
+    iov[0].iov_len = size;
+
+    msg.msg_name = NULL;
+    msg.msg_namelen = 0;
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 1;
+
+    n = sendmsg(s, &msg, 0);
+
+    if (n == -1) {
+        err = ngx_errno;
+        if (err == NGX_EAGAIN) {
+            return NGX_AGAIN;
+        }
+
+        ngx_log_error(NGX_LOG_ALERT, log, err, "sendmsg() failed");
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+{% endhighlight %}
+
+这里使用sendmsg()函数向channel发送命令。在ngx_auto_config.h头文件中，我们有如下定义：
+<pre>
+#ifndef NGX_HAVE_MSGHDR_MSG_CONTROL
+#define NGX_HAVE_MSGHDR_MSG_CONTROL  1
+#endif
+</pre>
+因此，这里采用我们常用的msghdr.cmsghdr的方式来传递文件描述符。关于```strict-aliasing```,请参看：[C/C++ Strict Alias 小记](http://blog.csdn.net/dbzhang800/article/details/6720141)
+
+另外这里说明一下，旧的unix系统使用的是```msg_accrights```域来传递文件描述符，因此在不支持```NGX_HAVE_MSGHDR_MSG_CONTROL```时采用如下方式：
+{% highlight string %}
+if (ch->fd == -1) {
+    msg.msg_accrights = NULL;
+    msg.msg_accrightslen = 0;
+
+} else {
+    msg.msg_accrights = (caddr_t) &ch->fd;
+    msg.msg_accrightslen = sizeof(int);
+}
+{% endhighlight %}
 
 
+### 2.2 从channel读取命令
+{% highlight string %}
+ngx_int_t
+ngx_read_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size, ngx_log_t *log)
+{
+    ssize_t             n;
+    ngx_err_t           err;
+    struct iovec        iov[1];
+    struct msghdr       msg;
+
+#if (NGX_HAVE_MSGHDR_MSG_CONTROL)
+    union {
+        struct cmsghdr  cm;
+        char            space[CMSG_SPACE(sizeof(int))];
+    } cmsg;
+#else
+    int                 fd;
+#endif
+
+    iov[0].iov_base = (char *) ch;
+    iov[0].iov_len = size;
+
+    msg.msg_name = NULL;
+    msg.msg_namelen = 0;
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 1;
+
+#if (NGX_HAVE_MSGHDR_MSG_CONTROL)
+    msg.msg_control = (caddr_t) &cmsg;
+    msg.msg_controllen = sizeof(cmsg);
+#else
+    msg.msg_accrights = (caddr_t) &fd;
+    msg.msg_accrightslen = sizeof(int);
+#endif
+
+    n = recvmsg(s, &msg, 0);
+
+    if (n == -1) {
+        err = ngx_errno;
+        if (err == NGX_EAGAIN) {
+            return NGX_AGAIN;
+        }
+
+        ngx_log_error(NGX_LOG_ALERT, log, err, "recvmsg() failed");
+        return NGX_ERROR;
+    }
+
+    if (n == 0) {
+        ngx_log_debug0(NGX_LOG_DEBUG_CORE, log, 0, "recvmsg() returned zero");
+        return NGX_ERROR;
+    }
+
+    if ((size_t) n < sizeof(ngx_channel_t)) {
+        ngx_log_error(NGX_LOG_ALERT, log, 0,
+                      "recvmsg() returned not enough data: %z", n);
+        return NGX_ERROR;
+    }
+
+#if (NGX_HAVE_MSGHDR_MSG_CONTROL)
+
+    if (ch->command == NGX_CMD_OPEN_CHANNEL) {
+
+        if (cmsg.cm.cmsg_len < (socklen_t) CMSG_LEN(sizeof(int))) {
+            ngx_log_error(NGX_LOG_ALERT, log, 0,
+                          "recvmsg() returned too small ancillary data");
+            return NGX_ERROR;
+        }
+
+        if (cmsg.cm.cmsg_level != SOL_SOCKET || cmsg.cm.cmsg_type != SCM_RIGHTS)
+        {
+            ngx_log_error(NGX_LOG_ALERT, log, 0,
+                          "recvmsg() returned invalid ancillary data "
+                          "level %d or type %d",
+                          cmsg.cm.cmsg_level, cmsg.cm.cmsg_type);
+            return NGX_ERROR;
+        }
+
+        /* ch->fd = *(int *) CMSG_DATA(&cmsg.cm); */
+
+        ngx_memcpy(&ch->fd, CMSG_DATA(&cmsg.cm), sizeof(int));
+    }
+
+    if (msg.msg_flags & (MSG_TRUNC|MSG_CTRUNC)) {
+        ngx_log_error(NGX_LOG_ALERT, log, 0,
+                      "recvmsg() truncated data");
+    }
+
+#else
+
+    if (ch->command == NGX_CMD_OPEN_CHANNEL) {
+        if (msg.msg_accrightslen != sizeof(int)) {
+            ngx_log_error(NGX_LOG_ALERT, log, 0,
+                          "recvmsg() returned no ancillary data");
+            return NGX_ERROR;
+        }
+
+        ch->fd = fd;
+    }
+
+#endif
+
+    return n;
+}
+{% endhighlight %}
+
+<pre>
+https://trac.nginx.org/nginx/ticket/1426
+</pre>
 
 
 <br />
