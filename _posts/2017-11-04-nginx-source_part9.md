@@ -483,7 +483,7 @@ ngx_close_channel(ngx_fd_t *fd, ngx_log_t *log)
 }
 {% endhighlight %}
 
-关于关闭channel,这里有一个情况说明一下： 当前master通过ngx_spawn_process()函数创建出一对匿名channel,然后通过fork()自动传递给了子进程，在子进程的初始化中将channel[0]关闭，用channel[1]读取来自父进程中通过channel[0]发送过来的消息，但是在父进程中却没有关闭channel[1]。关于这个问题的解释，请参看：https://trac.nginx.org/nginx/ticket/1426
+关于关闭channel,这里有一个情况说明一下： 当前master通过ngx_spawn_process()函数创建出一对匿名channel,然后通过fork()自动传递给了子进程，在子进程的初始化中将channel[0]关闭，用channel[1]读取来自父进程中通过channel[0]发送过来的消息，但是在父进程中却没有关闭channel[1]。关于这个问题的解释，请参看 [nginx-ticket 1426](https://trac.nginx.org/nginx/ticket/1426)
 
 
 
