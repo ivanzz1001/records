@@ -117,7 +117,7 @@ Steal 值比较高的话，需要向主机供应商申请扩容虚拟机。服�
 <pre>
 KiB Mem:   8093596 total,  7201400 used,   892196 free,     1000 buffers
 KiB Swap:  8000508 total,      880 used,  7999628 free.  1732676 cached Mem
-<pre>
+</pre>
 
 
 
