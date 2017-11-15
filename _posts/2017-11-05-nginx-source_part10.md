@@ -267,6 +267,9 @@ int main(int argc,char *argv[])
 [root@localhost test-src]# pgrep -lf test
 101892 test
 
+[root@localhost test-src]# echo $?
+0
+
 [root@localhost test-src]# tail -f /var/log/messages
 Nov 14 18:42:22 localhost ./test: ./test running daemonized
 Nov 14 18:42:23 localhost ./test: ./test running daemonized
@@ -279,6 +282,8 @@ Nov 14 18:42:29 localhost ./test: ./test running daemonized
 Nov 14 18:42:30 localhost ./test: ./test running daemonized
 Nov 14 18:42:31 localhost ./test: ./test running daemonized
 Nov 14 18:42:32 localhost ./test: ./test running daemonized
+
+[root@localhost test-src]# pgrep -lf test | awk '{print $1}' | xargs kill -9
 </pre>
 
 
