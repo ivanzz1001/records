@@ -146,9 +146,142 @@ ngx_daemon(ngx_log_t *log)
 
 <br />
 
-如下给出一个例子：
+如下给出一个例子(test.c)：
 {% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <syslog.h>
+#include <fcntl.h>
+#include <sys/resource.h>
+#include <signal.h>
+#include <unistd.h>
+
+void daemonize(const char *cmd)
+{
+    int i,fd0,fd1,fd2,fd3;
+    pid_t pid;
+    struct rlimit rl;
+    struct sigaction sa;
+
+    /*
+     * Clear file creation mask 
+    */
+    umask(0);
+
+    /*
+     * Get maximum number of file descriptors
+    */
+    if(getrlimit(RLIMIT_NOFILE,&rl) < 0)
+    {
+       printf("can't get file limit\n");
+       exit(-1);
+    }
+
+    /*
+     * Become a session leader to lose controlling TTY
+    */
+    if((pid = fork()) < 0)
+    {
+       printf("%s can't fork\n",cmd);
+       exit(-2);
+    }
+    else if(pid != 0)           //parent
+       exit(0);
+    
+    setsid();
+
+    /*
+     * Ensure future opens won't allocate controlling TTYs
+    */
+   sa.sa_handler = SIG_IGN;
+   sigemptyset(&sa.sa_mask);
+   sa.sa_flags = 0;
+   if(sigaction(SIGHUP, &sa,NULL) < 0)
+   {
+      printf("%s: can't ignore SIGHUP\n",cmd);
+      exit(-3);
+   }
+   if((pid = fork()) < 0)
+   {
+      printf("%s: can't fork\n",cmd);
+      exit(-4);
+   }
+   else if(pid != 0)         //parent
+      exit(0);
+   
+   
+   /*
+    * Change the current working directory to the root so
+    * we won't prevent file systems from being unmounted.
+   */
+   if(chdir("/") < 0)
+   {
+      printf("%s: can't change directory to /\n",cmd);
+      exit(-5);
+   }
+
+
+   /*
+    * Close all open file descriptions.
+   */ 
+   if(rl.rlim_max == RLIM_INFINITY)
+       rl.rlim_max = 1024;
+   for(i = 0; i < rl.rlim_max;i++)
+       close(i);
+
+   /*
+    * Attach file descriptors 0, 1 and 2 to /dev/null
+   */
+   fd0 = open("/dev/null",O_RDWR);
+   fd1 = dup(0);
+   fd2 = dup(0);
+  
+   /*
+    * Initialize the log file
+   */
+   openlog(cmd, LOG_CONS, LOG_DAEMON);
+   if(fd0 != 0 || fd1 != 1 || fd2 != 2)
+   {
+      syslog(LOG_ERR,"unexpected file descriptors %d %d %d\n",
+        fd0, fd1, fd2);
+      exit(-6);
+   }
+}
+
+
+int main(int argc,char *argv[])
+{
+    daemonize(argv[0]);
+    while(1)
+    {
+      syslog(LOG_INFO, "%s running daemonized\n",argv[0]);
+      usleep(1000*1000);
+    }
+    return 0;
+}
 {% endhighlight %}
+编译运行：
+<pre>
+[root@localhost test-src]# gcc -o test test.c
+[root@localhost test-src]# ./test
+[root@localhost test-src]# pgrep -lf test
+101892 test
+
+[root@localhost test-src]# tail -f /var/log/messages
+Nov 14 18:42:22 localhost ./test: ./test running daemonized
+Nov 14 18:42:23 localhost ./test: ./test running daemonized
+Nov 14 18:42:24 localhost ./test: ./test running daemonized
+Nov 14 18:42:25 localhost ./test: ./test running daemonized
+Nov 14 18:42:26 localhost ./test: ./test running daemonized
+Nov 14 18:42:27 localhost ./test: ./test running daemonized
+Nov 14 18:42:28 localhost ./test: ./test running daemonized
+Nov 14 18:42:29 localhost ./test: ./test running daemonized
+Nov 14 18:42:30 localhost ./test: ./test running daemonized
+Nov 14 18:42:31 localhost ./test: ./test running daemonized
+Nov 14 18:42:32 localhost ./test: ./test running daemonized
+</pre>
+
+
 
 
 
