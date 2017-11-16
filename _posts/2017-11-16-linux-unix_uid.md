@@ -66,7 +66,49 @@ FreeBSD 8.0 和 Linux 3.2.0提供了getresuid和getresgid函数，它们可以�
 
 ### 1.1 函数setreuid和setregid
 
+历史上，BSD支持setreuid函数，其功能是```交换```实际用户ID和有效用户ID的值。
+{% highlight string %}
+#include <sys/types.h>
+#include <unistd.h>
 
+int setreuid(uid_t ruid, uid_t euid);
+int setregid(gid_t rgid, gid_t egid);
+
+描述：
+setreuid()设置调用进程的实际用户ID和有效用户ID。
+
+假如上述函数参数的任何一个值为-1的话，则保持该对应的ID不变。
+
+* 对于非特权进程，只能将有效用户ID设置为实际用户ID、有效用户ID或者保存的设置用户ID
+* 对于非特权用户，只能将实际用户ID设置为实际用户ID或者有效用户ID
+
+正是由于上述这两点，所以前面才会讲 “功能是'交换'实际用户ID和有效用户ID的值”
+
+注： 假如实际用户ID或有效用户ID被设置为不同于原实际用户ID的话，保存的设置用户ID(saved set-user-ID)会被设置为
+新的有效用户ID。
+{% endhighlight %}
+规则很简单：一个非特权用户总能交换实际用户ID和有效用户ID。这就允许一个设置用户ID程序交换成普通的用户权限，以后又可再次交换回设置用户ID权限。POSIX.1引进了保存的设置用户ID特性后，其规则也相应加强，它允许一个非特权用户将其有效用户ID设置为保存的设置用户ID。
+
+### 1.2 函数seteuid和setegid
+
+POSIX.1包含了两个函数seteuid和setegid。它们类似于setuid和setgid，但只能更改有效用户ID和有效组ID。
+{% highlight string %}
+#include <sys/types.h>
+#include <unistd.h>
+
+int seteuid(uid_t euid);
+int setegid(gid_t egid);
+
+这两个函数返回值： 若成功，返回0；若出错，返回-1
+{% endhighlight %}
+
+一个非特权用户可以将其有效用户ID设置为其实际用户ID或其保存的设置用户ID。对于一个特权用户则可将有效用户ID设置为uid。（这区别于setuid函数，它更改所有3个用户ID。）
+
+<br />
+
+下图给出了上面所述的更改3个不同用户ID的各个函数：
+
+![setuid methods](https://ivanzz1001.github.io/records/assets/img/linux/set_uid_methods.jpg)
 
 
 <br />
