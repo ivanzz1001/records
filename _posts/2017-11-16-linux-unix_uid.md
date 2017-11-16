@@ -110,6 +110,14 @@ int setegid(gid_t egid);
 
 ![setuid methods](https://ivanzz1001.github.io/records/assets/img/linux/set_uid_methods.jpg)
 
+注：可以通过如下命令设置```设置用户ID位```
+<pre>
+# chmod o+s file
+# chmod g+s file
+
+# chmod o-s file
+# chmod g-s file
+</pre>
 
 <br />
 <br />
