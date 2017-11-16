@@ -59,6 +59,12 @@ sysconf函数。
 ![change uid](https://ivanzz1001.github.io/records/assets/img/linux/change_uid_method.jpg)
 
 
+**注意：** ```getuid```和```geteuid```函数只能获得实际的用户ID和有效公户ID的当前值。我们没有可移植的方法去获得保存的设置用户ID的当前值。
+<pre>
+FreeBSD 8.0 和 Linux 3.2.0提供了getresuid和getresgid函数，它们可以分别用于获取保存的设置用户ID和保存的设置组ID。
+</pre>
+
+### 1.1 函数setreuid和setregid
 
 
 
