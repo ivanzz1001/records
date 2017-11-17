@@ -178,6 +178,20 @@ lrwxrwxrwx 1 root root    8 11月 13 16:56 softlink.txt -> test.txt
 # cd .. && cp -ar src-dir dst-dir
 {% endhighlight %}
 
+**12） 统计网络流量**
+<pre>
+
+root@ai-test:~# sar -n DEV 10                  //每10s钟统计一次
+Linux 3.13.0-32-generic (ai-test)       11/17/2017      _x86_64_        (16 CPU)
+
+10:56:22 AM     IFACE   rxpck/s   txpck/s    rxkB/s    txkB/s   rxcmp/s   txcmp/s  rxmcst/s   %ifutil
+10:56:32 AM      eth0      0.00      0.00      0.00      0.00      0.00      0.00      0.00      0.00
+10:56:32 AM        lo      0.00      0.00      0.00      0.00      0.00      0.00      0.00      0.00
+
+10:56:32 AM     IFACE   rxpck/s   txpck/s    rxkB/s    txkB/s   rxcmp/s   txcmp/s  rxmcst/s   %ifutil
+10:56:42 AM      eth0      1.20      1.20      0.07      0.15      0.00      0.00      0.00      0.00
+10:56:42 AM        lo      0.00      0.00      0.00      0.00      0.00      0.00      0.00      0.00
+</pre>
 
 
 
