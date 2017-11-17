@@ -193,6 +193,27 @@ Linux 3.13.0-32-generic (ai-test)       11/17/2017      _x86_64_        (16 CPU)
 10:56:42 AM        lo      0.00      0.00      0.00      0.00      0.00      0.00      0.00      0.00
 </pre>
 
+**13） at命令**
+<pre>
+[root@localhost test-src]# at 4pm + 3 days   // 3天后的下午4点执行一个任务
+at> echo "hello,world"
+at>  Ctrl+D
+
+
+[root@localhost test-src]# at 10am Jul 31    // 7月31号上午10点执行一个任务
+at> echo "hello,world"
+at>  Ctrl+D
+
+[root@localhost test-src]#  at 1am tomorrow    // 明天凌晨1点执行一个任务
+at> echo "hello,world"
+at>  Ctrl+D
+
+[root@localhost test-src]# at -l               // 列出任务
+
+
+[root@localhost test-src]# at -d [task-id]     // 删除任务
+</pre>
+
 
 
 <br />
