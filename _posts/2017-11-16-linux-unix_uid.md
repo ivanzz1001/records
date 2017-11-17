@@ -203,20 +203,34 @@ saved set-user-id user: ivan1001
 
 ## 3. 总结
 每个Linux进程都包含如下这些属性，这些属性功能决定了该进程访问文件的权限：
+<pre>
+1. real user id
 
-* 1. real user id
+2. real user group
 
-* 2. real user group
+3. effective user id
 
-* 3. effective user id
+4. effective user group
 
-* 4. effective user group
+5. saved set-user-id
 
-* 5. saved set-user-id
+6. saved set-user-group
+</pre>
+*  1、2简称ruid、rgid， 由启动进程的用户决定，通常是当前登录用户（运行可执行文件的用户）；
 
-* 6. saved set-user-group
+*  3、4简称euid、egid，一般在进程启动时，直接由1、2复制而来；或者当进程对应的可执行文件的set-user-id/set-group-id (chmod u+s)标志位为true时，为该文件的所属用户/所属组。这组属性决定了进程访问文件的权限。
 
+*  5、6简称suid、sgid，从euid、egid复制。
 
+下面这张图描述了进程启动时，这些属性是怎么赋值的：
+
+![linux process uid](https://ivanzz1001.github.io/records/assets/img/linux/linux-process-uid.png)
+
+* step 1-2: 由登录用户启动运行可执行文件，启动进程；
+
+* step 3: 设置进程的rid/rgid为当前用户的uid/gid
+
+* step 4: 设置进程的euid/egid，根据可执行文件的set-user-id/set-group-id属性（红色：0 ， 紫色：1），为1时，设为可执行文件的uid/gid，否则从ruid/rgid拷贝。
 
 
 
