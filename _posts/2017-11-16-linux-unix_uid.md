@@ -120,7 +120,7 @@ int setegid(gid_t egid);
 </pre>
 
 
-## 2. 示例
+## 2. 示例-1
 
 如下sample.c源文件：
 {% highlight string %}
@@ -198,10 +198,11 @@ saved set-user-id user: ivan1001
 </pre>
 
 
+## 3. 示例-2
 
+at程序(略）
 
-
-## 3. 总结
+## 4. 总结
 每个Linux进程都包含如下这些属性，这些属性功能决定了该进程访问文件的权限：
 <pre>
 1. real user id
