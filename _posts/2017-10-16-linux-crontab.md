@@ -122,7 +122,22 @@ hello,world
 [root@localhost script]# cat clear.sh
 #!/bin/sh
 
-find /root/tesseract-src/tesstutorial/chi_simoutput/ -ctime +1 -name "*.checkpoint" -exec rm {} \;
+
+#echo "remove checkpoint files" >> /root/tesseract-src/script/rm_result.txt
+count=`find /root/tesseract-src/tesstutorial/chi_simoutput/ -amin +2160 -name "*.checkpoint" | wc -l`
+total=`find /root/tesseract-src/tesstutorial/chi_simoutput/ -amin +0 -name "*.checkpoint" | wc -l`
+left=$(($total - $count))
+
+
+if [ $count -gt 8 ] && [ $left -gt 12 ]
+then
+   echo "remove $count checkpoint files" >> /root/tesseract-src/script/rm_result.txt
+   find /root/tesseract-src/tesstutorial/chi_simoutput/ -amin +2160 -name "*.checkpoint" -exec rm {} \;
+fi
+sed -i '1,10000d' /root/tesseract-src/tesstutorial/chi_simoutput/basetrain.log
+
+#find /root/tesseract-src/tesstutorial/chi_simoutput/ -amin +1200 -name "*.checkpoint" -exec rm {} \;
+#sed -i '1,10000d' /root/tesseract-src/tesstutorial/chi_simoutput/basetrain.log
 [root@localhost script]# chmod +x clear.sh
 
 
