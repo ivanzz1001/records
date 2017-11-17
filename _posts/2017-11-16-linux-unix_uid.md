@@ -238,7 +238,7 @@ saved set-user-id user: ivan1001
 
 <br />
 <br />
-参看：
+**参看：**
 
 1. [Linux进程权限的研究](http://blog.csdn.net/ybxuwei/article/details/23563423)
 
