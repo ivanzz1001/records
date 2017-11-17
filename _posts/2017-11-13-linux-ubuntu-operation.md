@@ -194,6 +194,8 @@ Linux 3.13.0-32-generic (ai-test)       11/17/2017      _x86_64_        (16 CPU)
 </pre>
 
 **13） at命令**
+
+定时执行 1 次任务：
 <pre>
 [root@localhost test-src]# at 4pm + 3 days   // 3天后的下午4点执行一个任务
 at> echo "hello,world"
