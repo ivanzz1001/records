@@ -119,6 +119,116 @@ int setegid(gid_t egid);
 # chmod g-s file
 </pre>
 
+
+## 2. 示例
+
+如下sample.c源文件：
+{% highlight string %}
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <pwd.h>
+
+int main()
+{
+    struct passwd* ruser = NULL;
+    struct passwd* euser = NULL;
+    struct passwd* suser = NULL;
+    uid_t uid, euid, suid;
+    
+    /* get uid euid suid */
+    if(getresuid(&uid, &euid, &suid) != 0)
+    {
+        perror(0);
+        return 1;
+    }
+
+    /* get name of id */
+    ruser = getpwuid(uid);
+    printf("real user: %s\n", ruser->pw_name);
+    euser = getpwuid(euid);
+    printf("effective user: %s\n", euser->pw_name);
+    suser = getpwuid(suid);
+    printf("saved set-user-id user: %s\n", suser->pw_name);
+    return 0;
+}
+{% endhighlight %}
+编译：
+<pre>
+[ivan1001@localhost test-src]$ gcc -o sample sample.c 
+</pre>
+
+**(1) 普通用户权限执行**
+<pre>
+[ivan1001@localhost test-src]$ ls -al sample
+-rwxrwxr-x. 1 ivan1001 ivan1001 8720 Nov 16 17:46 sample
+
+[ivan1001@localhost test-src]$ ./sample
+real user: ivan1001
+effective user: ivan1001
+saved set-user-id user: ivan1001
+</pre> 
+
+**(2) 特权用户权限执行**
+<pre>
+[ivan1001@localhost test-src]$ su
+Password: 
+[root@localhost test-src]# ls -al sample
+-rwxrwxr-x. 1 ivan1001 ivan1001 8720 Nov 16 17:46 sample
+
+[root@localhost test-src]# ./sample
+real user: root
+effective user: root
+saved set-user-id user: root
+</pre>
+
+**(3) 设置用户ID执行**
+<pre>
+[root@localhost test-src]# chmod u+s ./sample
+[root@localhost test-src]# ls -al sample
+-rwsrwxr-x. 1 ivan1001 ivan1001 8720 Nov 16 17:46 sample
+
+[root@localhost test-src]# ./sample
+real user: root
+effective user: ivan1001
+saved set-user-id user: ivan1001
+</pre>
+
+
+
+
+
+## 3. 总结
+每个Linux进程都包含如下这些属性，这些属性功能决定了该进程访问文件的权限：
+
+* 1. real user id
+
+* 2. real user group
+
+* 3. effective user id
+
+* 4. effective user group
+
+* 5. saved set-user-id
+
+* 6. saved set-user-group
+
+
+
+
+
+
+
+<br />
+<br />
+参看：
+
+1. [Linux进程权限的研究](http://blog.csdn.net/ybxuwei/article/details/23563423)
+
+
 <br />
 <br />
 <br />
