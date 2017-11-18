@@ -196,6 +196,14 @@ failed:
 {% endhighlight %}
 
 
+<br />
+<br />
+
+**[参考]：**
+
+1. [Nginx源码完全注释（8）ngx_errno.c](http://blog.csdn.net/Poechant/article/details/8032389)
+
+2. [可重入性 线程安全 Async-Signal-Safe](http://blog.csdn.net/ldong2007/article/details/4271685)
 
 <br />
 <br />
