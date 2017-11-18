@@ -48,7 +48,7 @@ description: Linux命令行与shell脚本
 [root@localhost test-src]# b=$[ 5 + 6 ]
 [root@localhost test-src]# echo $b
 11
-<pre>
+</pre>
 
 (4) 使用let命令
 <pre>
