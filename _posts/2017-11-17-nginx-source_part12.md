@@ -205,6 +205,8 @@ failed:
 
 2. [可重入性 线程安全 Async-Signal-Safe](http://blog.csdn.net/ldong2007/article/details/4271685)
 
+3. [strerror线程安全分析](http://blog.csdn.net/aquester/article/details/23839619)
+
 <br />
 <br />
 <br />
