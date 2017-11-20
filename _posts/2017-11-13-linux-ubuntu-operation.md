@@ -216,6 +216,43 @@ at>  Ctrl+D
 [root@localhost test-src]# at -d [task-id]     // 删除任务
 </pre>
 
+**14) xargs与管道的区别**
+
+管道是实现： 将前面的标准输出作为后面的标准输入
+
+xargs是实现：将标准输入作为命令的参数。
+
+举个例子：
+<pre>
+[root@localhost test-src]# echo "--help" | cat
+--help
+[root@localhost test-src]# echo "--help" | xargs cat
+Usage: cat [OPTION]... [FILE]...
+Concatenate FILE(s), or standard input, to standard output.
+
+  -A, --show-all           equivalent to -vET
+  -b, --number-nonblank    number nonempty output lines, overrides -n
+  -e                       equivalent to -vE
+  -E, --show-ends          display $ at end of each line
+  -n, --number             number all output lines
+  -s, --squeeze-blank      suppress repeated empty output lines
+  -t                       equivalent to -vT
+  -T, --show-tabs          display TAB characters as ^I
+  -u                       (ignored)
+  -v, --show-nonprinting   use ^ and M- notation, except for LFD and TAB
+      --help     display this help and exit
+      --version  output version information and exit
+
+With no FILE, or when FILE is -, read standard input.
+
+Examples:
+  cat f - g  Output f's contents, then standard input, then g's contents.
+  cat        Copy standard input to standard output.
+
+GNU coreutils online help: <http://www.gnu.org/software/coreutils/>
+For complete documentation, run: info coreutils 'cat invocation'
+</pre>
+如果你直接在命令行输入cat而不输入其余的任何东西，这时候的cat会等待标准输入，因此这时候可以通过键盘并按回车来让cat读取输入，cat会原样返回； 而如果你输入--help，那么cat程序会在标准输出上打印自己的帮助文档。**也就是说**，管道符 | 所传递给程序的不是你简单地在程序名后面输入的参数，它会被程序内部的读取功能如scanf和gets等接收，而xargs则是将内容作为普通的参数传递给程序。如上面的例子相当于你手写了```cat --help```。
 
 
 <br />
