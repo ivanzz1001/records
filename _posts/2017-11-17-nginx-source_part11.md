@@ -285,6 +285,15 @@ ret: 5
 ret: 300
 </pre>
 
+注： ```-rdynamic```选项主要是将所有符号加载到符号表中。对其更详细解释请参看如下：
+<pre>
+-rdynamic
+Pass the flag ‘-export-dynamic’ to the ELF linker, on targets that support
+it. This instructs the linker to add all symbols, not only used ones, to the
+dynamic symbol table. This option is needed for some uses of dlopen or to
+allow obtaining backtraces from within a program.
+</pre>
+
 <br />
 
 ## 2. os/unix/ngx_dlopen.c源文件
