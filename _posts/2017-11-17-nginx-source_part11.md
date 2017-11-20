@@ -144,6 +144,22 @@ str2 is NULL
 
 * (ELF only) 假若调用程序的可执行文件包含DT_RPATH tag并且不包含DT_RUNPATH的话，则会搜索DT_RPATH tag所列出的所有目录
 
+* 假若在程序启动的时候，环境变量LD_LIBRARY_PATH被定义，则会搜索该变量所指定的目录（出于安全上的考虑，假若可执行程序设置了set-user-ID和set-group-ID的话，则会忽略此环境变量）
+
+* (ELF only) 假若调用程序的可执行文件包含DT_RUNPATH tag的话，然后该tag所列出的目录会被搜索。
+
+* 查询缓存文件/etc/ld.so.cache以检查是否有名称为filename的entry（ld.so.cache缓存文件有ldconfig维护)
+
+* 搜索/lib和/usr/lib目录
+
+假若该加载的动态链接库有依赖于其他库的话，那些依赖库也会被动态链接器按上述相同的规则进行加载。
+
+dlopen()函数的flag参数必须要包含如下两个值之一：
+
+* RTLD_LAZY: 执行lazy binding。只有在引用到这些symbols的代码被执行时才会解析符号表。假若符号表从来不会被引用到，则动态链接库的符号表不会被解析。（对于lazy binding，其只会发生在函数引用上，而对于变量的引用，则在动态链接库一加载时就会被bind）
+
+* RTLD_NOW: 假若这个值被指定，或者环境变量LD_BIND_NOW被设置为一个非空字符串，所有在库中为定义的符号都会在dlopen()函数返回前被解析。假若解析失败，则返回错误。
+
 
 
 <br />
