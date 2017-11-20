@@ -160,7 +160,130 @@ dlopen()函数的flag参数必须要包含如下两个值之一：
 
 * RTLD_NOW: 假若这个值被指定，或者环境变量LD_BIND_NOW被设置为一个非空字符串，所有在库中为定义的符号都会在dlopen()函数返回前被解析。假若解析失败，则返回错误。
 
+另外参数flag还可以与如下的一个或多个值进行按位或操作：
 
+* RTLD_GLOBAL: 使当前库所加载的符号表可以被后续加载库所查找到
+
+* RTLD_LOCAL: 与RTLD_GLOBAL刚好相反，并且如果未被指定的话，默认值为RTLD_LOCAL。当前库所加载的符号表并不能被后续所加载的库所找到。
+
+* RTLD_NODELETE
+
+* RTLD_NOLOAD
+
+* RTLD_DEEPBIND
+
+
+假若filename为NULL，则返回代表当前主应用程序的handle。当把这个handle传递给dlsym()函数时，将首先会查找本主应用程序中的符号表，然后再是程序启动时加载的动态链接库，然后还会从用RTLD_GLOBAL标志dlopen()的动态链接库中进行查找。
+
+在动态链接库加载时，如果该库中有```_init()```方法，并且被导出，则首先会执行该方法。下面我们给出一个例子：
+
+calc.c源文件：
+{% highlight string %}
+int add(int a,int b)
+{
+    return (a + b);
+}
+
+int sub(int a, int b)
+{
+    return (a - b);
+}
+
+int mul(int a, int b)
+{
+    return (a * b);
+}
+
+int div(int a, int b)
+{
+    return (a / b);
+}
+{% endhighlight %}
+
+编译：
+<pre>
+[root@localhost test-src]# gcc -fPIC -shared -o libcalc.so calc.c 
+</pre>
+
+编写main函数(test.c):
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <dlfcn.h>
+
+typedef int (*OperFunc)(int,int);
+
+int main(int argc,char *argv[])
+{
+   void *handle = NULL, *handle2 = NULL;
+   int ret;
+
+   handle = dlopen("./libcalc.so",RTLD_NOW|RTLD_GLOBAL);
+   if(handle == NULL)
+   {
+      printf("err: %s\n",dlerror());
+      return -1;
+   }
+
+   OperFunc addptr = (OperFunc)dlsym(handle,"add");
+   OperFunc subptr = (OperFunc)dlsym(handle,"sub");
+   OperFunc mulptr = (OperFunc)dlsym(handle,"mul");
+   OperFunc divptr = (OperFunc)dlsym(handle,"div");
+
+   if(addptr)
+   {
+      ret = (*addptr)(2,3);
+      printf("ret: %d\n",ret);
+   }
+
+   if(subptr)
+   {
+      ret = (*subptr)(5,2);
+      printf("ret: %d\n",ret);
+   }
+   
+   if(mulptr)
+   {
+      ret = (*mulptr)(3,4);
+      printf("ret: %d\n",ret);
+   }
+
+   if(divptr)
+   {
+      ret = (*divptr)(20,4);
+      printf("ret: %d\n",ret);
+   }
+
+   handle2 = dlopen(NULL,RTLD_LAZY);     //这里演示NULL情况，从当前程序的Global符号表中加载
+   if(handle2 == NULL)
+   {
+      printf("err: %s\n",dlerror());
+      return -2;
+   }
+
+   OperFunc add2ptr = (OperFunc)dlsym(handle2,"add");
+   if(add2ptr)
+   {
+       ret = (*add2ptr)(100,200);
+       printf("ret: %d\n",ret);
+   }
+
+   dlclose(handle2);
+   dlclose(handle);
+   return 0;
+
+}
+{% endhighlight %}
+编译运行：
+<pre>
+[root@localhost test-src]# gcc -o test test.c -rdynamic -ldl
+[root@localhost test-src]# ./test
+ret: 5
+ret: 3
+ret: 12
+ret: 5
+ret: 300
+</pre>
 
 <br />
 
@@ -197,6 +320,9 @@ ngx_dlerror(void)
 
 #endif
 {% endhighlight %}
+
+ngx_dlerror()函数较为简单，只是对dlerror()函数进行了一个简单的封装。
+
 
 
 <br />
