@@ -72,7 +72,28 @@ char *ngx_dlerror(void);
 #define NGX_HAVE_DLOPEN  1
 #endif
 </pre>
-因此，定义有```char *ngx_dlerror(void);```函数。
+因此，定义有```char *ngx_dlerror(void);```函数。下面我们再详细介绍一下加载动态链接库相关的接口函数：
+
+### 1.1 Linux加载动态链接库接口函数
+
+动态链接库加载的基本函数主要有：dladdr,dlclose,dlerror,dlopen,dlsym,dlvsym。其中标准Linux C包含如下几个函数：
+{% highlight string %}
+#include <dlfcn.h>
+
+void *dlopen(const char *filename, int flag);
+
+char *dlerror(void);
+
+void *dlsym(void *handle, const char *symbol);
+
+int dlclose(void *handle);
+
+Link with -ldl.
+{% endhighlight %}
+
+**(1) 描述**
+
+这四个函数dlopen(),dlerror(),dlsym(),dlclose()实现了动态链接库加载的接口。
 
 
 
