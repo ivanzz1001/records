@@ -95,9 +95,53 @@ Link with -ldl.
 
 这四个函数dlopen(),dlerror(),dlsym(),dlclose()实现了动态链接库加载的接口。
 
+```dlerror()```: 该函数返回自上一次调用dlerror()函数以来，最新发生在dlopen()、dlsym()、dlclose()函数调用所产生的错误的字符串描述。假若从初始化以来并未发生错误，则会返回NULL；若从上一次调用dlerror()以来，再并未发生新的错误，则第二次也会返回NULL。参看如下例子(test.c)：
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <dlfcn.h>
 
 
+int main(int argc,char *argv[])
+{
+   void *handle = NULL;
+   char *str1,*str2;
 
+   handle = dlopen("./aa.so",RTLD_NOW|RTLD_GLOBAL);
+   if(handle == NULL)
+   {
+        str1 = dlerror();
+        if(str1)
+            printf("str1: %s\n",str1);
+        else
+            printf("str1 is NULL\n");
+
+        str2 = dlerror();
+        if(str2)
+            printf("str2: %s\n",str2);
+        else
+            printf("str2 is NULL\n");
+
+       return -1;
+   }
+
+   return 0;
+
+}
+{% endhighlight %}
+编译运行：
+<pre>
+[root@localhost test-src]# gcc -o test test.c -ldl
+[root@localhost test-src]# ./test
+str1: ./aa.so: cannot open shared object file: No such file or directory
+str2 is NULL
+</pre>
+如上可以看到，连续地两次dlerror()，第二次会将第一次的error信息清除掉。
+
+<br />
+
+
+<br />
 
 ## 2. os/unix/ngx_dlopen.c源文件
 
