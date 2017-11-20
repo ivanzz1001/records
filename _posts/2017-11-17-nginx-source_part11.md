@@ -140,6 +140,11 @@ str2 is NULL
 
 <br />
 
+```dlopen()```: 该函数用于加载filename指定的链接库，并且返回一个handle。如果filename为NULL，则返回代表当前主应用程序的handle。假若filename中包含"/"，则会将其解释为一个相对或绝对路径。否则，动态链接器会按如下顺序搜索库：
+
+* (ELF only) 假若调用程序的可执行文件包含DT_RPATH tag并且不包含DT_RUNPATH的话，则会搜索DT_RPATH tag所列出的所有目录
+
+
 
 <br />
 
