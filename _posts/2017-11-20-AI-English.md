@@ -36,7 +36,8 @@ description: AI常用专业术语
 
 11.  attention model 注意力模型
 
-12. Support Vector Machine (SVM) 支持向量机，是常见的一种判别方法。在机器学习领域，是一个有监督的学习模型，通常用来进行模式识别、分类以及回归分析。
+12. Support Vector Machine (SVM) 支持向量机，是常见的一种判别方法。在机器学习领域，是一个有监督的学习模型，
+    通常用来进行模式识别、分类以及回归分析。
 
 13. Decision Tree 决策树
 
