@@ -44,6 +44,9 @@ description: AI常用专业术语
 14. Sigmoid函数： 是一个在生物学中常见的S型的函数，也称为S型生长曲线。在信息科学中，由于其单增以及反函数单增等性质，
     Sigmoid函数常被用作神经网络的阈值函数，将变量映射到0,1之间。
 
+15. logistic regression 逻辑回归
+
+16. naive Bayes 朴素贝叶斯
 
 </pre>
 
