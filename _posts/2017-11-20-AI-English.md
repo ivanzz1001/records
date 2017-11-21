@@ -52,6 +52,10 @@ description: AI常用专业术语
 
 18. multilayer perceptron (MLP) 多层感知机
 
+20. Linear Algebra 线性代数
+
+21. cybernetics 控制论
+
 </pre>
 
 
