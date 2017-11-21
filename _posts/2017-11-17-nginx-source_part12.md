@@ -100,6 +100,115 @@ ngx_int_t ngx_strerror_init(void);
 {% endhighlight %}
 
 
+### 1.1 相关宏定义
+
+头文件主要是对相应的错误进行了重新的定义。在ngx_auto_config.h头文件中，有如下定义：
+<pre>
+#ifndef NGX_HAVE_OPENAT
+#define NGX_HAVE_OPENAT  1
+#endif
+</pre>
+因此，这里会将NGX_EMLINK定义为EMLINK。当前我们并没有```__hpux__```定义，因此这里NGX_AGAIN被定义为EAGAIN。
+
+<br />
+
+### 1.2 相关函数的声明
+{% highlight string %}
+#define ngx_errno                  errno
+#define ngx_socket_errno           errno
+#define ngx_set_errno(err)         errno = err
+#define ngx_set_socket_errno(err)  errno = err
+
+
+u_char *ngx_strerror(ngx_err_t err, u_char *errstr, size_t size);
+ngx_int_t ngx_strerror_init(void);
+{% endhighlight %}
+这里由于操作系统提供的:
+<pre>
+char *strerror(int errnum);
+
+int strerror_r(int errnum, char *buf, size_t buflen);
+           /* XSI-compliant */
+
+char *strerror_r(int errnum, char *buf, size_t buflen);
+</pre>
+都不是```异步信号安全```的，因此这里实现自身的ngx_strerror()函数。
+
+这里我们来分析一下原生的strerror()函数：
+{% highlight string %}
+// glibc-2.14\string\strerror.c
+#include <errno.h>
+ 
+/* Return a string describing the errno code in ERRNUM.
+   The storage is good only until the next call to strerror.
+   Writing to the storage causes undefined behavior.  */
+libc_freeres_ptr (static char *buf);
+ 
+char *
+strerror (int errnum)
+{
+	char *ret = __strerror_r (errnum, NULL, 0);
+	int saved_errno;
+
+	if (__builtin_expect (ret != NULL, 1))
+		return ret;
+
+	saved_errno = errno;
+	if (buf == NULL)
+		buf = malloc (1024);
+	
+	__set_errno (saved_errno);
+	if (buf == NULL)
+		return _("Unknown error");
+	
+	return __strerror_r (errnum, buf, 1024);
+}
+
+// glibc-2.14\string\_strerror.c
+/* Return a string describing the errno code in ERRNUM.  */
+char *
+__strerror_r (int errnum, char *buf, size_t buflen)
+{
+	if (__builtin_expect (errnum < 0 || errnum >= _sys_nerr_internal
+		|| _sys_errlist_internal[errnum] == NULL, 0))
+	{
+		/* Buffer we use to print the number in.  For a maximum size for
+		`int' of 8 bytes we never need more than 20 digits.  */
+		char numbuf[21];
+		const char *unk = _("Unknown error ");
+		size_t unklen = strlen (unk);
+		char *p, *q;
+		bool negative = errnum < 0;
+
+		numbuf[20] = '\0';
+		p = _itoa_word (abs (errnum), &numbuf[20], 10, 0);
+
+		/* Now construct the result while taking care for the destination
+		buffer size.  */
+		q = __mempcpy (buf, unk, MIN (unklen, buflen));
+		if (negative && unklen < buflen)
+		{
+			*q++ = '-';
+			++unklen;
+		}
+		
+		if (unklen < buflen)
+			memcpy (q, p, MIN ((size_t) (&numbuf[21] - p), buflen - unklen));
+
+		/* Terminate the string in any case.  */
+		if (buflen > 0)
+		buf[buflen - 1] = '\0';
+
+		return buf;
+	}
+
+	return (char *) _(_sys_errlist_internal[errnum]);
+}
+
+weak_alias (__strerror_r, strerror_r)
+libc_hidden_def (__strerror_r)
+{% endhighlight %}
+
 
 ## 2. os/unix/ngx_errno.c源文件
 
@@ -206,6 +315,8 @@ failed:
 2. [可重入性 线程安全 Async-Signal-Safe](http://blog.csdn.net/ldong2007/article/details/4271685)
 
 3. [strerror线程安全分析](http://blog.csdn.net/aquester/article/details/23839619)
+
+4. [gcc的__builtin_函数介绍](http://blog.csdn.net/jasonchen_gbd/article/details/44948523)
 
 <br />
 <br />
