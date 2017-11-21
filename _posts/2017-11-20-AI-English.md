@@ -48,6 +48,10 @@ description: AI常用专业术语
 
 16. naive Bayes 朴素贝叶斯
 
+17. Representation learning 表示学习
+
+18. multilayer perceptron (MLP) 多层感知机
+
 </pre>
 
 
