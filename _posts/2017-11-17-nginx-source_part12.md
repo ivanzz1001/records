@@ -333,6 +333,8 @@ failed:
 {% endhighlight %}
 
 
+这里之所以用ngx_strerror()，有两点原因。上面代码开头部分已经解释很清楚，这里不再赘述。
+
 <br />
 <br />
 
