@@ -211,7 +211,32 @@ weak_alias (__strerror_r, strerror_r)
 libc_hidden_def (__strerror_r)
 {% endhighlight %}
 
+这里可以看到，对于strerror(int errnum)函数，如果参数errnum是一个已知的errno，其直接从一个预先定义好的数组中返回相应的字符串，因此是绝对安全的。但是假如errnum参数所表示的错误码并未在系统内部定义的话，则会执行malloc()开辟一段内存空间。malloc()函数本身是线程安全的，但是却不是```异步信号安全```的。这里strerror()函数之所以线程不安全，是因为两次调用strerror()函数，后一次调用会将前一次调用所分配的空间释放掉。
+
 <br />
+
+这里在对上面函数中```__builtin_expect()```做一个简单的介绍：
+
+__builtin_expect(long exp, long c):  用来引导gcc进行条件分支预测。在一条指令执行时，由于流水线的作用，CPU可以完成下一条指令的取指，这样可以提高CPU的利用率。在执行一条条件分支指令时，CPU也会预取下一条执行，但是如果条件分支跳转到了其他指令，那CPU预取的下一条指令就没用了，这样就降低了流水线的效率。内核中likely()和unlikely()就是通过```__builtin_expect```来实现的。
+
+__builtin_expect(long exp, long c)函数可以优化程序编译后的指令序列，使指令尽可能的顺序执行，从而提高CPU的预取指令的正确率。该函数的第二个参数可以取0和1。 例如：
+<pre>
+if (__builtin_expect(x,0))
+	foo();
+</pre>
+表示x的值大部分情况下可能为0，因此foo()函数得到执行的机会较少。gcc就不必将foo()函数的汇编指令紧挨着if条件跳转指令。
+
+由于第二个参数只能取整数，所以如果要判断指针或字符串，可以像下面这样写：
+<pre>
+if(__builtin_expect(ptr != NULL, 1))
+	foo(*ptr);
+</pre>
+表示ptr一般不会为NULL，所以foo函数得到执行的概率较大，gcc会将foo函数的汇编指令放在紧挨着if跳转执行的位置。
+
+
+<br />
+
+
 
 ## 2. os/unix/ngx_errno.c源文件
 
