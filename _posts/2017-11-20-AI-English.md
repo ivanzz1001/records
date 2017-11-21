@@ -56,6 +56,8 @@ description: AI常用专业术语
 
 21. cybernetics 控制论
 
+22. artifical neural network (ANN) 人工神经网络
+
 </pre>
 
 
