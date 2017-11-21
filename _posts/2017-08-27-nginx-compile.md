@@ -218,5 +218,13 @@ access.log  error.log
 
 <br />
 <br />
+
+**[参看]：**
+
+1. [Nginx快速入门-菜鸟笔记](https://www.cnblogs.com/wylhome/p/6057198.html)
+
+
+<br />
+<br />
 <br />
 
