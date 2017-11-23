@@ -884,7 +884,7 @@ training/combine_tessdata -e ../tesstutorial/chi_simoutput/chi_sim.traineddata \
   
 training/lstmtraining --debug_interval 100 \
   --continue_from ../tesstutorial/newchi_simoutput/chi_sim.lstm \
-  --traineddata ../tesstutorial/chi_simoutput/chi_sim.traineddata \
+  --traineddata ../tesstutorial/chi_simtrain/chi_sim/chi_sim.traineddata \
   --model_output ../tesstutorial/newchi_simoutput/base \
   --train_listfile ../tesstutorial/chi_simtrain/chi_sim.training_files.txt \
   --eval_listfile ../tesstutorial/chi_simeval/chi_sim.training_files.txt \

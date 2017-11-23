@@ -58,6 +58,10 @@ description: AI常用专业术语
 
 22. artifical neural network (ANN) 人工神经网络
 
+23. adaptive linear element (ADALINE) 自适应线性单元
+
+24. stochastic gradient descent 随机梯度下降
+
 </pre>
 
 
