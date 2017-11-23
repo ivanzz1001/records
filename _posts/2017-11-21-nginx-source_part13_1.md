@@ -418,7 +418,170 @@ ssize_t ngx_thread_write_chain_to_file(ngx_file_t *file, ngx_chain_t *cl,
 #endif /* _NGX_FILES_H_INCLUDED_ */
 {% endhighlight %}
 
+下面我们分成几个部分来详细解释一下ngx_files.h头文件
 
+### 1.1 相关数据结构声明
+
+**(1) 基本数据类型**
+{% highlight string %}
+typedef int                      ngx_fd_t;
+typedef struct stat              ngx_file_info_t;
+typedef ino_t                    ngx_file_uniq_t;
+{% endhighlight %}
+其中```struct stat```包含了文件当前状态的详细信息，该结构体字段一般类似于如下：
+<pre>
+struct stat {
+   dev_t     st_dev;     /* ID of device containing file */
+   ino_t     st_ino;     /* inode number */
+   mode_t    st_mode;    /* protection */
+   nlink_t   st_nlink;   /* number of hard links */
+   uid_t     st_uid;     /* user ID of owner */
+   gid_t     st_gid;     /* group ID of owner */
+   dev_t     st_rdev;    /* device ID (if special file) */
+   off_t     st_size;    /* total size, in bytes */
+   blksize_t st_blksize; /* blocksize for file system I/O */
+   blkcnt_t  st_blocks;  /* number of 512B blocks allocated */
+   time_t    st_atime;   /* time of last access */
+   time_t    st_mtime;   /* time of last modification */
+   time_t    st_ctime;   /* time of last status change */
+};
+</pre>
+
+```ino_t```表示为当前inode类型。
+
+
+**(2) ngx_file_mapping_t数据类型**
+{% highlight string %}
+typedef struct {
+    u_char                      *name;
+    size_t                       size;
+    void                        *addr;
+    ngx_fd_t                     fd;
+    ngx_log_t                   *log;
+} ngx_file_mapping_t;
+{% endhighlight %}
+用于将文件映射到内存的一个数据结构。
+
+**(3) ngx_dir_t数据类型**
+{% highlight string %}
+typedef struct {
+    DIR                         *dir;
+    struct dirent               *de;
+    struct stat                  info;
+
+    unsigned                     type:8;
+    unsigned                     valid_info:1;
+} ngx_dir_t;
+{% endhighlight %}
+其中```DIR *dir```一般表示一个打开的目录句柄：
+<pre>
+DIR *opendir(const char *name);
+</pre>
+
+```struct dirent *de```主要用于保存一个打开的目录的详细信息，结构一般如下：
+<pre>
+struct dirent {
+   ino_t          d_ino;       /* inode number */
+   off_t          d_off;       /* not an offset; see NOTES */
+   unsigned short d_reclen;    /* length of this record */
+   unsigned char  d_type;      /* type of file; not supported
+                                  by all file system types */
+   char           d_name[256]; /* filename */
+};
+</pre>
+
+```unsigned type:8```字段一般表示文件的类型。一般等于```de->d_type```值。
+
+**(4) ngx_glob_t数据类型**
+
+{% highlight string %}
+typedef struct {
+    size_t                       n;
+    glob_t                       pglob;
+    u_char                      *pattern;
+    ngx_log_t                   *log;
+    ngx_uint_t                   test;
+} ngx_glob_t;
+{% endhighlight %}
+```glob_t pglob```一般用于基于模式的文件查找，其结构一般如下：
+<pre>
+int glob(const char *pattern, int flags,
+        int (*errfunc) (const char *epath, int eerrno),
+        glob_t *pglob);
+void globfree(glob_t *pglob);
+
+typedef struct {
+   size_t   gl_pathc;    /* Count of paths matched so far  */
+   char   **gl_pathv;    /* List of matched pathnames.  */
+   size_t   gl_offs;     /* Slots to reserve in gl_pathv.  */
+} glob_t;
+</pre>
+
+**(5) 相关错误码**
+<pre>
+#define NGX_INVALID_FILE         -1
+#define NGX_FILE_ERROR           -1
+</pre>
+
+<br />
+
+## 1.2 open函数
+主要是定义open函数原型及标志：
+{% highlight string %}
+#ifdef __CYGWIN__
+
+#ifndef NGX_HAVE_CASELESS_FILESYSTEM
+#define NGX_HAVE_CASELESS_FILESYSTEM  1
+#endif
+
+#define ngx_open_file(name, mode, create, access)                            \
+    open((const char *) name, mode|create|O_BINARY, access)
+
+#else
+
+#define ngx_open_file(name, mode, create, access)                            \
+    open((const char *) name, mode|create, access)
+
+#endif
+
+#define ngx_open_file_n          "open()"
+
+#define NGX_FILE_RDONLY          O_RDONLY
+#define NGX_FILE_WRONLY          O_WRONLY
+#define NGX_FILE_RDWR            O_RDWR
+#define NGX_FILE_CREATE_OR_OPEN  O_CREAT
+#define NGX_FILE_OPEN            0
+#define NGX_FILE_TRUNCATE        (O_CREAT|O_TRUNC)
+#define NGX_FILE_APPEND          (O_WRONLY|O_APPEND)
+#define NGX_FILE_NONBLOCK        O_NONBLOCK
+
+#if (NGX_HAVE_OPENAT)
+#define NGX_FILE_NOFOLLOW        O_NOFOLLOW
+
+#if defined(O_DIRECTORY)
+#define NGX_FILE_DIRECTORY       O_DIRECTORY
+#else
+#define NGX_FILE_DIRECTORY       0
+#endif
+
+#if defined(O_SEARCH)
+#define NGX_FILE_SEARCH          (O_SEARCH|NGX_FILE_DIRECTORY)
+
+#elif defined(O_EXEC)
+#define NGX_FILE_SEARCH          (O_EXEC|NGX_FILE_DIRECTORY)
+
+#elif (NGX_HAVE_O_PATH)
+#define NGX_FILE_SEARCH          (O_PATH|O_RDONLY|NGX_FILE_DIRECTORY)
+
+#else
+#define NGX_FILE_SEARCH          (O_RDONLY|NGX_FILE_DIRECTORY)
+#endif
+
+#endif /* NGX_HAVE_OPENAT */
+
+#define NGX_FILE_DEFAULT_ACCESS  0644
+#define NGX_FILE_OWNER_ACCESS    0600
+{% endhighlight %}
 
 
 <br />
