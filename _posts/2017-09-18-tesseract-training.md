@@ -879,11 +879,8 @@ WordStr <left> <bottom> <right> <top> <page> #<text for line including spaces>
 {% highlight string %}
 mkdir -p ../tesstutorial/newchi_simoutput
 
-training/combine_tessdata -e ../tesstutorial/chi_simoutput/chi_sim.traineddata \
-  ../tesstutorial/newchi_simoutput/chi_sim.lstm
-  
 training/lstmtraining --debug_interval 100 \
-  --continue_from ../tesstutorial/newchi_simoutput/chi_sim.lstm \
+  --continue_from ../tesstutorial/chi_simoutput/base_checkpoint \
   --traineddata ../tesstutorial/chi_simtrain/chi_sim/chi_sim.traineddata \
   --model_output ../tesstutorial/newchi_simoutput/base \
   --train_listfile ../tesstutorial/chi_simtrain/chi_sim.training_files.txt \
