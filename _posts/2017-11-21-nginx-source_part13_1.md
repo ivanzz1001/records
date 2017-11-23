@@ -525,7 +525,7 @@ typedef struct {
 
 <br />
 
-## 1.2 open函数
+## 1.2 open()函数
 主要是定义open函数原型及标志：
 {% highlight string %}
 #ifdef __CYGWIN__
