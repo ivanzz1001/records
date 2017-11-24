@@ -62,6 +62,7 @@ description: AI常用专业术语
 
 24. stochastic gradient descent 随机梯度下降
 
+25. principal components analysis (PCA) 主成分分析
 </pre>
 
 
