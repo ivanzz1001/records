@@ -117,6 +117,13 @@ ssh start/running, process 12784
 62c83f05b4f10e058018da436ac7eb2f  sources.list.trusty
 </pre> 
 
+其实Windows上也同样有类似与```md5sum```的命令行工具certutil，使用方法如下：
+<pre>
+certutil -hashfile filename MD5  
+certutil -hashfile filename SHA1  
+certutil -hashfile filename SHA256
+</pre>
+
 **8) 杀死所有名称带有vap字段的进程**
 <pre>
 # ps -ef | grep vap | grep -v grep | awk '{print $2}' | xargs kill -9
