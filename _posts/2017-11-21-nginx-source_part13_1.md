@@ -583,6 +583,60 @@ typedef struct {
 #define NGX_FILE_OWNER_ACCESS    0600
 {% endhighlight %}
 
+```open()```函数部分主要包括：函数的定义、相应的打开创建模式、文件创建时候的权限。当前在 ngx_auto_config.h头文件中，具有如下定义：
+<pre>
+#ifndef NGX_HAVE_OPENAT
+#define NGX_HAVE_OPENAT  1
+#endif
+</pre>
+对应我们当前的操作系统环境(32位Ubuntu16.04)，我们进行如下测试(test.c):
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+
+int main(int argc,char *argv[])
+{
+    #if defined(O_DIRECTORY)
+        printf("have O_DIRECTORY flags\n");
+    #endif
+
+    #if defined(O_SEARCH)
+        printf("have O_SEARCH flags\n");
+    #endif
+
+    #if defined(O_EXEC)
+        printf("have o_EXEC flags\n");
+    #endif
+    return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+[root@localhost test-src]# gcc -o test test.c
+[root@localhost test-src]# ./test
+have O_DIRECTORY flags
+</pre>
+
+<br />
+
+## 1.3 关闭文件句柄
+{% highlight string %}
+#define ngx_close_file           close
+#define ngx_close_file_n         "close()"
+{% endhighlight %}
+
+## 1.4 删除文件
+{% highlight string %}
+#define ngx_delete_file(name)    unlink((const char *) name)
+#define ngx_delete_file_n        "unlink()"
+{% endhighlight %}
+```unlink```删除文件系统中名为name的文件。
+
 
 <br />
 <br />
