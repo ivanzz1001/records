@@ -635,8 +635,76 @@ have O_DIRECTORY flags
 #define ngx_delete_file(name)    unlink((const char *) name)
 #define ngx_delete_file_n        "unlink()"
 {% endhighlight %}
-```unlink```删除文件系统中名为name的文件。
+```unlink```删除目录项，并将由name所引用的文件的链接数减1。假如该名字是所引用文件的最后一个链接，且没有进程打开了该文件，则该文件会被删除并将所占用的空间释放；假如该名字是所引用文件的最后一个链接，但是仍有其他进程打开了该文件，则等到所有进程关闭文件句柄之后该文件就会被删除；假若该名字引用的是一个软链接的话，则该软链接会被删除。看如下示例test.c:
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
+int main(int argc,char *argv[])
+{
+    int fd1 = -1;
+    struct stat finfo;
+    int ret = -1;
+
+    fd1 = open("hello.txt",O_RDONLY);
+
+    if(fd1 < 0)
+       goto END;
+
+    if(stat("hello.txt",&finfo) < 0)
+       goto END;
+    printf("1) st_nlink: %d\n",(intptr_t)finfo.st_nlink);
+
+
+
+    if(link("hello.txt","new.txt") < 0)
+       goto END;
+    if(stat("new.txt",&finfo) < 0)
+       goto END;    
+    printf("2) st_nlink: %d\n",(intptr_t)finfo.st_nlink);
+
+
+    unlink("new.txt");
+    if(stat("hello.txt",&finfo) < 0)
+       goto END;
+    printf("3) st_nlink: %d\n",(intptr_t)finfo.st_nlink);
+
+
+    unlink("hello.txt");
+    if(stat("hello.txt",&finfo) < 0)
+       goto END;
+    printf("4) st_nlink: %d\n",(intptr_t)finfo.st_nlink);
+
+
+    unlink("hello.txt");
+    if(stat("hello.txt",&finfo) < 0)  
+       goto END;
+    printf("5) st_nlink: %d\n",(intptr_t)finfo.st_nlink);
+   
+
+    ret = 0;
+
+
+END:
+    close(fd1);
+    return ret;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+[root@localhost test-src]# gcc -o test1 test.c
+[root@localhost test-src]# echo "hello,world" > hello.txt
+[root@localhost test-src]# ./test
+1) st_nlink: 1
+2) st_nlink: 2
+3) st_nlink: 1
+[root@localhost test-src]# ls 
+test  test.c
+</pre>
 
 <br />
 <br />
