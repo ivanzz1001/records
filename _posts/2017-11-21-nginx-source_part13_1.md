@@ -851,9 +851,145 @@ ngx_int_t ngx_set_file_time(u_char *name, ngx_fd_t fd, time_t s);
 
 * 获得文件相关信息(stat,fstat,lstat)
 
+<br />
+
+## 1.7 文件内存映射
+{% highlight string %}
+ngx_int_t ngx_create_file_mapping(ngx_file_mapping_t *fm);
+void ngx_close_file_mapping(ngx_file_mapping_t *fm);
 
 
+#define ngx_realpath(p, r)       (u_char *) realpath((char *) p, (char *) r)
+#define ngx_realpath_n           "realpath()"
+#define ngx_getcwd(buf, size)    (getcwd((char *) buf, size) != NULL)
+#define ngx_getcwd_n             "getcwd()"
+#define ngx_path_separator(c)    ((c) == '/')
+{% endhighlight %}
+```realpath()```获得一个规范的绝对路径值；```getcwd()```返回调用进程当前工作目录的绝对路径。
 
+<br />
+
+## 1.8 
+{% highlight string %}
+#if defined(PATH_MAX)
+
+#define NGX_HAVE_MAX_PATH        1
+#define NGX_MAX_PATH             PATH_MAX
+
+#else
+
+#define NGX_MAX_PATH             4096
+
+#endif
+
+
+#define NGX_DIR_MASK_LEN         0
+
+
+ngx_int_t ngx_open_dir(ngx_str_t *name, ngx_dir_t *dir);
+#define ngx_open_dir_n           "opendir()"
+
+
+#define ngx_close_dir(d)         closedir((d)->dir)
+#define ngx_close_dir_n          "closedir()"
+
+
+ngx_int_t ngx_read_dir(ngx_dir_t *dir);
+#define ngx_read_dir_n           "readdir()"
+
+
+#define ngx_create_dir(name, access) mkdir((const char *) name, access)
+#define ngx_create_dir_n         "mkdir()"
+
+
+#define ngx_delete_dir(name)     rmdir((const char *) name)
+#define ngx_delete_dir_n         "rmdir()"
+
+
+#define ngx_dir_access(a)        (a | (a & 0444) >> 2)
+
+
+#define ngx_de_name(dir)         ((u_char *) (dir)->de->d_name)
+#if (NGX_HAVE_D_NAMLEN)
+#define ngx_de_namelen(dir)      (dir)->de->d_namlen
+#else
+#define ngx_de_namelen(dir)      ngx_strlen((dir)->de->d_name)
+#endif
+
+static ngx_inline ngx_int_t
+ngx_de_info(u_char *name, ngx_dir_t *dir)
+{
+    dir->type = 0;
+    return stat((const char *) name, &dir->info);
+}
+
+#define ngx_de_info_n            "stat()"
+#define ngx_de_link_info(name, dir)  lstat((const char *) name, &(dir)->info)
+#define ngx_de_link_info_n       "lstat()"
+
+#if (NGX_HAVE_D_TYPE)
+
+/*
+ * some file systems (e.g. XFS on Linux and CD9660 on FreeBSD)
+ * do not set dirent.d_type
+ */
+
+#define ngx_de_is_dir(dir)                                                   \
+    (((dir)->type) ? ((dir)->type == DT_DIR) : (S_ISDIR((dir)->info.st_mode)))
+#define ngx_de_is_file(dir)                                                  \
+    (((dir)->type) ? ((dir)->type == DT_REG) : (S_ISREG((dir)->info.st_mode)))
+#define ngx_de_is_link(dir)                                                  \
+    (((dir)->type) ? ((dir)->type == DT_LNK) : (S_ISLNK((dir)->info.st_mode)))
+
+#else
+
+#define ngx_de_is_dir(dir)       (S_ISDIR((dir)->info.st_mode))
+#define ngx_de_is_file(dir)      (S_ISREG((dir)->info.st_mode))
+#define ngx_de_is_link(dir)      (S_ISLNK((dir)->info.st_mode))
+
+#endif
+
+#define ngx_de_access(dir)       (((dir)->info.st_mode) & 0777)
+#define ngx_de_size(dir)         (dir)->info.st_size
+#define ngx_de_fs_size(dir)                                                  \
+    ngx_max((dir)->info.st_size, (dir)->info.st_blocks * 512)
+#define ngx_de_mtime(dir)        (dir)->info.st_mtime
+{% endhighlight %}
+
+对于```PATH_MAX```,我们在当前环境采用如下程序测试：
+{% highlight string %}
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <dirent.h>
+
+int main(int argc,char *argv[])
+{
+    #if defined(PATH_MAX)
+       printf("PATH_MAX: %d\n",PATH_MAX);
+    #endif
+   
+    return 0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+[root@localhost test-src]# gcc -o test test.c
+[root@localhost test-src]# ./test
+PATH_MAX: 4096
+</pre>
+可以看到，```PATH_MAX```在我们当前环境中被定义，且默认值为4096.
+
+```ngx_dir_access()```: 对于目录来说，执行位的作用是控制能否进入或者通过该目录，而不是控制能否列出它的内容。读取位和执行位的组合的作用才是控制是否列出目录中的内容。写入位和执行位的组合则是允许在目录中创建，删除，和重命名文件。
+
+```NGX_HAVE_D_NAMLEN```在我们当前环境并未定义。
+
+而对于```NGX_HAVE_D_TYPE```我们在ngx_auto_config.h头文件中具有如下定义(另请参看： man 3 readdir)：
+<pre>
+#ifndef NGX_HAVE_D_TYPE
+#define NGX_HAVE_D_TYPE  1
+#endif
+</pre>
 
 
 
