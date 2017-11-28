@@ -525,7 +525,7 @@ typedef struct {
 
 <br />
 
-## 1.2 open()函数
+### 1.2 open()函数
 主要是定义open函数原型及标志：
 {% highlight string %}
 #ifdef __CYGWIN__
@@ -624,13 +624,13 @@ have O_DIRECTORY flags
 
 <br />
 
-## 1.3 关闭文件句柄
+### 1.3 关闭文件句柄
 {% highlight string %}
 #define ngx_close_file           close
 #define ngx_close_file_n         "close()"
 {% endhighlight %}
 
-## 1.4 删除文件
+### 1.4 删除文件
 {% highlight string %}
 #define ngx_delete_file(name)    unlink((const char *) name)
 #define ngx_delete_file_n        "unlink()"
@@ -705,6 +705,128 @@ END:
 [root@localhost test-src]# ls 
 test  test.c
 </pre>
+这里注意与```remove()```函数的区别：remove函数用于从文件系统中删除一个文件。当该文件是一个普通文件时，其调用unlink()函数来删除；当该文件是一个目录文件时，其通过调用rmdir()函数来删除。
+
+<br />
+
+### 1.5 读写文件
+这一部分代码如下：
+{% highlight string %}
+ngx_fd_t ngx_open_tempfile(u_char *name, ngx_uint_t persistent,
+    ngx_uint_t access);
+#define ngx_open_tempfile_n      "open()"
+
+
+ssize_t ngx_read_file(ngx_file_t *file, u_char *buf, size_t size, off_t offset);
+#if (NGX_HAVE_PREAD)
+#define ngx_read_file_n          "pread()"
+#else
+#define ngx_read_file_n          "read()"
+#endif
+
+ssize_t ngx_write_file(ngx_file_t *file, u_char *buf, size_t size,
+    off_t offset);
+
+ssize_t ngx_write_chain_to_file(ngx_file_t *file, ngx_chain_t *ce,
+    off_t offset, ngx_pool_t *pool);
+
+
+#define ngx_read_fd              read
+#define ngx_read_fd_n            "read()"
+
+/*
+ * we use inlined function instead of simple #define
+ * because glibc 2.3 sets warn_unused_result attribute for write()
+ * and in this case gcc 4.3 ignores (void) cast
+ */
+static ngx_inline ssize_t
+ngx_write_fd(ngx_fd_t fd, void *buf, size_t n)
+{
+    return write(fd, buf, n);
+}
+
+#define ngx_write_fd_n           "write()"
+
+
+#define ngx_write_console        ngx_write_fd
+
+
+#define ngx_linefeed(p)          *p++ = LF;
+#define NGX_LINEFEED_SIZE        1
+#define NGX_LINEFEED             "\x0a"
+{% endhighlight %}
+
+**(1) 创建临时文件**
+<pre>
+ngx_fd_t ngx_open_tempfile(u_char *name, ngx_uint_t persistent,
+    ngx_uint_t access);
+</pre>
+
+**(2) 读文件**
+<pre>
+ssize_t ngx_read_file(ngx_file_t *file, u_char *buf, size_t size, off_t offset);
+</pre>
+从```ngx_file_t *file```中读取数据到buf中。
+
+**(3) 写文件**
+<pre>
+ssize_t ngx_write_file(ngx_file_t *file, u_char *buf, size_t size,
+    off_t offset);
+ssize_t ngx_write_chain_to_file(ngx_file_t *file, ngx_chain_t *ce,
+    off_t offset, ngx_pool_t *pool);
+
+/*
+ * we use inlined function instead of simple #define
+ * because glibc 2.3 sets warn_unused_result attribute for write()
+ * and in this case gcc 4.3 ignores (void) cast
+ */
+static ngx_inline ssize_t
+ngx_write_fd(ngx_fd_t fd, void *buf, size_t n)
+{
+    return write(fd, buf, n);
+}
+
+#define ngx_write_console        ngx_write_fd
+</pre>
+前面两个函数只是申明了相应的原型。第3个函数主要是由于编译器在对函数返回值的处理方面的原因，导致并未使用如下写法：
+<pre>
+#define ngx_write_fd(fd,buf,n) write(fd,buf,n)
+</pre>
+
+**(4) 相关换行符的定义**
+<pre>
+#define ngx_linefeed(p)          *p++ = LF;
+#define NGX_LINEFEED_SIZE        1
+#define NGX_LINEFEED             "\x0a"
+</pre>
+其中```LF```在src/core/ngx_core.h头文件中被定义为：
+<pre>
+#define LF     (u_char) '\n'
+#define CR     (u_char) '\r'
+#define CRLF   "\r\n"
+</pre>
+
+
+
+
+
+
+
+
+
+
+<br />
+<br />
+
+**[参看]:**
+
+1. [吕涛博客](https://www.lvtao.net/tag/nginx/5/)
+
+
+
+
+
+
 
 <br />
 <br />
