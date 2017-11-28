@@ -991,7 +991,149 @@ PATH_MAX: 4096
 #endif
 </pre>
 
+### 1.8 文件查找
+{% highlight string %}
+ngx_int_t ngx_open_glob(ngx_glob_t *gl);
+#define ngx_open_glob_n          "glob()"
+ngx_int_t ngx_read_glob(ngx_glob_t *gl, ngx_str_t *name);
+void ngx_close_glob(ngx_glob_t *gl);
+{% endhighlight %}
 
+
+### 1.9 文件读写锁
+{% highlight string %}
+ngx_err_t ngx_trylock_fd(ngx_fd_t fd);
+ngx_err_t ngx_lock_fd(ngx_fd_t fd);
+ngx_err_t ngx_unlock_fd(ngx_fd_t fd);
+
+#define ngx_trylock_fd_n         "fcntl(F_SETLK, F_WRLCK)"
+#define ngx_lock_fd_n            "fcntl(F_SETLKW, F_WRLCK)"
+#define ngx_unlock_fd_n          "fcntl(F_SETLK, F_UNLCK)"
+{% endhighlight %}
+
+
+### 1.10 文件预先读取
+{% highlight string %}
+#if (NGX_HAVE_F_READAHEAD)
+
+#define NGX_HAVE_READ_AHEAD      1
+
+#define ngx_read_ahead(fd, n)    fcntl(fd, F_READAHEAD, (int) n)
+#define ngx_read_ahead_n         "fcntl(fd, F_READAHEAD)"
+
+#elif (NGX_HAVE_POSIX_FADVISE)
+
+#define NGX_HAVE_READ_AHEAD      1
+
+ngx_int_t ngx_read_ahead(ngx_fd_t fd, size_t n);
+#define ngx_read_ahead_n         "posix_fadvise(POSIX_FADV_SEQUENTIAL)"
+
+#else
+
+#define ngx_read_ahead(fd, n)    0
+#define ngx_read_ahead_n         "ngx_read_ahead_n"
+
+#endif
+{% endhighlight %}
+
+在ngx_auto_config.h头文件中，我们有如下定义：
+<pre>
+#ifndef NGX_HAVE_POSIX_FADVISE
+#define NGX_HAVE_POSIX_FADVISE  1
+#endif
+</pre>
+
+### 1.11 direct io支持
+{% highlight string %}
+#if (NGX_HAVE_O_DIRECT)
+
+ngx_int_t ngx_directio_on(ngx_fd_t fd);
+#define ngx_directio_on_n        "fcntl(O_DIRECT)"
+
+ngx_int_t ngx_directio_off(ngx_fd_t fd);
+#define ngx_directio_off_n       "fcntl(!O_DIRECT)"
+
+#elif (NGX_HAVE_F_NOCACHE)
+
+#define ngx_directio_on(fd)      fcntl(fd, F_NOCACHE, 1)
+#define ngx_directio_on_n        "fcntl(F_NOCACHE, 1)"
+
+#elif (NGX_HAVE_DIRECTIO)
+
+#define ngx_directio_on(fd)      directio(fd, DIRECTIO_ON)
+#define ngx_directio_on_n        "directio(DIRECTIO_ON)"
+
+#else
+
+#define ngx_directio_on(fd)      0
+#define ngx_directio_on_n        "ngx_directio_on_n"
+
+#endif
+{% endhighlight %}
+
+在ngx_auto_config.h头文件中，我们有如下定义：
+<pre>
+#ifndef NGX_HAVE_O_DIRECT
+#define NGX_HAVE_O_DIRECT  1
+#endif
+</pre>
+
+
+### 1.12 open at支持
+{% highlight string %}
+size_t ngx_fs_bsize(u_char *name);
+
+
+#if (NGX_HAVE_OPENAT)
+
+#define ngx_openat_file(fd, name, mode, create, access)                      \
+    openat(fd, (const char *) name, mode|create, access)
+
+#define ngx_openat_file_n        "openat()"
+
+#define ngx_file_at_info(fd, name, sb, flag)                                 \
+    fstatat(fd, (const char *) name, sb, flag)
+
+#define ngx_file_at_info_n       "fstatat()"
+
+#define NGX_AT_FDCWD             (ngx_fd_t) AT_FDCWD
+
+#endif
+
+
+#define ngx_stdout               STDOUT_FILENO
+#define ngx_stderr               STDERR_FILENO
+#define ngx_set_stderr(fd)       dup2(fd, STDERR_FILENO)
+#define ngx_set_stderr_n         "dup2(STDERR_FILENO)"
+{% endhighlight %}
+
+```ngx_fs_bsize()```用于获取文件系统块大小；在ngx_auto_config.h头文件中我们有如下定义：
+<pre>
+#ifndef NGX_HAVE_OPENAT
+#define NGX_HAVE_OPENAT  1
+#endif
+</pre>
+
+### 1.13 aio及多线程读写支持
+{% highlight string %}
+#if (NGX_HAVE_FILE_AIO)
+
+ngx_int_t ngx_file_aio_init(ngx_file_t *file, ngx_pool_t *pool);
+ssize_t ngx_file_aio_read(ngx_file_t *file, u_char *buf, size_t size,
+    off_t offset, ngx_pool_t *pool);
+
+extern ngx_uint_t  ngx_file_aio;
+
+#endif
+
+#if (NGX_THREADS)
+ssize_t ngx_thread_read(ngx_file_t *file, u_char *buf, size_t size,
+    off_t offset, ngx_pool_t *pool);
+ssize_t ngx_thread_write_chain_to_file(ngx_file_t *file, ngx_chain_t *cl,
+    off_t offset, ngx_pool_t *pool);
+#endif
+{% endhighlight %}
+当前我们并不支持```NGX_HAVE_FILE_AIO```及```NGX_THREAD```。
 
 
 <br />
