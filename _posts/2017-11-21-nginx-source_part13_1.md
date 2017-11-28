@@ -806,7 +806,50 @@ ngx_write_fd(ngx_fd_t fd, void *buf, size_t n)
 #define CRLF   "\r\n"
 </pre>
 
+<br />
 
+### 1.6 文件属性操作
+{% highlight string %}
+#define ngx_rename_file(o, n)    rename((const char *) o, (const char *) n)
+#define ngx_rename_file_n        "rename()"
+
+
+#define ngx_change_file_access(n, a) chmod((const char *) n, a)
+#define ngx_change_file_access_n "chmod()"
+
+
+ngx_int_t ngx_set_file_time(u_char *name, ngx_fd_t fd, time_t s);
+#define ngx_set_file_time_n      "utimes()"
+
+
+#define ngx_file_info(file, sb)  stat((const char *) file, sb)
+#define ngx_file_info_n          "stat()"
+
+#define ngx_fd_info(fd, sb)      fstat(fd, sb)
+#define ngx_fd_info_n            "fstat()"
+
+#define ngx_link_info(file, sb)  lstat((const char *) file, sb)
+#define ngx_link_info_n          "lstat()"
+
+#define ngx_is_dir(sb)           (S_ISDIR((sb)->st_mode))
+#define ngx_is_file(sb)          (S_ISREG((sb)->st_mode))
+#define ngx_is_link(sb)          (S_ISLNK((sb)->st_mode))
+#define ngx_is_exec(sb)          (((sb)->st_mode & S_IXUSR) == S_IXUSR)
+#define ngx_file_access(sb)      ((sb)->st_mode & 0777)
+#define ngx_file_size(sb)        (sb)->st_size
+#define ngx_file_fs_size(sb)     ngx_max((sb)->st_size, (sb)->st_blocks * 512)
+#define ngx_file_mtime(sb)       (sb)->st_mtime
+#define ngx_file_uniq(sb)        (sb)->st_ino
+{% endhighlight %}
+主要包括以下几个部分：
+
+* 重命名文件
+
+* 改变文件访问属性
+
+* 设置文件的```访问时间```（access time) 与```修改时间```(modification time)
+
+* 获得文件相关信息(stat,fstat,lstat)
 
 
 
