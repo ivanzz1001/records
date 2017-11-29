@@ -309,9 +309,23 @@ For complete documentation, run: info coreutils 'cat invocation'
 1007
 </pre>
 
+**17) 命令行for语句**
+{% highlight string %}
+[root@localhost test-src]# for i in {1..10}; do echo "index:$i"; done
+index:1
+index:2
+index:3
+index:4
+index:5
+index:6
+index:7
+index:8
+index:9
+index:10
+{% endhighlight %}
 
-<br />
-<br />
+
+
 
 
 
