@@ -284,6 +284,31 @@ For complete documentation, run: info coreutils 'cat invocation'
 1007
 {% endhighlight %}
 
+**16) sed替换文件内容**
+<pre>
+[root@localhost test-src]# cat mydata.txt 
+1000
+1001
+1002
+1003
+1004
+1002
+1005
+1004
+1007
+[root@localhost test-src]# sed -i 's/1002/100000000/g' mydata.txt
+[root@localhost test-src]# cat mydata.txt 
+1000
+1001
+100000000
+1003
+1004
+100000000
+1005
+1004
+1007
+</pre>
+
 
 <br />
 <br />
