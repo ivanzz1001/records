@@ -307,6 +307,20 @@ For complete documentation, run: info coreutils 'cat invocation'
 1005
 1004
 1007
+
+
+全字匹配替换：
+[root@localhost test-src]# sed -i 's/\<1000\>/99999/g' mydata.txt 
+[root@localhost test-src]# cat mydata.txt 
+99999
+1001
+1111100000
+1003
+1004
+1111100000
+1005
+1004
+1007
 </pre>
 
 **17) 命令行for语句**
