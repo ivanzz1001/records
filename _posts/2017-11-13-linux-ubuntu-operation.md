@@ -262,6 +262,29 @@ For complete documentation, run: info coreutils 'cat invocation'
 如果你直接在命令行输入cat而不输入其余的任何东西，这时候的cat会等待标准输入，因此这时候可以通过键盘并按回车来让cat读取输入，cat会原样返回； 而如果你输入--help，那么cat程序会在标准输出上打印自己的帮助文档。**也就是说**，管道符 | 所传递给程序的不是你简单地在程序名后面输入的参数，它会被程序内部的读取功能如scanf和gets等接收，而xargs则是将内容作为普通的参数传递给程序。如上面的例子相当于你手写了```cat --help```。
 
 
+**15) gawk去除一个文件中所有重复的数字**
+{% highlight string %}
+[root@localhost test-src]# cat mydata.txt
+1000
+1001
+1002
+1003
+1004
+1002
+1005
+1004
+1007
+[root@localhost test-src]# gawk '!a[$0]++' mydata.txt 
+1000
+1001
+1002
+1003
+1004
+1005
+1007
+{% endhighlight %}
+
+
 <br />
 <br />
 
