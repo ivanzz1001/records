@@ -77,11 +77,20 @@ windows系统没有提供本地回环网络的接口，用wireshark监控网络�
 
 ![winpcap startup](https://ivanzz1001.github.io/records/assets/img/linux/wireshark_npcap_startup.png)
 
+<br />
+
+
+**3) 抓取localhost数据包**
 
 它不仅可以抓URL是**localhost**的，也可以是**127.0.0.1**:
 
 ![capture localhost](https://ivanzz1001.github.io/records/assets/img/linux/wireshark_localhost.png)
 
+<br />
+
+
+
+**4) 抓取本机数据包**
 
 当然，抓**本机IP**也是可以的：
 
