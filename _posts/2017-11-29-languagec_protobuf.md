@@ -28,6 +28,8 @@ description: protobuf通信协议
 
 2. [全方位评测：Protobuf性能到底有没有比JSON快5倍？](http://www.52im.net/forum.php?mod=viewthread&tid=772#lastpost)
 
+3. [Protobuf github](https://github.com/google/protobuf/tree/master/src/google/protobuf)
+
 <br />
 <br />
 <br />
