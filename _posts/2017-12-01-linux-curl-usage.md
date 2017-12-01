@@ -199,7 +199,55 @@ Options: (H) means HTTP/HTTPS only, (F) means FTP only
 
 * -m, --max-time SECONDS： 指定处理的最大时长
 
-* 
+* -H, --header LINE: 指定请求头参数
+
+* -s, --silent: 减少输出信息，比如进度等
+
+* --connect-timeout SECONDS: 指定尝试连接的最大时长
+
+* -x, --proxy [PROTOCOL://]HOST[:PORT]: 指定代理服务器的地址和端口，默认端口为1080
+
+* -T, --upload-file FILE: 传输文件到目标地址
+
+* -o, --output FILE: 指定输出文件名称
+
+* -d, --data DATA: 指定http post的内容
+
+* --retry NUM: 假如产生错误的情况下，执行的重试次数
+
+* -e, --referer: 指定引用地址
+
+*  -I, --head: 仅返回头部信息，使用head请求
+
+## 3. GET请求
+如下我们给出一些示例，展示如何使用Get请求：
+<pre>
+# curl http://www.baidu.com   //回车之后，HTML内容打印在屏幕上；如果这里的URL指向的是一个文件或者一副图则可以直接下载到本地
+
+# curl -i http://www.baidu.com  // 在输出信息中打印包括头部消息在内的整个消息
+
+# curl -I http://www.baidu.com  // 只显示头部信息，其实这里采用的是HEAD请求，可以通过添加-v选项来查看请求与响应详细消息
+
+# curl -v http://www.baidu.com  // 显示get请求全过程解析
+</pre>
+
+这里我们可以同时用tcpdump进行抓包，来观察响应的请求与响应：
+{% highlight string %}
+// 窗口1启动tcpdump抓取数据包
+# tcpdump -i ens33 -v -x -w curl_output.pcap host www.baidu.com
+
+// 窗口2 curl请求目标地址
+# curl http://www.baidu.com
+
+//也可以通过如下方式模拟curl向目标地址请求数据
+# nc www.baidu.com 80 > abc.txt << EOF
+> GET / HTTP/1.1
+> User-Agent: curl/7.29.0
+> Host: www.baidu.com
+> Accept: */*
+> 
+> EOF
+{% endhighlight %}
 
 
 
