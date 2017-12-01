@@ -239,7 +239,7 @@ Options: (H) means HTTP/HTTPS only, (F) means FTP only
 // 窗口2 curl请求目标地址
 # curl http://www.baidu.com
 
-//也可以通过如下方式模拟curl向目标地址请求数据
+//也可以通过如下方式模拟curl向目标地址请求数据(注意：这个百度服务器根据User-Agent不同，可能返回不同的结果)
 # nc www.baidu.com 80 > abc.txt << EOF
 > GET / HTTP/1.1
 > User-Agent: curl/7.29.0
