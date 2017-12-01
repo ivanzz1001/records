@@ -352,10 +352,59 @@ HTTP Referer是header的一部分，当浏览器向web服务器发送请求的�
 # curl -c /home/test/cookie.txt -d "username=abcd" -d "passwd=1234" http://www.example.com
 {% endhighlight %}
 
-## 11. 定义
+## 11. 定义输出显示内容
+{% highlight string %}
+-w, --write-out FORMAT: 定义在请求完成之后的输出内容。如常用的http码，tcp连接时间，域名解析的时间，握手时间及响应时间等，非常强大。
+
+//1. 打印出返回的http吗
+# curl -o /dev/null -s -w "%{http_code}\n" http://www.baidu.com
+200
+
+//2. 打印响应时间
+# curl -o /dev/null -s -w "time_total: %{time_total}\n" http://www.baidu.com
+{% endhighlight %}
+
+## 12. PUT方法
+HTTP协议文件上传的标准方法是使用PUT，此时curl命令使用```-T```参数：
+<pre>
+# curl -T uploadfile http://www.upload.com/receive.cgi
+</pre>
 
 
+## 13. 补充：表单处理
+我们前面虽然也提到了post表单元素，但是我们在这里在做一个补充。在WEB页面设计中，form是很重要的元素。Form通常用来收集并向网站提交信息。提交信息的方法有两种，GET方法和POST方法。先讨论GET方法，例如有下面一段：
 
+![form get](https://ivanzz1001.github.io/records/assets/img/linux/linux_curl_segment1.png)
+
+那么在浏览器上会出现一个文本框和一个标为"OK"的按钮。按下这个按钮，表单就用GET方法向服务器提交文本框的数据。例如原始页面是在www.hotmail.com/when/birth.html看到的，然后你的文本框中输入1905，然后按"OK"按钮，那么浏览器的URL现在应该是：**www.hotmail.com/when/junk.cgi?birthyear=1905&press=OK**。 对于这种网页，curl可以直接处理，例如想要获取上面的网页，只要输入：
+<pre>
+# curl www.hotmail.com/when/junk.cgi?birthyear=1905&press=OK
+</pre>
+就可以了。
+
+<br />
+
+表达用来提交信息的第二种方法叫做POST方法，POST方法和GET方法的区别在于GET方法使用的时候浏览器中会产生目标URL，而POST方法不会。类似GET，这里有一个网页：
+
+![form post](https://ivanzz1001.github.io/records/assets/img/linux/linux_curl_segment2.png)
+
+浏览器上也会出现一个文本框和一个标为"OK"的按钮。按下这个按钮，表单用POST方法向服务器提交数据。这时的URL是看不到的，因此需要使用特殊的方法来抓取这个页面：
+<pre>
+# curl -d "birthyear=1905&press=OK" www.hotmail.com/when/junk.cgi
+</pre>
+
+<br />
+
+而在1995年末，RFC 1867定义了一种新的POST方法，用来上传文件。主要用于把本地文件上传到服务器。此时页面是这样写的：
+
+![form multipart](https://ivanzz1001.github.io/records/assets/img/linux/linux_curl_segment3.png)
+
+对于这种页面，curl的用法不同：
+<pre>
+# curl -F upload=@local_file_name -F press=OK [URL]
+</pre>
+
+这个命令的实质是将本地文件用POST上传到服务器。
 
 
 
