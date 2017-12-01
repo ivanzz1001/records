@@ -260,6 +260,9 @@ Options: (H) means HTTP/HTTPS only, (F) means FTP only
 
 * [也谈一下TCP segment of a reassembled PDU](http://blog.csdn.net/hldjf/article/details/7450565)
 
+如下是HTTP请求与响应的一个跟踪:
+
+![tcp trace](https://ivanzz1001.github.io/records/assets/img/linux/linux_curl_tcp_trace.png)
 
 
 
