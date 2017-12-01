@@ -2,8 +2,8 @@
 layout: post
 title: protobuf通信协议
 tags:
-- c/c++
-categories: c/c++
+- cplusplus
+categories: cplusplus
 description: protobuf通信协议
 ---
 
