@@ -194,30 +194,20 @@ Options: (H) means HTTP/HTTPS only, (F) means FTP only
 {% endhighlight %}
 
 上面我们可以看到curl命令参数有很多，这里我们说明一下如下几个：
-
-* **-v, --verbose:** 小写的v参数，用于打印更多信息，包括发送的请求信息，这在调试脚本特别有用。
-
-* **-m, --max-time SECONDS:** 指定处理的最大时长
-
-* **-H, --header LINE:** 指定请求头参数
-
-* **-s, --silent:** 减少输出信息，比如进度等
-
-* **--connect-timeout SECONDS:** 指定尝试连接的最大时长
-
-* **-x, --proxy [PROTOCOL://]HOST[:PORT]:** 指定代理服务器的地址和端口，默认端口为1080
-
-* **-T, --upload-file FILE:** 传输文件到目标地址
-
-* **-o, --output FILE:** 指定输出文件名称
-
-* **-d, --data DATA:** 指定http post的内容
-
-* **--retry NUM:** 假如产生错误的情况下，执行的重试次数
-
-* **-e, --referer:** 指定引用地址
-
-* **-I, --head:** 仅返回头部信息，使用head请求
+<pre>
+1) -v, --verbose: 小写的v参数，用于打印更多信息，包括发送的请求信息，这在调试脚本特别有用。
+2) -m, --max-time SECONDS: 指定处理的最大时长
+3) -H, --header LINE: 指定请求头参数
+4) -s, --silent: 减少输出信息，比如进度等
+5) --connect-timeout SECONDS: 指定尝试连接的最大时长
+6) -x, --proxy [PROTOCOL://]HOST[:PORT]: 指定代理服务器的地址和端口，默认端口为1080
+7) -T, --upload-file FILE: 传输文件到目标地址
+8) -o, --output FILE: 指定输出文件名称
+9) -d, --data DATA:** 指定http post的内容
+10) --retry NUM:** 假如产生错误的情况下，执行的重试次数
+11) -e, --referer:** 指定引用地址
+12) -I, --head:** 仅返回头部信息，使用head请求
+</pre>
 
 ## 3. GET请求
 如下我们给出一些示例，展示如何使用Get请求：
@@ -287,7 +277,43 @@ download_logo.png
 就会自动保存文件为index.html。
  
 
-## 5. 
+## 5. 上传
+下面给出一个具体示例：
+{% highlight string %}
+-T, --upload-file FILE: 往服务器上传文件
+
+//1: 向ftp服务器上传多个文件
+# curl -T "img[1-1000].png" ftp://example.com/upload/
+
+# curl -T "{file1,file2}" http://www.example.com
+{% endhighlight %}
+
+## 6. Post方法
+下面给出一个具体示例：
+{% highlight string %}
+1) 
+  // -d, –-data DATA: post请求提交参数
+
+用法：
+# curl -d "id=1&name=test" http://example.com/example.php   //需把请求参数与URL分开
+
+//下面相当于提交了两个参数，当提交的参数中有特殊字符就需要先转义。如果有空格时，就需要转义成%20
+# curl -d "id=1" -d "name=test" http://example.com/example.php 
+
+
+2) 
+   // --data-urlencode DATA: 特殊字符可以自动转义，无需人工事先转义
+
+用法：
+# curl --data-urlencode "name=April 1" http://example.com/example.php
+
+
+3） 
+   // -F, --form CONTENT: 将HTTP multipart数据post到服务器
+
+用法(Form表单形式上次)：
+# curl -F "fieldname=@/home/test/test.pic" http://example.com/example.php   //千万不能漏掉@符号
+{% endhighlight %}
 
 
 
