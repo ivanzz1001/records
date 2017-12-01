@@ -254,6 +254,11 @@ Options: (H) means HTTP/HTTPS only, (F) means FTP only
 ![curl output](https://ivanzz1001.github.io/records/assets/img/linux/linux-curl-get.png)
 
 
+注意到上面的第6个数据包，后面显示```TCP segment of a reassembled PDU```,其实5、6、8三个数据包合起来才是对第4个数据包的回复，这几个数据包的ack号都是一样的。请参看如下：
+
+* [关于“TCP segment of a reassembled PDU”](http://blog.csdn.net/dog250/article/details/51809566)
+
+* [也谈一下TCP segment of a reassembled PDU](http://blog.csdn.net/hldjf/article/details/7450565)
 
 
 
@@ -269,6 +274,11 @@ Options: (H) means HTTP/HTTPS only, (F) means FTP only
 
 2. [curl 工具的使用](https://www.cnblogs.com/z-sm/p/5631352.html)
 
+3. [TCP报文格式详解](http://www.360doc.com/content/12/1218/10/3405077_254718387.shtml)
+
+4. [Ethernet IP TCP UDP 协议头部格式及大小](http://blog.csdn.net/winbobob/article/details/41475959)
+
+5. [理解TCP序列号（Sequence Number）和确认号（Acknowledgment Number）](http://blog.csdn.net/a19881029/article/details/38091243/)
 <br />
 <br />
 <br />
