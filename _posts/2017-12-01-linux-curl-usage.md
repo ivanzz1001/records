@@ -372,7 +372,9 @@ HTTP协议文件上传的标准方法是使用PUT，此时curl命令使用```-T`
 
 
 ## 13. 补充：表单处理
-我们前面虽然也提到了post表单元素，但是我们在这里在做一个补充。在WEB页面设计中，form是很重要的元素。Form通常用来收集并向网站提交信息。提交信息的方法有两种，GET方法和POST方法。先讨论GET方法，例如有下面一段：
+我们前面虽然也提到了post表单元素，但是我们在这里在做一个补充。
+
+**1)** 在WEB页面设计中，form是很重要的元素。Form通常用来收集并向网站提交信息。提交信息的方法有两种，GET方法和POST方法。先讨论GET方法，例如有下面一段：
 
 ![form get](https://ivanzz1001.github.io/records/assets/img/linux/linux_curl_segment1.png)
 
@@ -384,7 +386,7 @@ HTTP协议文件上传的标准方法是使用PUT，此时curl命令使用```-T`
 
 <br />
 
-表达用来提交信息的第二种方法叫做POST方法，POST方法和GET方法的区别在于GET方法使用的时候浏览器中会产生目标URL，而POST方法不会。类似GET，这里有一个网页：
+**2)** 表达用来提交信息的第二种方法叫做POST方法，POST方法和GET方法的区别在于GET方法使用的时候浏览器中会产生目标URL，而POST方法不会。类似GET，这里有一个网页：
 
 ![form post](https://ivanzz1001.github.io/records/assets/img/linux/linux_curl_segment2.png)
 
@@ -395,7 +397,7 @@ HTTP协议文件上传的标准方法是使用PUT，此时curl命令使用```-T`
 
 <br />
 
-而在1995年末，RFC 1867定义了一种新的POST方法，用来上传文件。主要用于把本地文件上传到服务器。此时页面是这样写的：
+**3)** 而在1995年末，RFC 1867定义了一种新的POST方法，用来上传文件。主要用于把本地文件上传到服务器。此时页面是这样写的：
 
 ![form multipart](https://ivanzz1001.github.io/records/assets/img/linux/linux_curl_segment3.png)
 
