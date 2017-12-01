@@ -251,8 +251,7 @@ Options: (H) means HTTP/HTTPS only, (F) means FTP only
 
 如下用wireshark打开上面抓取到的```curl_output.pcap```数据包：
 
-![curl_output](https://ivanzz1001.github.io/records/assets/img/linux/linux-curl-get.png)
-
+![curl output](https://ivanzz1001.github.io/records/assets/img/linux/linux-curl-get.png)
 
 
 
