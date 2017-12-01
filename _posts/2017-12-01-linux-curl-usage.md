@@ -204,9 +204,9 @@ Options: (H) means HTTP/HTTPS only, (F) means FTP only
 7) -T, --upload-file FILE: 传输文件到目标地址
 8) -o, --output FILE: 指定输出文件名称
 9) -d, --data DATA:** 指定http post的内容
-10) --retry NUM:** 假如产生错误的情况下，执行的重试次数
-11) -e, --referer:** 指定引用地址
-12) -I, --head:** 仅返回头部信息，使用head请求
+10) --retry NUM: 假如产生错误的情况下，执行的重试次数
+11) -e, --referer: 指定引用地址
+12) -I, --head: 仅返回头部信息，使用head请求
 13) -X, --request COMMAND: 指定请求方法OPTIONS、HEAD、GET、POST、PUT、DELETE、TRACE、CONNECT
 </pre>
 
