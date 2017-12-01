@@ -195,29 +195,29 @@ Options: (H) means HTTP/HTTPS only, (F) means FTP only
 
 上面我们可以看到curl命令参数有很多，这里我们说明一下如下几个：
 
-* -v, --verbose: 小写的v参数，用于打印更多信息，包括发送的请求信息，这在调试脚本特别有用。
+* **-v, --verbose:** 小写的v参数，用于打印更多信息，包括发送的请求信息，这在调试脚本特别有用。
 
-* -m, --max-time SECONDS： 指定处理的最大时长
+* **-m, --max-time SECONDS:** 指定处理的最大时长
 
-* -H, --header LINE: 指定请求头参数
+* **-H, --header LINE:** 指定请求头参数
 
-* -s, --silent: 减少输出信息，比如进度等
+* **-s, --silent:** 减少输出信息，比如进度等
 
-* --connect-timeout SECONDS: 指定尝试连接的最大时长
+* **--connect-timeout SECONDS:** 指定尝试连接的最大时长
 
-* -x, --proxy [PROTOCOL://]HOST[:PORT]: 指定代理服务器的地址和端口，默认端口为1080
+* **-x, --proxy [PROTOCOL://]HOST[:PORT]:** 指定代理服务器的地址和端口，默认端口为1080
 
-* -T, --upload-file FILE: 传输文件到目标地址
+* **-T, --upload-file FILE:** 传输文件到目标地址
 
-* -o, --output FILE: 指定输出文件名称
+* **-o, --output FILE:** 指定输出文件名称
 
-* -d, --data DATA: 指定http post的内容
+* **-d, --data DATA:** 指定http post的内容
 
-* --retry NUM: 假如产生错误的情况下，执行的重试次数
+* **--retry NUM:** 假如产生错误的情况下，执行的重试次数
 
-* -e, --referer: 指定引用地址
+* **-e, --referer:** 指定引用地址
 
-*  -I, --head: 仅返回头部信息，使用head请求
+* **-I, --head:** 仅返回头部信息，使用head请求
 
 ## 3. GET请求
 如下我们给出一些示例，展示如何使用Get请求：
