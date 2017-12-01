@@ -191,7 +191,7 @@ Options: (H) means HTTP/HTTPS only, (F) means FTP only
  -w, --write-out FORMAT  What to output after completion
      --xattr        Store metadata in extended file attributes
  -q                 If used as the first parameter disables .curlrc
-{ % endhighlight %}
+{% endhighlight %}
 
 上面我们可以看到curl命令参数有很多，这里我们说明一下如下几个：
 
