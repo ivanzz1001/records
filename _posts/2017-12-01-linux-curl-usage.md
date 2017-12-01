@@ -207,6 +207,7 @@ Options: (H) means HTTP/HTTPS only, (F) means FTP only
 10) --retry NUM:** 假如产生错误的情况下，执行的重试次数
 11) -e, --referer:** 指定引用地址
 12) -I, --head:** 仅返回头部信息，使用head请求
+13) -X, --request COMMAND: 指定请求方法OPTIONS、HEAD、GET、POST、PUT、DELETE、TRACE、CONNECT
 </pre>
 
 ## 3. GET请求
@@ -314,6 +315,46 @@ download_logo.png
 用法(Form表单形式上次)：
 # curl -F "fieldname=@/home/test/test.pic" http://example.com/example.php   //千万不能漏掉@符号
 {% endhighlight %}
+
+
+## 7. 设置referer
+
+HTTP Referer是header的一部分，当浏览器向web服务器发送请求的时候，一般会带上Referer，告诉服务器我是从哪个页面链接过来的，服务器基于此可以获得一些信息用于处理。请参看：[HTTP_REFERER](https://baike.baidu.com/item/HTTP_REFERER/5358396?fr=aladdin)
+
+有的时候我们如果直接请求某个URL不能成功，它需要判断referer是否正确，那就可以通过-e或--referer参数模拟：
+{% highlight string %}
+# curl -e http://www.example.com http://www.example.com
+{% endhighlight %}
+
+## 8. 指定user agent
+下面给出具体使用示例：
+{% highlight string %}
+ -A, --user-agent STRING: 指定访问的客户端类型
+
+例如：
+# curl -A "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36" www.baidu.com
+{% endhighlight %}
+
+## 9. 伪造cookie
+下面给出具体使用示例：
+{% highlight string %}
+-b, --cookie STRING/FILE: 指定cookies
+
+# curl --cookie "name=xxx" http://www.example.com    //方法一
+# curl --cookie /home/test/cookie.txt http://www.example.com   //方法二
+{% endhighlight %}
+
+## 10. 保存cookie
+下面给出具体使用示例：
+{% highlight string %}
+-c, --cookie-jar FILE: 保存操作时生成的cookie到文件
+
+# curl -c /home/test/cookie.txt -d "username=abcd" -d "passwd=1234" http://www.example.com
+{% endhighlight %}
+
+## 11. 定义
+
+
 
 
 
