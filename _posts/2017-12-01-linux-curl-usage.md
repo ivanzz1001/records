@@ -30,7 +30,7 @@ description: Linux下curl工具的使用
 ## 2. curl命令的基本使用
 
 如下我们列出curl工具使用时的相关参数：
-<pre>
+{% highlight string %}
 [root@localhost test-src]# curl --help
 Usage: curl [options...] <url>
 Options: (H) means HTTP/HTTPS only, (F) means FTP only
@@ -191,7 +191,7 @@ Options: (H) means HTTP/HTTPS only, (F) means FTP only
  -w, --write-out FORMAT  What to output after completion
      --xattr        Store metadata in extended file attributes
  -q                 If used as the first parameter disables .curlrc
-</pre>
+{ % endhighlight %}
 
 上面我们可以看到curl命令参数有很多，这里我们说明一下如下几个：
 
