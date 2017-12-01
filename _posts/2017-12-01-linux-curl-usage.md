@@ -265,6 +265,23 @@ Options: (H) means HTTP/HTTPS only, (F) means FTP only
 ![tcp trace](https://ivanzz1001.github.io/records/assets/img/linux/linux_curl_tcp_trace.png)
 
 
+## 4. 下载
+<pre>
+# curl -o download_logo.png https://www.baidu.com/img/bd_logo1.png
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  7877  100  7877    0     0  19440      0 --:--:-- --:--:-- --:--:-- 19497
+
+# ls
+download_logo.png
+</pre>
+可以看到执行命令后会有下载进度提示，完成100%后会自动退出，并且把相应的下载内容保存在```-o```指定的文件中。curl命令还有一个大写的```-O```选项，是按照服务器上的文件名保存到本地。如果执行**curl -O www.baidu.com**，是会报错的，提示找不到文件名，如果换成**curl -O www.baidu.com/index.html**就会自动保存文件为index.html。
+ 
+
+## 5. 
+
+
+
 
 
 
