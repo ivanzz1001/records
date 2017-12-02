@@ -696,7 +696,7 @@ END:
 {% endhighlight %}
 编译运行：
 <pre>
-[root@localhost test-src]# gcc -o test1 test.c
+[root@localhost test-src]# gcc -o test test.c
 [root@localhost test-src]# echo "hello,world" > hello.txt
 [root@localhost test-src]# ./test
 1) st_nlink: 1
@@ -1045,6 +1045,7 @@ ngx_err_t ngx_unlock_fd(ngx_fd_t fd);
 #define ngx_lock_fd_n            "fcntl(F_SETLKW, F_WRLCK)"
 #define ngx_unlock_fd_n          "fcntl(F_SETLK, F_UNLCK)"
 {% endhighlight %}
+通过上述函数设置文件的读写锁，请参看：[fcntl函数说明 F_SETLK/F_SETLKW例子](http://blog.csdn.net/wangyin159/article/details/48467315)
 
 
 ### 1.10 文件预先读取
@@ -1077,6 +1078,16 @@ ngx_int_t ngx_read_ahead(ngx_fd_t fd, size_t n);
 #define NGX_HAVE_POSIX_FADVISE  1
 #endif
 </pre>
+
+这里主要是通过操作系统内核的支持加快对文件的访问，属于系统优化的部分。
+<pre>
+Programs  can  use posix_fadvise() to announce an intention to access file data in a specific pattern in the
+future, thus allowing the kernel to perform appropriate optimizations.
+</pre>
+更多请参看```man posix_fadvise```。
+
+
+
 
 ### 1.11 direct io支持
 {% highlight string %}
@@ -1112,6 +1123,18 @@ ngx_int_t ngx_directio_off(ngx_fd_t fd);
 #define NGX_HAVE_O_DIRECT  1
 #endif
 </pre>
+主要是为了建议操作系统尽快将对文件的写操作刷新到硬盘。请参看```man 2 open```:
+<pre>
+O_DIRECT (Since Linux 2.4.10)
+  Try to minimize cache effects of the I/O to and from this file.  In general this will degrade performance, but it 
+  is useful in special situations,  such as  when  applications  do  their  own  caching.  File I/O is done directly
+  to/from user-space buffers.  The O_DIRECT flag on its own makes an effort to transfer data synchronously, but does
+  not give the guarantees of the O_SYNC flag that data and necessary metadata are transferred. To  guarantee synchronous
+  I/O, O_SYNC must be used in addition to O_DIRECT.  See NOTES below for further discussion.
+</pre>
+
+
+
 
 
 ### 1.12 open at支持
@@ -1148,6 +1171,20 @@ size_t ngx_fs_bsize(u_char *name);
 #define NGX_HAVE_OPENAT  1
 #endif
 </pre>
+```openat()```函数与open()函数类似，只不过是在相对路径处理方面有些许不同：
+<pre>
+If  the pathname given in pathname is relative, then it is interpreted relative to the directory referred to by the file 
+descriptor dirfd (rather than relative to the current working directory of the calling process, as is done by open(2) for
+a relative pathname).
+
+If pathname is relative and dirfd is the special value AT_FDCWD, then pathname is interpreted relative to the current working
+directory of the calling  process(like open(2)).
+
+If pathname is absolute, then dirfd is ignored.
+</pre>
+
+
+
 
 ### 1.13 aio及多线程读写支持
 {% highlight string %}
