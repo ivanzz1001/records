@@ -999,6 +999,41 @@ ngx_int_t ngx_read_glob(ngx_glob_t *gl, ngx_str_t *name);
 void ngx_close_glob(ngx_glob_t *gl);
 {% endhighlight %}
 
+这里给出一个glob使用的示例(test.c):
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <glob.h>
+
+int main(int argc,char *argv)
+{
+   glob_t globbuf;
+
+   globbuf.gl_offs = 2;
+   glob("*.c", GLOB_DOOFFS, NULL, &globbuf);
+   glob("../*.c", GLOB_DOOFFS | GLOB_APPEND, NULL, &globbuf);
+   globbuf.gl_pathv[0] = "ls";
+   globbuf.gl_pathv[1] = "-l";
+   execvp("ls", &globbuf.gl_pathv[0]);
+  
+   return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+[root@localhost test-src]# gcc -o test test.c
+[root@localhost test-src]# ls 
+test  test1.c  test2.c  test3.c  test4.c  test.c
+[root@localhost test-src]# ./test
+-rw-r--r--. 1 root root   0 Dec  1 18:45 test1.c
+-rw-r--r--. 1 root root   0 Dec  1 18:45 test2.c
+-rw-r--r--. 1 root root   0 Dec  1 18:45 test3.c
+-rw-r--r--. 1 root root   0 Dec  1 18:45 test4.c
+-rw-r--r--. 1 root root 405 Dec  1 18:47 test.c
+</pre>
+
 
 ### 1.9 文件读写锁
 {% highlight string %}
@@ -1107,7 +1142,7 @@ size_t ngx_fs_bsize(u_char *name);
 #define ngx_set_stderr_n         "dup2(STDERR_FILENO)"
 {% endhighlight %}
 
-```ngx_fs_bsize()```用于获取文件系统块大小；在ngx_auto_config.h头文件中我们有如下定义：
+```ngx_fs_bsize()```用于获取文件系统块大小，我们稍后会进行讲解；在ngx_auto_config.h头文件中我们有如下定义：
 <pre>
 #ifndef NGX_HAVE_OPENAT
 #define NGX_HAVE_OPENAT  1
