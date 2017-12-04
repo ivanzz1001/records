@@ -1018,7 +1018,7 @@ ngx_read_file(ngx_file_t *file, u_char *buf, size_t size, off_t offset)
 ngx_file_t->sys_offset: 用于记录当前文件的指针偏移
 ngx_file_t->offset: 用于记录当前fd已经读写过的字节总数
 </pre>
-这里我们简要介绍一下pread()函数：
+当前我们支持```NGX_HAVE_PREAD```。这里我们简要介绍一下pread()函数：
 {% highlight string %}
 #include <unistd.h>
 
@@ -1027,9 +1027,38 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset);
 pread()函数从fd的offset处读取count数量的数据到buf中，读取完成后，**该fd对应的offset并不会改变**, 这一点与普通的read函数有区别。
 
 
+## 4. thread read相关
+如下我们暂不支持：
+{% highlight string %}
+#if (NGX_THREADS)
 
+typedef struct {
+    ngx_fd_t       fd;
+    ngx_uint_t     write;   /* unsigned  write:1; */
 
+    u_char        *buf;
+    size_t         size;
+    ngx_chain_t   *chain;
+    off_t          offset;
 
+    size_t         nbytes;
+    ngx_err_t      err;
+} ngx_thread_file_ctx_t;
+ssize_t
+ngx_thread_read(ngx_file_t *file, u_char *buf, size_t size, off_t offset,
+    ngx_pool_t *pool);
+
+#if (NGX_HAVE_PREAD)
+static void
+ngx_thread_read_handler(void *data, ngx_log_t *log);
+#else
+#error pread() is required!
+#endif
+
+#endif
+{% endhighlight %}
+
+## 5. 
 
 
 
