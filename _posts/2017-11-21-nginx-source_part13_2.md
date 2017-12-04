@@ -422,9 +422,149 @@ ngx_write_chain_to_file(ngx_file_t *file, ngx_chain_t *cl, off_t offset,
 
     return total;
 }
+
+
+static ngx_chain_t *
+ngx_chain_to_iovec(ngx_iovec_t *vec, ngx_chain_t *cl)
+{
+    size_t         total, size;
+    u_char        *prev;
+    ngx_uint_t     n;
+    struct iovec  *iov;
+
+    iov = NULL;
+    prev = NULL;
+    total = 0;
+    n = 0;
+
+    for ( /* void */ ; cl; cl = cl->next) {
+
+        if (ngx_buf_special(cl->buf)) {
+            continue;
+        }
+
+        size = cl->buf->last - cl->buf->pos;
+
+        if (prev == cl->buf->pos) {
+            iov->iov_len += size;
+
+        } else {
+            if (n == vec->nalloc) {
+                break;
+            }
+
+            iov = &vec->iovs[n++];
+
+            iov->iov_base = (void *) cl->buf->pos;
+            iov->iov_len = size;
+        }
+
+        prev = cl->buf->pos + size;
+        total += size;
+    }
+
+    vec->count = n;
+    vec->size = total;
+
+    return cl;
+}
+
+
+static ssize_t
+ngx_writev_file(ngx_file_t *file, ngx_iovec_t *vec, off_t offset)
+{
+    ssize_t    n;
+    ngx_err_t  err;
+
+    ngx_log_debug3(NGX_LOG_DEBUG_CORE, file->log, 0,
+                   "writev: %d, %uz, %O", file->fd, vec->size, offset);
+
+#if (NGX_HAVE_PWRITEV)
+
+eintr:
+
+    n = pwritev(file->fd, vec->iovs, vec->count, offset);
+
+    if (n == -1) {
+        err = ngx_errno;
+
+        if (err == NGX_EINTR) {
+            ngx_log_debug0(NGX_LOG_DEBUG_CORE, file->log, err,
+                           "pwritev() was interrupted");
+            goto eintr;
+        }
+
+        ngx_log_error(NGX_LOG_CRIT, file->log, err,
+                      "pwritev() \"%s\" failed", file->name.data);
+        return NGX_ERROR;
+    }
+
+    if ((size_t) n != vec->size) {
+        ngx_log_error(NGX_LOG_CRIT, file->log, 0,
+                      "pwritev() \"%s\" has written only %z of %uz",
+                      file->name.data, n, vec->size);
+        return NGX_ERROR;
+    }
+
+#else
+
+    if (file->sys_offset != offset) {
+        if (lseek(file->fd, offset, SEEK_SET) == -1) {
+            ngx_log_error(NGX_LOG_CRIT, file->log, ngx_errno,
+                          "lseek() \"%s\" failed", file->name.data);
+            return NGX_ERROR;
+        }
+
+        file->sys_offset = offset;
+    }
+
+eintr:
+
+    n = writev(file->fd, vec->iovs, vec->count);
+
+    if (n == -1) {
+        err = ngx_errno;
+
+        if (err == NGX_EINTR) {
+            ngx_log_debug0(NGX_LOG_DEBUG_CORE, file->log, err,
+                           "writev() was interrupted");
+            goto eintr;
+        }
+
+        ngx_log_error(NGX_LOG_CRIT, file->log, err,
+                      "writev() \"%s\" failed", file->name.data);
+        return NGX_ERROR;
+    }
+
+    if ((size_t) n != vec->size) {
+        ngx_log_error(NGX_LOG_CRIT, file->log, 0,
+                      "writev() \"%s\" has written only %z of %uz",
+                      file->name.data, n, vec->size);
+        return NGX_ERROR;
+    }
+
+    file->sys_offset += n;
+
+#endif
+
+    file->offset += n;
+
+    return n;
+}
 {% endhighlight %}
 
+这三个函数是相关的，我们放到一起来讲解：
+<pre>
+ssize_t
+ngx_write_chain_to_file(ngx_file_t *file, ngx_chain_t *cl, off_t offset,
+    ngx_pool_t *pool);
 
+static ngx_chain_t *
+ngx_chain_to_iovec(ngx_iovec_t *vec, ngx_chain_t *cl);
+
+static ssize_t
+ngx_writev_file(ngx_file_t *file, ngx_iovec_t *vec, off_t offset);
+</pre>
 
 
 <br />
