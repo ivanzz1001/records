@@ -930,11 +930,101 @@ ngx_fs_bsize(u_char *name)
 #endif
 {% endhighlight %}
 
+下面我们简要分析一下各个部分：
+
+## 2. 相关函数声明
+在这里主要对一些静态函数及全局变量进行声明：
+{% highlight string %}
+#if (NGX_THREADS)
+#include <ngx_thread_pool.h>
+static void ngx_thread_read_handler(void *data, ngx_log_t *log);
+static void ngx_thread_write_chain_to_file_handler(void *data, ngx_log_t *log);
+#endif
+
+static ngx_chain_t *ngx_chain_to_iovec(ngx_iovec_t *vec, ngx_chain_t *cl);
+static ssize_t ngx_writev_file(ngx_file_t *file, ngx_iovec_t *vec,
+    off_t offset);
 
 
+#if (NGX_HAVE_FILE_AIO)
+
+ngx_uint_t  ngx_file_aio = 1;
+
+#endif
+{% endhighlight %}
+当前，我们并不支持```NGX_THREAD```与```NGX_HAVE_FILE_AIO```。
+<pre>
+static ngx_chain_t *ngx_chain_to_iovec(ngx_iovec_t *vec, ngx_chain_t *cl);
+static ssize_t ngx_writev_file(ngx_file_t *file, ngx_iovec_t *vec,
+    off_t offset);
+</pre>
+其中，```ngx_chain_to_iovec()```函数主要用于将ngx_chain_t中的数据写到ngx_iovec_t中；
+
+```ngx_writev_file()```函数主要用于将ngx_iovec_t中的数据写到ngx_file_t的offset处。
 
 
+## 3. ngx_read_file()函数
+```ngx_read_file()```函数用于从file文件的offset处读取size字节的数据到buf中。
+{% highlight string %}
+ssize_t
+ngx_read_file(ngx_file_t *file, u_char *buf, size_t size, off_t offset)
+{
+    ssize_t  n;
 
+    ngx_log_debug4(NGX_LOG_DEBUG_CORE, file->log, 0,
+                   "read: %d, %p, %uz, %O", file->fd, buf, size, offset);
+
+#if (NGX_HAVE_PREAD)
+
+    n = pread(file->fd, buf, size, offset);
+
+    if (n == -1) {
+        ngx_log_error(NGX_LOG_CRIT, file->log, ngx_errno,
+                      "pread() \"%s\" failed", file->name.data);
+        return NGX_ERROR;
+    }
+
+#else
+
+    if (file->sys_offset != offset) {
+        if (lseek(file->fd, offset, SEEK_SET) == -1) {
+            ngx_log_error(NGX_LOG_CRIT, file->log, ngx_errno,
+                          "lseek() \"%s\" failed", file->name.data);
+            return NGX_ERROR;
+        }
+
+        file->sys_offset = offset;
+    }
+
+    n = read(file->fd, buf, size);
+
+    if (n == -1) {
+        ngx_log_error(NGX_LOG_CRIT, file->log, ngx_errno,
+                      "read() \"%s\" failed", file->name.data);
+        return NGX_ERROR;
+    }
+
+    file->sys_offset += n;
+
+#endif
+
+    file->offset += n;
+
+    return n;
+}
+{% endhighlight %}
+关于```ngx_file_t```数据结构我们后面会介绍，这里:
+<pre>
+ngx_file_t->sys_offset: 用于记录当前文件的指针偏移
+ngx_file_t->offset: 用于记录当前fd已经读写过的字节总数
+</pre>
+这里我们简要介绍一下pread()函数：
+{% highlight string %}
+#include <unistd.h>
+
+ssize_t pread(int fd, void *buf, size_t count, off_t offset);
+{% endhighlight %}
+pread()函数从fd的offset处读取count数量的数据到buf中，读取完成后，**该fd对应的offset并不会改变**, 这一点与普通的read函数有区别。
 
 
 
