@@ -16,6 +16,7 @@ description: nginx源代码分析
 
 <br />
 <br />
+<br />
 
 
 ## 1. 相关函数声明
@@ -830,9 +831,44 @@ ngx_close_file_mapping(ngx_file_mapping_t *fm)
 }
 {% endhighlight %}
 
+函数```ngx_create_file_mapping()```首先创建一个文件(如果文件已存在，则NGX_FILE_TRUNCATE标志将其截断为0），然后调用ftruncate()将其截断成指定大小的文件，然后再进行映射。
+
+函数```ngx_close_file_mapping```首先解除映射，然后关闭文件。
+
+## 10. 目录的操作
+{% highlight string %}
+ngx_int_t
+ngx_open_dir(ngx_str_t *name, ngx_dir_t *dir)
+{
+    dir->dir = opendir((const char *) name->data);
+
+    if (dir->dir == NULL) {
+        return NGX_ERROR;
+    }
+
+    dir->valid_info = 0;
+
+    return NGX_OK;
+}
 
 
+ngx_int_t
+ngx_read_dir(ngx_dir_t *dir)
+{
+    dir->de = readdir(dir->dir);
 
+    if (dir->de) {
+#if (NGX_HAVE_D_TYPE)
+        dir->type = dir->de->d_type;
+#else
+        dir->type = 0;
+#endif
+        return NGX_OK;
+    }
+
+    return NGX_ERROR;
+}
+{% endhighlight %}
 
 <br />
 <br />
