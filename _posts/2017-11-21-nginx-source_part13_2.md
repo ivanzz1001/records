@@ -566,6 +566,26 @@ static ssize_t
 ngx_writev_file(ngx_file_t *file, ngx_iovec_t *vec, off_t offset);
 </pre>
 
+首先我们来看一下ngx_iovec_t数据结构(os/unix/ngx_os.h)：
+{% highlight string %}
+typedef struct {
+    struct iovec  *iovs;
+    ngx_uint_t     count;      //当前所使用的iovs的个数
+    size_t         size;       //当前存放的总的字节数
+    ngx_uint_t     nalloc;     //总的iovs个数
+} ngx_iovec_t;
+{% endhighlight %}
+而对于```ngx_chain_t```数据结构有如下定义：
+{% highlight string %}
+typedef struct ngx_chain_s       ngx_chain_t;
+struct ngx_chain_s {
+    ngx_buf_t    *buf;
+    ngx_chain_t  *next;
+};
+{% endhighlight %}
+关于```ngx_buf_t```我们后续会详细介绍，这里我们只给出一个大体的示意图：
+
+![ngx-chain-t](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_chain_t.jpg)
 
 <br />
 <br />
