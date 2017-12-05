@@ -18,7 +18,7 @@ description: AI学习资料收集
 
 1. [莫烦Python](https://morvanzhou.github.io/)
 
-
+2. [中科院数字图像处理视频教程](https://www.mukedaba.com/forum.php?mod=viewthread&tid=8964&extra=page%3D1&page=1)
 
 
 

@@ -124,7 +124,7 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset);
 pread()函数从fd的offset处读取count数量的数据到buf中，读取完成后，**该fd对应的offset并不会改变**,因此这里```ngx_file_t->sys_offset```并不会被改变, 这一点与普通的read函数有区别。
 
 
-## 3. thread read相关
+## 3. thread 读操作
 如下我们暂不支持```NGX_THREADS```:
 {% highlight string %}
 #if (NGX_THREADS)
@@ -586,6 +586,253 @@ struct ngx_chain_s {
 关于```ngx_buf_t```我们后续会详细介绍，这里我们只给出一个大体的示意图：
 
 ![ngx-chain-t](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_chain_t.jpg)
+
+**(1) 函数ngx_chain_to_iovec()**
+
+该函数的主要作用是将```ngx_chain_t```缓存链转换为```ngx_iovec_t```,转换时进行适当的内存合并。
+
+<br />
+
+**(2) 函数ngx_writev_file()**
+
+当前环境支持```NGX_HAVE_PWRITEV```，因此这里采用```pwritev()```函数进行分散文件的写入。
+
+<br />
+
+**(3) 函数ngx_write_chain_to_file()**
+<pre>
+ssize_t
+ngx_write_chain_to_file(ngx_file_t *file, ngx_chain_t *cl, off_t offset,
+    ngx_pool_t *pool);
+</pre>
+该函数主要是循环遍历```ngx_chain_t```，然后将数据发送到ngx_file_t保存的文件句柄中。
+
+<br />
+在这里文件的读写采用了如下两组函数：
+
+* 读函数: read()、readv()、pread()、preadv()
+
+* 写函数: write()、writev()、pwrite()、pwritev()
+
+请注意上述两组函数中各个函数的区别。
+
+
+## 7. thread 写操作
+
+当前我们并不支持```NGX_THREADS```:
+{% highlight string %}
+#if (NGX_THREADS)
+
+ssize_t
+ngx_thread_write_chain_to_file(ngx_file_t *file, ngx_chain_t *cl, off_t offset,
+    ngx_pool_t *pool)
+{
+    ngx_thread_task_t      *task;
+    ngx_thread_file_ctx_t  *ctx;
+
+    ngx_log_debug3(NGX_LOG_DEBUG_CORE, file->log, 0,
+                   "thread write chain: %d, %p, %O",
+                   file->fd, cl, offset);
+
+    task = file->thread_task;
+
+    if (task == NULL) {
+        task = ngx_thread_task_alloc(pool,
+                                     sizeof(ngx_thread_file_ctx_t));
+        if (task == NULL) {
+            return NGX_ERROR;
+        }
+
+        file->thread_task = task;
+    }
+
+    ctx = task->ctx;
+
+    if (task->event.complete) {
+        task->event.complete = 0;
+
+        if (!ctx->write) {
+            ngx_log_error(NGX_LOG_ALERT, file->log, 0,
+                          "invalid thread call, write instead of read");
+            return NGX_ERROR;
+        }
+
+        if (ctx->err || ctx->nbytes == 0) {
+            ngx_log_error(NGX_LOG_CRIT, file->log, ctx->err,
+                          "pwritev() \"%s\" failed", file->name.data);
+            return NGX_ERROR;
+        }
+
+        file->offset += ctx->nbytes;
+        return ctx->nbytes;
+    }
+
+    task->handler = ngx_thread_write_chain_to_file_handler;
+
+    ctx->write = 1;
+
+    ctx->fd = file->fd;
+    ctx->chain = cl;
+    ctx->offset = offset;
+
+    if (file->thread_handler(task, file) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    return NGX_AGAIN;
+}
+
+
+static void
+ngx_thread_write_chain_to_file_handler(void *data, ngx_log_t *log)
+{
+    ngx_thread_file_ctx_t *ctx = data;
+
+#if (NGX_HAVE_PWRITEV)
+
+    off_t          offset;
+    ssize_t        n;
+    ngx_err_t      err;
+    ngx_chain_t   *cl;
+    ngx_iovec_t    vec;
+    struct iovec   iovs[NGX_IOVS_PREALLOCATE];
+
+    vec.iovs = iovs;
+    vec.nalloc = NGX_IOVS_PREALLOCATE;
+
+    cl = ctx->chain;
+    offset = ctx->offset;
+
+    ctx->nbytes = 0;
+    ctx->err = 0;
+
+    do {
+        /* create the iovec and coalesce the neighbouring bufs */
+        cl = ngx_chain_to_iovec(&vec, cl);
+
+eintr:
+
+        n = pwritev(ctx->fd, iovs, vec.count, offset);
+
+        if (n == -1) {
+            err = ngx_errno;
+
+            if (err == NGX_EINTR) {
+                ngx_log_debug0(NGX_LOG_DEBUG_CORE, log, err,
+                               "pwritev() was interrupted");
+                goto eintr;
+            }
+
+            ctx->err = err;
+            return;
+        }
+
+        if ((size_t) n != vec.size) {
+            ctx->nbytes = 0;
+            return;
+        }
+
+        ctx->nbytes += n;
+        offset += n;
+    } while (cl);
+
+#else
+
+    ctx->err = NGX_ENOSYS;
+    return;
+
+#endif
+}
+
+#endif /* NGX_THREADS */
+{% endhighlight %}
+
+
+## 8. 设置文件```最近访问时间```和```最近修改时间```
+{% highlight string %}
+ngx_int_t
+ngx_set_file_time(u_char *name, ngx_fd_t fd, time_t s)
+{
+    struct timeval  tv[2];
+
+    tv[0].tv_sec = ngx_time();
+    tv[0].tv_usec = 0;
+    tv[1].tv_sec = s;
+    tv[1].tv_usec = 0;
+
+    if (utimes((char *) name, tv) != -1) {
+        return NGX_OK;
+    }
+
+    return NGX_ERROR;
+}
+{% endhighlight %}
+
+这里采用utimes()函数设置文件的```access time```和```modification time```:
+{% highlight string %}
+#include <sys/time.h>
+
+int utimes(const char *filename, const struct timeval times[2]);
+{% endhighlight %}
+其中times[0]用于修改```access time```，times[1]用于修改```modification time```。
+
+## 9. 文件mmap映射
+{% highlight string %}
+ngx_int_t
+ngx_create_file_mapping(ngx_file_mapping_t *fm)
+{
+    fm->fd = ngx_open_file(fm->name, NGX_FILE_RDWR, NGX_FILE_TRUNCATE,
+                           NGX_FILE_DEFAULT_ACCESS);
+    if (fm->fd == NGX_INVALID_FILE) {
+        ngx_log_error(NGX_LOG_CRIT, fm->log, ngx_errno,
+                      ngx_open_file_n " \"%s\" failed", fm->name);
+        return NGX_ERROR;
+    }
+
+    if (ftruncate(fm->fd, fm->size) == -1) {
+        ngx_log_error(NGX_LOG_CRIT, fm->log, ngx_errno,
+                      "ftruncate() \"%s\" failed", fm->name);
+        goto failed;
+    }
+
+    fm->addr = mmap(NULL, fm->size, PROT_READ|PROT_WRITE, MAP_SHARED,
+                    fm->fd, 0);
+    if (fm->addr != MAP_FAILED) {
+        return NGX_OK;
+    }
+
+    ngx_log_error(NGX_LOG_CRIT, fm->log, ngx_errno,
+                  "mmap(%uz) \"%s\" failed", fm->size, fm->name);
+
+failed:
+
+    if (ngx_close_file(fm->fd) == NGX_FILE_ERROR) {
+        ngx_log_error(NGX_LOG_ALERT, fm->log, ngx_errno,
+                      ngx_close_file_n " \"%s\" failed", fm->name);
+    }
+
+    return NGX_ERROR;
+}
+
+
+void
+ngx_close_file_mapping(ngx_file_mapping_t *fm)
+{
+    if (munmap(fm->addr, fm->size) == -1) {
+        ngx_log_error(NGX_LOG_CRIT, fm->log, ngx_errno,
+                      "munmap(%uz) \"%s\" failed", fm->size, fm->name);
+    }
+
+    if (ngx_close_file(fm->fd) == NGX_FILE_ERROR) {
+        ngx_log_error(NGX_LOG_ALERT, fm->log, ngx_errno,
+                      ngx_close_file_n " \"%s\" failed", fm->name);
+    }
+}
+{% endhighlight %}
+
+
+
+
 
 <br />
 <br />
