@@ -241,7 +241,7 @@ ngx_thread_read_handler(void *data, ngx_log_t *log)
 #endif /* NGX_THREADS */
 {% endhighlight %}
 
-## 4. 
+## 4. ngx_write_file()函数
 函数内容如下：
 {% highlight string %}
 ssize_t
