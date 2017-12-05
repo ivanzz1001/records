@@ -869,7 +869,7 @@ void ngx_close_file_mapping(ngx_file_mapping_t *fm);
 
 <br />
 
-## 1.8 
+## 1.8 目录操作
 {% highlight string %}
 #if defined(PATH_MAX)
 
@@ -991,7 +991,7 @@ PATH_MAX: 4096
 #endif
 </pre>
 
-### 1.8 文件查找
+### 1.9 文件查找
 {% highlight string %}
 ngx_int_t ngx_open_glob(ngx_glob_t *gl);
 #define ngx_open_glob_n          "glob()"
@@ -1035,7 +1035,7 @@ test  test1.c  test2.c  test3.c  test4.c  test.c
 </pre>
 
 
-### 1.9 文件读写锁
+### 1.10 文件读写锁
 {% highlight string %}
 ngx_err_t ngx_trylock_fd(ngx_fd_t fd);
 ngx_err_t ngx_lock_fd(ngx_fd_t fd);
@@ -1048,7 +1048,7 @@ ngx_err_t ngx_unlock_fd(ngx_fd_t fd);
 通过上述函数设置文件的读写锁，请参看：[fcntl函数说明 F_SETLK/F_SETLKW例子](http://blog.csdn.net/wangyin159/article/details/48467315)
 
 
-### 1.10 文件预先读取
+### 1.11 文件预先读取
 {% highlight string %}
 #if (NGX_HAVE_F_READAHEAD)
 
@@ -1089,7 +1089,7 @@ future, thus allowing the kernel to perform appropriate optimizations.
 
 
 
-### 1.11 direct io支持
+### 1.12 direct io支持
 {% highlight string %}
 #if (NGX_HAVE_O_DIRECT)
 
@@ -1137,7 +1137,7 @@ O_DIRECT (Since Linux 2.4.10)
 
 
 
-### 1.12 open at支持
+### 1.13 open at支持
 {% highlight string %}
 size_t ngx_fs_bsize(u_char *name);
 
@@ -1186,7 +1186,7 @@ If pathname is absolute, then dirfd is ignored.
 
 
 
-### 1.13 aio及多线程读写支持
+### 1.14 aio及多线程读写支持
 {% highlight string %}
 #if (NGX_HAVE_FILE_AIO)
 

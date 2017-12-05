@@ -836,6 +836,7 @@ ngx_close_file_mapping(ngx_file_mapping_t *fm)
 函数```ngx_close_file_mapping```首先解除映射，然后关闭文件。
 
 ## 10. 目录的操作
+这里封装了打开目录与读取目录的相关操作:
 {% highlight string %}
 ngx_int_t
 ngx_open_dir(ngx_str_t *name, ngx_dir_t *dir)
@@ -869,6 +870,81 @@ ngx_read_dir(ngx_dir_t *dir)
     return NGX_ERROR;
 }
 {% endhighlight %}
+
+
+## 11. 文件查找
+{% highlight string %}
+ngx_int_t
+ngx_open_glob(ngx_glob_t *gl)
+{
+    int  n;
+
+    n = glob((char *) gl->pattern, 0, NULL, &gl->pglob);
+
+    if (n == 0) {
+        return NGX_OK;
+    }
+
+#ifdef GLOB_NOMATCH
+
+    if (n == GLOB_NOMATCH && gl->test) {
+        return NGX_OK;
+    }
+
+#endif
+
+    return NGX_ERROR;
+}
+
+
+ngx_int_t
+ngx_read_glob(ngx_glob_t *gl, ngx_str_t *name)
+{
+    size_t  count;
+
+#ifdef GLOB_NOMATCH
+    count = (size_t) gl->pglob.gl_pathc;
+#else
+    count = (size_t) gl->pglob.gl_matchc;
+#endif
+
+    if (gl->n < count) {
+
+        name->len = (size_t) ngx_strlen(gl->pglob.gl_pathv[gl->n]);
+        name->data = (u_char *) gl->pglob.gl_pathv[gl->n];
+        gl->n++;
+
+        return NGX_OK;
+    }
+
+    return NGX_DONE;
+}
+
+
+void
+ngx_close_glob(ngx_glob_t *gl)
+{
+    globfree(&gl->pglob);
+}
+{% endhighlight %}
+函数```ngx_open_glob()```用于基于模式匹配的文件查找，查找到的结果保存在```ngx_glob_t```数据结构中。
+
+函数```ngx_read_glob()```用于从上述查找结果中读取一个查找结果。
+
+函数```ngx_close_glob()```释放相关的资源。
+
+
+## 12. 
+
+
+
+
+
+
+
+
+
+
 
 <br />
 <br />
