@@ -934,15 +934,75 @@ ngx_close_glob(ngx_glob_t *gl)
 函数```ngx_close_glob()```释放相关的资源。
 
 
-## 12. 
+## 12. 文件锁
+{% highlight string %}
+ngx_err_t
+ngx_trylock_fd(ngx_fd_t fd)
+{
+    struct flock  fl;
+
+    ngx_memzero(&fl, sizeof(struct flock));
+    fl.l_type = F_WRLCK;
+    fl.l_whence = SEEK_SET;
+
+    if (fcntl(fd, F_SETLK, &fl) == -1) {
+        return ngx_errno;
+    }
+
+    return 0;
+}
+
+
+ngx_err_t
+ngx_lock_fd(ngx_fd_t fd)
+{
+    struct flock  fl;
+
+    ngx_memzero(&fl, sizeof(struct flock));
+    fl.l_type = F_WRLCK;
+    fl.l_whence = SEEK_SET;
+
+    if (fcntl(fd, F_SETLKW, &fl) == -1) {
+        return ngx_errno;
+    }
+
+    return 0;
+}
+
+
+ngx_err_t
+ngx_unlock_fd(ngx_fd_t fd)
+{
+    struct flock  fl;
+
+    ngx_memzero(&fl, sizeof(struct flock));
+    fl.l_type = F_UNLCK;
+    fl.l_whence = SEEK_SET;
+
+    if (fcntl(fd, F_SETLK, &fl) == -1) {
+        return  ngx_errno;
+    }
+
+    return 0;
+}
+{% endhighlight %}
+ 
+上面代码比较简单，这里我们主要介绍一下Linux环境下flock和lockf。
+
+### 12.1 flock 和 lockf
+
+从底层实现上来说，Linux的文件锁主要有两种：```flock```和```lockf```。需要额外对lockf说明的是，**它只是fcntl系统调用的一个封装**。从使用角度讲，lockf或fcntl实现了更细粒度的文件锁，即：记录锁。我们可以使用lockf或fcntl对文件的部分字节上锁，而**flock只能对整个文件上锁**。
 
 
 
 
 
+<br />
+<br />
 
+**[参看]:**
 
-
+1. [多进程之间的文件锁](http://www.jianshu.com/p/eb57a467f702)
 
 
 
