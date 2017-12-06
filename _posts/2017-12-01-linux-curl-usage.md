@@ -308,8 +308,12 @@ download_logo.png
 用法：
 # curl --data-urlencode "name=April 1" http://example.com/example.php
 
-
 3） 
+   //传递json格式
+# curl -H "Content-Type: application/json" -X POST  --data '{"name":"test"}' http://example.com/example.php
+ 
+
+4） 
    // -F, --form CONTENT: 将HTTP multipart数据post到服务器
 
 用法(Form表单形式上次)：
