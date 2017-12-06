@@ -933,6 +933,28 @@ ngx_close_glob(ngx_glob_t *gl)
 
 函数```ngx_close_glob()```释放相关的资源。
 
+通过如下程序代码测试(test.c):
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <glob.h>
+
+int main(int argc,char *argv[])
+{
+    #ifdef GLOB_NOMATCH
+       printf("support GLOB_NOMATCH\n");
+    #endif
+    return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# ./test
+support GLOB_NOMATCH
+</pre>
 
 ## 12. 文件锁
 {% highlight string %}
@@ -1014,11 +1036,14 @@ int main(int argc,char *argv[])
 {
     int fd = -1;
     int fd2 = -1;
+    int fd3 = -1;
     pid_t pid;
     char buf[16];
     size_t sz;
-    
+
     fd = open("test.txt",O_RDWR,0);
+
+
     pid = fork();
     if(pid == 0)
     {
@@ -1033,10 +1058,17 @@ int main(int argc,char *argv[])
 
     wait(NULL);
 
-    fd2 = open("test.txt",O_RDWR,0);
+    fd2 = dup(fd);
     sz = read(fd2,buf,4);
     buf[sz] = 0;
-    printf("parent buf2: %s\n",buf);  
+    printf("parent buf2: %s\n",buf);
+
+
+    fd3 = open("test.txt",O_RDWR,0);
+    sz = read(fd3,buf,4);
+    buf[sz] = 0;
+    printf("parent buf3: %s\n",buf);
+
 
     return 0;
 }
@@ -1046,14 +1078,166 @@ int main(int argc,char *argv[])
 [root@localhost test-src]# ./test
 parent buf: hell
 child buf: o,wo
-parent buf2: hell
+parent buf2: rld.
+parent buf3: hell
 </pre>
 可以看到，通过fork()传递的文件描述符共享同一个```文件表项```(dup()函数类似)，而两次通过open()函数打开同一个文件获得的是不同的```文件表项```。如下图所示：
 
 ![file table entry](https://ivanzz1001.github.io/records/assets/img/nginx/linux_file_table.jpg)
 
+```flock()```锁是作用于```文件表项```上的递归锁，因此可以对同一个文件表项多次进行加锁，例如（test2.c)：
+{% highlight string %}
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/file.h>
+int main (int argc, char ** argv)
+{
+    int ret;
+    int fd1 = open("test.txt",O_RDWR);
+
+    ret = flock(fd1,LOCK_EX);
+    printf("get lock1, ret: %d\n", ret);
+    ret = flock(fd1,LOCK_EX);
+    printf("get lock2, ret: %d\n", ret);
+
+    return 0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+[root@localhost test-src]# ./test2
+get lock1, ret: 0
+get lock2, ret: 0
+</pre>
+
+注意：
+<pre>
+flock()递归锁允许对同一个文件表项在解锁之前进行多次加锁，其内部会维持锁的计数，在解锁次数和加锁次数不相同的情况下，
+不会释放锁。所以，如果对一个递归锁加锁两次，然后解锁一次，那么该文件表项仍然处于加锁状态，对它再次解锁以前不能释放
+该锁。
+</pre>
+
+而fcntl()的```F_WRLCK```锁在跨进程之间互斥的，flock()是跨文件表项互斥。
 
 
+## 13. 函数ngx_read_ahead()
+{% highlight string %}
+#if (NGX_HAVE_POSIX_FADVISE) && !(NGX_HAVE_F_READAHEAD)
+
+ngx_int_t
+ngx_read_ahead(ngx_fd_t fd, size_t n)
+{
+    int  err;
+
+    err = posix_fadvise(fd, 0, 0, POSIX_FADV_SEQUENTIAL);
+
+    if (err == 0) {
+        return 0;
+    }
+
+    ngx_set_errno(err);
+    return NGX_FILE_ERROR;
+}
+
+#endif
+{% endhighlight %}
+当前```NGX_HAVE_POSIX_FADVISE```为1，```NGX_HAVE_F_READAHEAD```值为0。这里主要是通过操作系统内核的支持加快对文件的访问，属于系统优化的部分。
+
+
+## 14. direct io支持
+{% highlight string %}
+#if (NGX_HAVE_O_DIRECT)
+
+ngx_int_t
+ngx_directio_on(ngx_fd_t fd)
+{
+    int  flags;
+
+    flags = fcntl(fd, F_GETFL);
+
+    if (flags == -1) {
+        return NGX_FILE_ERROR;
+    }
+
+    return fcntl(fd, F_SETFL, flags | O_DIRECT);
+}
+
+
+ngx_int_t
+ngx_directio_off(ngx_fd_t fd)
+{
+    int  flags;
+
+    flags = fcntl(fd, F_GETFL);
+
+    if (flags == -1) {
+        return NGX_FILE_ERROR;
+    }
+
+    return fcntl(fd, F_SETFL, flags & ~O_DIRECT);
+}
+
+#endif
+{% endhighlight %}
+
+当前```NGX_HAVE_O_DIRECT```值为1。这里打开与关闭direct io的支持。
+
+## 14. 
+{% highlight string %}
+#if (NGX_HAVE_STATFS)
+
+size_t
+ngx_fs_bsize(u_char *name)
+{
+    struct statfs  fs;
+
+    if (statfs((char *) name, &fs) == -1) {
+        return 512;
+    }
+
+    if ((fs.f_bsize % 512) != 0) {
+        return 512;
+    }
+
+    return (size_t) fs.f_bsize;
+}
+
+#elif (NGX_HAVE_STATVFS)
+
+size_t
+ngx_fs_bsize(u_char *name)
+{
+    struct statvfs  fs;
+
+    if (statvfs((char *) name, &fs) == -1) {
+        return 512;
+    }
+
+    if ((fs.f_frsize % 512) != 0) {
+        return 512;
+    }
+
+    return (size_t) fs.f_frsize;
+}
+
+#else
+
+size_t
+ngx_fs_bsize(u_char *name)
+{
+    return 512;
+}
+
+#endif
+{% endhighlight %}
+在ngx_auto_config.h头文件中我们有如下定义：
+<pre>
+#ifndef NGX_HAVE_STATFS
+#define NGX_HAVE_STATFS  1
+#endif
+</pre>
+```fs.f_bsize```获取一个文件块的大小。读写文件时按块大小来进行读写，能获得最高的效率。
 
 
 <br />
@@ -1063,7 +1247,7 @@ parent buf2: hell
 
 1. [多进程之间的文件锁](http://www.jianshu.com/p/eb57a467f702)
 
-
+2. [Linux 中 fcntl()、lockf、flock 的区别](http://blog.jobbole.com/104331/)
 
 <br />
 <br />
