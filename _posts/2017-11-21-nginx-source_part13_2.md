@@ -995,13 +995,62 @@ ngx_unlock_fd(ngx_fd_t fd)
 
 除了这个区别外，```fcntl```系统调用还可以支持强制锁（Mandatory locking）。强制锁的概念是传统```UNIX```为了强制应用程序遵守锁规则而引入的一个概念，与之对应的概念就是建议锁(Advisory locking)。我们日常使用的基本都是建议锁，它并不强制生效。这里的不强制生效的意思是，**如果某一个进程对一个文件持有一把锁之后，其他进程仍然可以直接对文件进行各种操作的**，比如open、read、write。只有当多个进程在操作文件前都去检查和对相关锁进行锁操作的时候，文件锁的规则才会生效。这就是一般建议锁行为。而强制锁试图实现一套内核级的锁操作。当有进程对某个文件上锁之后，其他进程即使不在操作之前检查锁，也会在open()、read()或write()等文件操作时发生错误。内核将对有锁的文件在任何情况下的锁规则都生效，这就是强制锁的行为。由此可以理解，如果内核想要支持强制锁，将需要在内核实现open()、read()或write()等系统调用内部进行支持。
 
-从应用角度来说，
+从应用角度来说，**Linux内核虽然号称具备了锁的能力，但其对强制锁的实现是不可靠的，建议大家还是不要在Linux下使用强制锁**。鉴于此，我们就不在此介绍如何在Linux环境中打开所谓的强制锁支持了。我们只需知道，在Linux环境下的应用程序，flock和lockf在锁类型方面没有本质区别，它们都是建议锁，而非强制锁。
 
 
+flock和lockf的另一个差别是它们实现锁的方式不同。这在应用的时候表现在flock的语义是针对文件的锁，而lockf是针对文件描述符(fd)的锁。
+
+### 12.2 内核文件结构
+我们先来通过如下的程序来理解一下一个打开的文件的内核结构：
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
 
 
+int main(int argc,char *argv[])
+{
+    int fd = -1;
+    int fd2 = -1;
+    pid_t pid;
+    char buf[16];
+    size_t sz;
+    
+    fd = open("test.txt",O_RDWR,0);
+    pid = fork();
+    if(pid == 0)
+    {
+        sz = read(fd,buf,4);
+        buf[sz] = 0;
+        printf("child buf: %s\n",buf);
+        exit(0);
+    }
+    sz = read(fd,buf,4);
+    buf[sz] = 0;
+    printf("parent buf: %s\n",buf);
 
+    wait(NULL);
 
+    fd2 = open("test.txt",O_RDWR,0);
+    sz = read(fd2,buf,4);
+    buf[sz] = 0;
+    printf("parent buf2: %s\n",buf);  
+
+    return 0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+[root@localhost test-src]# ./test
+parent buf: hell
+child buf: o,wo
+parent buf2: hell
+</pre>
+可以看到，通过fork()传递的文件描述符共享同一个```文件表项```(dup()函数类似)，而两次通过open()函数打开同一个文件获得的是不同的```文件表项```。如下图所示：
+
+![file table entry](https://ivanzz1001.github.io/records/assets/img/nginx/linux_file_table.jpg)
 
 
 
