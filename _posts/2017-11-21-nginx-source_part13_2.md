@@ -1183,7 +1183,7 @@ ngx_directio_off(ngx_fd_t fd)
 
 当前```NGX_HAVE_O_DIRECT```值为1。这里打开与关闭direct io的支持。
 
-## 14. 
+## 14. 函数ngx_fs_bsize()
 {% highlight string %}
 #if (NGX_HAVE_STATFS)
 
