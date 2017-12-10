@@ -310,7 +310,9 @@ extern ssize_t sendfile(int s, int fd, int32_t *offset, size_t size);
 
 然而，TCP_CORK的实现可能并不像你想象的那么完美，CORK并不会将连接完全塞住。内核其实并不知道应用层到底什么时候会发送第二批数据用于和第一批数据拼接以达到MTU的大小，因此内核会给出一个时间限制，在该时间内没有拼接成一个大包（努力接近MTU）的话，内核就会无条件发送。也就是说若应用层程序发送小数据包的间隔不够短时，TCP_CORK就没有一点作用，反而会失去数据的实时性（每个小包数据都会延时一定时间再发送）。
 
-
+<pre>
+这里的TCP_NOPUSH与TCP_CORK含义是相同的。TCP_CORK与TCP_NODELAY为互斥关系。
+</pre>
 
 
 <br />
@@ -321,6 +323,8 @@ extern ssize_t sendfile(int s, int fd, int32_t *offset, size_t size);
 
 2. [关于TCP_NODELAY和TCP_CORK选项](https://www.2cto.com/net/201308/238322.html)
 
+
+3. [ngx_linux_sendfile_chain](http://blog.csdn.net/wu5215080/article/details/53021965)
 <br />
 <br />
 <br />
