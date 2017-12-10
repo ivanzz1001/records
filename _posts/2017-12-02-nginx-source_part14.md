@@ -273,6 +273,7 @@ ngx_linux_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 }
 {% endhighlight %}
 
+### 1.1 sendfile()版本问题
 一直到Linux 2.4.21版本为止，sendfile()函数都只支持32bit的offset,在此种情况下如果off_t为64bit时，包含```<sys/sendfile.h>```头文件会导致编译失败。因此在没有sendfile64()函数的情况下，我们采用extern的方式声明sendfile()。
 {% highlight string %}
 #if (NGX_HAVE_SENDFILE64)
@@ -295,16 +296,30 @@ extern ssize_t sendfile(int s, int fd, int32_t *offset, size_t size);
 #endif
 </pre>
 
-### 2.1 限定发送发文件大小
-<pre>
-#define NGX_SENDFILE_MAXSIZE  2147483647L
-</pre>
-这里我们限定发送文件的最大大小为2GB-1字节。
+### 2.2 TCP_NODELAY/TCP_CORE
 
-### 2.2 ngx_linux_sendfile_chain工作流程
+**1) TCP_NODELAY**
+
+默认情况下，发送数据采用Nagle算法。这样虽然提高了网络吞吐量，但是实时性却降低了，对一些交互性很强的应用程序来说是不允许的，使用TCP_NODELAY选项可以禁止Nagle算法。
+
+此时，应用程序向内核递交的每个数据包都会立即发送出去。需要注意的是，虽然禁止了Nagle算法，但网络的传输仍然受到TCP确认延迟机制的影响。
+
+**2) TCP_CORK**
+
+所谓的CORK就是塞子的意思，形象的理解就是用CORK将连接塞住，使数据先不发送出去，等到拔去塞子后再发送出去。设置该选项后，内核会尽量把小数据包拼成一个大的数据包(一个MTU)再发送出去，当然若一定时间后（一般为200ms，该值尚待确认），内核仍然没有组合成一个MTU时也必须发送现有的数据。
+
+然而，TCP_CORK的实现可能并不像你想象的那么完美，CORK并不会将连接完全塞住。内核其实并不知道应用层到底什么时候会发送第二批数据用于和第一批数据拼接以达到MTU的大小，因此内核会给出一个时间限制，在该时间内没有拼接成一个大包（努力接近MTU）的话，内核就会无条件发送。也就是说若应用层程序发送小数据包的间隔不够短时，TCP_CORK就没有一点作用，反而会失去数据的实时性（每个小包数据都会延时一定时间再发送）。
 
 
 
+
+<br />
+<br />
+**[参看]:**
+
+1. [TCP_NODELAY与TCP_CORK](http://blog.csdn.net/gexiao/article/details/50722431)
+
+2. [关于TCP_NODELAY和TCP_CORK选项](https://www.2cto.com/net/201308/238322.html)
 
 <br />
 <br />
