@@ -331,7 +331,80 @@ ngx_linux_sendfile_chain()函数支持发送两种形式的数据：
 3) 对于静态文件的传输，用sendfile可以减少系统调用。注意：文件发送的场景主要是对文件数据不进行改变，如果数据需要作改变还是得用内存发送。
 
 
+下面我们仔细分析一下ngx_linux_sendfile_chain()函数：
+{% highlight string %}
+#define NGX_SENDFILE_MAXSIZE  2147483647L
 
+
+ngx_chain_t *
+ngx_linux_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
+{
+    //1: send用于记录到目前为止发送过的字节数，prev_send用于记录截止到上一次为止发送过的字节数
+    //   sent用于记录本次成功发送的字节数
+
+    off_t          send, prev_send;   
+    size_t         file_size, sent;
+
+    for(;;)
+    {
+	    prev_send = send;
+
+        //2: 创建iovec并且合并相邻的buf(这里只会合并处于内存中的数据，对于文件中的数据并不会合并)
+        cl = ngx_output_chain_to_iovec(&header, in, limit - send, c->log);
+		send += header.size;
+      
+        //3: set TCP_CORK if there is a header before a file
+
+        //4: 发送文件中的数据
+        if (header.count == 0 && cl && cl->buf->in_file && send < limit)   
+        {
+             //5: 合并相邻的文件buf
+			 file_size = (size_t) ngx_chain_coalesce_file(&cl, limit - send);
+
+             send += file_size;   
+
+             //6: 发送文件
+              #if NGX_THREADS
+                   if (file->file->thread_handler)
+                   {
+                       //多线程文件发送
+                        rc = ngx_linux_sendfile_thread(c, file, file_size, &sent);
+                   }else
+              #endif
+                   {
+                        //sendfile
+                   }
+        }
+        else{
+             //7: ngx_writev内存发送
+        }
+        
+        //8: 根据已经发送的数据，更新发送buf
+        in = ngx_chain_update_sent(in, sent);
+
+        //
+        if ((size_t) (send - prev_send) != sent) {
+           #if NGX_THREADS
+                //9: 这里多线程特别要注意，线程池队列中针对一个ngx_connection_t最多只能存在一个发送任务
+                //   如果这里不加限制，上面多次调用ngx_linux_senfile_thread就会导致发送混乱
+                 if (thread_complete) {
+                     send = prev_send + sent;
+                     continue;
+                 }
+           #endif
+           
+            //10: 这里重置wev->ready为0，然后return退出循环
+            wev->ready = 0;
+            return in;
+        }
+
+        //11: 数据发送完毕或者没有数据可以发送了，则return退出
+        if (send >= limit || in == NULL) {
+            return in;
+        }
+    }
+}
+{% endhighlight %}
 
 
 
