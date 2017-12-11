@@ -347,11 +347,11 @@ ngx_linux_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 
     for(;;)
     {
-	    prev_send = send;
+        prev_send = send;
 
         //2: 创建iovec并且合并相邻的buf(这里只会合并处于内存中的数据，对于文件中的数据并不会合并)
         cl = ngx_output_chain_to_iovec(&header, in, limit - send, c->log);
-		send += header.size;
+        send += header.size;
       
         //3: set TCP_CORK if there is a header before a file
 
@@ -360,7 +360,6 @@ ngx_linux_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
         {
              //5: 合并相邻的文件buf
 			 file_size = (size_t) ngx_chain_coalesce_file(&cl, limit - send);
-
              send += file_size;   
 
              //6: 发送文件
