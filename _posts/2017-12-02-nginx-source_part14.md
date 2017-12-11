@@ -378,7 +378,7 @@ ngx_linux_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
              //7: ngx_writev内存发送
         }
         
-        //8: 根据已经发送的数据，更新发送buf
+        //8: 根据已经发送的数据，更新发送buf(这里计算下一次应该从什么地方开始发送数据）
         in = ngx_chain_update_sent(in, sent);
 
         //
@@ -406,7 +406,271 @@ ngx_linux_sendfile_chain(ngx_connection_t *c, ngx_chain_t *in, off_t limit)
 {% endhighlight %}
 
 
+## 3. 函数ngx_linux_sendfile()
+{% highlight string %}
+static ssize_t
+ngx_linux_sendfile(ngx_connection_t *c, ngx_buf_t *file, size_t size)
+{
+#if (NGX_HAVE_SENDFILE64)
+    off_t      offset;
+#else
+    int32_t    offset;
+#endif
+    ssize_t    n;
+    ngx_err_t  err;
 
+#if (NGX_HAVE_SENDFILE64)
+    offset = file->file_pos;
+#else
+    offset = (int32_t) file->file_pos;
+#endif
+
+eintr:
+
+    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, c->log, 0,
+                   "sendfile: @%O %uz", file->file_pos, size);
+
+    n = sendfile(c->fd, file->file->fd, &offset, size);
+
+    if (n == -1) {
+        err = ngx_errno;
+
+        switch (err) {
+        case NGX_EAGAIN:
+            ngx_log_debug0(NGX_LOG_DEBUG_EVENT, c->log, err,
+                           "sendfile() is not ready");
+            return NGX_AGAIN;
+
+        case NGX_EINTR:
+            ngx_log_debug0(NGX_LOG_DEBUG_EVENT, c->log, err,
+                           "sendfile() was interrupted");
+            goto eintr;
+
+        default:
+            c->write->error = 1;
+            ngx_connection_error(c, err, "sendfile() failed");
+            return NGX_ERROR;
+        }
+    }
+
+    if (n == 0) {
+        /*
+         * if sendfile returns zero, then someone has truncated the file,
+         * so the offset became beyond the end of the file
+         */
+
+        ngx_log_error(NGX_LOG_ALERT, c->log, 0,
+                      "sendfile() reported that \"%s\" was truncated at %O",
+                      file->file->name.data, file->file_pos);
+
+        return NGX_ERROR;
+    }
+
+    ngx_log_debug3(NGX_LOG_DEBUG_EVENT, c->log, 0, "sendfile: %z of %uz @%O",
+                   n, size, file->file_pos);
+
+    return n;
+}
+{% endhighlight %}
+此函数调用sendfile()发送文件中的数据。注意如下几个方面：
+
+**1) offset变量的定义**
+{% highlight string %}
+#if (NGX_HAVE_SENDFILE64)
+    off_t      offset;
+#else
+    int32_t    offset;
+#endif
+    ssize_t    n;
+    ngx_err_t  err;
+
+#if (NGX_HAVE_SENDFILE64)
+    offset = file->file_pos;
+#else
+    offset = (int32_t) file->file_pos;
+#endif
+{% endhighlight %} 
+这里主要是由于sendfile()函数在32bit环境下被我们定义成了：
+<pre>
+extern ssize_t sendfile(int s, int fd, int32_t *offset, size_t size);
+</pre>
+
+
+**2) 对中断的处理**
+
+若发送过程中被INT信号中断，返回继续处理。
+
+**3) 对sendfile()返回值0的处理**
+{% highlight string %}
+if (n == 0) {
+    /*
+     * if sendfile returns zero, then someone has truncated the file,
+     * so the offset became beyond the end of the file
+     */
+
+    ngx_log_error(NGX_LOG_ALERT, c->log, 0,
+                  "sendfile() reported that \"%s\" was truncated at %O",
+                  file->file->name.data, file->file_pos);
+
+    return NGX_ERROR;
+}
+{% endhighlight %}
+这里返回0表示文件产生了截断。
+
+
+## 4. 多线程数据发送
+{% highlight string %}
+#if (NGX_THREADS)
+
+typedef struct {
+    ngx_buf_t     *file;
+    ngx_socket_t   socket;
+    size_t         size;
+
+    size_t         sent;
+    ngx_err_t      err;
+} ngx_linux_sendfile_ctx_t;
+
+
+static ngx_int_t
+ngx_linux_sendfile_thread(ngx_connection_t *c, ngx_buf_t *file, size_t size,
+    size_t *sent)
+{
+    ngx_event_t               *wev;
+    ngx_thread_task_t         *task;
+    ngx_linux_sendfile_ctx_t  *ctx;
+
+    ngx_log_debug3(NGX_LOG_DEBUG_CORE, c->log, 0,
+                   "linux sendfile thread: %d, %uz, %O",
+                   file->file->fd, size, file->file_pos);
+
+    task = c->sendfile_task;
+
+    if (task == NULL) {
+        task = ngx_thread_task_alloc(c->pool, sizeof(ngx_linux_sendfile_ctx_t));
+        if (task == NULL) {
+            return NGX_ERROR;
+        }
+
+        task->handler = ngx_linux_sendfile_thread_handler;
+
+        c->sendfile_task = task;
+    }
+
+    ctx = task->ctx;
+    wev = c->write;
+
+    if (task->event.complete) {
+        task->event.complete = 0;
+
+        if (ctx->err == NGX_EAGAIN) {
+            *sent = 0;
+
+            if (wev->complete) {
+                return NGX_DONE;
+            }
+
+            return NGX_AGAIN;
+        }
+
+        if (ctx->err) {
+            wev->error = 1;
+            ngx_connection_error(c, ctx->err, "sendfile() failed");
+            return NGX_ERROR;
+        }
+
+        if (ctx->sent == 0) {
+            /*
+             * if sendfile returns zero, then someone has truncated the file,
+             * so the offset became beyond the end of the file
+             */
+
+            ngx_log_error(NGX_LOG_ALERT, c->log, 0,
+                          "sendfile() reported that \"%s\" was truncated at %O",
+                          file->file->name.data, file->file_pos);
+
+            return NGX_ERROR;
+        }
+
+        *sent = ctx->sent;
+
+        if (ctx->sent == ctx->size || wev->complete) {
+            return NGX_DONE;
+        }
+
+        return NGX_AGAIN;
+    }
+
+    if (task->event.active && ctx->file == file) {
+        /*
+         * tolerate duplicate calls; they can happen due to subrequests
+         * or multiple calls of the next body filter from a filter
+         */
+
+        *sent = 0;
+
+        return NGX_OK;
+    }
+
+    ctx->file = file;
+    ctx->socket = c->fd;
+    ctx->size = size;
+
+    wev->complete = 0;
+
+    if (file->file->thread_handler(task, file->file) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    *sent = 0;
+
+    return NGX_OK;
+}
+
+
+static void
+ngx_linux_sendfile_thread_handler(void *data, ngx_log_t *log)
+{
+    ngx_linux_sendfile_ctx_t *ctx = data;
+
+    off_t       offset;
+    ssize_t     n;
+    ngx_buf_t  *file;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_CORE, log, 0, "linux sendfile thread handler");
+
+    file = ctx->file;
+    offset = file->file_pos;
+
+again:
+
+    n = sendfile(ctx->socket, file->file->fd, &offset, ctx->size);
+
+    if (n == -1) {
+        ctx->err = ngx_errno;
+
+    } else {
+        ctx->sent = n;
+        ctx->err = 0;
+    }
+
+#if 0
+    ngx_time_update();
+#endif
+
+    ngx_log_debug4(NGX_LOG_DEBUG_EVENT, log, 0,
+                   "sendfile: %z (err: %d) of %uz @%O",
+                   n, ctx->err, ctx->size, file->file_pos);
+
+    if (ctx->err == NGX_EINTR) {
+        goto again;
+    }
+}
+
+#endif /* NGX_THREADS */
+{% endhighlight %}
+
+这里两个函数都较为简单。```ngx_linux_sendfile_thread```主要是为connection分配一个sendfile_task,然后调用thread_handler将该任务添加到队列中。
 
 
 <br />
