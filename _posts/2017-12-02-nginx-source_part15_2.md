@@ -8,7 +8,7 @@ description: nginx源代码分析
 ---
 
 
-
+本节主要分析一下ngx_process.c源文件代码，其主要完成进程的产生、信号的初始化等操作。
 
 
 <!-- more -->
