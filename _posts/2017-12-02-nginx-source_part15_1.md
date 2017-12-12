@@ -108,6 +108,48 @@ extern ngx_process_t  ngx_processes[NGX_MAX_PROCESSES];
 {% endhighlight %}
 
 
+## 2. ngx_process_t数据结构
+ngx_process_t代表进程数据结构，主要用于记录Nginx产生的worker进程相关信息。ngx_exec_ctx_t用于记录进程执行时传递的上下文信息
+{% highlight string %}
+typedef pid_t       ngx_pid_t;
+
+#define NGX_INVALID_PID  -1
+
+typedef void (*ngx_spawn_proc_pt) (ngx_cycle_t *cycle, void *data);
+
+typedef struct {
+    ngx_pid_t           pid;              //代表该进程PID
+    int                 status;           //
+    ngx_socket_t        channel[2];       //进程的channel，通过socketpair来创建
+
+    ngx_spawn_proc_pt   proc;             //进程的初始化函数，在每次创建完worker进程时调用
+    void               *data;             //向进程初始化函数传递的参数
+    char               *name;             //进程名称
+
+    unsigned            respawn:1;        //重新创建的进程
+    unsigned            just_spawn:1;     //第一次创建的进程
+    unsigned            detached:1;       //分离的
+    unsigned            exiting:1;        //正在退出的
+    unsigned            exited:1;         //已经退出的
+} ngx_process_t;
+
+
+typedef struct {
+    char         *path;                 //用于传递可执行文件路径
+    char         *name;                 //用于传递要创建的进程的名称
+    char *const  *argv;                 //用于传递相关参数
+    char *const  *envp;                 //用于传递相关环境变量
+} ngx_exec_ctx_t;
+
+
+#define NGX_MAX_PROCESSES         1024    //定义最多可拥有的进程数目
+
+#define NGX_PROCESS_NORESPAWN     -1
+#define NGX_PROCESS_JUST_SPAWN    -2     //第一次创建的进程
+#define NGX_PROCESS_RESPAWN       -3     //重新创建的进程
+#define NGX_PROCESS_JUST_RESPAWN  -4     //第一次重新创建的进程
+#define NGX_PROCESS_DETACHED      -5
+{% endhighlight %}
 
 
 
@@ -115,8 +157,13 @@ extern ngx_process_t  ngx_processes[NGX_MAX_PROCESSES];
 
 
 
+<br />
+<br />
+**[参看]:**
 
+1. [ngx_master_process_cycle 多进程(一)](http://blog.csdn.net/lengzijian/article/details/7587740)
 
+2. [nginx的进程模型](http://blog.csdn.net/gsnumen/article/details/7979484?reload)
 
 <br />
 <br />
