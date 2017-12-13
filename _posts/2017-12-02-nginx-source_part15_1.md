@@ -91,9 +91,98 @@ nginx master与worker进程之间使用unix套接字进行通信： nginx在创�
 </pre>
 下面介绍这些标示：
 
-* NGX_PROCESS_NORESPAWN: 子进程退出时，父进程不会再次创建，该标记用在创建"cache loader process"
+* NGX_PROCESS_NORESPAWN: 子进程退出时，父进程不会再次创建，该标记用在创建"cache loader process"。
+<pre>
+请参看os/unix/ngx_process_cycle.c:
 
-* NGX_PROCESS_JUST_SPAWN: 
+static void
+ngx_start_cache_manager_processes(ngx_cycle_t *cycle, ngx_uint_t respawn)
+</pre>
+
+* NGX_PROCESS_JUST_SPAWN: 当```nginx -s reload```时，如果还有未加载的proxy_cache_path，则需要再次创建"cache loader process"加载，并用NGX_PROCESS_JUST_SPAWN给这个进程做记号。防止nginx master向**老的worker进程、老的cache manager进程、老的cache loader进程（如果存在）**发送NGX_CMD_QUIT或SIGQUIT时，误以为我们新创建的"cache loader process"是原来老旧的，而将其错误的杀掉。
+{% highlight string %}
+请参看 os/unix/ngx_process_cycle.c:
+
+void
+ngx_master_process_cycle(ngx_cycle_t *cycle)
+{
+    ...
+      if (ngx_reconfigure) {
+            ngx_reconfigure = 0;
+
+            if (ngx_new_binary) {
+                ngx_start_worker_processes(cycle, ccf->worker_processes,
+                                           NGX_PROCESS_RESPAWN);
+                ngx_start_cache_manager_processes(cycle, 0);
+                ngx_noaccepting = 0;
+
+                continue;
+            }
+
+            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reconfiguring");
+
+            cycle = ngx_init_cycle(cycle);
+            if (cycle == NULL) {
+                cycle = (ngx_cycle_t *) ngx_cycle;
+                continue;
+            }
+
+            ngx_cycle = cycle;
+            ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx,
+                                                   ngx_core_module);
+            ngx_start_worker_processes(cycle, ccf->worker_processes,
+                                       NGX_PROCESS_JUST_RESPAWN);
+            ngx_start_cache_manager_processes(cycle, 1);               //此处指示将其标记为一个新的cache loader process
+
+            /* allow new processes to start */
+            ngx_msleep(100);
+
+            live = 1;
+            ngx_signal_worker_processes(cycle,
+                                        ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
+        }
+    ...
+}
+{% endhighlight %}
+
+*  NGX_PROCESS_RESPAWN: 子进程异常退出时，master会重新创建它，如当worker或```cache manager process```异常退出时，父进程会重新创建它。
+
+* NGX_PROCESS_JUST_RESPAWN: 当```nginx -s reload```时，master会向老的```worker进程```，**老的cache manager process，老的cache loader process(如果存在)**发送ngx_write_channel(NGX_CMD_QUIT)(如果失败则发送SIGQUIT信号）。NGX_PROCESS_JUST_RESPAWN用来标记进程数组中哪些是新创建的子进程，而其他的就是属于老的子进程。
+{% highlight string %}
+请参看 os/unix/ngx_process_cycle.c:
+
+void
+ngx_master_process_cycle(ngx_cycle_t *cycle)
+{
+      ......
+
+      if (ngx_reconfigure) {
+            .....
+
+            ngx_start_worker_processes(cycle, ccf->worker_processes,
+                                       NGX_PROCESS_JUST_RESPAWN);
+            ngx_start_cache_manager_processes(cycle, 1);
+
+            .....
+
+            ngx_signal_worker_processes(cycle,
+                                        ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
+        }
+       .....
+}
+{% endhighlight %}
+
+* NGX_PROCESS_DETACHED: 热代码替换。
+<pre>
+请参看os/unix/ngx_process.c：
+
+ngx_pid_t
+ngx_execute(ngx_cycle_t *cycle, ngx_exec_ctx_t *ctx)
+{
+    return ngx_spawn_process(cycle, ngx_execute_proc, ctx, ctx->name,
+                             NGX_PROCESS_DETACHED);
+}
+</pre>
 
 
 
@@ -106,6 +195,8 @@ nginx master与worker进程之间使用unix套接字进行通信： nginx在创�
 1. [ngx_master_process_cycle 多进程(一)](http://blog.csdn.net/lengzijian/article/details/7587740)
 
 2. [nginx的进程模型](http://blog.csdn.net/gsnumen/article/details/7979484?reload)
+
+3. [nginx process的respawn和just_spawn 标志](http://kofreestyler.blog.163.com/blog/static/1077907512011215362391/)
 
 <br />
 <br />
