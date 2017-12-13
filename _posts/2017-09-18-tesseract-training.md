@@ -891,12 +891,7 @@ tail -f ../tesstutorial/newchi_simoutput/basetrain.log
 {% endhighlight %}
 
 
-<br />
-<br />
 
-**[参看]**：
-
-1. [tesseract-ocr 第四课 如何训练新语言](http://www.codeweblog.com/tesseract-ocr-%E7%AC%AC%E5%9B%9B%E8%AF%BE-%E5%A6%82%E4%BD%95%E8%AE%AD%E7%BB%83%E6%96%B0%E8%AF%AD%E8%A8%80/)
 
 <br />
 <br />

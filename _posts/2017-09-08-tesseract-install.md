@@ -412,6 +412,9 @@ tesseract字符提取时会用到很多文件，这里做一个介绍。
 
 1. [Tesseract-OCR识别中文与训练字库实例](http://www.cnblogs.com/wzben/p/5930538.html)
 
+2. [tesseract-ocr 第四课 如何训练新语言](http://www.codeweblog.com/tesseract-ocr-%E7%AC%AC%E5%9B%9B%E8%AF%BE-%E5%A6%82%E4%BD%95%E8%AE%AD%E7%BB%83%E6%96%B0%E8%AF%AD%E8%A8%80/)
+
+3. [使用Tesseract训练lang文件并OCR识别集装箱号](http://www.jianshu.com/p/5f847d8089ce)
 <br />
 <br />
 <br />
