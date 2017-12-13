@@ -81,7 +81,7 @@ static void ngx_unlock_mutexes(ngx_pid_t pid);
 
 * ngx_argv: 由于某些操作系统后续更改进程名的需要，用ngx_argv来备份nginx启动时传递进来的参数。
 
-* ngx_os_argv:
+* ngx_os_argv: 由于某些操作系统后续更改进程名的需要，这里用ngx_os_argv来记录更改后的进程名（可能具有相应的格式要求）
 
 * ngx_process_slot: 主要用于记录子进程ngx_process_t所表示的环境表存放在数组ngx_processes中的哪一个索引处，其会随着fork()函数自动传递给该子进程。
 
@@ -90,6 +90,72 @@ static void ngx_unlock_mutexes(ngx_pid_t pid);
 * ngx_last_process: 主要用于记录当前ngx_processes数组的最高下标的下一个位置，其也会随着fork()函数自动传递给子进程。例如，目前我们使用了ngx_processes数组的第0，1，3，5，7个位置，那么ngx_last_process则等于8。
 
 * ngx_processes: 当前所有进程的进程环境表。
+
+
+
+## 2. nginx中处理的所有信号
+{% highlight string %}
+ngx_signal_t  signals[] = {
+    { ngx_signal_value(NGX_RECONFIGURE_SIGNAL),
+      "SIG" ngx_value(NGX_RECONFIGURE_SIGNAL),
+      "reload",
+      ngx_signal_handler },
+
+    { ngx_signal_value(NGX_REOPEN_SIGNAL),
+      "SIG" ngx_value(NGX_REOPEN_SIGNAL),
+      "reopen",
+      ngx_signal_handler },
+
+    { ngx_signal_value(NGX_NOACCEPT_SIGNAL),
+      "SIG" ngx_value(NGX_NOACCEPT_SIGNAL),
+      "",
+      ngx_signal_handler },
+
+    { ngx_signal_value(NGX_TERMINATE_SIGNAL),
+      "SIG" ngx_value(NGX_TERMINATE_SIGNAL),
+      "stop",
+      ngx_signal_handler },
+
+    { ngx_signal_value(NGX_SHUTDOWN_SIGNAL),
+      "SIG" ngx_value(NGX_SHUTDOWN_SIGNAL),
+      "quit",
+      ngx_signal_handler },
+
+    { ngx_signal_value(NGX_CHANGEBIN_SIGNAL),
+      "SIG" ngx_value(NGX_CHANGEBIN_SIGNAL),
+      "",
+      ngx_signal_handler },
+
+    { SIGALRM, "SIGALRM", "", ngx_signal_handler },
+
+    { SIGINT, "SIGINT", "", ngx_signal_handler },
+
+    { SIGIO, "SIGIO", "", ngx_signal_handler },
+
+    { SIGCHLD, "SIGCHLD", "", ngx_signal_handler },
+
+    { SIGSYS, "SIGSYS, SIG_IGN", "", SIG_IGN },
+
+    { SIGPIPE, "SIGPIPE, SIG_IGN", "", SIG_IGN },
+
+    { 0, NULL, "", NULL }
+};
+{% endhighlight %}
+
+这里signals数组定义了nginx中要处理的所有信号：
+
+* NGX_RECONFIGURE_SIGNAL: 这里用作nginx重新读取配置文件，对应的实际信号为SIGHUP。
+
+* NGX_REOPEN_SIGNAL： 这里用作nginx的日志文件回滚，对应的实际信号为：
+<pre>
+#if (NGX_LINUXTHREADS)
+#define NGX_REOPEN_SIGNAL        INFO
+#else
+#define NGX_REOPEN_SIGNAL        USR1
+#endif
+</pre>
+
+* NGX_NOACCEPT_SIGNAL: 如果当前nginx已经后台化(daemonized)，对于nginx master进程和worker进程而言，
 
 
 
