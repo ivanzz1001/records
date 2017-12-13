@@ -108,31 +108,9 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 {
     ...
       if (ngx_reconfigure) {
-            ngx_reconfigure = 0;
+            ...
 
-            if (ngx_new_binary) {
-                ngx_start_worker_processes(cycle, ccf->worker_processes,
-                                           NGX_PROCESS_RESPAWN);
-                ngx_start_cache_manager_processes(cycle, 0);
-                ngx_noaccepting = 0;
-
-                continue;
-            }
-
-            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reconfiguring");
-
-            cycle = ngx_init_cycle(cycle);
-            if (cycle == NULL) {
-                cycle = (ngx_cycle_t *) ngx_cycle;
-                continue;
-            }
-
-            ngx_cycle = cycle;
-            ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx,
-                                                   ngx_core_module);
-            ngx_start_worker_processes(cycle, ccf->worker_processes,
-                                       NGX_PROCESS_JUST_RESPAWN);
-            ngx_start_cache_manager_processes(cycle, 1);               //此处指示将其标记为一个新的cache loader process
+            ngx_start_cache_manager_processes(cycle, 1);            //此处指示将其标记为一个新的cache loader process
 
             /* allow new processes to start */
             ngx_msleep(100);
@@ -183,6 +161,59 @@ ngx_execute(ngx_cycle_t *cycle, ngx_exec_ctx_t *ctx)
                              NGX_PROCESS_DETACHED);
 }
 </pre>
+
+<br />
+
+**3) ngx_process_t结构体respawn和just_spawn标志**
+
+接着上面2）进行讲解。respawn用于标记进程挂了要不要重启，启动的worker进程都是设置respawn=1的（不管ngx_start_worker_processes()用NGX_PROCESS_RESPAWN 还是 NGX_PROCESS_JUST_RESPAWN)。
+
+
+如果worker进程的退出返回值是2，即fatal error的话，则不重启了：
+<pre>
+请参看os/unix/ngx_process.c:
+
+static void
+ngx_process_get_status(void)
+{
+     ...
+     
+     if (WEXITSTATUS(status) == 2 && ngx_processes[i].respawn) {
+            ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
+                          "%s %P exited with fatal code %d "
+                          "and cannot be respawned",
+                          process, pid, WEXITSTATUS(status));
+            ngx_processes[i].respawn = 0;
+        }
+     .....
+}
+</pre>
+
+<br />
+
+**关于just_spawn**则要从ngxin配置开始说起：
+
+nginx master收到SIGHUP信号时，ngx_signal_handler()设置ngx_reconfigure=1，然后在master进程循环里，检测到reconfigure为1时，运行ngx_init_cycle()，然后启动新的worker进程：
+<pre>
+ngx_start_worker_processes(cycle, ccf->worker_processes,
+                                       NGX_PROCESS_JUST_RESPAWN);
+</pre>
+然后对worker进程发送shutdown信号，优雅的关闭旧的worker进程：
+<pre>
+ngx_signal_worker_processes(cycle,
+                                        ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
+</pre>
+该函数是对所有worker进程进行循环发信号的，所以要用一个标记just_spawn来标记刚刚生成的进程：
+<pre>
+if (ngx_processes[i].just_spawn) {
+        ngx_processes[i].just_spawn = 0;
+        continue;
+    }
+</bre>
+上面的```NGX_PROCESS_JUST_RESPAWN```会设置ngx_processes[s].just_spawn=1。
+
+
+
 
 
 
