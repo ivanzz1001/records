@@ -42,9 +42,9 @@ typedef struct {
 
 
 
-static void ngx_execute_proc(ngx_cycle_t *cycle, void *data);    //主要用于exec替换当前进程
-static void ngx_signal_handler(int signo);
-static void ngx_process_get_status(void);
+static void ngx_execute_proc(ngx_cycle_t *cycle, void *data);    
+static void ngx_signal_handler(int signo);                       
+static void ngx_process_get_status(void);                        
 static void ngx_unlock_mutexes(ngx_pid_t pid);
 
 
@@ -59,10 +59,37 @@ ngx_process_t    ngx_processes[NGX_MAX_PROCESSES];
 {% endhighlight %}
 
 
-上面ngx_signal_t数据类型是对信号相关信息的一个封装。
+上面ngx_signal_t数据类型是对信号相关信息的一个封装。而对于声明的如下几个静态函数：
 
+<pre>
+//1: 主要用于exec执行另外一个程序替换当前进程
+static void ngx_execute_proc(ngx_cycle_t *cycle, void *data);   
 
+//2: 信号处理函数
+static void ngx_signal_handler(int signo);                       
 
+//3: 获得一个子进程的状态
+static void ngx_process_get_status(void);                        //
+
+//4: 用于释放共享内存锁
+static void ngx_unlock_mutexes(ngx_pid_t pid);
+</pre>
+
+对于所声明的全局变量：
+
+* ngx_argc: 保存nginx启动时传递进来的参数数据的个数
+
+* ngx_argv: 由于某些操作系统后续更改进程名的需要，用ngx_argv来备份nginx启动时传递进来的参数。
+
+* ngx_os_argv:
+
+* ngx_process_slot: 主要用于记录子进程ngx_process_t所表示的环境表存放在数组ngx_processes中的哪一个索引处，其会随着fork()函数自动传递给该子进程。
+
+* ngx_channel: 主要用于记录子进程与父进程进行通信的channel号，其会随着fork()函数自动传递给子进程。
+
+* ngx_last_process: 主要用于记录当前ngx_processes数组的最高下标的下一个位置，其也会随着fork()函数自动传递给子进程。例如，目前我们使用了ngx_processes数组的第0，1，3，5，7个位置，那么ngx_last_process则等于8。
+
+* ngx_processes: 当前所有进程的进程环境表。
 
 
 

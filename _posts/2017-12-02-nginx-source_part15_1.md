@@ -276,9 +276,9 @@ extern ngx_process_t  ngx_processes[NGX_MAX_PROCESSES];
 {% endhighlight %}
 如上除```ngx_pid```均定义在os/unix/ngx_process.c文件中：
 <pre>
-int              ngx_argc;           //保存nginx启动时传递进来的参数数据
-char           **ngx_argv;           //通过分配额外的空间保存nginx启动时传递进来的参数（由于改进程名的需要）
-char           **ngx_os_argv;        //保存nginx启动时传递进来的参数（由于改进程名的需要，其所指向的值可能发生改变）
+int              ngx_argc;           //保存nginx启动时传递进来的参数数据的个数
+char           **ngx_argv;           //通过分配额外的空间保存nginx启动时传递进来的参数（由于某些系统改进程名的需要）
+char           **ngx_os_argv;        //保存nginx启动时传递进来的参数（由于某些系统改进程名的需要，其所指向的值可能发生改变）
 
 ngx_int_t        ngx_process_slot;   //
 ngx_socket_t     ngx_channel;
