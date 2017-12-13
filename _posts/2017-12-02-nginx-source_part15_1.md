@@ -209,13 +209,93 @@ if (ngx_processes[i].just_spawn) {
         ngx_processes[i].just_spawn = 0;
         continue;
     }
-</bre>
+</pre>
 上面的```NGX_PROCESS_JUST_RESPAWN```会设置ngx_processes[s].just_spawn=1。
 
 
+## 2. 相关函数声明
+{% highlight string %}
+#define ngx_getpid   getpid
+
+#ifndef ngx_log_pid
+#define ngx_log_pid  ngx_pid
+#endif
 
 
+ngx_pid_t ngx_spawn_process(ngx_cycle_t *cycle,
+    ngx_spawn_proc_pt proc, void *data, char *name, ngx_int_t respawn);
+ngx_pid_t ngx_execute(ngx_cycle_t *cycle, ngx_exec_ctx_t *ctx);
+ngx_int_t ngx_init_signals(ngx_log_t *log);
+void ngx_debug_point(void);
 
+
+#if (NGX_HAVE_SCHED_YIELD)
+#define ngx_sched_yield()  sched_yield()
+#else
+#define ngx_sched_yield()  usleep(1)
+#endif
+{% endhighlight %}
+
+ngx_log_pid这里被定义为ngx_pid， 其(ngx_pid)在os/unix/ngx_process_cycle.c文件中定义，并在nginx初始化时将该全局变量设置为主进程的进程ID。
+
+
+<pre>
+//1: 用于产生一个子进程
+ngx_pid_t ngx_spawn_process(ngx_cycle_t *cycle,
+    ngx_spawn_proc_pt proc, void *data, char *name, ngx_int_t respawn);
+
+//2: 产生一个子进程并用exec函数族替换该子进程
+ngx_pid_t ngx_execute(ngx_cycle_t *cycle, ngx_exec_ctx_t *ctx);
+
+//3: 初始化nginx中相关的信号处理
+ngx_int_t ngx_init_signals(ngx_log_t *log);
+
+//4: 设置一些程序的调试点（主要是为了方便在调试时定为一些严重的错误）
+void ngx_debug_point(void);
+</pre>
+
+在ngx_auto_config.h头文件中，我们有如下定义：
+<pre>
+#ifndef NGX_HAVE_SCHED_YIELD
+#define NGX_HAVE_SCHED_YIELD  1
+#endif
+</pre>
+
+
+## 3. 相关变量声明
+{% highlight string %}
+extern int            ngx_argc;
+extern char         **ngx_argv;
+extern char         **ngx_os_argv;
+
+extern ngx_pid_t      ngx_pid;
+extern ngx_socket_t   ngx_channel;
+extern ngx_int_t      ngx_process_slot;
+extern ngx_int_t      ngx_last_process;
+extern ngx_process_t  ngx_processes[NGX_MAX_PROCESSES];
+{% endhighlight %}
+如上除```ngx_pid```均定义在os/unix/ngx_process.c文件中：
+<pre>
+int              ngx_argc;           //保存nginx启动时传递进来的参数数据
+char           **ngx_argv;           //通过分配额外的空间保存nginx启动时传递进来的参数（由于改进程名的需要）
+char           **ngx_os_argv;        //保存nginx启动时传递进来的参数（由于改进程名的需要，其所指向的值可能发生改变）
+
+ngx_int_t        ngx_process_slot;   //
+ngx_socket_t     ngx_channel;
+ngx_int_t        ngx_last_process;
+ngx_process_t    ngx_processes[NGX_MAX_PROCESSES];
+</pre>
+
+* ngx_process_slot: 主要用于记录子进程ngx_process_t所表示的环境表存放在数组ngx_processes中的哪一个索引处，其会随着fork()函数自动传递给该子进程。
+
+* ngx_channel: 主要用于记录子进程与父进程进行通信的channel号，其会随着fork()函数自动传递给子进程。
+
+* ngx_last_process: 主要用于记录当前ngx_processes数组的最高下标的下一个位置，其也会随着fork()函数自动传递给子进程。例如，目前我们使用了ngx_processes数组的第0，1，3，5，7个位置，那么ngx_last_process则等于8。
+
+* ngx_processes: 当前所有进程的进程环境表。
+
+
+**说明：**由于改进程名的需要，这里延伸出ngx_argv与ngx_os_argv。对于FreeBSD, NetBSD, OpenBSD等操作系统，由于其原生支持setproctitle()，则可能没有这样的问题。参看：os/unix/ngx_setproctitle.h文件
 
 
 
