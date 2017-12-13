@@ -52,8 +52,8 @@ typedef struct {
     unsigned            respawn:1;        //对这些标示，我们下面会做详细介绍
     unsigned            just_spawn:1;     
     unsigned            detached:1;       
-    unsigned            exiting:1;        
-    unsigned            exited:1;        
+    unsigned            exiting:1;        //表明该进程处于正在退出状态
+    unsigned            exited:1;         //表明该进程已经退出了
 } ngx_process_t;
 
 
