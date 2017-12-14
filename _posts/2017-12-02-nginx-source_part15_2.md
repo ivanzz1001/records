@@ -158,7 +158,7 @@ ngx_signal_t  signals[] = {
 * NGX_NOACCEPT_SIGNAL: 对应的实际信号为SIGWINCH，作用请看如下：
 
 1) 如果收到本信号的当前进程为以后台方式工作的master进程，则master进程中将ngx_noaccept置为1，然后向worker进程发送shutdown信号，停止接收外部连接优雅的停止worker进程，参看os/unix/ngx_process_cycle.c:
-<pre>
+{% highlight string %}
 void
 ngx_master_process_cycle(ngx_cycle_t *cycle)
 {
@@ -171,14 +171,12 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
         }
    ...
 }
-
-</pre>
+{% endhighlight %}
 
 2) 如果当前nginx是以单进程方式工作，且正以后台话方式运行，收到此信号其实不会受到任何影响
 
 3) 如果收到本信号的worker进程(NGX_PROCESS_WORKER)或者辅助进程（NGX_PROCESS_HELPER），且当前nginx是以daemonized方式工作，则会优雅的停止该worker进程或辅助进程，同时退出时执行ngx_debug_point()，暗示非正常退出。参看os/unix/ngx_process.c:
-<pre>
-case NGX_PROCESS_WORKER:
+{% highlight string %}
 void
 ngx_signal_handler(int signo)
 {
@@ -203,8 +201,7 @@ ngx_signal_handler(int signo)
 
     ....
 }
-
-</pre>
+{% endhighlight string %}
 
 
 
