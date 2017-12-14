@@ -155,9 +155,71 @@ ngx_signal_t  signals[] = {
 #endif
 </pre>
 
-* NGX_NOACCEPT_SIGNAL: 如果当前nginx已经后台化(daemonized)，对于nginx master进程和worker进程而言，
+* NGX_NOACCEPT_SIGNAL: 对应的实际信号为SIGWINCH，作用请看如下：
+
+1) 如果收到本信号的当前进程为以后台方式工作的master进程，则master进程中将ngx_noaccept置为1，然后向worker进程发送shutdown信号，停止接收外部连接优雅的停止worker进程，参看os/unix/ngx_process_cycle.c:
+<pre>
+void
+ngx_master_process_cycle(ngx_cycle_t *cycle)
+{
+   ....
+    if (ngx_noaccept) {
+            ngx_noaccept = 0;
+            ngx_noaccepting = 1;
+            ngx_signal_worker_processes(cycle,
+                                        ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
+        }
+   ...
+}
+
+</pre>
+
+2) 如果当前nginx是以单进程方式工作，且正以后台话方式运行，收到此信号其实不会受到任何影响
+
+3) 如果收到本信号的worker进程(NGX_PROCESS_WORKER)或者辅助进程（NGX_PROCESS_HELPER），且当前nginx是以daemonized方式工作，则会优雅的停止该worker进程或辅助进程，同时退出时执行ngx_debug_point()，暗示非正常退出。参看os/unix/ngx_process.c:
+<pre>
+case NGX_PROCESS_WORKER:
+void
+ngx_signal_handler(int signo)
+{
+    ....
+
+    case NGX_PROCESS_WORKER:
+    case NGX_PROCESS_HELPER:
+        switch (signo) {
+
+        case ngx_signal_value(NGX_NOACCEPT_SIGNAL):
+            if (!ngx_daemonized) {
+                break;
+            }
+            ngx_debug_quit = 1;                       //注意此处没有break
+        case ngx_signal_value(NGX_SHUTDOWN_SIGNAL):
+            ngx_quit = 1;
+            action = ", shutting down";
+            break;
+
+        ...
+       }
+
+    ....
+}
+
+</pre>
 
 
+
+
+
+
+
+
+<br />
+<br />
+**[参考]:**
+
+1. [nginx 进程的类型](http://blog.csdn.net/benbendy1984/article/details/6008581)
+
+2. [初识nginx——配置解析篇](https://www.cnblogs.com/magicsoar/p/5817734.html)
 
 
 <br />
