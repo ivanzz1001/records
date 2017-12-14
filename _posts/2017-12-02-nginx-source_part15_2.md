@@ -144,9 +144,9 @@ ngx_signal_t  signals[] = {
 
 这里signals数组定义了nginx中要处理的所有信号：
 
-* NGX_RECONFIGURE_SIGNAL: 这里用作nginx重新读取配置文件，对应的实际信号为SIGHUP。
+* **NGX_RECONFIGURE_SIGNAL:** 这里用作nginx重新读取配置文件，对应的实际信号为SIGHUP。
 
-* NGX_REOPEN_SIGNAL： 这里用作nginx的日志文件回滚，对应的实际信号为：
+* **NGX_REOPEN_SIGNAL:** 这里用作nginx的日志文件回滚，对应的实际信号为：
 <pre>
 #if (NGX_LINUXTHREADS)
 #define NGX_REOPEN_SIGNAL        INFO
@@ -155,7 +155,7 @@ ngx_signal_t  signals[] = {
 #endif
 </pre>
 
-* NGX_NOACCEPT_SIGNAL: 对应的实际信号为SIGWINCH，作用请看如下：
+* **NGX_NOACCEPT_SIGNAL:** 对应的实际信号为SIGWINCH，作用请看如下：
 
 1) 如果收到本信号的当前进程为以后台方式工作的master进程，则master进程中将ngx_noaccept置为1，然后向worker进程发送shutdown信号，停止接收外部连接优雅的停止worker进程，参看os/unix/ngx_process_cycle.c:
 {% highlight string %}
@@ -204,9 +204,44 @@ ngx_signal_handler(int signo)
 {% endhighlight string %}
 
 
+* **NGX_TERMINATE_SIGNAL:** 对应的实际信号为TERM。
+
+1) nginx master收到此信号时，会向所有子进程发送TERM信号，通知子进程退出（子进程快速退出）。并在所有子进程退出后，master进程也退出。
+
+2) 单进程方式工作的nginx也会快速退出
+
+3) 工作进程或者辅助进程收到此信号时，会自行快速退出。
 
 
+* **NGX_SHUTDOWN_SIGNAL:** 对应的实际信号为SIGQUIT。
 
+1） nginx master收到此信号时，会向所有子进程发送QUIT信号，通知子进程在处理完成目前的任务之后优雅的退出。并在所有子进程退出后，master进程也退出
+
+2）单进程方式工作的nginx收到此信号执行相应的退出动作。
+
+3) 工作进程或者辅助进程收到此信号，会自行优雅的退出。
+
+
+* **NGX_CHANGEBIN_SIGNAL:** 这里用作Nginx平滑升级，对应的实际信号为：
+<pre>
+#if (NGX_LINUXTHREADS)
+#define NGX_CHANGEBIN_SIGNAL     XCPU
+#else
+#define NGX_CHANGEBIN_SIGNAL     USR2
+#endif
+</pre>
+
+* **SIGALRM:** 主要是用于nginx master收到TERM信号退出时的一个计时操作
+
+* **SIGINT:** 同上面NGX_TERMINATE_SIGNAL
+
+* **SIGGIO:** 暂时只是设置ngx_sigio为1，不会显著产生什么作用。参看[Nginx 源代码笔记 - SIGIO](http://ialloc.org/posts/2014/08/03/ngx-notes-sigio/)
+
+* **SIGCHLD:** 子进程退出时会向父进程返回相应的信号，此时父进程会做相应的清理操作。
+
+* **SIGSYS:** 信号被忽略
+
+* **SIGPIPE:** 信号被忽略
 
 
 
@@ -218,6 +253,7 @@ ngx_signal_handler(int signo)
 
 2. [初识nginx——配置解析篇](https://www.cnblogs.com/magicsoar/p/5817734.html)
 
+3. [Nginx源码分析 - 主流程篇 - 解析配置文件](http://blog.csdn.net/initphp/article/details/51911189)
 
 <br />
 <br />
