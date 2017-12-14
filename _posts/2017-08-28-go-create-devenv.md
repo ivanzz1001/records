@@ -28,6 +28,10 @@ description: go开发环境的搭建
 ![go-env](https://ivanzz1001.github.io/records/assets/img/go/go-env.png)
 
 
+IDE工具：**JetBrains Gogland**
+
+画图工具: EDraw
+
 
 
 <br />
