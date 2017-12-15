@@ -424,6 +424,54 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
 ![ngx-processes](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_processes.jpg)
 
 
+**1) 查找新进程的在ngx_processes数组中的存放位置**
+{% highlight string %}
+ngx_pid_t
+ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
+    char *name, ngx_int_t respawn)
+{
+    ...
+
+    if (respawn >= 0) {
+        s = respawn;
+
+    } else {
+        for (s = 0; s < ngx_last_process; s++) {
+            if (ngx_processes[s].pid == -1) {
+                break;
+            }
+        }
+
+        if (s == NGX_MAX_PROCESSES) {
+            ngx_log_error(NGX_LOG_ALERT, cycle->log, 0,
+                          "no more than %d processes can be spawned",
+                          NGX_MAX_PROCESSES);
+            return NGX_INVALID_PID;
+        }
+    }
+   ....
+}
+{% endhighlight %}
+
+这里当respawn参数大于等于0时，直接将respawn索引处存放新生成进程的ngx_process_t；否则在进程表中查找到一个合适的位置保存。
+
+**2) 生成父子进程通信的channel**
+
+如果将要生成的子进程为```NGX_PROCESS_DETACHED```类型，因为其最后是要通过exec函数族替换子进程的，所以这里不需要通过channel来通信，直接将channel[0-1]置为-1；如果为其他类型的子进程，则按如下方式产生并设置channel:
+
+* socketpair()产生unix域的流式socket
+
+* 设置channel[0]非阻塞(此fd在父进程中使用）
+
+* 设置channel[1]非阻塞(此fd通过后续的fork自动传递给子进程，在子进程中使用）
+
+* 设置channel[0]为FIOASYNC
+
+* 设置channel[0]的OWNER为当前进程的pid
+
+* 设置channel[0]属性为FD_CLOEXEC，这用于指示在执行exec函数族时关闭对应的文件描述符.
+
+* 设置channel[1]属性为FD_CLOEXEC，这用于指示在执行exec函数族时关闭对应的文件描述符.
 
 
 
