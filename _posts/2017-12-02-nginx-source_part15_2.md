@@ -467,12 +467,22 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
 
 * 设置channel[0]为FIOASYNC
 
+本标志fcntl及open的O_ASYNC标志等效，用于使能signal-driven I/O: 当此文件描述符变得可读或可写时就会产生相应的信号。本特征只针对终端、伪终端、socket、pipe和FIFO有效。（pipe及FIFO从Linux 2.6版本开始才起作用）
+
+参看：
+ 
+1. [SIGIO](http://blog.csdn.net/leamonl/article/details/4726480)
+
+2. [ioctl](https://baike.baidu.com/item/ioctl/6392403)
+
+
 * 设置channel[0]的OWNER为当前进程的pid
 
 * 设置channel[0]属性为FD_CLOEXEC，这用于指示在执行exec函数族时关闭对应的文件描述符.
 
 * 设置channel[1]属性为FD_CLOEXEC，这用于指示在执行exec函数族时关闭对应的文件描述符.
 
+参看: [执行时关闭标识位 FD_CLOEXEC 的作用](https://www.cnblogs.com/sunrisezhang/p/4113500.html)
 
 
 <br />
