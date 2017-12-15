@@ -150,7 +150,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 }
 {% endhighlight %}
 
-* NGX_PROCESS_DETACHED: 热代码替换。
+* NGX_PROCESS_DETACHED: 热代码替换(这里通过exec函数族替换当前进程)。
 <pre>
 请参看os/unix/ngx_process.c：
 
@@ -288,7 +288,7 @@ ngx_process_t    ngx_processes[NGX_MAX_PROCESSES];
 
 * ngx_process_slot: 主要用于记录子进程ngx_process_t所表示的环境表存放在数组ngx_processes中的哪一个索引处，其会随着fork()函数自动传递给该子进程。
 
-* ngx_channel: 主要用于记录子进程与父进程进行通信的channel号，其会随着fork()函数自动传递给子进程。
+* ngx_channel: 主要用于记录子进程与父进程进行通信的channel号，其会随着fork()函数自动传递给子进程(保存socketpair()产生的channel[1]，以自动的告诉子进程通过channel[1]与父进程中的channel[0]进行通信）。
 
 * ngx_last_process: 主要用于记录当前ngx_processes数组的最高下标的下一个位置，其也会随着fork()函数自动传递给子进程。例如，目前我们使用了ngx_processes数组的第0，1，3，5，7个位置，那么ngx_last_process则等于8。
 
