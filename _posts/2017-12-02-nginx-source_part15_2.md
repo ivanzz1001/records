@@ -467,13 +467,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
 
 * 设置channel[0]为FIOASYNC
 
-本标志fcntl及open的O_ASYNC标志等效，用于使能signal-driven I/O: 当此文件描述符变得可读或可写时就会产生相应的信号。本特征只针对终端、伪终端、socket、pipe和FIFO有效。（pipe及FIFO从Linux 2.6版本开始才起作用）
-
-参看：
- 
-1. [SIGIO](http://blog.csdn.net/leamonl/article/details/4726480)
-
-2. [ioctl](https://baike.baidu.com/item/ioctl/6392403)
+本标志fcntl及open的O_ASYNC标志等效，用于使能signal-driven I/O: 当此文件描述符变得可读或可写时就会产生相应的信号。本特征只针对终端、伪终端、socket、pipe和FIFO有效。（pipe及FIFO从Linux 2.6版本开始才起作用）参看：1. [SIGIO](http://blog.csdn.net/leamonl/article/details/4726480) 2. [ioctl](https://baike.baidu.com/item/ioctl/6392403)
 
 
 * 设置channel[0]的OWNER为当前进程的pid
@@ -483,6 +477,65 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
 * 设置channel[1]属性为FD_CLOEXEC，这用于指示在执行exec函数族时关闭对应的文件描述符.
 
 参看: [执行时关闭标识位 FD_CLOEXEC 的作用](https://www.cnblogs.com/sunrisezhang/p/4113500.html)
+
+<br />
+
+**3）产生子进程**
+{% highlight string %}
+pid = fork();
+
+switch (pid) {
+
+case -1:
+    ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                  "fork() failed while spawning \"%s\"", name);
+    ngx_close_channel(ngx_processes[s].channel, cycle->log);
+    return NGX_INVALID_PID;
+
+case 0:
+    ngx_pid = ngx_getpid();
+    proc(cycle, data);
+    break;
+
+default:
+    break;
+}
+{% endhighlight %}
+上面执行fork()函数产生子进程，子进程执行相应的回调函数。
+
+**4) 在进程表中登记相应的子进程信息**
+
+这里再次列出ngx_process_t数据结构，方便对照：
+{% highlight string %}
+typedef struct {
+    ngx_pid_t           pid;
+    int                 status;
+    ngx_socket_t        channel[2];
+
+    ngx_spawn_proc_pt   proc;
+    void               *data;
+    char               *name;
+
+    unsigned            respawn:1;
+    unsigned            just_spawn:1;
+    unsigned            detached:1;
+    unsigned            exiting:1;
+    unsigned            exited:1;
+} ngx_process_t;
+{% endhighlight %}
+
+这里注意一下当```respawn>=0```,这种情况一般是重启某一个子进程，此时一般设置完pid之后，就可以直接返回，其他的信息直接复用上一次的即可：
+{% highlight string %}
+ngx_processes[s].pid = pid;
+ngx_processes[s].exited = 0;
+
+if (respawn >= 0) {
+    return pid;
+}
+{% endhighlight %}
+
+
+
 
 
 <br />

@@ -42,7 +42,7 @@ typedef void (*ngx_spawn_proc_pt) (ngx_cycle_t *cycle, void *data);
 
 typedef struct {
     ngx_pid_t           pid;              //代表该进程PID
-    int                 status;           //
+    int                 status;           //用于保存子进程的退出状态
     ngx_socket_t        channel[2];       //进程的channel，通过socketpair来创建
 
     ngx_spawn_proc_pt   proc;             //进程的初始化函数，在每次创建完worker进程时调用
