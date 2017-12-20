@@ -59,6 +59,46 @@ description: Linux命令行与shell脚本
 </pre>
 
 
+## 2. shell字符串处理的掐头去尾法则
+
+```#```表示掐头， ```%```表示去尾.(助记: 键盘的排列上，# 在前面， %在后面)
+
+当个```#```或```%```表示最小匹配，双个```#```或```%```表示最大匹配。也就是说，当匹配有多种方案的时候，选择匹配最大程度还是最小长度。
+ 
+例如：
+{% highlight string %}
+[root@localhost test-src]# workspace=/home/user/test.txt
+
+(下面%/*最小匹配会去除/test.txt)
+[root@localhost test-src]# fullpath=${workspace%/*}
+[root@localhost test-src]# echo $fullpath
+/home/user
+
+(而%%/*会去除最长字符串)
+[root@localhost test-src]# base=${workspace%%/*}
+[root@localhost test-src]# echo $base            //整个字符串都被去除了
+
+(下面掐掉fullpath头部)
+[root@localhost test-src]# name=${workspace#*"${fullpath}"/}
+[root@localhost test-src]# echo $name
+test.txt
+
+(下面对比一下最小匹配与最大匹配)
+[root@localhost test-src]# test1=${workspace#*/}
+[root@localhost test-src]# echo $test1
+home/user/test.txt
+[root@localhost test-src]# test2=${workspace##*/}
+[root@localhost test-src]# echo $test2
+test.txt
+{% endhighlight %}
+
+
+
+
+
+
+
+
 <br />
 <br />
 <br />
