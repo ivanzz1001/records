@@ -467,7 +467,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
 
 * 设置channel[0]为FIOASYNC
 
-本标志fcntl及open的O_ASYNC标志等效，用于使能signal-driven I/O: 当此文件描述符变得可读或可写时就会产生相应的信号。本特征只针对终端、伪终端、socket、pipe和FIFO有效。（pipe及FIFO从Linux 2.6版本开始才起作用）参看：1. [SIGIO](http://blog.csdn.net/leamonl/article/details/4726480) 2. [ioctl](https://baike.baidu.com/item/ioctl/6392403)
+本标志fcntl及open的O_ASYNC标志等效，用于使能signal-driven I/O: 当此文件描述符变得可读或可写时就会产生相应的信号。本特征只针对终端、伪终端、socket、pipe和FIFO有效。（pipe及FIFO从Linux 2.6版本开始才起作用）参看：1. [SIGIO用法](http://blog.csdn.net/leamonl/article/details/4726480) 2. [ioctl的使用](https://baike.baidu.com/item/ioctl/6392403)
 
 
 * 设置channel[0]的OWNER为当前进程的pid

@@ -91,7 +91,7 @@ nginx master与worker进程之间使用unix套接字进行通信： nginx在创�
 </pre>
 下面介绍这些标示：
 
-* NGX_PROCESS_NORESPAWN: 子进程退出时，父进程不会再次创建，该标记用在创建"cache loader process"。
+* **NGX_PROCESS_NORESPAWN:** 子进程退出时，父进程不会再次创建，该标记用在创建"cache loader process"。
 <pre>
 请参看os/unix/ngx_process_cycle.c:
 
@@ -99,7 +99,7 @@ static void
 ngx_start_cache_manager_processes(ngx_cycle_t *cycle, ngx_uint_t respawn)
 </pre>
 
-* NGX_PROCESS_JUST_SPAWN: 当```nginx -s reload```时，如果还有未加载的proxy_cache_path，则需要再次创建"cache loader process"加载，并用NGX_PROCESS_JUST_SPAWN给这个进程做记号。防止nginx master向**老的worker进程、老的cache manager进程、老的cache loader进程（如果存在）**发送NGX_CMD_QUIT或SIGQUIT时，误以为我们新创建的"cache loader process"是原来老旧的，而将其错误的杀掉。
+* **NGX_PROCESS_JUST_SPAWN:** 当```nginx -s reload```时，如果还有未加载的proxy_cache_path，则需要再次创建"cache loader process"加载，并用NGX_PROCESS_JUST_SPAWN给这个进程做记号。防止nginx master向**老的worker进程、老的cache manager进程、老的cache loader进程（如果存在）**发送NGX_CMD_QUIT或SIGQUIT时，误以为我们新创建的"cache loader process"是原来老旧的，而将其错误的杀掉。
 {% highlight string %}
 请参看 os/unix/ngx_process_cycle.c:
 
@@ -123,9 +123,9 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 }
 {% endhighlight %}
 
-*  NGX_PROCESS_RESPAWN: 子进程异常退出时，master会重新创建它，如当worker或```cache manager process```异常退出时，父进程会重新创建它。
+* **NGX_PROCESS_RESPAWN:** 子进程异常退出时，master会重新创建它，如当worker或```cache manager process```异常退出时，父进程会重新创建它。
 
-* NGX_PROCESS_JUST_RESPAWN: 当```nginx -s reload```时，master会向老的```worker进程```，**老的cache manager process，老的cache loader process(如果存在)**发送ngx_write_channel(NGX_CMD_QUIT)(如果失败则发送SIGQUIT信号）。NGX_PROCESS_JUST_RESPAWN用来标记进程数组中哪些是新创建的子进程，而其他的就是属于老的子进程。
+* **NGX_PROCESS_JUST_RESPAWN:** 当```nginx -s reload```时，master会向老的```worker进程```，**老的cache manager process，老的cache loader process(如果存在)**发送ngx_write_channel(NGX_CMD_QUIT)(如果失败则发送SIGQUIT信号）。NGX_PROCESS_JUST_RESPAWN用来标记进程数组中哪些是新创建的子进程，而其他的就是属于老的子进程。
 {% highlight string %}
 请参看 os/unix/ngx_process_cycle.c:
 
@@ -150,7 +150,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 }
 {% endhighlight %}
 
-* NGX_PROCESS_DETACHED: 热代码替换(这里通过exec函数族替换当前进程)。
+* **NGX_PROCESS_DETACHED:** 热代码替换(这里通过exec函数族替换当前进程)。
 <pre>
 请参看os/unix/ngx_process.c：
 
