@@ -570,6 +570,83 @@ ngx_processes[s].just_spawn = 0;
 ngx_processes[s].detached = 1;
 </pre>
 
+## 4. 函数ngx_execute()与ngx_execute_proc()
+{% highlight string %}
+ngx_pid_t
+ngx_execute(ngx_cycle_t *cycle, ngx_exec_ctx_t *ctx)
+{
+    return ngx_spawn_process(cycle, ngx_execute_proc, ctx, ctx->name,
+                             NGX_PROCESS_DETACHED);
+}
+
+
+static void
+ngx_execute_proc(ngx_cycle_t *cycle, void *data)
+{
+    ngx_exec_ctx_t  *ctx = data;
+
+    if (execve(ctx->path, ctx->argv, ctx->envp) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                      "execve() failed while executing %s \"%s\"",
+                      ctx->name, ctx->path);
+    }
+
+    exit(1);
+}
+{% endhighlight %}
+
+这里ngx_execute()主要是用于产生一个子进程，然后调用exec函数族执行一个可执行文件，以替换当前子进程。主要用于nginx的热升级。
+
+exec函数族主要有如下函数：
+{% highlight string %}
+#include <unistd.h>
+
+extern char **environ;
+
+int execl(const char *path, const char *arg, ...);
+int execlp(const char *file, const char *arg, ...);
+int execle(const char *path, const char *arg,
+          ..., char * const envp[]);
+int execv(const char *path, char *const argv[]);
+int execvp(const char *file, char *const argv[]);
+int execvpe(const char *file, char *const argv[],
+           char *const envp[]);
+{% endhighlight %}
+
+参看：[linux系统编程之进程（五）：exec系列函数](https://www.cnblogs.com/mickole/p/3187409.html)
+
+
+## 5. 函数ngx_init_signals()
+{% highlight string %}
+ngx_int_t
+ngx_init_signals(ngx_log_t *log)
+{
+    ngx_signal_t      *sig;
+    struct sigaction   sa;
+
+    for (sig = signals; sig->signo != 0; sig++) {
+        ngx_memzero(&sa, sizeof(struct sigaction));
+        sa.sa_handler = sig->handler;
+        sigemptyset(&sa.sa_mask);
+        if (sigaction(sig->signo, &sa, NULL) == -1) {
+#if (NGX_VALGRIND)
+            ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
+                          "sigaction(%s) failed, ignored", sig->signame);
+#else
+            ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
+                          "sigaction(%s) failed", sig->signame);
+            return NGX_ERROR;
+#endif
+        }
+    }
+
+    return NGX_OK;
+}
+{% endhighlight %}
+
+
+
+
 
 
 
