@@ -809,7 +809,7 @@ ngx_signal_handler(int signo)
 }
 {% endhighlight %}
 
-这里我们先介绍一下整体的信号处理流程：
+这里我们先介绍一下整体的信号处理流程。关于具体的某一个信号的处理，我们后面会进行介绍。关于```NGX_CHANGEBIN_SIGNAL```热替换信号，我们这里做一个简单说明： 从shell控制台运行的nginx，其master进程的父进程ID(ppid)为```1```。
 {% highlight string %}
 void
 ngx_signal_handler(int signo)
@@ -842,7 +842,6 @@ ngx_signal_handler(int signo)
     //6: 恢复ngx_errno
 }
 {% endhighlight %}
-关于具体的某一个信号的处理，我们后面会进行介绍。关于```NGX_CHANGEBIN_SIGNAL```热替换信号，我们这里做一个简单说明： 从shell控制台运行的nginx，其master进程的父进程ID(ppid)为```1```。
 
 
 
