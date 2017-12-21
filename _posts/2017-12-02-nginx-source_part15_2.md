@@ -809,7 +809,40 @@ ngx_signal_handler(int signo)
 }
 {% endhighlight %}
 
+这里我们先介绍一下整体的信号处理流程：
+{% highlight string %}
+void
+ngx_signal_handler(int signo)
+{
+    //1: 保留当前ngx_errno
 
+    //2: 从signals全局数组中找到该信号
+
+    //3: 更新nginx中缓存的一些时间
+
+    //4: 对信号按进程类型、信号类型来处理
+    switch(ngx_process)
+    {
+       case NGX_PROCESS_MASTER:
+       case NGX_PROCESS_SINGLE:
+           switch(signo)
+           {
+           }
+          break;
+       case NGX_PROCESS_WORKER:
+       case NGX_PROCESS_HELPER:
+           switch(signo)
+           {
+           }
+         break;
+    }
+  
+    //5: 对于SIGCHLD信号，调用ngx_process_get_status(void)获得子进程退出状态
+
+    //6: 恢复ngx_errno
+}
+{% endhighlight %}
+关于具体的某一个信号的处理，我们后面会进行介绍。关于```NGX_CHANGEBIN_SIGNAL```热替换信号，我们这里做一个简单说明：
 
 
 
