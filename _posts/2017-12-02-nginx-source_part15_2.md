@@ -643,11 +643,171 @@ ngx_init_signals(ngx_log_t *log)
     return NGX_OK;
 }
 {% endhighlight %}
+这里主要是为signals数组中的每一个信号通过sigaction()函数装载对应的处理函数。sigaction()函数原型如下：
+{% highlight string %}
+#include <signal.h>
+
+int sigaction(int signum, const struct sigaction *act,
+             struct sigaction *oldact);
+
+struct sigaction {
+   void     (*sa_handler)(int);
+   void     (*sa_sigaction)(int, siginfo_t *, void *);
+   sigset_t   sa_mask;      //指定在信号处理过程中，哪些信号应当被阻塞。缺省情况下当前信号本身被阻塞
+   int        sa_flags;
+   void     (*sa_restorer)(void);
+};
+{% endhighlight %}
+可以用sigaction()函数装载除```SIGKILL```和```SIGSTOP```之外的信号的处理函数。一般通过fork()函数产生的子进程会继承父进程的信号处理。而在执行execve()函数期间，先前被处理的信号会恢复默认；原来被忽略的信号维持不变。
 
 
+参看： [linux下的struct sigaction](http://blog.csdn.net/a511244213/article/details/45146987)
 
 
+## 6. 函数ngx_signal_handler()
+{% highlight string %}
+void
+ngx_signal_handler(int signo)
+{
+    char            *action;
+    ngx_int_t        ignore;
+    ngx_err_t        err;
+    ngx_signal_t    *sig;
 
+    ignore = 0;
+
+    err = ngx_errno;
+
+    for (sig = signals; sig->signo != 0; sig++) {
+        if (sig->signo == signo) {
+            break;
+        }
+    }
+
+    ngx_time_sigsafe_update();
+
+    action = "";
+
+    switch (ngx_process) {
+
+    case NGX_PROCESS_MASTER:
+    case NGX_PROCESS_SINGLE:
+        switch (signo) {
+
+        case ngx_signal_value(NGX_SHUTDOWN_SIGNAL):
+            ngx_quit = 1;
+            action = ", shutting down";
+            break;
+
+        case ngx_signal_value(NGX_TERMINATE_SIGNAL):
+        case SIGINT:
+            ngx_terminate = 1;
+            action = ", exiting";
+            break;
+
+        case ngx_signal_value(NGX_NOACCEPT_SIGNAL):
+            if (ngx_daemonized) {
+                ngx_noaccept = 1;
+                action = ", stop accepting connections";
+            }
+            break;
+
+        case ngx_signal_value(NGX_RECONFIGURE_SIGNAL):
+            ngx_reconfigure = 1;
+            action = ", reconfiguring";
+            break;
+
+        case ngx_signal_value(NGX_REOPEN_SIGNAL):
+            ngx_reopen = 1;
+            action = ", reopening logs";
+            break;
+
+        case ngx_signal_value(NGX_CHANGEBIN_SIGNAL):
+            if (getppid() > 1 || ngx_new_binary > 0) {
+
+                /*
+                 * Ignore the signal in the new binary if its parent is
+                 * not the init process, i.e. the old binary's process
+                 * is still running.  Or ignore the signal in the old binary's
+                 * process if the new binary's process is already running.
+                 */
+
+                action = ", ignoring";
+                ignore = 1;
+                break;
+            }
+
+            ngx_change_binary = 1;
+            action = ", changing binary";
+            break;
+
+        case SIGALRM:
+            ngx_sigalrm = 1;
+            break;
+
+        case SIGIO:
+            ngx_sigio = 1;
+            break;
+
+        case SIGCHLD:
+            ngx_reap = 1;
+            break;
+        }
+
+        break;
+
+    case NGX_PROCESS_WORKER:
+    case NGX_PROCESS_HELPER:
+        switch (signo) {
+
+        case ngx_signal_value(NGX_NOACCEPT_SIGNAL):
+            if (!ngx_daemonized) {
+                break;
+            }
+            ngx_debug_quit = 1;
+        case ngx_signal_value(NGX_SHUTDOWN_SIGNAL):
+            ngx_quit = 1;
+            action = ", shutting down";
+            break;
+
+        case ngx_signal_value(NGX_TERMINATE_SIGNAL):
+        case SIGINT:
+            ngx_terminate = 1;
+            action = ", exiting";
+            break;
+
+        case ngx_signal_value(NGX_REOPEN_SIGNAL):
+            ngx_reopen = 1;
+            action = ", reopening logs";
+            break;
+
+        case ngx_signal_value(NGX_RECONFIGURE_SIGNAL):
+        case ngx_signal_value(NGX_CHANGEBIN_SIGNAL):
+        case SIGIO:
+            action = ", ignoring";
+            break;
+        }
+
+        break;
+    }
+
+    ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0,
+                  "signal %d (%s) received%s", signo, sig->signame, action);
+
+    if (ignore) {
+        ngx_log_error(NGX_LOG_CRIT, ngx_cycle->log, 0,
+                      "the changing binary signal is ignored: "
+                      "you should shutdown or terminate "
+                      "before either old or new binary's process");
+    }
+
+    if (signo == SIGCHLD) {
+        ngx_process_get_status();
+    }
+
+    ngx_set_errno(err);
+}
+{% endhighlight %}
 
 
 <br />
