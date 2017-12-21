@@ -516,8 +516,8 @@ typedef struct {
     void               *data;
     char               *name;
 
-    unsigned            respawn:1;
-    unsigned            just_spawn:1;
+    unsigned            respawn:1;                   //表明该进程退出后要不要再进行重启
+    unsigned            just_spawn:1;                //表明该进程是否为刚刚建立的进程，以此作为与原来旧进程的区隔
     unsigned            detached:1;
     unsigned            exiting:1;
     unsigned            exited:1;
@@ -533,7 +533,42 @@ if (respawn >= 0) {
     return pid;
 }
 {% endhighlight %}
+下面我们再列出各种类型子进程相应flag的设置：
 
+* **NGX_PROCESS_NORESPAWN:**
+<pre>
+ngx_processes[s].respawn = 0;
+ngx_processes[s].just_spawn = 0;
+ngx_processes[s].detached = 0;
+</pre>
+
+* **NGX_PROCESS_JUST_SPAWN:**
+<pre>
+ngx_processes[s].respawn = 0;
+ngx_processes[s].just_spawn = 1;
+ngx_processes[s].detached = 0;
+</pre>
+
+* **NGX_PROCESS_RESPAWN:**
+<pre>
+ngx_processes[s].respawn = 1;
+ngx_processes[s].just_spawn = 0;
+ngx_processes[s].detached = 0;
+</pre>
+
+* **NGX_PROCESS_JUST_RESPAWN:**
+<pre>
+ngx_processes[s].respawn = 1;
+ngx_processes[s].just_spawn = 1;
+ngx_processes[s].detached = 0;
+</pre>
+
+* **NGX_PROCESS_DETACHED:**
+<pre>
+ngx_processes[s].respawn = 0;
+ngx_processes[s].just_spawn = 0;
+ngx_processes[s].detached = 1;
+</pre>
 
 
 
