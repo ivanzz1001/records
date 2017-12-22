@@ -663,6 +663,39 @@ struct sigaction {
 
 参看： [linux下的struct sigaction](http://blog.csdn.net/a511244213/article/details/45146987)
 
+下面给出一个打印```sa_flags```所有值的程序test.c:
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <unistd.h>
+
+int main(int argc,char *argv[])
+{
+     printf("SA_NOCLDSTOP:%u\n",SA_NOCLDSTOP);
+     printf("SA_NOCLDWAIT:%u\n",SA_NOCLDWAIT);
+     printf("SA_NODEFER:%u\n",SA_NODEFER);
+     printf("SA_ONSTACK:%u\n",SA_ONSTACK);
+     printf("SA_RESETHAND:%u\n",SA_RESETHAND);
+     printf("SA_RESTART:%u\n",SA_RESTART);
+     printf("SA_SIGINFO:%u\n",SA_SIGINFO);
+
+     return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+[root@localhost test-src]# gcc -o test test.c
+[root@localhost test-src]# ./test
+SA_NOCLDSTOP:1
+SA_NOCLDWAIT:2
+SA_NODEFER:1073741824
+SA_ONSTACK:134217728
+SA_RESETHAND:2147483648
+SA_RESTART:268435456
+SA_SIGINFO:4
+</pre>
+
 
 ## 6. 函数ngx_signal_handler()
 {% highlight string %}
