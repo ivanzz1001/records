@@ -62,6 +62,61 @@ l    is multi-threaded (using CLONE_THREAD, like NPTL pthreads do)
 +    is in the foreground process group
 {% endhighlight %}
 
+### 1.1 暂停进程
+通过```kill -STOP pid```命令可以暂停进程。例如：
+<pre>
+[root@localhost ~]# kill -STOP 35691
+[root@localhost ~]# ps -aux | grep test | grep -v grep
+root      35691  0.0  0.0   4156   344 pts/2    T    21:57   0:00 ./test
+</pre>
+在程序运行终端也可以看到如下：
+<pre>
+[root@localhost test-src]# ./test
+
+[1]+  Stopped                 ./test
+</pre>
+
+### 1.2 恢复到后台运行
+通过```kill -CONT pid```命令可以将暂停的进程恢复到后台运行。例如：
+<pre>
+[root@localhost ~]# kill -CONT 35691
+[root@localhost ~]# ps -aux | grep test | grep -v grep
+root      35691  0.0  0.0   4156   344 pts/2    S    21:57   0:00 ./test
+</pre>
+这可以看到，进程恢复到后台运行。
+
+### 1.3 恢复到前台运行
+如果要将处于后台运行的进程恢复到前台运行，可以在当时运行该进程的那个终端用jobs命令查询暂停的进程，然后用```fg [job号]```把进程恢复到前台。例如：
+<pre>
+[root@localhost test-src]# jobs
+[1]+  Stopped                 ./test
+[root@localhost test-src]# fg 1
+./test
+</pre>
+
+
+## 2. Shell对进程的控制
+Linux Shell支持对进程进行相应的控制。主要有以下命令：
+
+* **command &** 让进程在后台运行
+
+* **jobs** 查看后台运行的进程
+
+* **fg %n** 让后台运行的进程n到前台来
+
+* **bg %n** 让进程n到后台去。例如：
+<pre>
+[root@localhost test-src]# fg %1
+./test
+^Z
+[1]+  Stopped                 ./test
+[root@localhost test-src]# bg 1
+[1]+ ./test &
+</pre>
+
+注意： 上面```%n```为jobs命令查看到的job编号。
+
+此外，还可以通过```CTRL + Z```组合按键将前台执行的程序放到后台，并且暂停。
 
 
 
