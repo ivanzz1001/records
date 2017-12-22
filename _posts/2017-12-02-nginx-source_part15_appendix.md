@@ -1,6 +1,6 @@
 ---
 layout: post
-title: os/unix/ngx_process.c(h)源码分析附录
+title: os/unix/ngx_process.c源码分析(附录)
 tags:
 - nginx
 categories: nginx
@@ -50,6 +50,8 @@ pid_t waitpid(pid_t pid, int *status, int options);
 {% endhighlight %}
 waitpid()系统调用会挂起调用进程的执行，直到```pid```参数指定的子进程状态发生改变。默认情况下，waitpid()只会等待终止的子进程，但是该行为可以通过```options```参数所修改。
 
+**1) 参数pid**
+
 参数pid的取值可以为：
 {% highlight string %}
  < -1    等待任何一个子进程，该子进程的进程组ID等于pid的绝对值
@@ -61,7 +63,25 @@ waitpid()系统调用会挂起调用进程的执行，直到```pid```参数指�
  > 0     等待进程ID为pid的子进程
 {% endhighlight %}
 
+**2) 参数options**
 
+参数options可以为如下常量的按位或.
+
+* **WNOHANG**: 假若并没有子进程退出的话，则马上返回
+
+* **WUNTRACED**: 假若一个子进程已经暂停的话(此子进程不应该被ptrace()系统调用所traced)，则函数返回。如果被traced的子进车已经停止的话，则不管本选项有没有提供其都会返回相应的状态。
+
+* **WCONTINUED**: 假若一个暂停的子进程通过SIGCONT信号恢复运行的话，则函数也会返回。（此选项从Linux 2.6.10版本开始支持）
+
+**3) 参数status**
+
+假若status参数不为NULL的话，wait()及waitpid()会将相应的状态信息存储到status所指向的空间中。这个整数值可以通过如下的一些宏来进行解释：
+
+* **WIFEXITED(status)**： 假如子进程是正常终止的话，则返回true。（正常终止是指：调用exit()、_exit()或者main()函数return返回）
+
+* **WEXITSTATUS(status)**: 返回子进程的退出状态。status的低8位存储着相应的退出状态（通过exit()、_exit()、main()返回的退出状态)。 此宏定义只应在```WIFEXITED(status)```返回true时使用。
+
+* **
 
 
 <br />
