@@ -73,6 +73,35 @@ waitpid()系统调用会挂起调用进程的执行，直到```pid```参数指�
 
 * **WCONTINUED**: 假若一个暂停的子进程通过SIGCONT信号恢复运行的话，则函数也会返回。（此选项从Linux 2.6.10版本开始支持）
 
+
+我们通过如下程序(test.c)打印一下这些常量的值：
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+
+int main(int argc,char *argv[])
+{
+    printf("WNOHANG: %d\n",WNOHANG);
+    printf("WUNTRACED: %d\n",WUNTRACED);
+    printf("WCONTINUED: %d\n",WCONTINUED);
+
+    return 0x0;
+}
+{% endhighlight %}
+编译运行:
+<pre>
+[root@localhost test-src]# gcc -o test test.c
+[root@localhost test-src]# ./test 
+WNOHANG: 1
+WUNTRACED: 2
+WCONTINUED: 8
+</pre>
+
+
 **3) 参数status**
 
 假若status参数不为NULL的话，wait()及waitpid()会将相应的状态信息存储到status所指向的空间中。这个整数值可以通过如下的一些宏来进行解释：
@@ -81,7 +110,47 @@ waitpid()系统调用会挂起调用进程的执行，直到```pid```参数指�
 
 * **WEXITSTATUS(status)**: 返回子进程的退出状态。status的低8位存储着相应的退出状态（通过exit()、_exit()、main()返回的退出状态)。 此宏定义只应在```WIFEXITED(status)```返回true时使用。
 
-* **
+* **WIFSIGNALED(status)**: 假若该子进程是通过信号的方式终止的话，返回true
+
+* **WTERMSIG(status)**: 返回导致该子进程终止的信号编码。此宏定义只应在```WIFSIGNALED(status)```返回为true时使用
+
+* **WCOREDUMP(status)**: 假若子进程产生了一个core dump的话，返回true。此宏定义只应在```WIFSIGNALED(status)```返回true时使用。
+<pre>
+注意：WCOREDUMP宏只在某些平台及版本中被定义。因此在使用时请用如下代码段包围：
+
+#ifdef WCOREDUMP
+    WCOREDUMP(status)
+#endif
+</pre>
+
+* **WIFSTOPPED(status)**: 假若此子进程是通过信号暂停的话，返回true。此种情况只可能发生在使用了```WUNTRACED```选项或者子进程被traced的情形下。
+
+* **WSTOPSIG(status)**: 返回引起子进程暂停的信号编码。本宏定义只应在```WIFSTOPPED(status)```返回true时使用。
+
+* **WIFCONTINUED(status)**: 假若子进程收到SIGCONT信号从暂停状态下恢复的话，则返回true。（since Linux 2.6.10)
+
+
+### 1.3 waitid()函数
+{% highlight string %}
+int waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
+{% endhighlight %} 
+
+waitid()系统调用针对子进程状态的改变提供了更为精确的控制。(since Linux 2.6.9)
+
+
+###1.4 返回值
+
+下面分别介绍每一个函数的返回值：
+
+* **wait()**: 成功则返回终止进程的进程ID；否则，返回-1
+
+* **waitpid()**: 成功则返回状态发生改变的进程ID；若指定了```WNOHANG```选项，并且pid所指定的一个或多个存在的话，此时如果子进程状态未发生改变，则返回0。出错的情况下返回-1.
+
+* **waitid()**: 成功的话，返回0； 如果指定了```WNOHANG```选项，并且id所指定的子进程状态未发生改变的话，返回0；出错的情况下返回-1。
+
+上面这些函数在出错的情况下，都会设置errno为适当的值。
+
+
 
 
 <br />
