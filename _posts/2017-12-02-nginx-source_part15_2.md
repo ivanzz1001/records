@@ -974,6 +974,9 @@ ngx_process_get_status(void)
 }
 {% endhighlight %}
 
+在介绍本函数之前，请先参看[Linux wait函数族介绍](https://ivanzz1001.github.io/records/post/nginx/2017/12/02/nginx-source_part15_appendix)。
+
+
 
 
 <br />
