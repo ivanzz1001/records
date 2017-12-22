@@ -35,10 +35,31 @@ int waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
 
 在一个子进程终止的情形下，调用wait允许操作系统释放该子进程所占用的资源；如果并未执行一个wait操作，则这个已经终止的子进程将会保持在```zombie```状态。
 
-假若一个子进程的状态发生了改变，则如上调用会马上返回。否则，这些系统调用会一直阻塞直到一个子进程的状态发生了改变，又或者被信号中断（这里假设中断的系统调用并不会自动重启： 通过设置sigaction()的SA_RESTART标志)。在本章中，一个子进程的状态发生了改变，但是并未被如上wait函数族所wait的话，则称该子进程处于```waitable终止状态```.
+假若一个子进程的状态发生了改变，则如上调用会马上返回。否则，这些系统调用会一直阻塞直到一个子进程的状态发生了改变，又或者被信号中断（这里假设中断的系统调用并不会自动重启： 通过设置sigaction()的SA_RESTART标志)。在本章中，一个子进程的状态发生了改变，但是并未被如上wait函数族所wait的话，则称该子进程处于```waitable状态```.
 
 
+### 1.1 wait()函数
+wait()系统调用会挂起调用进程的执行，直到其子进程终止。wait(&status)调用等价于：
+<pre>
+waitpid(-1,&status,0);
+</pre>
 
+### 1.2 waitpid()函数
+{% highlight string %}
+pid_t waitpid(pid_t pid, int *status, int options);
+{% endhighlight %}
+waitpid()系统调用会挂起调用进程的执行，直到```pid```参数指定的子进程状态发生改变。默认情况下，waitpid()只会等待终止的子进程，但是该行为可以通过```options```参数所修改。
+
+参数pid的取值可以为：
+{% highlight string %}
+ < -1    等待任何一个子进程，该子进程的进程组ID等于pid的绝对值
+
+ -1      等待任何一个子进程
+
+ 0       等待任何一个子进程，该子进程的进程组ID等于调用进程的进程组ID
+
+ > 0     等待进程ID为pid的子进程
+{% endhighlight %}
 
 
 
