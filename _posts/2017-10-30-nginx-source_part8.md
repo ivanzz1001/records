@@ -451,8 +451,8 @@ type __sync_nand_and_fetch (type *ptr, type value, ...)
 
 3）
 {% highlight string %}
-bool __sync_bool_compare_and_swap (type *ptr, type oldval type newval, ...)
-type __sync_val_compare_and_swap (type *ptr, type oldval type newval, ...)
+bool __sync_bool_compare_and_swap (type *ptr, type oldval, type newval, ...)
+type __sync_val_compare_and_swap (type *ptr, type oldval, type newval, ...)
 {% endhighlight %}
 上面这两个函数提供原子的比较和交换：如果 *ptr == oldval，就将 newval 写入 *ptr. 其中第一个函数在相等并写入的情况下返回true; 第二个函数返回操作之前的值。
 
