@@ -250,7 +250,7 @@ ngx_pid_t ngx_execute(ngx_cycle_t *cycle, ngx_exec_ctx_t *ctx);
 //3: 初始化nginx中相关的信号处理
 ngx_int_t ngx_init_signals(ngx_log_t *log);
 
-//4: 设置一些程序的调试点（主要是为了方便在调试时定为一些严重的错误）
+//4: 设置一些程序的调试点（主要是为了方便在调试时定位一些严重的错误）
 void ngx_debug_point(void);
 </pre>
 

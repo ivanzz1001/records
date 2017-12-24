@@ -1237,6 +1237,72 @@ ngx_debug_point(void)
 }
 {% endhighlight %}
 
+设置一些程序的调试点，主要是为了方便在调试时定位一些严重的错误。
+{% highlight string %}
+#include <signal.h>
+
+int raise(int sig);
+{% endhighlight %}
+raise()函数用于向调用进程或线程发送一个信号。并且如果raise()发送一个信号导致对应的Handler被调用的话，则raise()函数会等到handler被调用完成才会返回。
+
+这里```raise(SIGSTOP)```会停止当前调用进程或线程的执行。看如下程序test.c:
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+
+int main(int argc,char *argv[])
+{
+    printf("before calling raise()\n");
+
+    raise(SIGSTOP);
+
+    printf("after calling raise()\n");
+
+    return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o test test.c
+# ./test
+before calling raise()
+
+[1]+  Stopped                 ./test
+# ps -ef | grep test | grep -v grep
+ivan1001  6852  6828  0 05:03 pts/18   00:00:00 ./test
+# kill -CONT 6852
+after calling raise()
+[1]+  Done                    ./test
+</pre>
+
+可以看到```raise(SIGSTOP)```暂停了当前调用进程的执行。
+
+
+## 10. 函数ngx_os_signal_process()
+{% highlight string %}
+ngx_int_t
+ngx_os_signal_process(ngx_cycle_t *cycle, char *name, ngx_pid_t pid)
+{
+    ngx_signal_t  *sig;
+
+    for (sig = signals; sig->signo != 0; sig++) {
+        if (ngx_strcmp(name, sig->name) == 0) {
+            if (kill(pid, sig->signo) != -1) {
+                return 0;
+            }
+
+            ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                          "kill(%P, %d) failed", pid, sig->signo);
+        }
+    }
+
+    return 1;
+}
+{% endhighlight %}
+
+本函数主要用于向某一指定的进程发送指定名称的信号。发送成功返回0，发送失败返回1。
+
 
 <br />
 <br />
@@ -1247,6 +1313,9 @@ ngx_debug_point(void)
 2. [初识nginx——配置解析篇](https://www.cnblogs.com/magicsoar/p/5817734.html)
 
 3. [Nginx源码分析 - 主流程篇 - 解析配置文件](http://blog.csdn.net/initphp/article/details/51911189)
+
+4. [Linux C实践(1)：不可忽略或捕捉的信号—SIGSTOP和SIGKILL](http://blog.csdn.net/madpointer/article/details/13091705)
+
 
 <br />
 <br />
