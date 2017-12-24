@@ -1192,6 +1192,51 @@ ngx_unlock_mutexes(ngx_pid_t pid)
 }
 {% endhighlight %}
 
+这里释放两种锁：
+
+* **ngx_accept_mutex**: nginx各子进程抢占互斥锁，然后accept外部进来的连接。如果当前终止的子进程持有了锁，则需要在退出时释放该锁。
+
+* **共享内存锁**: nginx各进程间还涉及到大量的共享内存。在终止的子进程结束时也应该释放相应的锁。这里各共享内存段是以ngx_list_t链表的形式来管理的。下面我们简要给出该链表结构，在后面的章节我们会对ngx_list_t结构做详细的介绍。
+
+![ngx-shm-list](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_shm_list.jpg)
+
+elt[i]中的每一个数据结构都是如下类型(src/core/ngx_cycle.h)：
+{% highlight string %}
+struct ngx_shm_zone_s {
+    void                     *data;
+    ngx_shm_t                 shm;
+    ngx_shm_zone_init_pt      init;
+    void                     *tag;
+    ngx_uint_t                noreuse;  /* unsigned  noreuse:1; */
+};
+{% endhighlight %}
+
+
+关于```ngx_shmtx_force_unlock()```函数，我们后面在讲解nginx共享内存时会再做详细的介绍。
+
+
+## 9. 函数ngx_debug_point()
+{% highlight string %}
+void
+ngx_debug_point(void)
+{
+    ngx_core_conf_t  *ccf;
+
+    ccf = (ngx_core_conf_t *) ngx_get_conf(ngx_cycle->conf_ctx,
+                                           ngx_core_module);
+
+    switch (ccf->debug_points) {
+
+    case NGX_DEBUG_POINTS_STOP:
+        raise(SIGSTOP);
+        break;
+
+    case NGX_DEBUG_POINTS_ABORT:
+        ngx_abort();
+    }
+}
+{% endhighlight %}
+
 
 <br />
 <br />
