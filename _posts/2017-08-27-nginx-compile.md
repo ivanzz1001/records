@@ -179,6 +179,15 @@ description: nginx源代码编译安装
 # sudo /usr/local/nginx/nginx -s stop    #停止
 
 # sudo /usr/local/nginx/nginx -s reload  #重载配置文件
+
+
+# sudo /usr/local/nginx/nginx            #下面采用默认的配置文件启动，并查看各进程的状态
+# ps -aux | grep nginx | grep -v grep
+root      5088  0.0  0.0   6308   480 ?        Ss   19:52   0:00 nginx: master process /usr/local/nginx/nginx
+nobody    5089  0.0  0.2   6448  2064 ?        S    19:52   0:00 nginx: worker process
+# ps -ef | grep nginx | grep -v grep
+root      5088     1  0 19:52 ?        00:00:00 nginx: master process /usr/local/nginx/nginx
+nobody    5089  5088  0 19:52 ?        00:00:00 nginx: worker process
 {% endhighlight %}
 
 **7) 安装后目录情况**
