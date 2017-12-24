@@ -159,6 +159,8 @@ waitid()系统调用针对子进程状态的改变提供了更为精确的控制
 
 1. [UNIX再学习 -- exit 和 wait 系列函数](http://blog.csdn.net/qq_29350001/article/details/70255915)
 
+2. [linux下的僵尸进程处理SIGCHLD信号](https://www.cnblogs.com/wuchanming/p/4020463.html)
+
 
 <br />
 <br />

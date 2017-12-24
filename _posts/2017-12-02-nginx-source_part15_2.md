@@ -976,6 +976,173 @@ ngx_process_get_status(void)
 
 在介绍本函数之前，请先参看[Linux wait函数族介绍](https://ivanzz1001.github.io/records/post/nginx/2017/12/02/nginx-source_part15_appendix)。
 
+### 7.1 waitpid()返回-1情况的处理
+这里我们主要讲述一下waitpid()函数对返回-1这种情况的处理。我们先来看如下程序test.c：
+{% highlight string %}
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <string.h>
+#include <errno.h>
+
+static void sighandler(int sig)
+{
+   
+}
+int main(int argc,char *argv[])
+{
+   pid_t pid;
+
+   signal(SIGCHLD,SIG_IGN);
+
+   pid = fork();
+
+   if(pid == -1)
+     return -1;
+   else if(pid == 0)
+   {
+       printf("child 1\n");
+       exit(0);
+   }
+   printf("parent_1\n");
+   sleep(1);               //wait child1 exit
+
+   signal(SIGCHLD,sighandler);
+   pid = waitpid(-1,NULL,0);
+   printf("pid: %d\n",pid);
+   if(pid == -1)
+     printf("errno: %s\n",strerror(errno));
+   
+
+   pid = fork();
+   if(pid == -1)
+       return -1;
+   else if(pid == 0)
+   {
+      printf("child 2\n");
+      exit(0);
+   }
+   
+  printf("parent_2\n");
+  sleep(1);               //wait child2 exit
+  pid = waitpid(-1,NULL,0);
+  printf("pid: %d\n",pid);
+  
+  if(pid == -1)
+     printf("errno: %s\n",strerror(errno));
+ 
+
+  pid = waitpid(-1,NULL,0);
+  printf("pid: %d\n",pid);
+  if(pid == -1)
+    printf("errno: %s\n",strerror(errno));
+
+  return 0x0;  
+}
+{% endhighlight %}
+
+编译运行：
+<pre>
+root@ubuntu:/home/ivan1001/Share/test-src# gcc -o test test.c
+root@ubuntu:/home/ivan1001/Share/test-src# ./test
+parent_1
+child 1
+pid: -1
+errno: No child processes
+parent_2
+child 2
+pid: 4972
+pid: -1
+errno: No child processes
+</pre>
+从上面我们可以看到，如果我们将对于某一个子进程的``SIGCHLD```信号设置处理函数为```SIG_IGN```，则调用waitpid()函数会返回-1，并提示errno为```ECHILD```。如果并没有任何可等待的子进程退出，函数waitpid()也会返回-1。
+
+接下来我们来看nginx中对pid为-1的情况下的处理：
+{% highlight string %}
+if (pid == -1) {
+    err = ngx_errno;
+
+    if (err == NGX_EINTR) {
+        continue;
+    }
+
+    if (err == NGX_ECHILD && one) {
+        return;
+    }
+
+    /*
+     * Solaris always calls the signal handler for each exited process
+     * despite waitpid() may be already called for this process.
+     *
+     * When several processes exit at the same time FreeBSD may
+     * erroneously call the signal handler for exited process
+     * despite waitpid() may be already called for this process.
+     */
+
+    if (err == NGX_ECHILD) {
+        ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, err,
+                      "waitpid() failed");
+        return;
+    }
+
+    ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, err,
+                  "waitpid() failed");
+    return;
+}
+{% endhighlight %}
+
+这里假设主进程有3个子进程，如果这三个子进程分别在不同时间退出，则最后一个子进程退出时是有可能会发生:
+<pre>
+if (err == NGX_ECHILD && one) {
+    return;
+}
+</pre>
+如果这三个子进程同时退出的话，就会产生三个```SIGCHLD```。由于在信号处理过程中，缺省情况下对于与本信号相同的信号会进行阻塞，因此这三个```SIGCHLD```的信号处理函数会在上一个调用完成之后依次被调用。而在第一次调用信号处理函数时，waitpid()函数就会将3个子进程的相关数据结构进行回收，那后面两次调用waitpid()函数则有可能会出现：
+<pre>
+/*
+ * Solaris always calls the signal handler for each exited process
+ * despite waitpid() may be already called for this process.
+ *
+ * When several processes exit at the same time FreeBSD may
+ * erroneously call the signal handler for exited process
+ * despite waitpid() may be already called for this process.
+ */
+
+if (err == NGX_ECHILD) {
+    ngx_log_error(NGX_LOG_INFO, ngx_cycle->log, err,
+                  "waitpid() failed");
+    return;
+}
+
+ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, err,
+              "waitpid() failed");
+return;
+</pre>
+
+
+### 7.2 WTERMSIG()打印退出信号码
+这里通过WTERMSIG()宏定义打印出到底是什么信号导致的子进程退出。
+
+### 7.3 子进程严重错误退出
+在子进程出现严重错误的情况下退出，此时即使此子进程```respawn```标志为1，也不再重新创建此子进程：
+{% highlight string %}
+if (WEXITSTATUS(status) == 2 && ngx_processes[i].respawn) {
+    ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
+                  "%s %P exited with fatal code %d "
+                  "and cannot be respawned",
+                  process, pid, WEXITSTATUS(status));
+    ngx_processes[i].respawn = 0;
+}
+{% endhighlight %}
+
+### 7.4 解除已终止子进程锁
+因为在nginx中大量使用到了```共享内存```，这里面就会涉及到相应的锁。因此在子进程退出时，会将相应的锁进行释放。关于具体的释放方法，我们后面会进行介绍。
+<pre>
+ngx_unlock_mutexes(pid);
+</pre>
+
 
 
 
