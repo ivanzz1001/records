@@ -338,7 +338,13 @@ index:9
 index:10
 {% endhighlight %}
 
-
+**18) Linux下查看显卡类型**
+<pre>
+# lspci | grep -i vga
+02:00.0 VGA compatible controller: NVIDIA Corporation Device 1b06 (rev a1)
+03:00.0 VGA compatible controller: NVIDIA Corporation Device 1b06 (rev a1)
+# ls -al NVIDIA-Linux-x86_64-384.98.run 
+</pre>
 
 
 
