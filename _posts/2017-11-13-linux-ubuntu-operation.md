@@ -339,12 +339,35 @@ index:10
 {% endhighlight %}
 
 **18) Linux下查看显卡类型**
-<pre>
+{% highlight string %}
 # lspci | grep -i vga
 02:00.0 VGA compatible controller: NVIDIA Corporation Device 1b06 (rev a1)
 03:00.0 VGA compatible controller: NVIDIA Corporation Device 1b06 (rev a1)
 # ls -al NVIDIA-Linux-x86_64-384.98.run 
-</pre>
+
+
+# lspci -v -s 02:00.0            //如下查看显卡详细信息
+02:00.0 VGA compatible controller: NVIDIA Corporation Device 1b06 (rev a1) (prog-if 00 [VGA controller])
+        Subsystem: Gigabyte Technology Co., Ltd Device 376b
+        Physical Slot: 2
+        Flags: bus master, fast devsel, latency 0, IRQ 55
+        Memory at f4000000 (32-bit, non-prefetchable) [size=16M]
+        Memory at c0000000 (64-bit, prefetchable) [size=256M]
+        Memory at d0000000 (64-bit, prefetchable) [size=32M]
+        I/O ports at 2000 [size=128]
+        [virtual] Expansion ROM at 000c0000 [disabled] [size=128K]
+        Capabilities: [60] Power Management version 3
+        Capabilities: [68] MSI: Enable+ Count=1/1 Maskable- 64bit+
+        Capabilities: [78] Express Legacy Endpoint, MSI 00
+        Capabilities: [100] Virtual Channel
+        Capabilities: [250] Latency Tolerance Reporting
+        Capabilities: [128] Power Budgeting <?>
+        Capabilities: [420] Advanced Error Reporting
+        Capabilities: [600] Vendor Specific Information: ID=0001 Rev=1 Len=024 <?>
+        Capabilities: [900] #19
+        Kernel driver in use: nvidia
+        Kernel modules: nvidiafb, nouveau, nvidia_drm, nvidia
+{% endhighlight %}
 
 
 
