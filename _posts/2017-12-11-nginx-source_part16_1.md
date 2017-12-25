@@ -167,6 +167,106 @@ extern sig_atomic_t    ngx_change_binary;
 
 
 
+
+<br />
+关于```ngx_inherited```我们再给出如下例子：
+
+程序1(test.c):
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+
+int main(int argc,char *argv[])
+{
+
+   int fd = -1;
+   int sz;
+   char buf[128];
+
+   fd = open("./helloworld.txt",O_RDONLY);
+
+   sz = read(fd,buf,5);
+   if(sz < 0)
+   {
+      printf("read failure\n");
+      exit(-1);
+   }
+
+  buf[sz] = 0;
+  printf("test buf: %s\n",buf);
+
+  sprintf(buf,"%d",fd);
+
+  execl("./read","read",buf,NULL);
+
+  return 0x0;
+
+}
+{% endhighlight %}
+
+程序2(read.c):
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+
+int main(int argc,char *argv[])
+{
+    int fd = -1;
+    char buf[128];
+    int sz;
+
+    if(argc < 2)
+    {
+       printf("argc must equal to 2\n");
+
+       return -1;
+    }
+
+    fd = atoi(argv[1]);
+    if(fd < 0)
+    {
+       printf("error fd:%d\n",fd);
+       return -2;
+    }
+
+    sz = read(fd,buf,16);
+    if(sz < 0)
+    {
+       printf("read error\n");
+       return -3;
+    }
+
+    buf[sz] = 0;
+    printf("read buf:%s\n",buf);
+
+    return 0x0;
+}
+{% endhighlight %}
+
+helloworld.txt:
+<pre>
+[root@localhost test-src]# cat helloworld.txt 
+hello,world
+</pre>
+程序编译运行：
+<pre>
+[root@localhost test-src]# gcc -o test test.c
+[root@localhost test-src]# gcc -o read read.c
+[root@localhost test-src]# ./test
+test buf: hello
+read buf:,world
+
+</pre>
+通过上面我们可以看到文件描述符在执行exec后仍然有效（前提是并未加close_on_exec)。
+
+
 <br />
 <br />
 **[参看]:**
