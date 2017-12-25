@@ -87,7 +87,82 @@ nginx中各个进程之间是通过管道的方式来进行通信的，如下图
 
 * **NGX_PROCESS_SINGLE**: 只有在nginx.conf配置文件中设置为```master_process off```，且ngx_process值为0时，才有可能会进入单进程工作模式。
 
-* **NGX_PROCESS_MASTER**: 
+* **NGX_PROCESS_MASTER**: 用于指示当前nginx工作方式为master-worker，并且当前进程为master进程
+
+* **NGX_PROCESS_SIGNALLER**: 我们可以通过运行```nginx -s reload```命令的方式来向正在运行的nginx进程发送信号。这种情况下，其实我们只是想发送一个信号，而并不是真正想要运行一个nginx服务器程序。因此这里我们用```NGX_PROCESS_SIGNALLER```来表明当前运行的nginx只是一个发送信号的进程。一般如下情况都只是起一个signaller进程：
+<pre>
+# nginx -s stop      //快速停止服务
+
+# nginx -s quit      //优雅的停止服务
+
+# nginx -s reopen    //进行日志回滚
+
+# nginx -s reload    //告诉原nginx进程重新加载配置文件
+</pre>
+
+* **NGX_PROCESS_WORKER**： 表明当前进程是worker进程
+
+* **NGX_PROCESS_HELPER**: 表明当前进程为辅助进程。例如缓存管理器是作为一个辅助进程。
+
+
+## 2. 缓存管理器上下文
+{% highlight string %}
+typedef struct {
+    ngx_event_handler_pt       handler;
+    char                      *name;
+    ngx_msec_t                 delay;
+} ngx_cache_manager_ctx_t;
+{% endhighlight %}
+主要是用于保存缓存管理器进程的一个上下文数据：
+
+* **handler**: 该缓存管理器所绑定的事件处理器
+
+* **name**: 缓存管理器进程的名称
+
+* **delay**: 给缓存管理器绑定的一个定时器延迟
+
+
+## 3. 相关函数声明
+{% highlight string %}
+void ngx_master_process_cycle(ngx_cycle_t *cycle);     
+void ngx_single_process_cycle(ngx_cycle_t *cycle);
+{% endhighlight %}
+
+第一个函数为nginx工作在master-worker方式下，master进程的主循环； 第二个函数为nginx工作在单进程方式下的主循环。
+
+## 4. 相关变量的声明
+{% highlight string %}
+extern ngx_uint_t      ngx_process;
+extern ngx_uint_t      ngx_worker;
+extern ngx_pid_t       ngx_pid;
+extern ngx_pid_t       ngx_new_binary;
+extern ngx_uint_t      ngx_inherited;
+extern ngx_uint_t      ngx_daemonized;
+extern ngx_uint_t      ngx_exiting;
+
+extern sig_atomic_t    ngx_reap;
+extern sig_atomic_t    ngx_sigio;
+extern sig_atomic_t    ngx_sigalrm;
+extern sig_atomic_t    ngx_quit;
+extern sig_atomic_t    ngx_debug_quit;
+extern sig_atomic_t    ngx_terminate;
+extern sig_atomic_t    ngx_noaccept;
+extern sig_atomic_t    ngx_reconfigure;
+extern sig_atomic_t    ngx_reopen;
+extern sig_atomic_t    ngx_change_binary;
+{% endhighlight %} 
+
+这些变量都定义在os/unix/ngx_process_cycle.c文件中，下面分别简单介绍一下各变量：
+
+* **ngx_process**: 用于指示当前进程是什么类型的进程，如在master-worker工作模式下，在master进程中其值为```NGX_PROCESS_MASTER```, 在worker进程中其值为```NGX_PROCESS_WORKER```。
+
+* **ngx_worker**： 用于指示当前worker进程是第几个worker子进程
+
+* **ngx_pid**: 用于保存当前进程的进程ID
+
+* **ngx_new_binary**: 用于指示当前进程是否是热替换的进程（主要用于热升级）
+
+* **ngx_inherited**: 此变量主要是在热升级的情况下，避免重新创建新的socket。因为socket文件描述符创建时只要没有设置close_on_exec，则执行exec替换后对应的文件描述符仍可以使用。
 
 
 
@@ -98,8 +173,13 @@ nginx中各个进程之间是通过管道的方式来进行通信的，如下图
 
 1. [控制 Nginx 的基本功能的指令](http://www.linuxidc.com/Linux/2012-04/57908.htm)
 
+2. [nginx运行期间修改配置文件的处理](http://blog.csdn.net/opens_tym/article/details/17270411)
 
+3. [nginx学习十四 ngx_master_process_cycle(master进程)](http://blog.csdn.net/xiaoliangsky/article/details/40866855)
 
+4. [ngx_add_inherited_sockets 继承的sockets](http://blog.csdn.net/huangyimo/article/details/50170657)
+
+5. [nginx继承socket 和 热代码替换](http://blog.csdn.net/jiaoyongqing134/article/details/52127732)
 <br />
 <br />
 <br />
