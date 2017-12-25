@@ -83,6 +83,20 @@ nginx中各个进程之间是通过管道的方式来进行通信的，如下图
 #define NGX_PROCESS_WORKER     3
 #define NGX_PROCESS_HELPER     4
 </pre>
+默认情况下nginx是以master-worker方式工作的。上面这些宏分别表示当前的进程类型：
+
+* **NGX_PROCESS_SINGLE**: 只有在nginx.conf配置文件中设置为```master_process off```，且ngx_process值为0时，才有可能会进入单进程工作模式。
+
+* **NGX_PROCESS_MASTER**: 
+
+
+
+
+<br />
+<br />
+**[参看]:**
+
+1. [控制 Nginx 的基本功能的指令](http://www.linuxidc.com/Linux/2012-04/57908.htm)
 
 
 
