@@ -368,7 +368,7 @@ index:10
         Kernel driver in use: nvidia
         Kernel modules: nvidiafb, nouveau, nvidia_drm, nvidia
 {% endhighlight %}
-
+参看：[linux下显卡信息的查看](http://blog.csdn.net/wind19/article/details/17095541)
 
 
 
