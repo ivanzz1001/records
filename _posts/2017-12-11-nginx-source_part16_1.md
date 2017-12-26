@@ -178,10 +178,54 @@ extern sig_atomic_t    ngx_change_binary;
 
 * **ngx_sigalrm**: 主要是用于nginx master收到TERM信号退出时的一个计时操作。通过setitimer()函数在定时到了之后会产生SIGALRM信号。
 
-* **ngx_quit**:
+* **ngx_quit**: 用于指示优雅的关闭nginx
+
+* **ngx_debug_quit**: 一般用作调试的时候，给某一个worker进程或辅助进程发送一个```NGX_NOACCEPT_SIGNAL```信号，然后会设置ngx_debug_quit值为1，接着再设置ngx_quit值为1。这样对应的子进程就会退出，并在退出时执行ngx_debug_point()暗示非正常退出。
+{% highlight string %}
+void
+ngx_signal_handler(int signo)
+{
+    ...
+    case ngx_signal_value(NGX_NOACCEPT_SIGNAL):
+        if (!ngx_daemonized) {
+            break;
+        }
+        ngx_debug_quit = 1;                 //注意此处并无break
+    case ngx_signal_value(NGX_SHUTDOWN_SIGNAL):
+        ngx_quit = 1;
+        action = ", shutting down";
+        break;
+    ...
+}
+{% endhighlight %}
+
+* **ngx_terminate**: 用于指示快速的终止nginx服务
+
+* **ngx_noaccept**: 用于指示优雅的退出worker进程，对于master及其他辅助进程并不会产生影响。这与shutdown是不同的。
+
+* **ngx_reconfigure**: 用于指示nginx重新读取配置文件
+
+* **ngx_reopen**: 用于指示nginx日志文件回滚
+
+* **ngx_change_binary**: 用于指示nginx进行热升级。
+
+### 4.1 sig_atomic_t数据类型
+当把变量声明为该类型时，则会保证该变量在使用或赋值时，无论是在32位还是64位的机器上都能保证操作是原子的。它会根据机器的类型自适应。```sig_atomic_t```这个数据类型是定义在signal.h头文件中的，下面类说说这个类型：
+
+在处理信号(signal)的时候，有时对于一些变量的访问希望不会被中断，无论是硬件中断还是软件中断，这就要求访问或改变这些变量需要在计算机的一条指令内完成。通常情况下，int类型的变量一般是原子访问的，也可以认为sig_atomic_t是int类型的数据。因为对这些变量要求一条指令完成，所以sig_atomic_t不可能是结构体，只会是数字类型。在Linux是这样定义：
+<pre>
+typedef int __sig_atomic_t;
+</pre>
+另外GNU C的文档也说比int短的类型通常也具有原子性的。例如short类型。同时指针（地址）也一定是原子性的。该类型在所有GNU C库支持的系统和支持posix的系统中都有定义。
+
+**注：** 关于int型是不是原子类型，可以参看如下文档
+<pre>
+http://www.gnu.org/s/hello/manual/libc/Atomic-Types.html
+</pre>
 
 
-<br />
+
+### 4.2 ngx_inherited示例
 关于```ngx_inherited```我们再给出如下例子：
 
 程序1(test.c):

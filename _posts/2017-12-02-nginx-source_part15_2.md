@@ -157,7 +157,7 @@ ngx_signal_t  signals[] = {
 
 * **NGX_NOACCEPT_SIGNAL:** 对应的实际信号为SIGWINCH，作用请看如下：
 
-1) 如果收到本信号的当前进程为以后台方式工作的master进程，则master进程中将ngx_noaccept置为1，然后向worker进程发送shutdown信号，停止接收外部连接优雅的停止worker进程，参看os/unix/ngx_process_cycle.c:
+1) 如果收到本信号的当前进程为以后台方式工作的master进程，则master进程中将ngx_noaccept置为1，然后向worker进程发送shutdown信号，停止接收外部连接,优雅的停止worker进程(但是master进程本身并不退出，这与shutdown是不同的)，参看os/unix/ngx_process_cycle.c:
 {% highlight string %}
 void
 ngx_master_process_cycle(ngx_cycle_t *cycle)
