@@ -176,7 +176,9 @@ extern sig_atomic_t    ngx_change_binary;
 
 * **ngx_sigio**: 用于指示接收到SIGIO信号(目前只是对变量设置值，并未做其他用）
 
-* **ngx_sigalrm**: 
+* **ngx_sigalrm**: 主要是用于nginx master收到TERM信号退出时的一个计时操作。通过setitimer()函数在定时到了之后会产生SIGALRM信号。
+
+* **ngx_quit**:
 
 
 <br />
