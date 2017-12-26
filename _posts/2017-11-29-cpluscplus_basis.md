@@ -96,6 +96,9 @@ sizeF: 8
 <br />
 <br />
 
+**[参看]:**
+
+1. [ 网络带宽的测试算法研究](http://www.docin.com/p-575514222.html)
 
 
 <br />
