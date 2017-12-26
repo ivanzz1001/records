@@ -164,8 +164,19 @@ extern sig_atomic_t    ngx_change_binary;
 
 * **ngx_inherited**: 此变量主要是在热升级的情况下，避免重新创建新的socket。因为socket文件描述符创建时只要没有设置close_on_exec，则执行exec替换后对应的文件描述符仍可以使用。
 
+* **ngx_daemonized**: 用于指示当前nginx是否是以daemonized方式运行。nginx默认是以守护进程的方式来运行的；通过热升级的方式运行的nginx一般也是以守护进程的方式来运行。
+<pre>
+在热升级方式下，旧的nginx进程一般是先fork()出一个新的子进程，在子进程中执行新的nginx二进制文件。在升级完成之后，
+旧的nginx就会优雅的退出。因此通过热升级的方式运行的nginx一般也是以守护进程的方式来运行的。
+</pre>
 
+* **ngx_exiting**: 用于指示当前子进程是否处于**正在退出**状态。
 
+* **ngx_reap**: 用于指示回收对应的子进程
+
+* **ngx_sigio**: 用于指示接收到SIGIO信号(目前只是对变量设置值，并未做其他用）
+
+* **ngx_sigalrm**: 
 
 
 <br />
@@ -280,6 +291,8 @@ read buf:,world
 4. [ngx_add_inherited_sockets 继承的sockets](http://blog.csdn.net/huangyimo/article/details/50170657)
 
 5. [nginx继承socket 和 热代码替换](http://blog.csdn.net/jiaoyongqing134/article/details/52127732)
+
+6. [volatile 和 sig_atomic_t](https://www.cnblogs.com/GoodGoodWorkDayDayUp/archive/2011/05/14/2046082.html)
 <br />
 <br />
 <br />
