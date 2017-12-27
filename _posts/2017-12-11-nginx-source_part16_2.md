@@ -16,9 +16,9 @@ ngx_process_cycle.c源文件主要是定义了nginx中各进程的主循环函�
 * ngx_worker_process_cycle()主循环
 
 * ngx_cache_manager_process_cycle()主循环
-<pre>
-cache manager和cache loader用ngx_cache_manager_process_cycle()函数作为其主循环函数。
-</pre>
+
+（注：cache manager和cache loader都用ngx_cache_manager_process_cycle()函数作为其主循环函数）
+
 
 
 <!-- more -->
