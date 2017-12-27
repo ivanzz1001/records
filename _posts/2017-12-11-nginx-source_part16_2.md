@@ -76,10 +76,10 @@ static void ngx_channel_handler(ngx_event_t *ev);
 //11: cache manager进程主循环
 static void ngx_cache_manager_process_cycle(ngx_cycle_t *cycle, void *data);
 
-//12: cache manager进程事件处理函数（定时事件与其他事件）
+//12: cache manager进程事件处理函数(这里为处理定时器超时事件）
 static void ngx_cache_manager_process_handler(ngx_event_t *ev);
 
-//13: cache loader进程事件处理函数(定时事件与其他事件）
+//13: cache loader进程事件处理函数（这里为处理定时器超时事件）
 static void ngx_cache_loader_process_handler(ngx_event_t *ev);
 
 {% endhighlight %}
