@@ -85,7 +85,296 @@ static void ngx_cache_loader_process_handler(ngx_event_t *ev);
 {% endhighlight %}
 
 
+## 2. 相关变量定义
+{% highlight string %}
+ngx_uint_t    ngx_process;
+ngx_uint_t    ngx_worker;
+ngx_pid_t     ngx_pid;
 
+sig_atomic_t  ngx_reap;
+sig_atomic_t  ngx_sigio;
+sig_atomic_t  ngx_sigalrm;
+sig_atomic_t  ngx_terminate;
+sig_atomic_t  ngx_quit;
+sig_atomic_t  ngx_debug_quit;
+ngx_uint_t    ngx_exiting;
+sig_atomic_t  ngx_reconfigure;
+sig_atomic_t  ngx_reopen;
+
+sig_atomic_t  ngx_change_binary;
+ngx_pid_t     ngx_new_binary;
+ngx_uint_t    ngx_inherited;
+ngx_uint_t    ngx_daemonized;
+
+sig_atomic_t  ngx_noaccept;
+ngx_uint_t    ngx_noaccepting;
+ngx_uint_t    ngx_restart;
+
+
+static u_char  master_process[] = "master process";
+
+
+static ngx_cache_manager_ctx_t  ngx_cache_manager_ctx = {
+    ngx_cache_manager_process_handler, "cache manager process", 0
+};
+
+static ngx_cache_manager_ctx_t  ngx_cache_loader_ctx = {
+    ngx_cache_loader_process_handler, "cache loader process", 60000
+};
+
+
+static ngx_cycle_t      ngx_exit_cycle;
+static ngx_log_t        ngx_exit_log;
+static ngx_open_file_t  ngx_exit_log_file;
+{% endhighlight %}
+
+前面```ngx_process```到```ngx_noaccept```间的这些变量我们都在头文件中讲述过，这里不再赘述。这里只讲述一下剩余的几个变量：
+
+* **ngx_noaccepting**: 本变量是与```ngx_noaccept```变量搭配一起使用的。因为在master优雅的停止子进程的时候，需要一定的时间，这时会用到此变量表示```正在停止接收```这一状态.
+
+* **ngx_restart**: 本变量是与```ngx_noaccept```变量搭配一起使用的。因为在热升级的时候，新创建的进程的父进程可能已经不是本master进程了，则此时要重启原来的子进程。
+
+* **master_process**: master进程的名称
+
+* **ngx_cache_manager_ctx**: 缓存管理器上下文
+
+* **ngx_cache_loader_ctx**: 缓存加载器上下文
+
+* **ngx_exit_cycle**: 此静态变量主要是为了保存相应信息，使得在进程退出时，信号处理器仍可以用该静态变量
+
+* **ngx_exit_log**: 同上
+
+* **ngx_exit_log_file**: 同上
+
+## 2. 函数ngx_master_process_cycle()
+
+## 2.1 启动部分
+{% highlight string %}
+void
+ngx_master_process_cycle(ngx_cycle_t *cycle)
+{
+    char              *title;
+    u_char            *p;
+    size_t             size;
+    ngx_int_t          i;
+    ngx_uint_t         n, sigio;
+    sigset_t           set;
+    struct itimerval   itv;
+    ngx_uint_t         live;
+    ngx_msec_t         delay;
+    ngx_listening_t   *ls;
+    ngx_core_conf_t   *ccf;
+
+    sigemptyset(&set);
+    sigaddset(&set, SIGCHLD);
+    sigaddset(&set, SIGALRM);
+    sigaddset(&set, SIGIO);
+    sigaddset(&set, SIGINT);
+    sigaddset(&set, ngx_signal_value(NGX_RECONFIGURE_SIGNAL));
+    sigaddset(&set, ngx_signal_value(NGX_REOPEN_SIGNAL));
+    sigaddset(&set, ngx_signal_value(NGX_NOACCEPT_SIGNAL));
+    sigaddset(&set, ngx_signal_value(NGX_TERMINATE_SIGNAL));
+    sigaddset(&set, ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
+    sigaddset(&set, ngx_signal_value(NGX_CHANGEBIN_SIGNAL));
+
+    if (sigprocmask(SIG_BLOCK, &set, NULL) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                      "sigprocmask() failed");
+    }
+
+    sigemptyset(&set);
+
+
+    size = sizeof(master_process);
+
+    for (i = 0; i < ngx_argc; i++) {
+        size += ngx_strlen(ngx_argv[i]) + 1;
+    }
+
+    title = ngx_pnalloc(cycle->pool, size);
+    if (title == NULL) {
+        /* fatal */
+        exit(2);
+    }
+
+    p = ngx_cpymem(title, master_process, sizeof(master_process) - 1);
+    for (i = 0; i < ngx_argc; i++) {
+        *p++ = ' ';
+        p = ngx_cpystrn(p, (u_char *) ngx_argv[i], size);
+    }
+
+    ngx_setproctitle(title);
+
+
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+
+    ngx_start_worker_processes(cycle, ccf->worker_processes,
+                               NGX_PROCESS_RESPAWN);
+    ngx_start_cache_manager_processes(cycle, 0);
+
+    ngx_new_binary = 0;
+    delay = 0;
+    sigio = 0;
+    live = 1;
+
+    for ( ;; ) {
+        .....
+    }
+}
+{% endhighlight %}
+
+## 2.2 主循环部分
+{% highlight string %}
+void
+ngx_master_process_cycle(ngx_cycle_t *cycle)
+{
+	for ( ;; ) {
+        if (delay) {
+            if (ngx_sigalrm) {
+                sigio = 0;
+                delay *= 2;
+                ngx_sigalrm = 0;
+            }
+
+            ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+                           "termination cycle: %M", delay);
+
+            itv.it_interval.tv_sec = 0;
+            itv.it_interval.tv_usec = 0;
+            itv.it_value.tv_sec = delay / 1000;
+            itv.it_value.tv_usec = (delay % 1000 ) * 1000;
+
+            if (setitimer(ITIMER_REAL, &itv, NULL) == -1) {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                              "setitimer() failed");
+            }
+        }
+
+        ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "sigsuspend");
+
+        sigsuspend(&set);
+
+        ngx_time_update();
+
+        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+                       "wake up, sigio %i", sigio);
+
+        if (ngx_reap) {
+            ngx_reap = 0;
+            ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "reap children");
+
+            live = ngx_reap_children(cycle);
+        }
+
+        if (!live && (ngx_terminate || ngx_quit)) {
+            ngx_master_process_exit(cycle);
+        }
+
+        if (ngx_terminate) {
+            if (delay == 0) {
+                delay = 50;
+            }
+
+            if (sigio) {
+                sigio--;
+                continue;
+            }
+
+            sigio = ccf->worker_processes + 2 /* cache processes */;
+
+            if (delay > 1000) {
+                ngx_signal_worker_processes(cycle, SIGKILL);
+            } else {
+                ngx_signal_worker_processes(cycle,
+                                       ngx_signal_value(NGX_TERMINATE_SIGNAL));
+            }
+
+            continue;
+        }
+
+        if (ngx_quit) {
+            ngx_signal_worker_processes(cycle,
+                                        ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
+
+            ls = cycle->listening.elts;
+            for (n = 0; n < cycle->listening.nelts; n++) {
+                if (ngx_close_socket(ls[n].fd) == -1) {
+                    ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_socket_errno,
+                                  ngx_close_socket_n " %V failed",
+                                  &ls[n].addr_text);
+                }
+            }
+            cycle->listening.nelts = 0;
+
+            continue;
+        }
+
+        if (ngx_reconfigure) {
+            ngx_reconfigure = 0;
+
+            if (ngx_new_binary) {
+                ngx_start_worker_processes(cycle, ccf->worker_processes,
+                                           NGX_PROCESS_RESPAWN);
+                ngx_start_cache_manager_processes(cycle, 0);
+                ngx_noaccepting = 0;
+
+                continue;
+            }
+
+            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reconfiguring");
+
+            cycle = ngx_init_cycle(cycle);
+            if (cycle == NULL) {
+                cycle = (ngx_cycle_t *) ngx_cycle;
+                continue;
+            }
+
+            ngx_cycle = cycle;
+            ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx,
+                                                   ngx_core_module);
+            ngx_start_worker_processes(cycle, ccf->worker_processes,
+                                       NGX_PROCESS_JUST_RESPAWN);
+            ngx_start_cache_manager_processes(cycle, 1);
+
+            /* allow new processes to start */
+            ngx_msleep(100);
+
+            live = 1;
+            ngx_signal_worker_processes(cycle,
+                                        ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
+        }
+
+        if (ngx_restart) {
+            ngx_restart = 0;
+            ngx_start_worker_processes(cycle, ccf->worker_processes,
+                                       NGX_PROCESS_RESPAWN);
+            ngx_start_cache_manager_processes(cycle, 0);
+            live = 1;
+        }
+
+        if (ngx_reopen) {
+            ngx_reopen = 0;
+            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reopening logs");
+            ngx_reopen_files(cycle, ccf->user);
+            ngx_signal_worker_processes(cycle,
+                                        ngx_signal_value(NGX_REOPEN_SIGNAL));
+        }
+
+        if (ngx_change_binary) {
+            ngx_change_binary = 0;
+            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "changing binary");
+            ngx_new_binary = ngx_exec_new_binary(cycle, ngx_argv);
+        }
+
+        if (ngx_noaccept) {
+            ngx_noaccept = 0;
+            ngx_noaccepting = 1;
+            ngx_signal_worker_processes(cycle,
+                                        ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
+        }
+    }
+}
+{% endhighlight %}
 
 <br />
 <br />
@@ -103,6 +392,8 @@ static void ngx_cache_loader_process_handler(ngx_event_t *ev);
 5. [Nginx核心进程模型](https://www.cnblogs.com/ljygoodgoodstudydaydayup/p/3888508.html)
 
 6. [event 模块(二) ——事件驱动核心](http://blog.csdn.net/lengzijian/article/details/7601730)
+
+7. [Nginx平滑升级源码分析](http://blog.csdn.net/zdy0_2004/article/details/78230352)
 
 <br />
 <br />
