@@ -376,6 +376,80 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 }
 {% endhighlight %}
 
+
+{% highlight string %}
+root@ubuntu:/usr/local/nginx# ./nginx
+root@ubuntu:/usr/local/nginx# 
+root@ubuntu:/usr/local/nginx# ps -ef | grep nginx
+root      6960     1  0 07:48 ?        00:00:00 nginx: master process ./nginx
+nobody    6961  6960  0 07:48 ?        00:00:00 nginx: worker process
+root      6963  6929  0 07:48 pts/8    00:00:00 grep --color=auto nginx
+root@ubuntu:/usr/local/nginx# kill -s SIGUSR2 6960
+root@ubuntu:/usr/local/nginx# ls 
+client_body_temp        koi-utf             nginx.conf.default   uwsgi_params
+fastcgi.conf            koi-win             nginx.pid            uwsgi_params.default
+fastcgi.conf.default    logs                nginx.pid.oldbin     uwsgi_temp
+fastcgi_params          mime.types          proxy_temp           win-utf
+fastcgi_params.default  mime.types.default  scgi_params
+fastcgi_temp            nginx               scgi_params.default
+html                    nginx.conf          scgi_temp
+root@ubuntu:/usr/local/nginx# ./nginx
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+nginx: [emerg] still could not bind()
+root@ubuntu:/usr/local/nginx# ps -ef | grep nginx
+root      6960     1  0 07:48 ?        00:00:00 nginx: master process ./nginx
+nobody    6961  6960  0 07:48 ?        00:00:00 nginx: worker process
+root      6964  6960  0 07:49 ?        00:00:00 nginx: master process ./nginx
+nobody    6965  6964  0 07:49 ?        00:00:00 nginx: worker process
+root      6982  6929  0 07:50 pts/8    00:00:00 grep --color=auto nginx
+root@ubuntu:/usr/local/nginx# ls
+client_body_temp        koi-utf             nginx.conf.default   uwsgi_params
+fastcgi.conf            koi-win             nginx.pid            uwsgi_params.default
+fastcgi.conf.default    logs                nginx.pid.oldbin     uwsgi_temp
+fastcgi_params          mime.types          proxy_temp           win-utf
+fastcgi_params.default  mime.types.default  scgi_params
+fastcgi_temp            nginx               scgi_params.default
+html                    nginx.conf          scgi_temp
+root@ubuntu:/usr/local/nginx# cat nginx.pid
+6964
+root@ubuntu:/usr/local/nginx# kill -s SIGHUP 6960
+root@ubuntu:/usr/local/nginx# ps -ef | grep nginx
+root      6960     1  0 07:48 ?        00:00:00 nginx: master process ./nginx
+nobody    6961  6960  0 07:48 ?        00:00:00 nginx: worker process
+root      6964  6960  0 07:49 ?        00:00:00 nginx: master process ./nginx
+nobody    6965  6964  0 07:49 ?        00:00:00 nginx: worker process
+nobody    6985  6960  0 07:53 ?        00:00:00 nginx: worker process
+root      6987  6929  0 07:53 pts/8    00:00:00 grep --color=auto nginx
+root@ubuntu:/usr/local/nginx# ./nginx -s reload
+root@ubuntu:/usr/local/nginx# ps -ef | grep nginx
+root      6960     1  0 07:48 ?        00:00:00 nginx: master process ./nginx
+nobody    6961  6960  0 07:48 ?        00:00:00 nginx: worker process
+root      6964  6960  0 07:49 ?        00:00:00 nginx: master process ./nginx
+nobody    6985  6960  0 07:53 ?        00:00:00 nginx: worker process
+nobody    6990  6964  0 07:54 ?        00:00:00 nginx: worker process
+root      6992  6929  0 07:54 pts/8    00:00:00 grep --color=auto nginx
+root@ubuntu:/usr/local/nginx# ls
+client_body_temp        koi-utf             nginx.conf.default   uwsgi_params
+fastcgi.conf            koi-win             nginx.pid            uwsgi_params.default
+fastcgi.conf.default    logs                nginx.pid.oldbin     uwsgi_temp
+fastcgi_params          mime.types          proxy_temp           win-utf
+fastcgi_params.default  mime.types.default  scgi_params
+fastcgi_temp            nginx               scgi_params.default
+html                    nginx.conf          scgi_temp
+root@ubuntu:/usr/local/nginx# kill -s SIGHUP 6960
+root@ubuntu:/usr/local/nginx# ps -ef | grep nginx
+root      6960     1  0 07:48 ?        00:00:00 nginx: master process ./nginx
+nobody    6961  6960  0 07:48 ?        00:00:00 nginx: worker process
+root      6964  6960  0 07:49 ?        00:00:00 nginx: master process ./nginx
+nobody    6985  6960  0 07:53 ?        00:00:00 nginx: worker process
+nobody    6990  6964  0 07:54 ?        00:00:00 nginx: worker process
+nobody    6994  6960  0 07:57 ?        00:00:00 nginx: worker process
+root      6996  6929  0 07:57 pts/8    00:00:00 grep --color=auto nginx
+{% endhighlight %}
 <br />
 <br />
 
