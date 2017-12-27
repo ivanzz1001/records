@@ -76,10 +76,10 @@ static void ngx_channel_handler(ngx_event_t *ev);
 //11: cache manager进程主循环
 static void ngx_cache_manager_process_cycle(ngx_cycle_t *cycle, void *data);
 
-//12: cache manager进程事件处理函数
+//12: cache manager进程事件处理函数（定时事件与其他事件）
 static void ngx_cache_manager_process_handler(ngx_event_t *ev);
 
-//13: cache loader进程事件处理函数
+//13: cache loader进程事件处理函数(定时事件与其他事件）
 static void ngx_cache_loader_process_handler(ngx_event_t *ev);
 
 {% endhighlight %}
@@ -96,9 +96,13 @@ static void ngx_cache_loader_process_handler(ngx_event_t *ev);
 
 2. [Nginx缓存机制详解之一缓存管理进程](http://www.it165.net/admin/html/201606/7890.html)
 
+3. [cache loader process进程分析](http://blog.csdn.net/weiyuefei/article/details/35634675)
 
+4. [绑定Nginx到gdb](http://book.51cto.com/art/201305/395377.htm)
 
+5. [Nginx核心进程模型](https://www.cnblogs.com/ljygoodgoodstudydaydayup/p/3888508.html)
 
+6. [event 模块(二) ——事件驱动核心](http://blog.csdn.net/lengzijian/article/details/7601730)
 
 <br />
 <br />
