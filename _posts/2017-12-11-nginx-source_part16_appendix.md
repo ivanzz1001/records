@@ -152,7 +152,22 @@ Killed               //此处我们在另一个终端向本进程发送了kill -
 
 int sigsuspend(const sigset_t *mask);
 {% endhighlight %}
+sigsuspend()函数临时用```mask```信号集替换当前调用进程的信号阻塞掩码，然后挂起进程的执行，直到收到一个需要调用处理函数的信号(处理函数不能为SIG_IGN)或者进程终止。
 
+假如该信号终止了进程，则sigsuspend()函数并不会返回；假如信号被捕捉到，则在信号处理函数返回后sigsuspend()函数才会返回，并且当前被阻塞的信号掩码会被重置为调用sigsuspend()函数之前的状态。
+
+<pre>
+注意：并不能阻塞SIGKILL和SIGSTOP信号。即使在信号掩码中指定这两个信号，都不会实质影响到进程的信号掩码。
+</pre>
+
+通常情况下，sigsuspend()函数搭配sigprocmask()函数一起使用，以此来保护关键代码段在执行期间并不会被投递我们屏蔽的信号。调用者一般是先调用sigprocmask()函数屏蔽一些信号，然后执行关键代码段，再接着调用sigsuspend()函数等待相应需要处理的信号的到来。如下：
+<pre>
+sigprocmask()
+
+critical_code
+
+sigsuspend()
+</pre>
 
 
 
