@@ -369,8 +369,63 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 
 **1) master进程信号屏蔽**
 
-关于```sigprocmask()```函数请先参看: [ngx_process_cycle源码分析-附录]()
+关于```sigprocmask()```函数请先参看: [ngx_process_cycle源码分析-附录](https://ivanzz1001.github.io/records/post/nginx/2017/12/11/nginx-source_part16_appendix)
 
+这里主要是屏蔽一下10个信号：
+
+* SIGCHLD
+
+* SIGALRM
+
+* SIGIO
+
+* SIGINT
+
+* NGX_RECONFIGURE_SIGNAL
+
+* NGX_REOPEN_SIGNAL
+
+* NGX_NOACCEPT_SIGNAL
+
+* NGX_TERMINATE_SIGNAL
+
+* NGX_SHUTDOWN_SIGNAL
+
+* NGX_CHANGEBIN_SIGNAL
+
+可以看到，与ngx_process.c中signals数组中的信号一致，只是少了```SIGSYS```与```SIGPIPE```。这是因为这两个信号的处理函数都是```SIG_IGN```, sigsuspend()并不会受到所忽略的信号的影响。
+
+**2) 设置master进程的标题**
+{% highlight string %}
+size = sizeof(master_process);
+
+for (i = 0; i < ngx_argc; i++) {
+    size += ngx_strlen(ngx_argv[i]) + 1;
+}
+
+title = ngx_pnalloc(cycle->pool, size);
+if (title == NULL) {
+    /* fatal */
+    exit(2);
+}
+
+p = ngx_cpymem(title, master_process, sizeof(master_process) - 1);
+for (i = 0; i < ngx_argc; i++) {
+    *p++ = ' ';
+    p = ngx_cpystrn(p, (u_char *) ngx_argv[i], size);
+}
+
+ngx_setproctitle(title);
+{% endhighlight %}
+这里首先分配一定的空间用于存放title,然后将```nginx process```字符串与nginx启动参数拼接，最后调用ngx_setproctitle()函数设置进程title。最后大概设置成如下样式：
+<pre>
+nginx: master process /usr/local/nginx/nginx
+</pre>
+
+
+** 3) 启动worker进程**
+{% highlight string %}
+{% endhighlight %}
 
 
 
