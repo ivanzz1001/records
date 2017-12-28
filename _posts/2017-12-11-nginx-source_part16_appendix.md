@@ -170,9 +170,190 @@ sigsuspend()
 </pre>
 
 
+## 1.3 函数pthread_sigmask()
+前面我们说道，sigprocmask()函数是针对进程中只有一个线程的情况。针对一个进程中有多个线程这一情景，我们用pthread_sigmask()函数：
+{% highlight string %}
+#include <signal.h>
 
-<br />
-<br />
+int pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset);
+{% endhighlight %}
+pthread_sigmask()函数用法与sigprocmask()相似，但是主要是用在多线程这一情形中。pthread_sigmask()是线程安全的。
+
+本函数成功时返回0，失败时返回对应的错误号。
+
+<pre>
+说明：一个新创建的线程会继承其创建者的信号掩码
+</pre>
+
+如下给出一个例子。该例子会在主线程中阻塞一些信号，然后在创建一个线程通过sigwait()函数来获取这些信号：
+{% highlight string %}
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <errno.h>
+
+/* Simple error handling functions */
+
+#define handle_error_en(en, msg) \
+       do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
+
+static void *
+sig_thread(void *arg)
+{
+   sigset_t *set = arg;
+   int s, sig;
+
+   for (;;) {
+       s = sigwait(set, &sig);
+       if (s != 0)
+           handle_error_en(s, "sigwait");
+       printf("Signal handling thread got signal %d\n", sig);
+   }
+}
+
+int
+main(int argc, char *argv[])
+{
+   pthread_t thread;
+   sigset_t set;
+   int s;
+
+   /* Block SIGQUIT and SIGUSR1; other threads created by main()
+      will inherit a copy of the signal mask. */
+
+   sigemptyset(&set);
+   sigaddset(&set, SIGQUIT);
+   sigaddset(&set, SIGUSR1);
+   s = pthread_sigmask(SIG_BLOCK, &set, NULL);
+   if (s != 0)
+       handle_error_en(s, "pthread_sigmask");
+
+   s = pthread_create(&thread, NULL, &sig_thread, (void *) &set);
+   if (s != 0)
+       handle_error_en(s, "pthread_create");
+
+   /* Main thread carries on to create other threads and/or do
+      other work */
+
+   pause();            /* Dummy pause so we can test program */
+}
+{% endhighlight %}
+编译运行：
+<pre>
+[root@localhost test-src]# gcc -o test3 test3.c -lpthread
+[root@localhost test-src]# ./test3 &
+[1] 4985
+[root@localhost test-src]# kill -QUIT %1
+Signal handling thread got signal 3
+[root@localhost test-src]# kill -USR1 %1
+Signal handling thread got signal 10
+[root@localhost test-src]# kill -TERM %1
+[root@localhost test-src]# ps -ef | grep test3
+[1]+  Terminated              ./test3
+</pre>
+
+### 1.4 多线程程序信号投递
+在一个运行有多个线程的进程中，信号具体会投递到哪一个线程是未知的，请参看如下程序：
+{% highlight string %}
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <errno.h>
+
+/* Simple error handling functions */
+
+#define handle_error_en(en, msg) \
+       do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
+
+static void *
+sig_thread(void *arg)
+{
+   sigset_t *set = arg;
+   int s, sig;
+   pthread_t pid;
+   pid = pthread_self();
+
+   for (;;) {
+       s = sigwait(set, &sig);
+       if (s != 0)
+           handle_error_en(s, "sigwait");
+       printf("Signal handling thread[%d] got signal %d\n",pid, sig);
+   }
+}
+
+int
+main(int argc, char *argv[])
+{
+   pthread_t thread[5];
+   sigset_t set;
+   int s;
+   int sig;
+   int i;
+
+   /* Block SIGQUIT and SIGUSR1; other threads created by main()
+      will inherit a copy of the signal mask. */
+
+   sigemptyset(&set);
+   sigaddset(&set, SIGQUIT);
+   sigaddset(&set, SIGUSR1);
+   s = pthread_sigmask(SIG_BLOCK, &set, NULL);
+   if (s != 0)
+       handle_error_en(s, "pthread_sigmask");
+
+   for(i = 0;i<5;i++)
+   {
+      s = pthread_create(&thread[i], NULL, &sig_thread, (void *) &set);
+      if (s != 0)
+         handle_error_en(s, "pthread_create");
+   }
+
+   /* Main thread carries on to create other threads and/or do
+      other work */
+
+   //pause();            /* Dummy pause so we can test program */
+    for (;;) {
+        s = sigwait(&set, &sig);
+        if (s != 0)
+            handle_error_en(s, "sigwait");
+        printf("Signal handling thread(main) got signal %d\n", sig);
+    }
+    return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+[root@localhost test-src]# gcc -o test3 test3.c -lpthread
+[root@localhost test-src]# for i in {1..20}; do kill -QUIT %1; done
+Signal handling thread(main) got signal 3
+Signal handling thread[1332807424] got signal 3
+Signal handling thread[1332807424] got signal 3
+Signal handling thread[1332807424] got signal 3
+Signal handling thread(main) got signal 3
+Signal handling thread[1299236608] got signal 3
+Signal handling thread(main) got signal 3
+Signal handling thread(main) got signal 3
+Signal handling thread[1332807424] got signal 3
+Signal handling thread[1332807424] got signal 3
+Signal handling thread(main) got signal 3
+Signal handling thread(main) got signal 3
+Signal handling thread[1299236608] got signal 3
+Signal handling thread[1299236608] got signal 3
+Signal handling thread[1332807424] got signal 3
+</pre>
+**说明：**
+
+1) 这里我们采用脚本来向test3发送信号，否则可能比较难以见到信号被投递到子线程
+
+2) 我们循环20次，发送了20个QUIT信号，但是```Signal handling...```只打印了15次，这是因为在信号中断的过程中一般会屏蔽接收相同的信号，直到从上一次信号中断返回为止，因此这里我们的打印次数一定<=20。我们可以在每次调用之后睡眠一段时间，这时候就可以看到打印次数为20。
+
+
+
+
+
 
 ## 2. nginx平滑升级时reconfigure
 {% highlight string %}
