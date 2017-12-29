@@ -425,8 +425,20 @@ nginx: master process /usr/local/nginx/nginx
 
 ** 3) 启动worker进程**
 {% highlight string %}
+ngx_start_worker_processes(cycle, ccf->worker_processes,
+                               NGX_PROCESS_RESPAWN);
 {% endhighlight %}
+关于ngx_start_worker_processes()函数我们会在下面进行讲解。这里只注意到一个参数```NGX_PROCESS_RESPAWN```，表示此进程退出后需要重启。
 
+**4) 启动cache manager进程**
+{% highlight string %}
+ngx_start_cache_manager_processes(cycle, 0);
+{% endhighlight %}
+关于ngx_start_cache_manager_processes()函数我们会在下面进行讲解。这里注意到传入的值为0。
+
+### 2.2 master主循环
+
+在讲解主循环之前，请先参看附录[ngx_process_cycle源码分析-附录](https://ivanzz1001.github.io/records/post/nginx/2017/12/11/nginx-source_part16_appendix)中关于setitimer()的讲解。
 
 
 

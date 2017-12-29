@@ -351,11 +351,169 @@ Signal handling thread[1332807424] got signal 3
 2) 我们循环20次，发送了20个QUIT信号，但是```Signal handling...```只打印了15次，这是因为在信号中断的过程中一般会屏蔽接收相同的信号，直到从上一次信号中断返回为止，因此这里我们的打印次数一定<=20。我们可以在每次调用之后睡眠一段时间，这时候就可以看到打印次数为20。
 
 
+## 2. Linux中setitimer()定时器
+{% highlight string %}
+#include <sys/time.h>
+
+int getitimer(int which, struct itimerval *curr_value);
+int setitimer(int which, const struct itimerval *new_value,
+             struct itimerval *old_value);
+{% endhighlight %}
+系统为每一个进程提供了3种间隔的定时器，每一种都在其特定的时间域内进行递减。当任何一个定时器到期之后，都会有一个信号发送到进程，然后根据设置定时器可能就会再进行重启。这三种类型的定时器分别为：
+
+* **ITIMER_REAL**: 在实际时间域进行递减，到期后会投递一个SIGALRM信号。
+
+* **ITIMER_VIRTUAL**: 以该进程在用户态花费的时间来计算，到期后会投递一个SIGVALRM信号。
+
+* **ITIMER_PROF**: 以该进程在用户态和内核态花费的时间来计算，到期后会投递一个ITIMER_PROF信号。
+
+Timer值由如下结构体定义：
+{% highlight string %}
+struct itimerval {
+   struct timeval it_interval; /* next value */
+   struct timeval it_value;    /* current value */
+};
+
+struct timeval {
+   time_t      tv_sec;         /* seconds */
+   suseconds_t tv_usec;        /* microseconds */
+};
+{% endhighlight %}
+函数**getitimer()**会用当前的设定值填充```curr_value```指向的结构体。curr_value->it_value会被设置为当前定时器的剩余时间，或者在该定时器被disable之后会被设置为0。相似的,curr_value->it_interval会被设置为重置值。
+
+函数**setitimter()**会设置指定的定时器(REAL,VIRTUAL,PROF)的值为```new_value```。假如```old_value```不为NULL，则该定时器的原来的值会存放于该参数。
+
+定时器(REAL,VIRTUAL,PROF)会从it_value一直递减到0，然后定时间隔会被重置为it_interval。如果一个定时器其it_value被设置为0，则该定时器就会停止。
+
+函数成功时返回0，失败时返回-1.
+
+<br />
+请参看如下的例子程序：
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <sys/time.h>
+#include <string.h>
 
 
+sig_atomic_t interrupt;
+
+static void sighandler(int sig)
+{
+    switch(sig)
+    {
+        case SIGINT:
+           interrupt = 1;
+           write(1,"RECV SIGINT\n",strlen("RECV SIGINT\n"));
+           break;
+        case SIGALRM:
+           write(1,"RECV SIGALRM\n",strlen("RECV SIGALRM\n"));
+           break;
+    }
+}
+
+int main(int argc,char *argv[])
+{
+    sigset_t set;
+    struct sigaction sa;
+    struct itimerval   itv;
+    int delay;
+
+    memset(&sa,0x0,sizeof(struct sigaction));
+    sa.sa_handler = sighandler;
+    sigemptyset(&sa.sa_mask);
+    if(sigaction(SIGINT,&sa,NULL) == -1)
+    {
+        printf("sigaction(SIGINT) failed\n");
+        exit(1);
+    }
+
+    memset(&sa,0x0,sizeof(struct sigaction));
+    sa.sa_handler = sighandler;
+    sigemptyset(&sa.sa_mask);
+    if(sigaction(SIGALRM,&sa,NULL) == -1)
+    {
+        printf("sigaction(SIGALRM) failed\n");
+        exit(1);
+    }
+    
+    sigemptyset(&set);
+    sigaddset(&set,SIGTERM);
+    sigaddset(&set,SIGALRM);
+    if(sigprocmask(SIG_BLOCK,&set,NULL) == -1)
+    {
+        printf("sigprocmask failed\n");
+        exit(2);
+    }
+    
+    sigemptyset(&set);
+
+   #if 0
+    delay = 8000;
+    itv.it_interval.tv_sec = 4;
+    itv.it_interval.tv_usec = 0;
+    itv.it_value.tv_sec = delay / 1000;
+    itv.it_value.tv_usec = (delay % 1000 ) * 1000;
+    if (setitimer(ITIMER_REAL, &itv, NULL) == -1) {
+       printf("setitimer failed\n");
+    }
+   #endif
+
+    for(;;)
+    {
+      #if 1
+        //当定时器过期之后，定时器会被重置为it_interval(这里为0，因此该定时器会停止,可认为本定时器是一个
+        //一次性定时器)，然后产生SIGALRM信号，sigsuspend()接收到该信号，调用该信号的处理函数sighandler(),
+        //在处理函数执行完毕后，sigsuspend()返回。返回后执行interrupt条件，然后再开启一次新的循环。
+        delay = 8000;
+        itv.it_interval.tv_sec = 0;
+        itv.it_interval.tv_usec = 0;
+        itv.it_value.tv_sec = delay / 1000;
+        itv.it_value.tv_usec = (delay % 1000 ) * 1000;
+        if (setitimer(ITIMER_REAL, &itv, NULL) == -1) {
+           printf("setitimer failed\n");
+        }
+       #endif
+       
+        sigsuspend(&set);
+        
+        if(interrupt)
+        {
+            interrupt = 0;
+            if(getitimer(ITIMER_REAL,&itv) == 0)
+            {
+                printf("it_interval: %u %u\n",itv.it_interval.tv_sec,itv.it_interval.tv_usec);
+                printf("it_value: %u %u\n", itv.it_value.tv_sec,itv.it_value.tv_usec);
+            }
+        }
+    }
+
+    return 0x0;
+
+}
+{% endhighlight %}
+
+编译运行：
+<pre>
+[root@localhost test-src]# gcc -o test test.c
+[root@localhost test-src]# ./test
+^CRECV SIGINT
+it_interval: 0 0
+it_value: 5 778717
+^CRECV SIGINT
+it_interval: 0 0
+it_value: 6 32245
+RECV SIGALRM
+RECV SIGALRM
+RECV SIGALRM
+Killed
+</pre>
 
 
-## 2. nginx平滑升级时reconfigure
+## 3. nginx平滑升级时reconfigure
 {% highlight string %}
 root@ubuntu:/usr/local/nginx# ./nginx
 root@ubuntu:/usr/local/nginx# 
