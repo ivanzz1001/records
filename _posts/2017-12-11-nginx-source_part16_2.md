@@ -607,6 +607,121 @@ ngx_reconfigure会重新加载配置文件。如果是平滑升级时，执行�
 
 如果是普通的**重新加载配置文件**操作，则首先读取配置文件，然后创建新的worker进程、cache manager进程，最后向原来旧的子进程发送shutdown信号优雅的退出。
 
+<br />
+
+**5) 执行ngx_restart**
+{% highlight string %}
+if (ngx_restart) {
+    ngx_restart = 0;
+    ngx_start_worker_processes(cycle, ccf->worker_processes,
+                               NGX_PROCESS_RESPAWN);
+    ngx_start_cache_manager_processes(cycle, 0);
+    live = 1;
+}
+{% endhighlight %}
+ngx_restart是配合```ngx_noaccept```使用的，ngx_noaccept会优雅的停止worker、cache manager进程，而如果此时又正好碰到平滑升级失败，则通过ngx_restart重新创建worker进程及cache manager进程。
+
+<br />
+
+**6) 执行ngx_reopen**
+{% highlight string %}
+if (ngx_reopen) {
+    ngx_reopen = 0;
+    ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reopening logs");
+    ngx_reopen_files(cycle, ccf->user);
+    ngx_signal_worker_processes(cycle,
+                                ngx_signal_value(NGX_REOPEN_SIGNAL));
+}
+{% endhighlight %}
+ngx_reopen()重新回滚日志。首先调用ngx_reopen_files()重新打开文件，然后向对应的子进程发送reopen信号。
+
+<br />
+
+
+**7) 执行ngx_change_binary**
+{% highlight string %}
+if (ngx_change_binary) {
+    ngx_change_binary = 0;
+    ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "changing binary");
+    ngx_new_binary = ngx_exec_new_binary(cycle, ngx_argv);
+}
+{% endhighlight %}
+这里执行平滑升级。首先创建出一个子进程，然后再执行exec函数族用新的nginx二进制文件替换当前子进程。
+
+<br />
+
+**8) 执行ngx_noaccept**
+{% highlight string %}
+if (ngx_noaccept) {
+    ngx_noaccept = 0;
+    ngx_noaccepting = 1;
+    ngx_signal_worker_processes(cycle,
+                                ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
+}
+{% endhighlight %}
+发送shutdown信号通知子进程优雅的退出。但是master进程不会退出，这一点是与ngx_quit相区别的，也不会向ngx_quit那样关闭监听socket。
+
+
+## 2. 函数ngx_single_process_cycle()
+{% highlight string %}
+void
+ngx_single_process_cycle(ngx_cycle_t *cycle)
+{
+    ngx_uint_t  i;
+
+    if (ngx_set_environment(cycle, NULL) == NULL) {
+        /* fatal */
+        exit(2);
+    }
+
+    for (i = 0; cycle->modules[i]; i++) {
+        if (cycle->modules[i]->init_process) {
+            if (cycle->modules[i]->init_process(cycle) == NGX_ERROR) {
+                /* fatal */
+                exit(2);
+            }
+        }
+    }
+
+    for ( ;; ) {
+        ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "worker cycle");
+
+        ngx_process_events_and_timers(cycle);
+
+        if (ngx_terminate || ngx_quit) {
+
+            for (i = 0; cycle->modules[i]; i++) {
+                if (cycle->modules[i]->exit_process) {
+                    cycle->modules[i]->exit_process(cycle);
+                }
+            }
+
+            ngx_master_process_exit(cycle);
+        }
+
+        if (ngx_reconfigure) {
+            ngx_reconfigure = 0;
+            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reconfiguring");
+
+            cycle = ngx_init_cycle(cycle);
+            if (cycle == NULL) {
+                cycle = (ngx_cycle_t *) ngx_cycle;
+                continue;
+            }
+
+            ngx_cycle = cycle;
+        }
+
+        if (ngx_reopen) {
+            ngx_reopen = 0;
+            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reopening logs");
+            ngx_reopen_files(cycle, (ngx_uid_t) -1);
+        }
+    }
+}
+{% endhighlight %}
+
+
 
 <br />
 <br />
