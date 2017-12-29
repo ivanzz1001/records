@@ -440,8 +440,80 @@ ngx_start_cache_manager_processes(cycle, 0);
 
 在讲解主循环之前，请先参看附录[ngx_process_cycle源码分析-附录](https://ivanzz1001.github.io/records/post/nginx/2017/12/11/nginx-source_part16_appendix)中关于setitimer()的讲解。
 
+下面我们分几个小的部分来进行讲解：
 
+**1) nginx进程terminate结束**
+{% highlight string %}
+for ( ;; ) {
+        if (delay) {
+            if (ngx_sigalrm) {
+                sigio = 0;
+                delay *= 2;
+                ngx_sigalrm = 0;
+            }
 
+            ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+                           "termination cycle: %M", delay);
+
+            itv.it_interval.tv_sec = 0;
+            itv.it_interval.tv_usec = 0;
+            itv.it_value.tv_sec = delay / 1000;
+            itv.it_value.tv_usec = (delay % 1000 ) * 1000;
+
+            if (setitimer(ITIMER_REAL, &itv, NULL) == -1) {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                              "setitimer() failed");
+            }
+        }
+
+        ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "sigsuspend");
+
+        sigsuspend(&set);
+
+        ngx_time_update();
+
+        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+                       "wake up, sigio %i", sigio);
+
+        if (ngx_reap) {
+            ngx_reap = 0;
+            ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "reap children");
+
+            live = ngx_reap_children(cycle);
+        }
+
+        if (!live && (ngx_terminate || ngx_quit)) {
+            ngx_master_process_exit(cycle);
+        }
+
+        if (ngx_terminate) {
+            if (delay == 0) {
+                delay = 50;
+            }
+
+            if (sigio) {
+                sigio--;
+                continue;
+            }
+
+            sigio = ccf->worker_processes + 2 /* cache processes */;
+
+            if (delay > 1000) {
+                ngx_signal_worker_processes(cycle, SIGKILL);
+            } else {
+                ngx_signal_worker_processes(cycle,
+                                       ngx_signal_value(NGX_TERMINATE_SIGNAL));
+            }
+
+            continue;
+        }
+}
+{% endhighlight %}
+这里首先涉及到一个延时退出的问题：首先在第一次收到SIGINT信号时，将delay设置为50，sigio设置为worker进程数+cache进程数，然后通过channel的方式告知子进程退出。如果长时间没有退出，则定时器时间就会超时，产生SIGALRM信号，这时会再发送相应的信号告诉子进程退出。如果在1秒钟的时间内子进程都没有退出，则发送SIGKILL信号暴力退出。
+
+这里有两个变量```delay```与```sigio```控制nginx的terminate退出。前一个主要控制超时，后一个主要控制信号。如果在terminate过程中收到指定数量的信号，则继续发送NGX_TERMINATE_SIGNAL信号指示进程退出,同时重置定时器；否则等待delay控制的定时器超时，然后再继续发送退出信号指示进程退出。
+
+在sigsuspend()上面设置超时定时器的部分关键代码段是不会被打断的，因此可以确保定时器设置成功，进入超时倒计时阶段。并且用sigio变量作为定时器超时过程中的一个额外的辅助变量，相互协作共同控制nginx进程的退出。
 
 
 <br />
