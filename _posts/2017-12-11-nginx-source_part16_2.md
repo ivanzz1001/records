@@ -775,7 +775,92 @@ if (ngx_reopen) {
 这里直接重新打开文件实现日志回滚。
 
 
+## 3. 函数ngx_start_worker_processes()
+{% highlight string %}
+static void
+ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
+{
+    ngx_int_t      i;
+    ngx_channel_t  ch;
 
+    ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "start worker processes");
+
+    ngx_memzero(&ch, sizeof(ngx_channel_t));
+
+    ch.command = NGX_CMD_OPEN_CHANNEL;
+
+    for (i = 0; i < n; i++) {
+
+        ngx_spawn_process(cycle, ngx_worker_process_cycle,
+                          (void *) (intptr_t) i, "worker process", type);
+
+        ch.pid = ngx_processes[ngx_process_slot].pid;
+        ch.slot = ngx_process_slot;
+        ch.fd = ngx_processes[ngx_process_slot].channel[0];
+
+        ngx_pass_open_channel(cycle, &ch);
+    }
+}
+{% endhighlight %}
+
+
+## 4. 函数ngx_start_cache_manager_processes()
+{% highlight string %}
+static void
+ngx_start_cache_manager_processes(ngx_cycle_t *cycle, ngx_uint_t respawn)
+{
+    ngx_uint_t       i, manager, loader;
+    ngx_path_t     **path;
+    ngx_channel_t    ch;
+
+    manager = 0;
+    loader = 0;
+
+    path = ngx_cycle->paths.elts;
+    for (i = 0; i < ngx_cycle->paths.nelts; i++) {
+
+        if (path[i]->manager) {
+            manager = 1;
+        }
+
+        if (path[i]->loader) {
+            loader = 1;
+        }
+    }
+
+    if (manager == 0) {
+        return;
+    }
+
+    ngx_spawn_process(cycle, ngx_cache_manager_process_cycle,
+                      &ngx_cache_manager_ctx, "cache manager process",
+                      respawn ? NGX_PROCESS_JUST_RESPAWN : NGX_PROCESS_RESPAWN);
+
+    ngx_memzero(&ch, sizeof(ngx_channel_t));
+
+    ch.command = NGX_CMD_OPEN_CHANNEL;
+    ch.pid = ngx_processes[ngx_process_slot].pid;
+    ch.slot = ngx_process_slot;
+    ch.fd = ngx_processes[ngx_process_slot].channel[0];
+
+    ngx_pass_open_channel(cycle, &ch);
+
+    if (loader == 0) {
+        return;
+    }
+
+    ngx_spawn_process(cycle, ngx_cache_manager_process_cycle,
+                      &ngx_cache_loader_ctx, "cache loader process",
+                      respawn ? NGX_PROCESS_JUST_SPAWN : NGX_PROCESS_NORESPAWN);
+
+    ch.command = NGX_CMD_OPEN_CHANNEL;
+    ch.pid = ngx_processes[ngx_process_slot].pid;
+    ch.slot = ngx_process_slot;
+    ch.fd = ngx_processes[ngx_process_slot].channel[0];
+
+    ngx_pass_open_channel(cycle, &ch);
+}
+{% endhighlight %}
 
 <br />
 <br />
