@@ -720,6 +720,60 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
     }
 }
 {% endhighlight %}
+nginx只有在配置文件中master_process设置为off时，才会以单进程运行。这里首先设置相应的环境变量，并初始化对应的模块，然后进入主循环。
+
+单进程nginx与master-worker方式运行的nginx，在主循环的处理上还是有很大的不同。在master-worker方式运行的主循环中，master只需要用sigsuspend()接收相应的信号，然后处理。而单进程nginx,它是通过在主循环中调用:
+<pre>
+ngx_process_events_and_timers(cycle);
+</pre>
+不断的接收和处理相关的事件来维持运行的。当ngx_terminate、ngx_quit、ngx_reopen等信号发生时，信号就会中断相应的事件处理模型(select、poll、epoll等）的系统调用，从而执行相应的信号处理函数，并在主循环中执行相应信号引起的其他操作：
+
+**1) 执行ngx_terminate/ngx_quit**
+{% highlight string %}
+if (ngx_terminate || ngx_quit) {
+
+    for (i = 0; cycle->modules[i]; i++) {
+        if (cycle->modules[i]->exit_process) {
+            cycle->modules[i]->exit_process(cycle);
+        }
+    }
+
+    ngx_master_process_exit(cycle);
+}
+{% endhighlight %}
+这里退出相应的模块，然后调用ngx_master_process_exit()退出主循环。
+
+<br />
+
+**2) 执行ngx_reconfigure**
+{% highlight string %}
+if (ngx_reconfigure) {
+    ngx_reconfigure = 0;
+    ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reconfiguring");
+
+    cycle = ngx_init_cycle(cycle);
+    if (cycle == NULL) {
+        cycle = (ngx_cycle_t *) ngx_cycle;
+        continue;
+    }
+
+    ngx_cycle = cycle;
+}
+{% endhighlight %}
+此种情况下，没有相应的平滑升级等方面需要考虑，直接调用ngx_init_cycle()重新初始化配置即可。
+
+<br />
+
+**3) 执行ngx_reopen**
+{% highlight string %}
+if (ngx_reopen) {
+    ngx_reopen = 0;
+    ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reopening logs");
+    ngx_reopen_files(cycle, (ngx_uid_t) -1);
+}
+{% endhighlight %}
+这里直接重新打开文件实现日志回滚。
+
 
 
 
