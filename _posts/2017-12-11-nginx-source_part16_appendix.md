@@ -553,7 +553,7 @@ fastcgi_temp            nginx               scgi_params.default
 html                    nginx.conf          scgi_temp
 root@ubuntu:/usr/local/nginx# cat nginx.pid
 6964
-root@ubuntu:/usr/local/nginx# kill -s SIGHUP 6960
+root@ubuntu:/usr/local/nginx# kill -s SIGHUP 6960                                //重新加载配置
 root@ubuntu:/usr/local/nginx# ps -ef | grep nginx
 root      6960     1  0 07:48 ?        00:00:00 nginx: master process ./nginx
 nobody    6961  6960  0 07:48 ?        00:00:00 nginx: worker process
@@ -566,7 +566,7 @@ root@ubuntu:/usr/local/nginx# ps -ef | grep nginx
 root      6960     1  0 07:48 ?        00:00:00 nginx: master process ./nginx
 nobody    6961  6960  0 07:48 ?        00:00:00 nginx: worker process
 root      6964  6960  0 07:49 ?        00:00:00 nginx: master process ./nginx
-nobody    6985  6960  0 07:53 ?        00:00:00 nginx: worker process
+nobody    6985  6960  0 07:53 ?        00:00:00 nginx: worker process              //对比上面如上pid，进程id发送了改变
 nobody    6990  6964  0 07:54 ?        00:00:00 nginx: worker process
 root      6992  6929  0 07:54 pts/8    00:00:00 grep --color=auto nginx
 root@ubuntu:/usr/local/nginx# ls
@@ -587,6 +587,16 @@ nobody    6990  6964  0 07:54 ?        00:00:00 nginx: worker process
 nobody    6994  6960  0 07:57 ?        00:00:00 nginx: worker process
 root      6996  6929  0 07:57 pts/8    00:00:00 grep --color=auto nginx
 {% endhighlight %}
+
+上面我们首先运行nginx，然后向master进程发送SIGUSR2信号执行平滑升级，这时我们可以看到有两个master进程同时在运行，这时我们发送SIGHUP信号重新加载配置，可以看到会新创建出一个worker process。
+<pre>
+这里注意到，执行./nginx -s reload命令，并没有增加子进程。这时因为此时nginx.pid文件已经发生了改变，我们这里是向新升级的
+nginx发送了SIGHUP信号，因此该新升级的master处理该信号时是先将其worker子进程shutdown掉，然后重新创建子进程。因此我们会
+发现子进程pid发生了改变。
+</pre>
+
+
+
 
 <br />
 <br />
