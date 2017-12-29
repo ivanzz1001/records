@@ -515,6 +515,94 @@ for ( ;; ) {
 
 在sigsuspend()上面设置超时定时器的部分关键代码段是不会被打断的，因此可以确保定时器设置成功，进入超时倒计时阶段。并且用sigio变量作为定时器超时过程中的一个额外的辅助变量，相互协作共同控制nginx进程的退出。
 
+<br />
+
+
+**2) 回收退出的子进程**
+{% highlight string %}
+sigsuspend(&set);
+
+ngx_time_update();
+
+ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+               "wake up, sigio %i", sigio);
+
+if (ngx_reap) {
+    ngx_reap = 0;
+    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "reap children");
+
+    live = ngx_reap_children(cycle);
+}
+
+if (!live && (ngx_terminate || ngx_quit)) {
+    ngx_master_process_exit(cycle);
+}
+{% endhighlight %}
+这里我们看到sigsuspend()接收到信号，调用对应的信号处理函数返回后首先会调用ngx_time_update()函数更新相应的时间。然后检测收到的信号，如果该信号是进程退出信号，则调用ngx_reap_children()回收相应的资源；如果该信号是terminate或quit信号，则调用ngx_master_process_exit()函数执行退出主循环。
+
+<br />
+
+**3) 执行ngx_quit退出操作**
+{% highlight string %}
+if (ngx_quit) {
+    ngx_signal_worker_processes(cycle,
+                                ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
+
+    ls = cycle->listening.elts;
+    for (n = 0; n < cycle->listening.nelts; n++) {
+        if (ngx_close_socket(ls[n].fd) == -1) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_socket_errno,
+                          ngx_close_socket_n " %V failed",
+                          &ls[n].addr_text);
+        }
+    }
+    cycle->listening.nelts = 0;
+
+    continue;
+}
+{% endhighlight %}
+nginx_quit是优雅退出，因此这里首先向对应的子进程(worker进程、缓存管理器进程）发送shutdown信号，然后依次关闭对应的监听socket。
+
+<br />
+
+**4) 执行ngx_reconfigure**
+{% highlight string %}
+if (ngx_reconfigure) {
+    ngx_reconfigure = 0;
+
+    if (ngx_new_binary) {
+        ngx_start_worker_processes(cycle, ccf->worker_processes,
+                                   NGX_PROCESS_RESPAWN);
+        ngx_start_cache_manager_processes(cycle, 0);
+        ngx_noaccepting = 0;
+
+        continue;
+    }
+
+    ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reconfiguring");
+
+    cycle = ngx_init_cycle(cycle);
+    if (cycle == NULL) {
+        cycle = (ngx_cycle_t *) ngx_cycle;
+        continue;
+    }
+
+    ngx_cycle = cycle;
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx,
+                                           ngx_core_module);
+    ngx_start_worker_processes(cycle, ccf->worker_processes,
+                               NGX_PROCESS_JUST_RESPAWN);
+    ngx_start_cache_manager_processes(cycle, 1);
+
+    /* allow new processes to start */
+    ngx_msleep(100);
+
+    live = 1;
+    ngx_signal_worker_processes(cycle,
+                                ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
+}
+{% endhighlight %}
+
 
 <br />
 <br />
