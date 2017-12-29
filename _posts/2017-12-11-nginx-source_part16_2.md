@@ -370,7 +370,6 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 **1) master进程信号屏蔽**
 
 关于```sigprocmask()```函数请先参看: [ngx_process_cycle源码分析-附录](https://ivanzz1001.github.io/records/post/nginx/2017/12/11/nginx-source_part16_appendix)
-
 这里主要是屏蔽一下10个信号：
 
 * SIGCHLD
@@ -423,7 +422,7 @@ nginx: master process /usr/local/nginx/nginx
 </pre>
 
 
-** 3) 启动worker进程**
+**3) 启动worker进程**
 {% highlight string %}
 ngx_start_worker_processes(cycle, ccf->worker_processes,
                                NGX_PROCESS_RESPAWN);
@@ -563,6 +562,7 @@ if (ngx_quit) {
 {% endhighlight %}
 nginx_quit是优雅退出，因此这里首先向对应的子进程(worker进程、缓存管理器进程）发送shutdown信号，然后依次关闭对应的监听socket。
 
+这里注意到，当执行terminate和quit退出时，末尾执行continue语句，并不会再对如ngx_reconfigure、ngx_restart等做出反应。
 <br />
 
 **4) 执行ngx_reconfigure**
@@ -602,6 +602,10 @@ if (ngx_reconfigure) {
                                 ngx_signal_value(NGX_SHUTDOWN_SIGNAL));
 }
 {% endhighlight %}
+
+ngx_reconfigure会重新加载配置文件。如果是平滑升级时，执行重新加载配置文件的操作，则ngx_new_binary条件为真，此时会新创建worker进程及cache manager进程，关于这一点请参看[ngx_process_cycle源码分析-附录](https://ivanzz1001.github.io/records/post/nginx/2017/12/11/nginx-source_part16_appendix)中相关章节。
+
+如果是普通的**重新加载配置文件**操作，则首先读取配置文件，然后创建新的worker进程、cache manager进程，最后向原来旧的子进程发送shutdown信号优雅的退出。
 
 
 <br />
