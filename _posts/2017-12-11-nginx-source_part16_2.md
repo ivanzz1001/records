@@ -803,6 +803,19 @@ ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
 }
 {% endhighlight %}
 
+这里循环调用ngx_spawn_process()产生n个worker子进程。并向ngx_processes表中的其他子进程(worker子进程以及cache manager子进程）传送文件描述符，用于进程之间的通信。这里有两点需要注意的地方：
+
+**1) 参数i的作用**
+{% highlight string %}
+ngx_spawn_process(cycle, ngx_worker_process_cycle,
+                          (void *) (intptr_t) i, "worker process", type);
+{% endhighlight %}
+这里传递参数i，主要是为了标识当前所产生的进程是属于第几个worker子进程，然后将该子进程与CPU进行绑定，即设置该进程的CPU亲和性。
+
+**2) 子进程间的通信**
+
+子进程之间的通信都是通过往channel[0]中写数据，然后从channel[1]中读取数据。
+
 
 ## 4. 函数ngx_start_cache_manager_processes()
 {% highlight string %}
@@ -861,6 +874,39 @@ ngx_start_cache_manager_processes(ngx_cycle_t *cycle, ngx_uint_t respawn)
     ngx_pass_open_channel(cycle, &ch);
 }
 {% endhighlight %}
+这里首先检查是否有相应的管理器与加载器，如果有的话则创建对应的子进程。关于cache manager我们后边会进行更详细的探讨。
+
+## 5. 函数ngx_pass_open_channel()
+{% highlight string %}
+static void
+ngx_pass_open_channel(ngx_cycle_t *cycle, ngx_channel_t *ch)
+{
+    ngx_int_t  i;
+
+    for (i = 0; i < ngx_last_process; i++) {
+
+        if (i == ngx_process_slot
+            || ngx_processes[i].pid == -1
+            || ngx_processes[i].channel[0] == -1)
+        {
+            continue;
+        }
+
+        ngx_log_debug6(NGX_LOG_DEBUG_CORE, cycle->log, 0,
+                      "pass channel s:%i pid:%P fd:%d to s:%i pid:%P fd:%d",
+                      ch->slot, ch->pid, ch->fd,
+                      i, ngx_processes[i].pid,
+                      ngx_processes[i].channel[0]);
+
+        /* TODO: NGX_AGAIN */
+
+        ngx_write_channel(ngx_processes[i].channel[0],
+                          ch, sizeof(ngx_channel_t), cycle->log);
+    }
+}
+{% endhighlight %}
+
+
 
 <br />
 <br />
@@ -880,6 +926,8 @@ ngx_start_cache_manager_processes(ngx_cycle_t *cycle, ngx_uint_t respawn)
 6. [event 模块(二) ——事件驱动核心](http://blog.csdn.net/lengzijian/article/details/7601730)
 
 7. [Nginx平滑升级源码分析](http://blog.csdn.net/zdy0_2004/article/details/78230352)
+
+8. [nginx文件结构](http://blog.csdn.net/apelife/article/details/53043275)
 
 <br />
 <br />
