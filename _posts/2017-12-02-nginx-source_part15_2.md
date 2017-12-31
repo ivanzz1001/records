@@ -1057,7 +1057,7 @@ pid: 4972
 pid: -1
 errno: No child processes
 </pre>
-从上面我们可以看到，如果我们将对于某一个子进程的``SIGCHLD```信号设置处理函数为```SIG_IGN```，则调用waitpid()函数会返回-1，并提示errno为```ECHILD```。如果并没有任何可等待的子进程退出，函数waitpid()也会返回-1。
+从上面我们可以看到，如果我们将对于某一个子进程的```SIGCHLD```信号设置处理函数为```SIG_IGN```，则调用waitpid()函数会返回-1，并提示errno为```ECHILD```。如果并没有任何可等待的子进程退出，函数waitpid()也会返回-1。
 
 接下来我们来看nginx中对pid为-1的情况下的处理：
 {% highlight string %}

@@ -1010,6 +1010,217 @@ ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
     }
 }
 {% endhighlight %}
+本函数是向worker子进程、cache manager子进程发送信号。首先在发送前准备好相应的命令:
+<pre>
+#if (NGX_BROKEN_SCM_RIGHTS)
+
+#else
+
+#endif
+</pre>
+这里并未定义```NGX_BROKEN_SCM_RIGHTS```，因此执行的是else分支。接下来循环向各个子进程发送相关命令：首先用ngx_write_channel()向子进程发送信息，如果发送失败则用kill()直接向对应的子进程发送信号。
+
+## 7. 函数ngx_reap_children()
+{% highlight string %}
+static ngx_uint_t
+ngx_reap_children(ngx_cycle_t *cycle)
+{
+    ngx_int_t         i, n;
+    ngx_uint_t        live;
+    ngx_channel_t     ch;
+    ngx_core_conf_t  *ccf;
+
+    ngx_memzero(&ch, sizeof(ngx_channel_t));
+
+    ch.command = NGX_CMD_CLOSE_CHANNEL;
+    ch.fd = -1;
+
+    live = 0;
+    for (i = 0; i < ngx_last_process; i++) {
+
+        ngx_log_debug7(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+                       "child: %i %P e:%d t:%d d:%d r:%d j:%d",
+                       i,
+                       ngx_processes[i].pid,
+                       ngx_processes[i].exiting,
+                       ngx_processes[i].exited,
+                       ngx_processes[i].detached,
+                       ngx_processes[i].respawn,
+                       ngx_processes[i].just_spawn);
+
+        if (ngx_processes[i].pid == -1) {
+            continue;
+        }
+
+        if (ngx_processes[i].exited) {
+
+            if (!ngx_processes[i].detached) {
+                ngx_close_channel(ngx_processes[i].channel, cycle->log);
+
+                ngx_processes[i].channel[0] = -1;
+                ngx_processes[i].channel[1] = -1;
+
+                ch.pid = ngx_processes[i].pid;
+                ch.slot = i;
+
+                for (n = 0; n < ngx_last_process; n++) {
+                    if (ngx_processes[n].exited
+                        || ngx_processes[n].pid == -1
+                        || ngx_processes[n].channel[0] == -1)
+                    {
+                        continue;
+                    }
+
+                    ngx_log_debug3(NGX_LOG_DEBUG_CORE, cycle->log, 0,
+                                   "pass close channel s:%i pid:%P to:%P",
+                                   ch.slot, ch.pid, ngx_processes[n].pid);
+
+                    /* TODO: NGX_AGAIN */
+
+                    ngx_write_channel(ngx_processes[n].channel[0],
+                                      &ch, sizeof(ngx_channel_t), cycle->log);
+                }
+            }
+
+            if (ngx_processes[i].respawn
+                && !ngx_processes[i].exiting
+                && !ngx_terminate
+                && !ngx_quit)
+            {
+                if (ngx_spawn_process(cycle, ngx_processes[i].proc,
+                                      ngx_processes[i].data,
+                                      ngx_processes[i].name, i)
+                    == NGX_INVALID_PID)
+                {
+                    ngx_log_error(NGX_LOG_ALERT, cycle->log, 0,
+                                  "could not respawn %s",
+                                  ngx_processes[i].name);
+                    continue;
+                }
+
+
+                ch.command = NGX_CMD_OPEN_CHANNEL;
+                ch.pid = ngx_processes[ngx_process_slot].pid;
+                ch.slot = ngx_process_slot;
+                ch.fd = ngx_processes[ngx_process_slot].channel[0];
+
+                ngx_pass_open_channel(cycle, &ch);
+
+                live = 1;
+
+                continue;
+            }
+
+            if (ngx_processes[i].pid == ngx_new_binary) {
+
+                ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx,
+                                                       ngx_core_module);
+
+                if (ngx_rename_file((char *) ccf->oldpid.data,
+                                    (char *) ccf->pid.data)
+                    == NGX_FILE_ERROR)
+                {
+                    ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                                  ngx_rename_file_n " %s back to %s failed "
+                                  "after the new binary process \"%s\" exited",
+                                  ccf->oldpid.data, ccf->pid.data, ngx_argv[0]);
+                }
+
+                ngx_new_binary = 0;
+                if (ngx_noaccepting) {
+                    ngx_restart = 1;
+                    ngx_noaccepting = 0;
+                }
+            }
+
+            if (i == ngx_last_process - 1) {
+                ngx_last_process--;
+
+            } else {
+                ngx_processes[i].pid = -1;
+            }
+
+        } else if (ngx_processes[i].exiting || !ngx_processes[i].detached) {
+            live = 1;
+        }
+    }
+
+    return live;
+}
+{% endhighlight %}
+本函数回收所有已经退出子进程。如果ngx_processes进程表中仍有未退出的子进程，则返回1；否则返回0。接着执行循环关闭与该子进程相关的channel：
+{% highlight string %}
+for(ngx_processes)
+{
+     //1: 关闭退出子进程相关的channel。主要是需要告知其他子进程不应该再用该退出子进程的channel[0]了
+
+    //2: 对于需要respawn的进程，调用ngx_spawn_process()重启进程
+
+    //3: 如果退出的子进程是平滑升级的子进程，此时会将nginx.pid.oldbin更改回nginx.pid，并且如果原来的worker子进程
+    //   执行了优雅的退出的话，此时会重启worker子进程。
+
+    //4: 更改ngx_processes表中的退出子进程的pid
+}
+{% endhighlight %}
+
+## 8. 函数ngx_master_process_exit()
+{% highlight string %}
+static void
+ngx_master_process_exit(ngx_cycle_t *cycle)
+{
+    ngx_uint_t  i;
+
+    ngx_delete_pidfile(cycle);
+
+    ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exit");
+
+    for (i = 0; cycle->modules[i]; i++) {
+        if (cycle->modules[i]->exit_master) {
+            cycle->modules[i]->exit_master(cycle);
+        }
+    }
+
+    ngx_close_listening_sockets(cycle);
+
+    /*
+     * Copy ngx_cycle->log related data to the special static exit cycle,
+     * log, and log file structures enough to allow a signal handler to log.
+     * The handler may be called when standard ngx_cycle->log allocated from
+     * ngx_cycle->pool is already destroyed.
+     */
+
+
+    ngx_exit_log = *ngx_log_get_file_log(ngx_cycle->log);
+
+    ngx_exit_log_file.fd = ngx_exit_log.file->fd;
+    ngx_exit_log.file = &ngx_exit_log_file;
+    ngx_exit_log.next = NULL;
+    ngx_exit_log.writer = NULL;
+
+    ngx_exit_cycle.log = &ngx_exit_log;
+    ngx_exit_cycle.files = ngx_cycle->files;
+    ngx_exit_cycle.files_n = ngx_cycle->files_n;
+    ngx_cycle = &ngx_exit_cycle;
+
+    ngx_destroy_pool(cycle->pool);
+
+    exit(0);
+}
+{% endhighlight %}}
+在master退出时，执行步骤如下：
+
+* 删除nginx.pid文件
+
+* 调用各个模块的exit_master()函数
+
+* 关闭监听socket
+
+* 销毁pool
+
+<pre>
+注意：在销毁pool之前会先把ngx_cycle->log相关的数据保存到一个静态的数据结构ngx_exit_cycle中，这是因为在ngx_cycle->pool
+销毁之后，有可能仍然会调用到日志打印相关的操作。
+</pre>
 
 
 <br />
