@@ -905,7 +905,111 @@ ngx_pass_open_channel(ngx_cycle_t *cycle, ngx_channel_t *ch)
     }
 }
 {% endhighlight %}
+这里主要是通过master进程，向其各个子进程通过ngx_write_channel()传递文件描述符。
 
+## 6. 函数ngx_signal_worker_processes()
+{% highlight string %}
+static void
+ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
+{
+    ngx_int_t      i;
+    ngx_err_t      err;
+    ngx_channel_t  ch;
+
+    ngx_memzero(&ch, sizeof(ngx_channel_t));
+
+#if (NGX_BROKEN_SCM_RIGHTS)
+
+    ch.command = 0;
+
+#else
+
+    switch (signo) {
+
+    case ngx_signal_value(NGX_SHUTDOWN_SIGNAL):
+        ch.command = NGX_CMD_QUIT;
+        break;
+
+    case ngx_signal_value(NGX_TERMINATE_SIGNAL):
+        ch.command = NGX_CMD_TERMINATE;
+        break;
+
+    case ngx_signal_value(NGX_REOPEN_SIGNAL):
+        ch.command = NGX_CMD_REOPEN;
+        break;
+
+    default:
+        ch.command = 0;
+    }
+
+#endif
+
+    ch.fd = -1;
+
+
+    for (i = 0; i < ngx_last_process; i++) {
+
+        ngx_log_debug7(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+                       "child: %i %P e:%d t:%d d:%d r:%d j:%d",
+                       i,
+                       ngx_processes[i].pid,
+                       ngx_processes[i].exiting,
+                       ngx_processes[i].exited,
+                       ngx_processes[i].detached,
+                       ngx_processes[i].respawn,
+                       ngx_processes[i].just_spawn);
+
+        if (ngx_processes[i].detached || ngx_processes[i].pid == -1) {
+            continue;
+        }
+
+        if (ngx_processes[i].just_spawn) {
+            ngx_processes[i].just_spawn = 0;
+            continue;
+        }
+
+        if (ngx_processes[i].exiting
+            && signo == ngx_signal_value(NGX_SHUTDOWN_SIGNAL))
+        {
+            continue;
+        }
+
+        if (ch.command) {
+            if (ngx_write_channel(ngx_processes[i].channel[0],
+                                  &ch, sizeof(ngx_channel_t), cycle->log)
+                == NGX_OK)
+            {
+                if (signo != ngx_signal_value(NGX_REOPEN_SIGNAL)) {
+                    ngx_processes[i].exiting = 1;
+                }
+
+                continue;
+            }
+        }
+
+        ngx_log_debug2(NGX_LOG_DEBUG_CORE, cycle->log, 0,
+                       "kill (%P, %d)", ngx_processes[i].pid, signo);
+
+        if (kill(ngx_processes[i].pid, signo) == -1) {
+            err = ngx_errno;
+            ngx_log_error(NGX_LOG_ALERT, cycle->log, err,
+                          "kill(%P, %d) failed", ngx_processes[i].pid, signo);
+
+            if (err == NGX_ESRCH) {
+                ngx_processes[i].exited = 1;
+                ngx_processes[i].exiting = 0;
+                ngx_reap = 1;
+            }
+
+            continue;
+        }
+
+        if (signo != ngx_signal_value(NGX_REOPEN_SIGNAL)) {
+            ngx_processes[i].exiting = 1;
+        }
+    }
+}
+{% endhighlight %}
 
 
 <br />
