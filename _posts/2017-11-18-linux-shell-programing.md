@@ -65,7 +65,7 @@ description: Linux命令行与shell脚本
 
 当个```#```或```%```表示最小匹配，双个```#```或```%```表示最大匹配。也就是说，当匹配有多种方案的时候，选择匹配最大程度还是最小长度。
  
-例如：
+**例1：**
 {% highlight string %}
 [root@localhost test-src]# workspace=/home/user/test.txt
 
@@ -92,6 +92,36 @@ home/user/test.txt
 test.txt
 {% endhighlight %}
 
+**例2:**
+
+我们有如下文件people.txt：
+{% highlight string %}
+{"usertag":{"tag":"支配欲强、有责任感","name":"zhangsan 张三","deptname":"集团职能|Headquarter of Group"},"userno":"1001"}
+{"usertag":{"tag":"精力旺盛、不服输","name":"lisi 李四","deptname":"集团职能|Headquarter of Group"},"userno":"1002"}
+{"usertag":{"tag":"性情天真、热情奔放","name":"wangwu 王五","deptname":"集团职能|Headquarter of Group"},"userno":"1003"}
+{% endhighlight %}
+现在要将其userno这一列取出。则可以用如下命令行来完成：
+{% highlight string %}
+# cat people.txt | while read line; do str1=${line##*\"userno\"}; str2=${str1#*\"}; usrno=${str2%%\"*};echo $usrno;done
+1001
+1002
+1003
+{% endhighlight %}
+下面我们演示一下各个步骤的打印输出:
+{% highlight string %}
+# cat people.txt | while read line; do str1=${line##*\"userno\"};echo $str1;done
+:"1001"}
+:"1002"}
+:"1003"}
+# cat people.txt | while read line; do str1=${line##*\"userno\"}; str2=${str1#*\"}; echo $str2;done
+1001"}
+1002"}
+1003"}
+# cat people.txt | while read line; do str1=${line##*\"userno\"}; str2=${str1#*\"}; usrno=${str2%%\"*}; echo $usrno;done
+1001
+1002
+1003
+{% endhighlight %}
 
 
 
