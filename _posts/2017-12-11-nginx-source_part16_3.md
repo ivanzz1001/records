@@ -310,6 +310,33 @@ if (ccf->rlimit_core != NGX_CONF_UNSET) {
 {% endhighlight %}
 如果值为0，则并不会产生coredump文件。
 
+**5) 设置进程的group id和uid**
+{% highlight string %}
+if (geteuid() == 0) {
+    if (setgid(ccf->group) == -1) {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                      "setgid(%d) failed", ccf->group);
+        /* fatal */
+        exit(2);
+    }
+
+    if (initgroups(ccf->username, ccf->group) == -1) {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                      "initgroups(%s, %d) failed",
+                      ccf->username, ccf->group);
+    }
+
+    if (setuid(ccf->user) == -1) {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                      "setuid(%d) failed", ccf->user);
+        /* fatal */
+        exit(2);
+    }
+}
+{% endhighlight %}
+这里若```geteuid()```返回值为0，则表示当前进程是以root特权身份执行的，此种情况下拥有权限可以设置生成的worker子进程的group id和user id。函数```setgid()```用于设置有效组ID.
+
+
 
 
 
