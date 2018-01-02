@@ -260,8 +260,55 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
 否则从系统环境变量中查找来进行赋值。
 </pre>
 
+<br />
 
+**2) 设置worker进程优先级**
 
+这里我们首先介绍一下setpriority()函数：
+{% highlight string %}
+#include <sys/time.h>
+#include <sys/resource.h>
+
+int getpriority(int which, int who);
+int setpriority(int which, int who, int prio);
+{% endhighlight %}
+上述两个函数分别用于获取和设置相应进程的调度优先级。参数which可以取值为**PRIO_PROCESS**、**PRIO_GRP**、**PRIO_USER**；参数who用于指定对应的id值，结合参数which共同确定对应的进程(进程ID、进程组ID、有效用户ID),若who取值为0则表示当前调用进程；参数prio用于指定对应的优先级，优先级范围为[-20,19]，并且prio值越小则越优先调度。
+<pre>
+注： 优先级范围在不同的系统上可能会不同。
+</pre>
+
+另外，对于getpriority()函数，如果which和who共同确定多个进程的话，则会返回这些进程中最优先的进程（即prio最低的进程)。
+
+<br />
+
+**3) 设置进程可打开的最大文件描述符数**
+{% highlight string %}
+if (ccf->rlimit_nofile != NGX_CONF_UNSET) {
+    rlmt.rlim_cur = (rlim_t) ccf->rlimit_nofile;
+    rlmt.rlim_max = (rlim_t) ccf->rlimit_nofile;
+
+    if (setrlimit(RLIMIT_NOFILE, &rlmt) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                      "setrlimit(RLIMIT_NOFILE, %i) failed",
+                      ccf->rlimit_nofile);
+    }
+}
+{% endhighlight %}
+
+**4) 设置进程产生的coredump文件的最大大小**
+{% highlight string %}
+if (ccf->rlimit_core != NGX_CONF_UNSET) {
+    rlmt.rlim_cur = (rlim_t) ccf->rlimit_core;
+    rlmt.rlim_max = (rlim_t) ccf->rlimit_core;
+
+    if (setrlimit(RLIMIT_CORE, &rlmt) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                      "setrlimit(RLIMIT_CORE, %O) failed",
+                      ccf->rlimit_core);
+    }
+}
+{% endhighlight %}
+如果值为0，则并不会产生coredump文件。
 
 
 
