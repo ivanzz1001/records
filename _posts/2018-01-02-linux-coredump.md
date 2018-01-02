@@ -34,7 +34,7 @@ Linux中很多信号(signal)的默认动作会使进程结束并产生一个core
 2) 我们可以使用```ulimit -c unlimited```来开启coredump功能，并且不限制coredump文件的大小；如果需要限制文件的大小，将unlimited改成你想生成core文件最大的大小（注意单位为blocks)。
 
 3) 用上面的命令只会对当前会话终端有效，如果想永久生效，可以修改/etc/security/limits.conf文件，增加如下一行
-<pre>
+{% highlight string %}
 [root@localhost test-src]# vi /etc/security/limits.conf 
 # /etc/security/limits.conf
 #
@@ -42,7 +42,7 @@ Linux中很多信号(signal)的默认动作会使进程结束并产生一个core
 #
 #<domain>        <type>  <item>  <value>
 *                 soft    core    unlimited
-</pre>
+{% endhighlight %}
 **注意**： 此种方式会在系统下一次重启时生效
 
 ### 1.2 修改core文件保存路径
@@ -77,14 +77,14 @@ Linux中很多信号(signal)的默认动作会使进程结束并产生一个core
 * **%c** 指定产生core文件的大小限制
 
 例如可以用如下命令：
-<pre>
+{% highlight string %}
 # cat /proc/sys/kernel/core_pattern
 |/usr/libexec/abrt-hook-ccpp %s %c %p %u %g %t e %P %I
 
 # echo "/tmp/corefile-%e-%p-%t" > /proc/sys/kernel/core_pattern
 # cat /proc/sys/kernel/core_pattern
 /tmp/corefile-%e-%p-%t
-</pre> 
+{% endhighlight %}
 
 这样设置之后生成的core文件保存在```/tmp/```目录下，文件名格式为"corefile-progname-pid-timestap"。
 
