@@ -334,10 +334,109 @@ if (geteuid() == 0) {
     }
 }
 {% endhighlight %}
-这里若```geteuid()```返回值为0，则表示当前进程是以root特权身份执行的，此种情况下拥有权限可以设置生成的worker子进程的group id和user id。函数```setgid()```用于设置有效组ID.
+这里若```geteuid()```返回值为0，则表示当前进程是以root特权身份执行的，此种情况下拥有权限可以设置生成的worker子进程的group id和user id。函数```setgid()```用于设置有效组ID。关于initgroups函数，有如下：
+{% highlight string %}
+#include <sys/types.h>
+#include <grp.h>
+
+int initgroups(const char *user, gid_t group);
+{% endhighlight %}
+initgroups()函数通过读取组数据库/etc/group来初始化组访问列表，然后使用组成员中拥有上述函数参数指定的user的组，此外参数group也会添加到这个组访问列表中。
+<pre>
+说明： 参数user必须为NON-NULL
+</pre>
+
+<br />
+
+**6) 设置worker子进程cpu亲和性**
+{% highlight string %}
+if (worker >= 0) {
+    cpu_affinity = ngx_get_cpu_affinity(worker);
+
+    if (cpu_affinity) {
+        ngx_setaffinity(cpu_affinity, cycle->log);
+    }
+}
+{% endhighlight %}
+
+**7) 设置进程为dumpable**
+{% highlight string %}
+#if (NGX_HAVE_PR_SET_DUMPABLE)
+
+    /* allow coredump after setuid() in Linux 2.4.x */
+
+    if (prctl(PR_SET_DUMPABLE, 1, 0, 0, 0) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                      "prctl(PR_SET_DUMPABLE) failed");
+    }
+
+#endif
+{% endhighlight %}
+当前我们在ngx_auto_config.h头文件中拥有如下定义：
+<pre>
+#ifndef NGX_HAVE_PR_SET_DUMPABLE
+#define NGX_HAVE_PR_SET_DUMPABLE  1
+#endif
+</pre>
+这里用于支持Linux 2.4.x系统，只有在setuid()完成后，才允许coredump。
 
 
+**8) 设置worker子进程的工作目录**
+{% highlight string %}
+if (ccf->working_directory.len) {
+    if (chdir((char *) ccf->working_directory.data) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                      "chdir(\"%s\") failed", ccf->working_directory.data);
+        /* fatal */
+        exit(2);
+    }
+}
+{% endhighlight %}
 
+
+**9) 清空worker子进程的信号屏蔽掩码**
+{% highlight string %}
+sigemptyset(&set);
+
+if (sigprocmask(SIG_SETMASK, &set, NULL) == -1) {
+    ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                  "sigprocmask() failed");
+}
+{% endhighlight %}
+我们在worker子进程中与master等待signal不同，worker子进程是需要不断的处理网络事件以及定时器事件。
+
+<br />
+
+**10) 设置当前进程的随机数种子**
+{% highlight string %}
+srandom((ngx_pid << 16) ^ ngx_time());
+{% endhighlight %}
+
+**11) 清除监听socket上以前的事件**
+{% highlight string %}
+/*
+ * disable deleting previous events for the listening sockets because
+ * in the worker processes there are no events at all at this point
+ */
+ls = cycle->listening.elts;
+for (i = 0; i < cycle->listening.nelts; i++) {
+    ls[i].previous = NULL;
+}
+{% endhighlight %}
+
+**12) 初始化相应模块**
+{% highlight string %}
+for (i = 0; cycle->modules[i]; i++) {
+    if (cycle->modules[i]->init_process) {
+        if (cycle->modules[i]->init_process(cycle) == NGX_ERROR) {
+            /* fatal */
+            exit(2);
+        }
+    }
+}
+{% endhighlight %}
+
+**13) **
 
 
 <br />
