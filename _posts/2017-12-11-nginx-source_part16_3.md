@@ -15,8 +15,7 @@ description: nginx源代码分析
 
 <!-- more -->
 
-<br />
-<br />
+
 
 ## 1. 函数ngx_worker_process_cycle()
 {% highlight string %}
