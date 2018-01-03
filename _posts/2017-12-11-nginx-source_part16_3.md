@@ -655,8 +655,175 @@ ngx_channel_handler(ngx_event_t *ev)
     }
 }
 {% endhighlight %}
+这里读取worker的channel[1]，如果读取失败，则关闭相应的连接（因为此种情况下，我们也没有其他办法再进行恢复）。接着处理channel发过来的相应的命令。
+<pre>
+注意：
+
+1) 在ngx_read_channel()读取出现错误时，如果当前用的网络事件模型是epoll模型，还应该将相应的句柄移除epoll监听队列
+
+2) 对于NGX_USE_EVENTPORT_EVENT模型，需要再次重新添加相应的事件
+</pre>
+
+## 5. 函数ngx_cache_manager_process_cycle()
+{% highlight string %}
+static void
+ngx_cache_manager_process_cycle(ngx_cycle_t *cycle, void *data)
+{
+    ngx_cache_manager_ctx_t *ctx = data;
+
+    void         *ident[4];
+    ngx_event_t   ev;
+
+    /*
+     * Set correct process type since closing listening Unix domain socket
+     * in a master process also removes the Unix domain socket file.
+     */
+    ngx_process = NGX_PROCESS_HELPER;
+
+    ngx_close_listening_sockets(cycle);
+
+    /* Set a moderate number of connections for a helper process. */
+    cycle->connection_n = 512;
+
+    ngx_worker_process_init(cycle, -1);
+
+    ngx_memzero(&ev, sizeof(ngx_event_t));
+    ev.handler = ctx->handler;
+    ev.data = ident;
+    ev.log = cycle->log;
+    ident[3] = (void *) -1;
+
+    ngx_use_accept_mutex = 0;
+
+    ngx_setproctitle(ctx->name);
+
+    ngx_add_timer(&ev, ctx->delay);
+
+    for ( ;; ) {
+
+        if (ngx_terminate || ngx_quit) {
+            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exiting");
+            exit(0);
+        }
+
+        if (ngx_reopen) {
+            ngx_reopen = 0;
+            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reopening logs");
+            ngx_reopen_files(cycle, -1);
+        }
+
+        ngx_process_events_and_timers(cycle);
+    }
+}
+{% endhighlight %}
+本函数是cache manager和cache loader的主循环函数。
+
+**1) 初始化**
+
+* 标识ngx_process为```NGX_PROCESS_HELPER```辅助进程
+
+* 关闭监听socket
+
+* 初始化本进程
+<pre>
+注意: ngx_worker_process_init(cycle, -1); 参数为-1，代表并不需要进行进行优先级的设置以及CPU亲和性的设置.
+</pre>
+
+* 添加定时器事件
+<pre>
+ngx_add_timer(&ev, ctx->delay);
+
+1) 对于cache manager进程，ctx->delay为0，表示定时器没有延迟，马上执行。
+
+2) 对于cache loader进程，ctx->delay为60000ms
+</pre>
+
+* ngx_use_accept_mutex设置为0，表示当前并不需要抢占accept锁，这是因为cache manager及cache loader进程均不会使用到tcp 80端口对应的socket。
+
+<br />
+
+**2) 主循环**
+{% highlight string %}
+for ( ;; ) {
+
+    if (ngx_terminate || ngx_quit) {
+        ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exiting");
+        exit(0);
+    }
+
+    if (ngx_reopen) {
+        ngx_reopen = 0;
+        ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reopening logs");
+        ngx_reopen_files(cycle, -1);
+    }
+
+    ngx_process_events_and_timers(cycle);
+}
+{% endhighlight %}
+
+这里主循环主要是处理网络事件及定时器事件。
 
 
+## 6. 函数ngx_cache_manager_process_handler()
+{% highlight string %}
+static void
+ngx_cache_manager_process_handler(ngx_event_t *ev)
+{
+    time_t        next, n;
+    ngx_uint_t    i;
+    ngx_path_t  **path;
+
+    next = 60 * 60;
+
+    path = ngx_cycle->paths.elts;
+    for (i = 0; i < ngx_cycle->paths.nelts; i++) {
+
+        if (path[i]->manager) {
+            n = path[i]->manager(path[i]->data);
+
+            next = (n <= next) ? n : next;
+
+            ngx_time_update();
+        }
+    }
+
+    if (next == 0) {
+        next = 1;
+    }
+
+    ngx_add_timer(ev, next * 1000);
+}
+{% endhighlight %}
+这是cache manager管理缓存的回调函数，会根据需要管理的缓存数量决定定时器的超时间隔。关于nginx缓存，我们后续还会有更详细的介绍。
+
+## 7. 函数ngx_cache_loader_process_handler()
+{% highlight string %}
+static void
+ngx_cache_loader_process_handler(ngx_event_t *ev)
+{
+    ngx_uint_t     i;
+    ngx_path_t   **path;
+    ngx_cycle_t   *cycle;
+
+    cycle = (ngx_cycle_t *) ngx_cycle;
+
+    path = cycle->paths.elts;
+    for (i = 0; i < cycle->paths.nelts; i++) {
+
+        if (ngx_terminate || ngx_quit) {
+            break;
+        }
+
+        if (path[i]->loader) {
+            path[i]->loader(path[i]->data);
+            ngx_time_update();
+        }
+    }
+
+    exit(0);
+}
+{% endhighlight %}
+这是cache loader缓存加载的回调函数。在加载完成之后就会调用exit(0)退出进程。
 
 
 
@@ -664,6 +831,9 @@ ngx_channel_handler(ngx_event_t *ev)
 <br />
 
 **[参看]:**
+
+1. [“惊群”，看看nginx是怎么解决它的](http://blog.csdn.net/russell_tao/article/details/7204260)
+
 
 
 
