@@ -7,10 +7,16 @@ categories: nginx
 description: nginx源代码分析
 ---
 
-这里我们接着上文继续讲述一下ngx_process_cycle.c源文件中的剩余的部分。
+这里我们接着上文继续讲述一下ngx_process_cycle.c源文件中的剩余的部分:
 
+* worker进程的相关处理
+
+* cache manager进程的相关处理
 
 <!-- more -->
+
+<br />
+<br />
 
 ## 1. 函数ngx_worker_process_cycle()
 {% highlight string %}
@@ -559,6 +565,101 @@ ngx_worker_process_exit(ngx_cycle_t *cycle)
 注意：在销毁pool之前会先把ngx_cycle->log相关的数据保存到一个静态的数据结构ngx_exit_cycle中，这是因为在ngx_cycle->pool
 销毁之后，有可能仍然会调用到日志打印相关的操作。
 </pre>
+
+
+## 4. 函数ngx_channel_handler()
+{% highlight string %}
+static void
+ngx_channel_handler(ngx_event_t *ev)
+{
+    ngx_int_t          n;
+    ngx_channel_t      ch;
+    ngx_connection_t  *c;
+
+    if (ev->timedout) {
+        ev->timedout = 0;
+        return;
+    }
+
+    c = ev->data;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_CORE, ev->log, 0, "channel handler");
+
+    for ( ;; ) {
+
+        n = ngx_read_channel(c->fd, &ch, sizeof(ngx_channel_t), ev->log);
+
+        ngx_log_debug1(NGX_LOG_DEBUG_CORE, ev->log, 0, "channel: %i", n);
+
+        if (n == NGX_ERROR) {
+
+            if (ngx_event_flags & NGX_USE_EPOLL_EVENT) {
+                ngx_del_conn(c, 0);
+            }
+
+            ngx_close_connection(c);
+            return;
+        }
+
+        if (ngx_event_flags & NGX_USE_EVENTPORT_EVENT) {
+            if (ngx_add_event(ev, NGX_READ_EVENT, 0) == NGX_ERROR) {
+                return;
+            }
+        }
+
+        if (n == NGX_AGAIN) {
+            return;
+        }
+
+        ngx_log_debug1(NGX_LOG_DEBUG_CORE, ev->log, 0,
+                       "channel command: %ui", ch.command);
+
+        switch (ch.command) {
+
+        case NGX_CMD_QUIT:
+            ngx_quit = 1;
+            break;
+
+        case NGX_CMD_TERMINATE:
+            ngx_terminate = 1;
+            break;
+
+        case NGX_CMD_REOPEN:
+            ngx_reopen = 1;
+            break;
+
+        case NGX_CMD_OPEN_CHANNEL:
+
+            ngx_log_debug3(NGX_LOG_DEBUG_CORE, ev->log, 0,
+                           "get channel s:%i pid:%P fd:%d",
+                           ch.slot, ch.pid, ch.fd);
+
+            ngx_processes[ch.slot].pid = ch.pid;
+            ngx_processes[ch.slot].channel[0] = ch.fd;
+            break;
+
+        case NGX_CMD_CLOSE_CHANNEL:
+
+            ngx_log_debug4(NGX_LOG_DEBUG_CORE, ev->log, 0,
+                           "close channel s:%i pid:%P our:%P fd:%d",
+                           ch.slot, ch.pid, ngx_processes[ch.slot].pid,
+                           ngx_processes[ch.slot].channel[0]);
+
+            if (close(ngx_processes[ch.slot].channel[0]) == -1) {
+                ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_errno,
+                              "close() channel failed");
+            }
+
+            ngx_processes[ch.slot].channel[0] = -1;
+            break;
+        }
+    }
+}
+{% endhighlight %}
+
+
+
+
 
 <br />
 <br />
