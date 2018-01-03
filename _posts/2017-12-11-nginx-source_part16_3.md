@@ -482,6 +482,84 @@ if (close(ngx_processes[ngx_process_slot].channel[0]) == -1) {
 将worker的channel[1]添加到可读事件列表中。这里针对channel的同一个fd，不会同时进行读写操作。
 
 
+## 3. 函数ngx_worker_process_exit()
+{% highlight string %}
+static void
+ngx_worker_process_exit(ngx_cycle_t *cycle)
+{
+    ngx_uint_t         i;
+    ngx_connection_t  *c;
+
+    for (i = 0; cycle->modules[i]; i++) {
+        if (cycle->modules[i]->exit_process) {
+            cycle->modules[i]->exit_process(cycle);
+        }
+    }
+
+    if (ngx_exiting) {
+        c = cycle->connections;
+        for (i = 0; i < cycle->connection_n; i++) {
+            if (c[i].fd != -1
+                && c[i].read
+                && !c[i].read->accept
+                && !c[i].read->channel
+                && !c[i].read->resolver)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, 0,
+                              "*%uA open socket #%d left in connection %ui",
+                              c[i].number, c[i].fd, i);
+                ngx_debug_quit = 1;
+            }
+        }
+
+        if (ngx_debug_quit) {
+            ngx_log_error(NGX_LOG_ALERT, cycle->log, 0, "aborting");
+            ngx_debug_point();
+        }
+    }
+
+    /*
+     * Copy ngx_cycle->log related data to the special static exit cycle,
+     * log, and log file structures enough to allow a signal handler to log.
+     * The handler may be called when standard ngx_cycle->log allocated from
+     * ngx_cycle->pool is already destroyed.
+     */
+
+    ngx_exit_log = *ngx_log_get_file_log(ngx_cycle->log);
+
+    ngx_exit_log_file.fd = ngx_exit_log.file->fd;
+    ngx_exit_log.file = &ngx_exit_log_file;
+    ngx_exit_log.next = NULL;
+    ngx_exit_log.writer = NULL;
+
+    ngx_exit_cycle.log = &ngx_exit_log;
+    ngx_exit_cycle.files = ngx_cycle->files;
+    ngx_exit_cycle.files_n = ngx_cycle->files_n;
+    ngx_cycle = &ngx_exit_cycle;
+
+    ngx_destroy_pool(cycle->pool);
+
+    ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0, "exit");
+
+    exit(0);
+}
+{% endhighlight %} 
+在worker子进程退出时，执行步骤如下：
+
+* 关闭cycle中所有的模块
+
+* 处理优雅退出情况(ngx_exiting)
+<pre>
+对于优雅退出的情况，如果监听socket上仍有多个打开的socket句柄，则调用ngx_debug_point()来处理本worker子进程；
+当收到NGX_NOACCEPT_SIGNAL信号时，则直接提示以ngx_debug_point()来处理本worker子进程。
+</pre>
+
+* 销毁pool
+<pre>
+注意：在销毁pool之前会先把ngx_cycle->log相关的数据保存到一个静态的数据结构ngx_exit_cycle中，这是因为在ngx_cycle->pool
+销毁之后，有可能仍然会调用到日志打印相关的操作。
+</pre>
+
 <br />
 <br />
 

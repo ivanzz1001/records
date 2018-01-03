@@ -1206,7 +1206,7 @@ ngx_master_process_exit(ngx_cycle_t *cycle)
 
     exit(0);
 }
-{% endhighlight %}}
+{% endhighlight %}
 在master退出时，执行步骤如下：
 
 * 删除nginx.pid文件
