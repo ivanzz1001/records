@@ -436,7 +436,50 @@ for (i = 0; cycle->modules[i]; i++) {
 }
 {% endhighlight %}
 
-**13) **
+**13) 关闭相应的管道**
+{% highlight string %}
+for (n = 0; n < ngx_last_process; n++) {
+
+    if (ngx_processes[n].pid == -1) {
+        continue;
+    }
+
+    if (n == ngx_process_slot) {
+        continue;
+    }
+
+    if (ngx_processes[n].channel[1] == -1) {
+        continue;
+    }
+
+    if (close(ngx_processes[n].channel[1]) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                      "close() channel failed");
+    }
+}
+
+if (close(ngx_processes[ngx_process_slot].channel[0]) == -1) {
+    ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                  "close() channel failed");
+}
+{% endhighlight %}
+在worker子进程中，其只用其本身的channel[1]来接收数据；用其他子进程的channel[0]来发送数据。
+
+**14) 将worker子进程的channel[1]添加到事件表中**
+{% highlight string %}
+#if 0
+    ngx_last_process = 0;
+#endif
+
+    if (ngx_add_channel_event(cycle, ngx_channel, NGX_READ_EVENT,
+                              ngx_channel_handler)
+        == NGX_ERROR)
+    {
+        /* fatal */
+        exit(2);
+    }
+{% endhighlight %}
+将worker的channel[1]添加到可读事件列表中。这里针对channel的同一个fd，不会同时进行读写操作。
 
 
 <br />
