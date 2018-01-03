@@ -464,7 +464,10 @@ ngx_add_channel_event(ngx_cycle_t *cycle, ngx_fd_t fd, ngx_int_t event,
 }
 {% endhighlight %}
 
-这里首先从ngx_cycle_t中获取到一个connection,然后将其添加到事件监听队列中。
+这里首先从ngx_cycle_t中获取到一个connection,然后将其添加到事件监听队列中。这里对channel的一个fd不会同时进行读写操作(channel[0]用于写，channel[1]用于读），因此这里会进行二选一操作：
+<pre>
+ev = (event == NGX_READ_EVENT) ? rev : wev;
+</pre>
 
 
 ### 2.4 关闭channel
