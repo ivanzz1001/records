@@ -202,7 +202,7 @@ ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *chain, off_t limit)
 
 下面我们对ngx_readv_chain()函数做一个简单的解释：
 
-**1) 对kqueue在rev->available的处理**
+**1) 对kqueue情形下rev->available的处理**
 {% highlight string %}
 #if (NGX_HAVE_KQUEUE)
 
@@ -386,7 +386,7 @@ if (err == NGX_EAGAIN || err == NGX_EINTR) {
 {% endhighlight %}
 此种情况下，有两种特例： ```NGX_EAGAIN```以及```NGX_EINTR```。
 
-```NGX_EINTR```这种情况是受到信号中断的影响，一般重新读取即可。对于```NGX_EAGAIN```一般表示当前并没有数目，此时不应该再进行继续读取数据操作了（但是此种情况并不真正表示数据读取出错了）。
+```NGX_EINTR```这种情况是受到信号中断的影响，一般重新读取即可。对于```NGX_EAGAIN```一般表示当前并没有数据，此时不应该再进行继续读取数据操作了（但是此种情况并不真正表示数据读取出错了）。
 
 
 
