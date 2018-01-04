@@ -13,7 +13,7 @@ description: nginx源代码分析
 <!-- more -->
 
 
-## 1. ## 1. os/unix/ngx_readv_chain.c源文件
+## 1. os/unix/ngx_readv_chain.c源文件
 {% highlight string %}
 
 
