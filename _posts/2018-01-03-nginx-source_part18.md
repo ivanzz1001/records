@@ -1,6 +1,6 @@
 ---
 layout: post
-title: os/unix/ngx_readv_chain.c源代码分析
+title: os/unix/ngx_recv.c源代码分析
 tags:
 - nginx
 categories: nginx
@@ -9,13 +9,12 @@ description: nginx源代码分析
 
 
 
-本节我们讲述一下ngx_readv_chain.c文件，其主要是用于分散读取数据到ngx_chain_t中。
+本节我们讲述一下ngx_recv.c文件。本文件与ngx_readv_chain.c类似，只不过是这里是将数据读取到连续的地址空间，而不是分散读。
 <!-- more -->
 
 
-## 1. ## 1. os/unix/ngx_readv_chain.c源文件
+## 1. ## 1. os/unix/ngx_recv.c源文件
 {% highlight string %}
-
 
 /*
  * Copyright (C) Igor Sysoev
@@ -29,14 +28,11 @@ description: nginx源代码分析
 
 
 ssize_t
-ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *chain, off_t limit)
+ngx_unix_recv(ngx_connection_t *c, u_char *buf, size_t size)
 {
-    u_char        *prev;
-    ssize_t        n, size;
-    ngx_err_t      err;
-    ngx_array_t    vec;
-    ngx_event_t   *rev;
-    struct iovec  *iov, iovs[NGX_IOVS_PREALLOCATE];
+    ssize_t       n;
+    ngx_err_t     err;
+    ngx_event_t  *rev;
 
     rev = c->read;
 
@@ -44,7 +40,7 @@ ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *chain, off_t limit)
 
     if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
         ngx_log_debug3(NGX_LOG_DEBUG_EVENT, c->log, 0,
-                       "readv: eof:%d, avail:%d, err:%d",
+                       "recv: eof:%d, avail:%d, err:%d",
                        rev->pending_eof, rev->available, rev->kq_errno);
 
         if (rev->available == 0) {
@@ -52,18 +48,18 @@ ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *chain, off_t limit)
                 rev->ready = 0;
                 rev->eof = 1;
 
-                ngx_log_error(NGX_LOG_INFO, c->log, rev->kq_errno,
-                              "kevent() reported about an closed connection");
-
                 if (rev->kq_errno) {
                     rev->error = 1;
                     ngx_set_socket_errno(rev->kq_errno);
-                    return NGX_ERROR;
+
+                    return ngx_connection_error(c, rev->kq_errno,
+                               "kevent() reported about an closed connection");
                 }
 
                 return 0;
 
             } else {
+                rev->ready = 0;
                 return NGX_AGAIN;
             }
         }
@@ -71,58 +67,11 @@ ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *chain, off_t limit)
 
 #endif
 
-    prev = NULL;
-    iov = NULL;
-    size = 0;
-
-    vec.elts = iovs;
-    vec.nelts = 0;
-    vec.size = sizeof(struct iovec);
-    vec.nalloc = NGX_IOVS_PREALLOCATE;
-    vec.pool = c->pool;
-
-    /* coalesce the neighbouring bufs */
-
-    while (chain) {
-        n = chain->buf->end - chain->buf->last;
-
-        if (limit) {
-            if (size >= limit) {
-                break;
-            }
-
-            if (size + n > limit) {
-                n = (ssize_t) (limit - size);
-            }
-        }
-
-        if (prev == chain->buf->last) {
-            iov->iov_len += n;
-
-        } else {
-            if (vec.nelts >= IOV_MAX) {
-                break;
-            }
-
-            iov = ngx_array_push(&vec);
-            if (iov == NULL) {
-                return NGX_ERROR;
-            }
-
-            iov->iov_base = (void *) chain->buf->last;
-            iov->iov_len = n;
-        }
-
-        size += n;
-        prev = chain->buf->end;
-        chain = chain->next;
-    }
-
-    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, c->log, 0,
-                   "readv: %ui, last:%uz", vec.nelts, iov->iov_len);
-
     do {
-        n = readv(c->fd, (struct iovec *) vec.elts, vec.nelts);
+        n = recv(c->fd, buf, size, 0);
+
+        ngx_log_debug3(NGX_LOG_DEBUG_EVENT, c->log, 0,
+                       "recv: fd:%d %z of %uz", c->fd, n, size);
 
         if (n == 0) {
             rev->ready = 0;
@@ -131,7 +80,7 @@ ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *chain, off_t limit)
 #if (NGX_HAVE_KQUEUE)
 
             /*
-             * on FreeBSD readv() may return 0 on closed socket
+             * on FreeBSD recv() may return 0 on closed socket
              * even if kqueue reported about available data
              */
 
@@ -153,7 +102,7 @@ ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *chain, off_t limit)
 
                 /*
                  * rev->available may be negative here because some additional
-                 * bytes may be received between kevent() and readv()
+                 * bytes may be received between kevent() and recv()
                  */
 
                 if (rev->available <= 0) {
@@ -169,7 +118,9 @@ ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *chain, off_t limit)
 
 #endif
 
-            if (n < size && !(ngx_event_flags & NGX_USE_GREEDY_EVENT)) {
+            if ((size_t) n < size
+                && !(ngx_event_flags & NGX_USE_GREEDY_EVENT))
+            {
                 rev->ready = 0;
             }
 
@@ -180,11 +131,11 @@ ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *chain, off_t limit)
 
         if (err == NGX_EAGAIN || err == NGX_EINTR) {
             ngx_log_debug0(NGX_LOG_DEBUG_EVENT, c->log, err,
-                           "readv() not ready");
+                           "recv() not ready");
             n = NGX_AGAIN;
 
         } else {
-            n = ngx_connection_error(c, err, "readv() failed");
+            n = ngx_connection_error(c, err, "recv() failed");
             break;
         }
 
@@ -193,11 +144,12 @@ ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *chain, off_t limit)
     rev->ready = 0;
 
     if (n == NGX_ERROR) {
-        c->read->error = 1;
+        rev->error = 1;
     }
 
     return n;
 }
+
 {% endhighlight %}
 
 下面我们对ngx_readv_chain()函数做一个简单的解释：
@@ -208,7 +160,7 @@ ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *chain, off_t limit)
 
     if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
         ngx_log_debug3(NGX_LOG_DEBUG_EVENT, c->log, 0,
-                       "readv: eof:%d, avail:%d, err:%d",
+                       "recv: eof:%d, avail:%d, err:%d",
                        rev->pending_eof, rev->available, rev->kq_errno);
 
         if (rev->available == 0) {
@@ -216,18 +168,18 @@ ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *chain, off_t limit)
                 rev->ready = 0;
                 rev->eof = 1;
 
-                ngx_log_error(NGX_LOG_INFO, c->log, rev->kq_errno,
-                              "kevent() reported about an closed connection");
-
                 if (rev->kq_errno) {
                     rev->error = 1;
                     ngx_set_socket_errno(rev->kq_errno);
-                    return NGX_ERROR;
+
+                    return ngx_connection_error(c, rev->kq_errno,
+                               "kevent() reported about an closed connection");
                 }
 
                 return 0;
 
             } else {
+                rev->ready = 0;
                 return NGX_AGAIN;
             }
         }
@@ -237,74 +189,12 @@ ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *chain, off_t limit)
 {% endhighlight %}
 当前我们采用的是epoll模型，因此这里并不会执行。
 
-**2) 合并ngx_chain_t中相邻的buf**
-{% highlight string %}
-ssize_t
-ngx_readv_chain(ngx_connection_t *c, ngx_chain_t *chain, off_t limit)
-{
-    ...
-    
-    prev = NULL;
-    iov = NULL;
-    size = 0;
 
-    vec.elts = iovs;
-    vec.nelts = 0;
-    vec.size = sizeof(struct iovec);
-    vec.nalloc = NGX_IOVS_PREALLOCATE;
-    vec.pool = c->pool;
-
-    /* coalesce the neighbouring bufs */
-
-    while (chain) {
-        n = chain->buf->end - chain->buf->last;
-
-        if (limit) {
-            if (size >= limit) {
-                break;
-            }
-
-            if (size + n > limit) {
-                n = (ssize_t) (limit - size);
-            }
-        }
-
-        if (prev == chain->buf->last) {
-            iov->iov_len += n;
-
-        } else {
-            if (vec.nelts >= IOV_MAX) {
-                break;
-            }
-
-            iov = ngx_array_push(&vec);
-            if (iov == NULL) {
-                return NGX_ERROR;
-            }
-
-            iov->iov_base = (void *) chain->buf->last;
-            iov->iov_len = n;
-        }
-
-        size += n;
-        prev = chain->buf->end;
-        chain = chain->next;
-    }
-
-    ...
-}
-{% endhighlight %}
-这里我们首先再次给出```ngx_chain_t```的结构：
-
-![ngx-chain-t](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_chain_t.jpg)
-
-当前空闲的空间为ngx_buf_s->last到ngx_buf_s->end之间的那一部分空间。
-
-**3) 读取fd中的数据**
+**2) 读取fd中的数据**
 
 这里我们看到调用readv()分散读取数据：
 <pre>
-n = readv(c->fd, (struct iovec *) vec.elts, vec.nelts);
+n = recv(c->fd, buf, size, 0);
 </pre>
 根据返回值n做不同的处理：
 
