@@ -377,7 +377,7 @@ SystemV共享内存主要用到如下几个API：shmget()、shmat()、shmctl()�
 
 int shmget(key_t key, size_t size, int shmflg);
 {% endhighlight %}
-
+```shmget()```会返回一个SystemV共享内存标识符，该段共享内存与```key```相关联。
 
 
 
@@ -410,6 +410,8 @@ int shmget(key_t key, size_t size, int shmflg);
 9. [linux进程间通信-----System V共享内存总结实例](http://blog.csdn.net/Linux_ever/article/details/50372573)
 
 10. [System V 与 POSIX](http://blog.csdn.net/firstlai/article/details/50705042)
+
+11. [System IPC 与Posix IPC（共享内存）](https://www.cnblogs.com/zhangsf/p/3324169.html)
 <br />
 <br />
 <br />
