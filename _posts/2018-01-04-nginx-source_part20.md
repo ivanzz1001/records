@@ -361,7 +361,7 @@ cpu affinity set
 
 
 在另外一个窗口执行top命令：
-[root@localhost test-src]# top            //按下数字键1
+[root@localhost test-src]# top            //按下数字键1，查看每个逻辑CPU使用率
 top - 05:13:28 up  3:32,  3 users,  load average: 0.95, 0.59, 0.29
 Tasks: 163 total,   2 running, 161 sleeping,   0 stopped,   0 zombie
 %Cpu0  :  0.0 us,  0.3 sy,  0.0 ni, 99.7 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
