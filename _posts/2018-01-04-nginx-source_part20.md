@@ -397,7 +397,7 @@ KiB Swap:  5112828 total,  5112828 free,        0 used.  9328352 avail Mem
 
 1. [线程绑定CPU核-sched_setaffinity](http://blog.csdn.net/lanyzh0909/article/details/50404664)
 
-2. [](http://blog.csdn.net/watkinsong/article/details/28418911)
+2. [c语言设置cpu affinity](http://blog.csdn.net/watkinsong/article/details/28418911)
 
 
 <br />
