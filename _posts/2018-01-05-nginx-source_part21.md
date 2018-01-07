@@ -368,7 +368,7 @@ hello,world
 
 
 ### 2.2 SystemV共享内存
-SystemV共享内存主要用到如下几个API：shmget()、shmat()、shmctl()、shmdt()
+SystemV共享内存主要用到如下几个API：shmget()、ftok()、shmat()、shmctl()、shmdt()
 
 **1) 函数shmget()**
 {% highlight string %}
@@ -377,9 +377,282 @@ SystemV共享内存主要用到如下几个API：shmget()、shmat()、shmctl()�
 
 int shmget(key_t key, size_t size, int shmflg);
 {% endhighlight %}
-```shmget()```会返回一个SystemV共享内存标识符，该段共享内存与```key```相关联。
+```shmget()```会返回一段与```key```相关联的SystemV共享内存标识符。在如下两种情况下会创建一个新的```size```(size会进行N倍的PAGE_SIZE上对齐）大小的共享内存段：
+
+* key取值为```IPC_PRIVATE```，且shmflag标志被指定为```IPC_CREAT```
+
+* key取值为其他值，并且当前系统中与该key相对应的共享内存段不存在，且shmflg标志被指定为```IPC_CREAT```
+
+假如shmflg标志同时指定了```IPC_CREAT```和```IPC_EXCL```，并且与key所关联的共享内存段已经存在的话，则shmget()函数返回错误并将errno设置为```EEXIST```（这与open()函数的O_CREAT|O_EXCL类似）。
+
+shmflg可以取如下值：
+
+* **IPC_CREAT**: 创建一段新的共享内存段。假如并未使用本标志，则shmget()会查找key所关联的共享内存段，然后检查用户是否是否有权限访问该共享内存段。
+
+* **IPC_EXCL**： 搭配```IPC_CREAT```一起使用，用于确保当key所指定的内存段已经存在时，返回错误
+
+* **mode_flags**: (shmflg的低9位)用于指定所有者、所属组、其他人对该共享内存段的访问权限。这些bits与open()函数的mode参数具有相同的格式、相同的含义。注意：当前execute权限并不会被系统所使用。
+
+* **SHM_HUGETLB**: (since Linux 2.6)使用"huge pages"分配共享内存段
+
+* **SHM_NORESERVE**： (since Linux 2.6.15)本标志与mmap()的```MAP_NORESERVE```标志一致，表示并不为本共享内存段保留swap空间。当swap空间被保留，这样就能够确保可以修改共享内存段；假如不保留swap空间的话，则在没有物理内存可用的情况下写共享内存段可能会产生```SIGSEGV```错误。
+
+假如成功的创建了一块新的共享内存段之后，则其内容就会被初始化为0，而与其相关联的数据结构shmid_ds将会被初始化为如下值：
+
+* shm_perm.cuid与shm_perm.uid会被设置为调用进程的有效用户ID
+
+* shm_perm.cgid和shm_perm.gid会被设置为调用进程的有效组ID
+
+* shm_perm.mode的最低9bits会被设置为shmflg的最低9bits
+
+* shm_segsz会被设置为参数```size```的值
+
+* shm_lpid、shm_nattch、shm_atime、shm_dtime会被设置为0
+
+* shm_ctime会被设置为当前时间
+
+假如共享内存段已经存在，则会检查相应的权限，然后还会检查其是否还被标记为```销毁状态```。
+
+函数在成功时返回共享内存标识符；失败时返回-1。
+
+<br />
+
+下面举一个例子test.c:
+{% highlight string %}
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#define KEY_ID    0x1000
+#define SIZE      128
+
+int main(int argc,char *argv[])
+{
+    int shmid;
+    shmid = shmget(KEY_ID, SIZE, 0x0);
+    if(shmid < 0)
+    {
+         printf("shmget(KEY_ID, SIZE, 0x0) failure\n");
+    }
+
+    shmid = shmget(KEY_ID, SIZE, IPC_CREAT);
+    if(shmid < 0)
+    {
+         printf("shmget(KEY_ID, SIZE, IPC_CREATE) failure(1)\n");
+    }
+
+    shmid = shmget(KEY_ID, SIZE, IPC_CREAT);
+    if(shmid < 0)
+    {
+        printf("shmget(KEY_ID, SIZE, IPC_CREAT) failure(2)\n");
+    }
+    
+    shmid = shmget(KEY_ID, SIZE, IPC_CREAT|0600);
+    if(shmid < 0)
+    {
+        printf("shmget(KEY_ID, SIZE, IPC_CREATE|0600) failure\n");
+    }
+   
+    shmid = shmget(KEY_ID, SIZE, IPC_CREAT|IPC_EXCL|0600);
+    if(shmid < 0)
+    {
+        printf("shmget(KEY_ID, SIZE, IPC_CREATE|IPC_EXCL|0600) failure\n");
+    }
+
+    return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+//第一次运行：
+# gcc -o test test.c
+# ./test
+shmget(KEY_ID, SIZE, 0x0) failure
+shmget(KEY_ID, SIZE, IPC_CREAT|IPC_EXCL|0600) failure
+# ipcs -m
+
+------ Shared Memory Segments --------
+key        shmid      owner      perms      bytes      nattch     status      
+0x00001000 131072     root       0          128        0                       
 
 
+//第二次运行
+# ./test
+shmget(KEY_ID, SIZE, IPC_CREAT|IPC_EXCL|0600) failure
+# ipcs -m
+
+------ Shared Memory Segments --------
+key        shmid      owner      perms      bytes      nattch     status      
+0x00001000 131072     root       0          128        0                       
+
+# ipcrm -m 131072
+# ipcs -m
+
+------ Shared Memory Segments --------
+key        shmid      owner      perms      bytes      nattch     status      
+
+</pre>
+从上面我们可以看到，当指定key的共享内存段不存在时，必须要携带```IPC_CREAT```标识；当存在时加不加```IPC_CREAT```都无所谓，都会返回该已创建的共享内存段
+
+同时我们可以用```ipcs -m```命令来查看当前系统上创建的所有共享内存段；用```ipcrm -m```来删除共享内存段。
+
+
+**2) 函数ftok()**
+{% highlight string %}
+#include <sys/types.h>
+#include <sys/ipc.h>
+
+key_t ftok(const char *pathname, int proj_id);
+{% endhighlight %}
+ftok()函数使用path_name标识的文件(注意此文件必须存在，且能被访问）以及proj_id的低8bit（必须为非0）来产生一个SystemV IPC key。这个key可用于msgget()、semget()、和shmget()。
+
+当proj_id相同时，对于同一个文件的所有不同路径（相对路径、绝对路径等）ftok()函数都会返回相同的值。假如路径或者proj_id不同时，ftok()函数会返回不同的值。
+
+<br />
+下面举一个例子test2.c:
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+
+
+int main(int argc,char *argv[])
+{
+   key_t key;
+   char buf[1024];
+   
+   key = ftok("/root",123);
+   printf("%d\n",key);
+
+   getcwd(buf,sizeof(buf));
+   printf("buf:%s\n",buf);
+
+   key = ftok("../",123);
+   printf("%d\n",key);
+   return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o test2 test2.c
+# ./test2
+2063805345
+buf:/root/test-src
+2063805345
+</pre>
+
+**3) 函数shmat()**
+{% highlight string %}
+#include <sys/types.h>
+#include <sys/shm.h>
+
+void *shmat(int shmid, const void *shmaddr, int shmflg);
+{% endhighlight %}
+shmat()函数将```shmid```标识的共享内存段绑定到当前调用进程的地址空间中。绑定的地址通过参数```shmaddr```指定，并且遵循如下准则：
+
+* 假如shmaddr为NULL，系统会选择一个合适的未使用的地址绑定到该共享内存段
+
+* 假如shmaddr不为NULL，并且```SHM_RND```在shmflg中被指定，则绑定的地址为参数shmaddr指定地址的```SHMLBA```字节下对齐；否则参数shmaddr必须指定为“页”对齐的地址。
+
+如果在shmflg中被指定了```SHM_RDONLY```，则被绑定的共享内存段只允许读，并且进程必须要有对该共享内存段的读权限。否则被绑定的共享内存段具有读写权限，并且进程必须要有对该共享内存段的读写权限。并没有```只写```共享内存段这一概念。
+
+此外如果shmflg中被指定了```SHM_REMAP```(本选项为Linux专属），则意味着当前映射的共享内存段应该替换任何在该位置已经存在的共享内存段（如果不用此选项的话，则在该地址空间若已经存在一个共享内存段会返回```EINVAL```错误）。
+<pre>
+说明： 在进程退出的时候，该被绑定的共享内存段会自动解绑。同一个共享内存段，可以在一个进程中可以被多次的绑定
+</pre>
+
+函数shmat()映射成功之后，会更新与该共享内存段所关联的shmid_ds结构：
+
+* **shm_atime**： 会被设置为当前时间
+
+* **shm_lpid**: 会被设置为当前调用进程的进程ID
+
+* **shm_nattch**: 在原来的基础上+1
+
+shmat()函数在成功时会返回映射的共享内存地址；在失败时返回-1.
+
+注意： fork()函数调用之后，子进程会继承该绑定的共享内存段。而在执行exec函数族后，所有该进程绑定的共享内存段都会被解绑。在调用_exit()函数后，所有该进程绑定的共享内存段也会被解绑。
+
+<br />
+
+**4) 函数shmdt()**
+{% highlight string %}
+#include <sys/types.h>
+#include <sys/shm.h>
+
+int shmdt(const void *shmaddr);
+{% endhighlight %}
+函数shmdt()从当前调用进程中解绑shmaddr地址处的共享内存段。此处将要解绑的共享内存段的地址shmaddr必须为shmat()函数的返回值。
+
+在shmdt()调用成功时，系统会更新与该共享内存段所关联的shmid_ds数据结构：
+
+* **shm_dtime**: 会被设置为当前时间
+
+* **shm_lpid**： 会被设置为当前调用进程的PID
+
+* **shm_nattch**: 会在原来的基础上-1。如果该值变为0的时候，则会将该共享内存段标记为```deletion```状态，该共享内存段就会被删除。
+
+函数shmdt()在成功时返回0；失败时返回-1.
+
+<br />
+
+**5) 函数shmctl()**
+{% highlight string %}
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+int shmctl(int shmid, int cmd, struct shmid_ds *buf);
+{% endhighlight %}
+函数shmctl()会在shmid所指定的SystemV共享内存段上执行参数cmd所表示的控制命令。其中buf参数是一个```shmid_ds```类型的数据结构，其在```<sys/shm.h>```中被定义为：
+{% highlight string %}
+struct shmid_ds {
+   struct ipc_perm shm_perm;    /* Ownership and permissions */
+   size_t          shm_segsz;   /* Size of segment (bytes) */
+   time_t          shm_atime;   /* Last attach time */
+   time_t          shm_dtime;   /* Last detach time */
+   time_t          shm_ctime;   /* Last change time */
+   pid_t           shm_cpid;    /* PID of creator */
+   pid_t           shm_lpid;    /* PID of last shmat(2)/shmdt(2) */
+   shmatt_t        shm_nattch;  /* No. of current attaches */
+   ...
+};
+
+struct ipc_perm {
+   key_t          __key;    /* Key supplied to shmget(2) */
+   uid_t          uid;      /* Effective UID of owner */
+   gid_t          gid;      /* Effective GID of owner */
+   uid_t          cuid;     /* Effective UID of creator */
+   gid_t          cgid;     /* Effective GID of creator */
+   unsigned short mode;     /* Permissions + SHM_DEST and
+                               SHM_LOCKED flags */
+   unsigned short __seq;    /* Sequence number */
+};
+{% endhighlight %}
+
+cmd支持的值有如下：
+
+* **IPC_STAT**: 将shmid所关联的共享内存段的内核数据结构拷贝到buf中，调用者必须要有该共享内存段的读权限。
+
+* **IPC_SET**: 将buf所指定的shmid_ds数据结构中的一些值写入到shmid所指定的共享内存的内核数据结构中，同时也会更新该内核结构的```shm_ctime```字段。如下的一下字段可以被改变： shm_perm.uid、shm_perm.gid以及shm_perm.mode的低9位。要执行此命令，调用进程的有效用户ID必须为该共享内存段的所有者(shm_perm.uid)或者创建者(shm_perm.cuid),又或者调用进程为特权进程。
+
+* **IPC_RMID**: 将该共享内存段标记为```销毁状态```。而一个共享内存段真正被销毁是发生在最后一个进程对该共享内存段解绑之后（即shm_attch变为0）。要调用此命令，调用进程必须为该共享内存段的所有者或创建者，或者该调用进程为特权进程。假如一个共享内存段被标记为销毁状态，则shm_perm.mode字段的```SHM_DEST```标志会被设置。
+
+* **IPC_INFO**: (Linux specific)通过buf返回系统级别的共享内存的限制与参数。此时buf结构应该为shminfo类型（需要做强制类型转换），该类型定义在<sys/shm.h>头文件中，并且需要定义```_GNU_SOURCE```宏：
+{% highlight string %}
+struct  shminfo {
+	 unsigned long shmmax; /* Maximum segment size */
+	 unsigned long shmmin; /* Minimum segment size;
+	                          always 1 */
+	 unsigned long shmmni; /* Maximum number of segments */
+	 unsigned long shmseg; /* Maximum number of segments
+	                          that a process can attach;
+	                          unused within kernel */
+	 unsigned long shmall; /* Maximum number of pages of
+	                          shared memory, system-wide */
+};
+{% endhighlight %}
 
 
 
