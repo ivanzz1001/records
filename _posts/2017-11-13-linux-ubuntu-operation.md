@@ -370,8 +370,17 @@ index:10
 {% endhighlight %}
 参看：[linux下显卡信息的查看](http://blog.csdn.net/wind19/article/details/17095541)
 
+**19) 去除文件中的"\r"换行**
+{% highlight string %}
+# cat midea_id.txt | while read line; do awk 'BEGIN{FS="\r"} {print $1}' >> def.txt; done
+{% endhighlight %}
 
+**20) 遍历指定的文件是否存在**
+{% highlight string %}
+// abc.txt存放指定的文件名列表， photos文件夹下存放所有照片文件 
 
+# cat abc.txt | while read line; do filename=photos/${line}_*.jpg; result=$(find $filename);if [[ -n $result ]]; then echo $line >> test.txt; fi done
+{% endhighlight %}
 
 
 
