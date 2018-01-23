@@ -382,7 +382,24 @@ index:10
 # cat abc.txt | while read line; do filename=photos/${line}_*.jpg; result=$(find $filename);if [[ -n $result ]]; then echo $line >> test.txt; fi done
 {% endhighlight %}
 
+**21) ubuntu16.04 修改配置文件 禁止系统自动更新**
 
+可以通过修改配置文件或者通过界面操作来禁止系统自动更新。
+
+**方式1： 修改配置文件**
+<pre>
+// 修改配置文件/etc/apt/apt.conf.d/10periodic， "0"是关闭，"1"是开启。这里将所有都关闭
+
+# cat /etc/apt/apt.conf.d/10periodic
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Download-Upgradeable-Packages "0";
+APT::Periodic::AutocleanInterval "0";
+</pre>
+
+**方式2： 界面操作**
+{% highlight string %}
+菜单栏点 系统 --> 首选项 --> 启动应用程序 --> 更新提示 前面的钩打掉,从不更新 关闭即可
+{% endhighlight %}
 
 
 <br />
