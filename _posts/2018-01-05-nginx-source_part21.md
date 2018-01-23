@@ -653,10 +653,96 @@ struct  shminfo {
 	                          shared memory, system-wide */
 };
 {% endhighlight %}
+可以通过修改/proc目录下的shmmin、shmmax、shmall文件来更改相应的限制。
+
+* **SHM_INFO**: (Linux specific)返回一个shm_info结构体，该结构体的相应字段反应了当前系统共享内存所消耗的系统资源。该结构体定义在<sys/shm.h>头文件中，并且需要定义```_GNU_SOURCE```宏：
+{% highlight string %}
+struct shm_info {
+ int           used_ids;         /* # of currently existingsegments */
+
+ unsigned long shm_tot;          /* Total number of shared memory pages */
+
+ unsigned long shm_rss;          /* # of resident shared memory pages */
+
+ unsigned long shm_swp;          /* # of swapped shared memory pages */
+
+ unsigned long swap_attempts;    /* Unused since Linux 2.4 */
+
+ unsigned long swap_successes;   /* Unused since Linux 2.4 */
+};
+{% endhighlight %}
+
+针对上述两个字段，我们举个例子test.c:
+{% highlight string %}
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 
 
+int main(int argc,char *argv[])
+{
+     struct shminfo ipcinfo;
+     struct shm_info info;
+     int shmid;
 
 
+     if(shmctl(0,IPC_INFO,(struct shmid_ds *)&ipcinfo) == -1)
+     {
+         printf("get ipc info failure\n");
+         exit(-1);
+     }
+
+
+     printf("IPC_INFO.shmmax: %lu\n",ipcinfo.shmmax);
+     printf("IPC_INFO.shmmin: %lu\n",ipcinfo.shmmin);
+     printf("IPC_INFO.shmmni: %lu\n",ipcinfo.shmmni);
+     printf("IPC_INFO.shmseg: %lu\n",ipcinfo.shmseg);
+     printf("IPC_INFO.shmall: %lu\n",ipcinfo.shmall);
+
+
+     shmid = shmget(IPC_PRIVATE, 1024,IPC_CREAT);
+     if(shmid < 0)
+     {
+         printf("create share memory failure\n");
+         exit(-2);
+     }
+     if(shmctl(shmid,SHM_INFO,(struct shmid_ds *)&info) == -1)
+     {
+         printf("get share memory info failure\n");
+         exit(-1);
+     }
+
+     printf("shm_info.used_ids:%d\n",info.used_ids);
+     printf("shm_info.shm_tot:%lu\n",info.shm_tot);
+     printf("shm_info.shm_rss:%lu\n",info.shm_rss);
+     printf("shm_info.shm_swp:%lu\n",info.shm_swp);
+     printf("shm_info.swap_attempts:%lu\n",info.swap_attempts);
+     printf("shm_info.swap_successes:%lu\n",info.swap_successes);
+
+     return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+[root@localhost test-src]# gcc -o test test.c
+[root@localhost test-src]# ./test
+IPC_INFO.shmmax: 18446744073692774399
+IPC_INFO.shmmin: 1
+IPC_INFO.shmmni: 4096
+IPC_INFO.shmseg: 4096
+IPC_INFO.shmall: 18446744073692774399
+shm_info.used_ids:2
+shm_info.shm_tot:2
+shm_info.shm_rss:0
+shm_info.shm_swp:0
+shm_info.swap_attempts:0
+shm_info.swap_successes:0
+</pre>
 
 
 
