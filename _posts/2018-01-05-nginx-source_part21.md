@@ -658,7 +658,7 @@ struct  shminfo {
 * **SHM_INFO**: (Linux specific)返回一个shm_info结构体，该结构体的相应字段反应了当前系统共享内存所消耗的系统资源。该结构体定义在<sys/shm.h>头文件中，并且需要定义```_GNU_SOURCE```宏：
 {% highlight string %}
 struct shm_info {
- int           used_ids;         /* # of currently existingsegments */
+ int           used_ids;         /* # of currently existing segments */
 
  unsigned long shm_tot;          /* Total number of shared memory pages */
 
@@ -705,13 +705,13 @@ int main(int argc,char *argv[])
      printf("IPC_INFO.shmall: %lu\n",ipcinfo.shmall);
 
 
-     shmid = shmget(IPC_PRIVATE, 1024,IPC_CREAT);
+     shmid = shmget(IPC_PRIVATE, 8192,IPC_CREAT);
      if(shmid < 0)
      {
          printf("create share memory failure\n");
          exit(-2);
      }
-     if(shmctl(shmid,SHM_INFO,(struct shmid_ds *)&info) == -1)
+     if(shmctl(0,SHM_INFO,(struct shmid_ds *)&info) == -1)
      {
          printf("get share memory info failure\n");
          exit(-1);
@@ -736,12 +736,29 @@ IPC_INFO.shmmin: 1
 IPC_INFO.shmmni: 4096
 IPC_INFO.shmseg: 4096
 IPC_INFO.shmall: 18446744073692774399
-shm_info.used_ids:2
+shm_info.used_ids:1
 shm_info.shm_tot:2
 shm_info.shm_rss:0
 shm_info.shm_swp:0
 shm_info.swap_attempts:0
 shm_info.swap_successes:0
+
+[root@localhost test-src]# ./test
+IPC_INFO.shmmax: 18446744073692774399
+IPC_INFO.shmmin: 1
+IPC_INFO.shmmni: 4096
+IPC_INFO.shmseg: 4096
+IPC_INFO.shmall: 18446744073692774399
+shm_info.used_ids:2
+shm_info.shm_tot:4
+shm_info.shm_rss:0
+shm_info.shm_swp:0
+shm_info.swap_attempts:0
+shm_info.swap_successes:0
+
+//如下清除相应的共享内存
+# ids=`ipcs -m | awk '{print $2}' | grep -v Shared | grep -v shmid`
+# for id in $ids; do echo "remove share memory: $id"; ipcrm -m $id; done
 </pre>
 
 
