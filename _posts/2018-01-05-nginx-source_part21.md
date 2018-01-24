@@ -761,6 +761,17 @@ shm_info.swap_successes:0
 # for id in $ids; do echo "remove share memory: $id"; ipcrm -m $id; done
 </pre>
 
+* **SHM_STAT**: (Linux specific)与IPC_STAT类似，返回一个shmid_ds数据结构。然而，这里参数shmid并不是一个共享内存段标识符，而是该共享内存段在系统内核共内存数组中的索引值。
+
+此外，我们可以在```cmd```参数中添加如下值来允许或禁止共享内存段使用交换分区：
+
+* **SHM_LOCK**: (Linux specific)禁止共享内存使用交换分区。此时，调用者必须确保在锁定后共享内存都处于内存中，而不是在交换分区中。
+
+* **SHM_UNLOCK**: (Linux specific) 解锁被锁定的共享内存段，以使其可以放到交换分区中去
+
+<br />
+**函数返回值：** ```IPC_INFO```及```SHM_INFO```操作成功时返回系统中共享内存段所对应的内核数组的最大索引值(该值可被用于```SHM_STAT```操作，以获取所有共享内存内存的相关信息)。```SHM_STAT```成功时返回shmid所指定索引处的共享内存标识符。对于其他操作，成功时返回0；失败时返回-1。
+
 
 
 <br />
