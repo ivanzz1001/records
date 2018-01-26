@@ -772,9 +772,140 @@ shm_info.swap_successes:0
 <br />
 **函数返回值：** ```IPC_INFO```及```SHM_INFO```操作成功时返回系统中共享内存段所对应的内核数组的最大索引值(该值可被用于```SHM_STAT```操作，以获取所有共享内存内存的相关信息)。```SHM_STAT```成功时返回shmid所指定索引处的共享内存标识符。对于其他操作，成功时返回0；失败时返回-1。
 
+### 2.3 ngx_shmem.c源代码分析
+
+**1) mmap匿名内存映射**
+{% highlight string %}
+#if (NGX_HAVE_MAP_ANON)
+
+ngx_int_t
+ngx_shm_alloc(ngx_shm_t *shm)
+{
+    shm->addr = (u_char *) mmap(NULL, shm->size,
+                                PROT_READ|PROT_WRITE,
+                                MAP_ANON|MAP_SHARED, -1, 0);
+
+    if (shm->addr == MAP_FAILED) {
+        ngx_log_error(NGX_LOG_ALERT, shm->log, ngx_errno,
+                      "mmap(MAP_ANON|MAP_SHARED, %uz) failed", shm->size);
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
+void
+ngx_shm_free(ngx_shm_t *shm)
+{
+    if (munmap((void *) shm->addr, shm->size) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, shm->log, ngx_errno,
+                      "munmap(%p, %uz) failed", shm->addr, shm->size);
+    }
+}
+#endif
+{% endhighlight %}
+这里比较简单，直接采用mmap()的匿名内存映射```MAP_ANON```。
+
 <br />
 
-**6) 函数shmdt()**
+**2) mmap命名内存映射**
+{% highlight string %}
+#if (NGX_HAVE_MAP_DEVZERO) 
+ngx_int_t
+ngx_shm_alloc(ngx_shm_t *shm)
+{
+    ngx_fd_t  fd;
+
+    fd = open("/dev/zero", O_RDWR);
+
+    if (fd == -1) {
+        ngx_log_error(NGX_LOG_ALERT, shm->log, ngx_errno,
+                      "open(\"/dev/zero\") failed");
+        return NGX_ERROR;
+    }
+
+    shm->addr = (u_char *) mmap(NULL, shm->size, PROT_READ|PROT_WRITE,
+                                MAP_SHARED, fd, 0);
+
+    if (shm->addr == MAP_FAILED) {
+        ngx_log_error(NGX_LOG_ALERT, shm->log, ngx_errno,
+                      "mmap(/dev/zero, MAP_SHARED, %uz) failed", shm->size);
+    }
+
+    if (close(fd) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, shm->log, ngx_errno,
+                      "close(\"/dev/zero\") failed");
+    }
+
+    return (shm->addr == MAP_FAILED) ? NGX_ERROR : NGX_OK;
+}
+
+
+void
+ngx_shm_free(ngx_shm_t *shm)
+{
+    if (munmap((void *) shm->addr, shm->size) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, shm->log, ngx_errno,
+                      "munmap(%p, %uz) failed", shm->addr, shm->size);
+    }
+}
+#endif
+{% endhighlight %}
+有些只支持mmap()命名内存映射，因此这里采用打开/dev/zero文件来实现命名内存映射。
+
+<br />
+
+**3) SystemV共享内存**
+{% highlight string %}
+#if (NGX_HAVE_SYSVSHM)
+
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+
+ngx_int_t
+ngx_shm_alloc(ngx_shm_t *shm)
+{
+    int  id;
+
+    id = shmget(IPC_PRIVATE, shm->size, (SHM_R|SHM_W|IPC_CREAT));
+
+    if (id == -1) {
+        ngx_log_error(NGX_LOG_ALERT, shm->log, ngx_errno,
+                      "shmget(%uz) failed", shm->size);
+        return NGX_ERROR;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_CORE, shm->log, 0, "shmget id: %d", id);
+
+    shm->addr = shmat(id, NULL, 0);
+
+    if (shm->addr == (void *) -1) {
+        ngx_log_error(NGX_LOG_ALERT, shm->log, ngx_errno, "shmat() failed");
+    }
+
+    if (shmctl(id, IPC_RMID, NULL) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, shm->log, ngx_errno,
+                      "shmctl(IPC_RMID) failed");
+    }
+
+    return (shm->addr == (void *) -1) ? NGX_ERROR : NGX_OK;
+}
+
+
+void
+ngx_shm_free(ngx_shm_t *shm)
+{
+    if (shmdt(shm->addr) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, shm->log, ngx_errno,
+                      "shmdt(%p) failed", shm->addr);
+    }
+}
+
+#endif
+{% endhighlight %}
+
 
 
 <br />

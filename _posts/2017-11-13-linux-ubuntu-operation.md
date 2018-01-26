@@ -380,6 +380,18 @@ index:10
 // abc.txt存放指定的文件名列表， photos文件夹下存放所有照片文件 
 
 # cat abc.txt | while read line; do filename=photos/${line}_*.jpg; result=$(find $filename);if [[ -n $result ]]; then echo $line >> test.txt; fi done
+
+
+
+
+//JR.txt是一个类似于如下的问题件：
+{"usertag":{"tag":"支配欲强、有责任感","name":"zhangsan 张三","deptname":"集团职能|Headquarter of Group"},"userno":"1001"}
+{"usertag":{"tag":"精力旺盛、不服输","name":"lisi 李四","deptname":"集团职能|Headquarter of Group"},"userno":"1002"}
+{"usertag":{"tag":"性情天真、热情奔放","name":"wangwu 王五","deptname":"集团职能|Headquarter of Group"},"userno":"1003"}
+
+//如下找出JR.txt文件中有照片的人员信息
+# cat JR.txt | while read line; do str1=${line##*\"userno\"}; str2=${str1#*\"}; usrno=${str2%%\"*};filename=photos/${usrno}_*.jpg; result=$(find $filename);if [[ -n $result ]]; then echo $line >> have_photo_person.txt; fi done
+
 {% endhighlight %}
 
 **21) ubuntu16.04 修改配置文件 禁止系统自动更新**
