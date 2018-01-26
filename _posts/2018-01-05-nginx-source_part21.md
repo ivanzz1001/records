@@ -366,8 +366,35 @@ main(int argc, char *argv[])
 hello,world
 </pre>
 
+### 2.2 Posix内存共享
+其实上面讲解的mmap()就是属于posix内存共享。这里我们再介绍几个函数：shm_open()、shm_unlink()、ftruncate()、fstat()。其实这里讲解的posix共享内存只是对mmap()的一个外壳包装。
 
-### 2.2 SystemV共享内存
+**1) 函数shm_open()、shm_unlink()**
+{% highlight string %}
+#include <sys/mman.h>
+#include <sys/stat.h>        /* For mode constants */
+#include <fcntl.h>           /* For O_* constants */
+
+int shm_open(const char *name, int oflag, mode_t mode);
+
+int shm_unlink(const char *name);
+
+//Link with -lrt.
+{% endhighlight %}
+函数shm_open()用于创建一个新的、或者打开一个已存在的共享内存对象。一个Posix共享内存对象作用于一个handle，该handle可以被无关进程的mmap()所映射，以此来实现共享内存。而函数shm_unlink()执行相反的操作，其将会移除一个由shm_open()所创建的共享内存对象。            
+
+shm_open()函数的操作类似于open()函数。参数```name```用于指定将要创建或打开的共享内存对象，为了系统的可移植性，共享内存对象的名称最好类似于```/somename```，由字符组成的长度最长为```NAME_MAX```的路径名。
+
+参数```oflag```可以为如下值的按位或操作：
+
+* **O_RDONLY**: 打开一个共享内存对象用于读访问。由此标志打开的共享内存对象只能有mmap()函数映射为读操作
+
+* **O_RDWR**: 映射共享内存对象为可读写
+
+* **O_CREAT**: 假如共享内存对象不存在的话则创建。所创建的共享内存对象的所有者和所属组为调用进程的有效用户ID，权限为参数```mode```的低九位（注意umask()的影响）。
+
+
+### 2.3 SystemV共享内存
 SystemV共享内存主要用到如下几个API：shmget()、ftok()、shmat()、shmctl()、shmdt()
 
 **1) 函数shmget()**
@@ -772,7 +799,7 @@ shm_info.swap_successes:0
 <br />
 **函数返回值：** ```IPC_INFO```及```SHM_INFO```操作成功时返回系统中共享内存段所对应的内核数组的最大索引值(该值可被用于```SHM_STAT```操作，以获取所有共享内存内存的相关信息)。```SHM_STAT```成功时返回shmid所指定索引处的共享内存标识符。对于其他操作，成功时返回0；失败时返回-1。
 
-### 2.3 ngx_shmem.c源代码分析
+### 2.4 ngx_shmem.c源代码分析
 
 **1) mmap匿名内存映射**
 {% highlight string %}
