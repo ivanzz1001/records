@@ -413,6 +413,15 @@ APT::Periodic::AutocleanInterval "0";
 菜单栏点 系统 --> 首选项 --> 启动应用程序 --> 更新提示 前面的钩打掉,从不更新 关闭即可
 {% endhighlight %}
 
+**22) 批量重命名文件**
+{% highlight string %}
+// 将当前文件夹下的所有.jpg文件命名为.png文件
+
+# for files in `ls *.txt`; do filename=`echo $files | sed 's/.jpg/.png/'`; mv $files $filename; done
+{% endhighlight %}
+
+
+
 
 <br />
 <br />
