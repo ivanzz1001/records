@@ -958,7 +958,7 @@ ngx_shm_free(ngx_shm_t *shm)
 
 #endif
 {% endhighlight %}
-
+这里注意在调用shmat()成功之后，立马就调用shmctl(id,IPC_RMID,NULL)将该共享内存段标记为```销毁状态```，这样当最后一个进程分离之后该共享内存段就会真正被销毁。
 
 
 <br />
