@@ -296,7 +296,7 @@ extern ssize_t sendfile(int s, int fd, int32_t *offset, size_t size);
 #endif
 </pre>
 
-### 2.2 TCP_NODELAY/TCP_CORE
+### 2.2 TCP_NODELAY/TCP_CORK
 
 **1) TCP_NODELAY**
 
