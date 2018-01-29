@@ -20,7 +20,7 @@ description: AI学习资料收集
 
 2. [中科院数字图像处理视频教程](https://www.mukedaba.com/forum.php?mod=viewthread&tid=8964&extra=page%3D1&page=1)
 
-
+3. [斯坦福李飞飞-深度学习计算机视觉](http://study.163.com/course/courseMain.htm?courseId=1003223001)
 
 <br />
 <br />
