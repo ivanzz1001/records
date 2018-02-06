@@ -22,6 +22,8 @@ description: AI学习资料收集
 
 3. [斯坦福李飞飞-深度学习计算机视觉](http://study.163.com/course/courseMain.htm?courseId=1003223001)
 
+4. [LSTM实现详解](http://blog.csdn.net/zdy0_2004/article/details/49977423)
+
 <br />
 <br />
 <br />
