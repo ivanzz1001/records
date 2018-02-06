@@ -190,6 +190,8 @@ typedef ngx_int_t   ngx_rbtree_key_int_t;
 
 4. [世界协调时间 (UTC)](http://zh.thetimenow.com/utc/coordinated_universal_time)
 
+5. [linux应用time和timezone](https://www.cnblogs.com/embedded-linux/p/7087558.html)
+
 <br />
 <br />
 <br />
