@@ -154,7 +154,7 @@ typedef ngx_int_t   ngx_rbtree_key_int_t;
 </pre>
 因此，当前我们编译系统是支持tm.tm_gmtoff与tm.tm_zone字段的。
 
-### 2.3 
+### 2.3 获得时区值
 {% highlight string %}
 #if (NGX_SOLARIS)
 
@@ -166,9 +166,58 @@ typedef ngx_int_t   ngx_rbtree_key_int_t;
 
 #endif
 {% endhighlight %}
+在Linux操作系统下的```time.h```头文件中，一般会有一个timezone全局变量，用于记录当前所设置的timezone值。请参看如下代码：
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
 
+int main(int argc,char *argv[])
+{
+    tzset();
+    printf("zone: %d\n",timezone);
 
+    #if 0
+      printf("altzone: %d\n", altzone);
+    #endif
+
+    printf("time: %lu\n",(unsigned long)time(NULL));
+    return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o test test.c
+
+# export TZ='Asia/Shanghai'
+# ./test
+zone: -28800                  //  28800/60/60=8，即东8区
+time: 1517923134
+
+# export TZ='America/New_York'   
+# ./test
+zone: 18000                  // 18000/60/60 = 5，即西5区
+time: 1517923508
+
+# export TZ='Europe/Moscow'
+# ./test
+zone: -10800
+time: 1517923235
+</pre>
+注意```tzset()```函数会依赖与当前的```TZ```环境变量来设置当前运行程序的timezone值。
+
+### 2.4 相关函数声明
+{% highlight string %}
+void ngx_timezone_update(void);
+void ngx_localtime(time_t s, ngx_tm_t *tm);
+void ngx_libc_localtime(time_t s, struct tm *tm);
+void ngx_libc_gmtime(time_t s, struct tm *tm);
+
+#define ngx_gettimeofday(tp)  (void) gettimeofday(tp, NULL);
+#define ngx_msleep(ms)        (void) usleep(ms * 1000)
+#define ngx_sleep(s)          (void) sleep(s)
+{% endhighlight %}
 
 
 
