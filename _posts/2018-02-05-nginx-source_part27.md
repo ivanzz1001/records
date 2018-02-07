@@ -221,10 +221,158 @@ void ngx_libc_gmtime(time_t s, struct tm *tm);
 
 
 
+## 3. os/unix/ngx_time.c源文件
+
+### 3.1 函数ngx_timezone_update()
+{% highlight string %}
+
+/*
+ * Copyright (C) Igor Sysoev
+ * Copyright (C) Nginx, Inc.
+ */
 
 
+#include <ngx_config.h>
+#include <ngx_core.h>
 
 
+/*
+ * FreeBSD does not test /etc/localtime change, however, we can workaround it
+ * by calling tzset() with TZ and then without TZ to update timezone.
+ * The trick should work since FreeBSD 2.1.0.
+ *
+ * Linux does not test /etc/localtime change in localtime(),
+ * but may stat("/etc/localtime") several times in every strftime(),
+ * therefore we use it to update timezone.
+ *
+ * Solaris does not test /etc/TIMEZONE change too and no workaround available.
+ */
+
+void
+ngx_timezone_update(void)
+{
+#if (NGX_FREEBSD)
+
+    if (getenv("TZ")) {
+        return;
+    }
+
+    putenv("TZ=UTC");
+
+    tzset();
+
+    unsetenv("TZ");
+
+    tzset();
+
+#elif (NGX_LINUX)
+    time_t      s;
+    struct tm  *t;
+    char        buf[4];
+
+    s = time(0);
+
+    t = localtime(&s);
+
+    strftime(buf, 4, "%H", t);
+
+#endif
+}
+{% endhighlight %}
+ngx_timezone_update()函数用于更新时区。在不同的操作系统上，更新时区的方法也有些许不同：
+
+* **FreeBsd操作系统**： FreeBSD并不会检测```/etc/localtime```文件的变化。然而，我们可以通过调用tzset()的方式来达到更新时区。具体操作如下：
+<pre>
+// 1) 设置TZ环境变量
+    putenv("TZ=UTC")
+
+// 2) 调用tzset()
+    tzset()
+
+// 3) 清空TZ环境变量
+    unsetenv("TZ")
+
+// 4) 调用tzset()
+    tzset()
+</pre>
+这个更新时区的小技巧从FreeBSD 2.1.0版本开始有效。
+
+
+* **Linux操作系统**: Linux操作系统在调用localtime()的时候也并不会检测/etc/localtime的更改情况，但是在每一次调用strftime()函数的时候会多次stat("/etc/localtime")，因此我们可以此来更新timezone。在ngx_auto_headers.h头文件中，我们有如下定义：
+<pre>
+</pre>
+
+* **Solaris操作系统**: 对于Solaris操作系统，也并不会检测/etc/localtime文件的变化情况，到目前为止并没有一些技巧来感知到其变化情况。
+
+### 3.2 函数ngx_localtime()
+{% highlight string %}
+void
+ngx_localtime(time_t s, ngx_tm_t *tm)
+{
+#if (NGX_HAVE_LOCALTIME_R)
+    (void) localtime_r(&s, tm);
+
+#else
+    ngx_tm_t  *t;
+
+    t = localtime(&s);
+    *tm = *t;
+
+#endif
+
+    tm->ngx_tm_mon++;
+    tm->ngx_tm_year += 1900;
+}
+{% endhighlight %}
+
+我们在ngx_auto_config.h头文件中，有如下定义：
+<pre>
+#ifndef NGX_HAVE_LOCALTIME_R
+#define NGX_HAVE_LOCALTIME_R  1
+#endif
+</pre>
+函数localtime()不是线程安全的，而localtime_r()是属于线程安全的。这里当执行else分支时，ngx_localtime()函数也是线程不安全的。
+<pre>
+ngx_localtime()函数将日历时间转换为本地时间，处理后的结果值便于人们阅读，因此在ngx_tm_year及ngx_tm_mon字段上做了相应的处理。
+</pre>
+
+### 3.3 函数ngx_libc_localtime()
+{% highlight string %}
+void
+ngx_libc_localtime(time_t s, struct tm *tm)
+{
+#if (NGX_HAVE_LOCALTIME_R)
+    (void) localtime_r(&s, tm);
+
+#else
+    struct tm  *t;
+
+    t = localtime(&s);
+    *tm = *t;
+
+#endif
+}
+{% endhighlight %}
+函数较为简单，这里不再赘述。
+
+### 3.4 函数ngx_libc_gmtime()
+{% highlight string %}
+void
+ngx_libc_gmtime(time_t s, struct tm *tm)
+{
+#if (NGX_HAVE_LOCALTIME_R)
+    (void) gmtime_r(&s, tm);
+
+#else
+    struct tm  *t;
+
+    t = gmtime(&s);
+    *tm = *t;
+
+#endif
+}
+{% endhighlight %}
+本函数将日历时间```time_t s```转换为UTC时间(格林尼治标准时间)。
 
 <br />
 <br />
