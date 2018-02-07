@@ -89,6 +89,16 @@ ngx_udp_unix_recv(ngx_connection_t *c, u_char *buf, size_t size)
     return n;
 }
 {% endhighlight %}
+这里对于接收udp数据包的处理比较简单，主要是注意一下几点：
+
+* 接收函数recv()返回值>=0，表示接收成功，直接返回即可。
+
+* 接收函数recv()返回值<0，此时如果是受中断信号导致的，则继续接收数据；否则设置设置好接收事件的相应状态位，然后返回
+{% highlight string %}
+// 接收错误，将ready置为0，表示没有准备好接收数据
+
+rev->ready = 0;
+{% endhighlight %}
 
 
 <br />
