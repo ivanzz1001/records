@@ -114,7 +114,19 @@ description: nginx源代码分析
 
 * ```NGX_CONF_TAKE7```: 配置指令接受7个参数
 
+* ```NGX_CONF_MAX_ARGS```: 
 
+
+
+
+<br />
+<br />
+
+**[参看]:**
+
+1. [handler模块(100%)](http://tengine.taobao.org/book/chapter_03.html)
+
+2. [Nginx配置参数说明](https://www.cnblogs.com/fansik/p/6952453.html)
 
 <br />
 <br />
