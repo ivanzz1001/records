@@ -94,10 +94,27 @@ description: nginx源代码分析
 
 #define NGX_MAX_CONF_ERRSTR  1024
 {% endhighlight %}
+下面我们介绍一下各宏定义的相关含义：
 
-* ```NGX_CONF_NOARGS```: 
+**1) 配置指令属性**
+ 
+* ```NGX_CONF_NOARGS```: 配置指令不接受任何参数
 
-* ```NGX_CONF_TAKE1```:
+* ```NGX_CONF_TAKE1```: 配置指令接受1个参数
+
+* ```NGX_CONF_TAKE2```: 配置指令接受2个参数
+
+* ```NGX_CONF_TAKE3```: 配置指令接受3个参数
+
+* ```NGX_CONF_TAKE4```: 配置指令接受4个参数
+
+* ```NGX_CONF_TAKE5```: 配置指令接受5个参数
+
+* ```NGX_CONF_TAKE6```: 配置指令接受6个参数
+
+* ```NGX_CONF_TAKE7```: 配置指令接受7个参数
+
+
 
 <br />
 <br />
