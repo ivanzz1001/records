@@ -134,6 +134,25 @@ NGX_CONF_NOARGS | NGX_CONF_TAKE1 | NGX_CONF_TAKE2
 
 * ```NGX_CONF_ARGS_NUMBER```: 用于取参数个数的宏定义
 
+* ```NGX_CONF_BLOCK```: 配置指令可以接受的值是一个配置信息块。也就是一对大括号括起来的内容。里面可以再包括很多的配置指令，比如常见的server指令就是这个属性的：
+<pre>
+http {
+
+    ...
+
+    server {
+        listen       8000;
+        server_name  somename  alias  another.alias;
+
+        location / {
+            root   html;
+            index  index.html index.htm;
+        }
+    }
+
+    ....
+}
+</pre>
 
 
 
