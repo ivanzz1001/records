@@ -117,9 +117,9 @@ description: nginx源代码分析
 * ```NGX_CONF_MAX_ARGS```: nginx配置指令最大参数大小，目前该值被定义为8，也就是不能超过8个参数值
 
 关于参数个数，可以组合多个属性。比如一个指令可以不填参数，也可以接受1个或者2个参数。那么就是：
-<pre>
+{% highlight string %}
 NGX_CONF_NOARGS | NGX_CONF_TAKE1 | NGX_CONF_TAKE2
-</pre>
+{% endhighlight %}
 如果写上面3个属性在一起，可能会觉得麻烦，因此nginx提供了一些定义，使用起来更简洁：
 
 * ```NGX_CONF_TAKE12```: 配置指令接受1个或2个参数
