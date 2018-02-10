@@ -164,9 +164,64 @@ http {
 
 * ```NGX_CONF_MULTI```: 配置指令可以接受多个参数，即个数不定（但是应确保不超过```NGX_CONF_MAX_ARGS```)
 
+<br />
+
+下面介绍一组说明配置指令可以出现的位置的属性：
+
+* ```NGX_DIRECT_CONF```: 可以出现在配置文件中最外层。例如已经提供的配置指令daemon，master_process等
+
+* ```NGX_MAIN_CONF```: 主配置: http、mail、events、error_log等
+
+* ```NGX_ANY_CONF```: 该配置指令可以出现在任意配置级别上。
+
+<br />
+
+**2) 其他**
+{% highlight string %}
+// 表示当前某一种类型的配置项未设置
+#define NGX_CONF_UNSET       -1
+#define NGX_CONF_UNSET_UINT  (ngx_uint_t) -1
+#define NGX_CONF_UNSET_PTR   (void *) -1
+#define NGX_CONF_UNSET_SIZE  (size_t) -1
+#define NGX_CONF_UNSET_MSEC  (ngx_msec_t) -1
 
 
+#define NGX_CONF_OK          NULL
+#define NGX_CONF_ERROR       (void *) -1
 
+
+// 表示配置信息块的开始/结束，整个配置文件的结束， 主要是用于解析配置文件时使用
+#define NGX_CONF_BLOCK_START 1
+#define NGX_CONF_BLOCK_DONE  2
+#define NGX_CONF_FILE_DONE   3
+
+// 模块类型的magic值
+#define NGX_CORE_MODULE      0x45524F43  /* "CORE" */
+#define NGX_CONF_MODULE      0x464E4F43  /* "CONF" */
+
+//配置文件最长错误字符串长度
+#define NGX_MAX_CONF_ERRSTR  1024
+{% endhighlight %}
+
+属于```NGX_CORE_MODULE```类型的模块主要有：
+
+* ngx_events_module
+
+* ngx_openssl_module
+
+* ngx_google_perftools_module
+
+* ngx_http_module
+
+* ngx_errlog_module
+
+* ngx_mail_module
+
+* ngx_regex_module
+
+* ngx_stream_module
+
+* ngx_thread_pool_module
 
 
 
