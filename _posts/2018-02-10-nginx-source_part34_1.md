@@ -154,7 +154,7 @@ http {
 }
 </pre>
 
-* ```NGX_CONF_FLAG```: 配置指令可以接受的值是```on```或者```off``，最终会被转成bool值
+* ```NGX_CONF_FLAG```: 配置指令可以接受的值是```on```或者```off```，最终会被转成bool值
 
 * ```NGX_CONF_ANY```: 配置指令可以接受任意参数值。一个或者多个，或者```on```，或者```off```，或者是配置块
 
@@ -168,7 +168,7 @@ http {
 
 下面介绍一组说明配置指令可以出现的位置的属性：
 
-* ```NGX_DIRECT_CONF```: 可以出现在配置文件中最外层。例如已经提供的配置指令daemon，master_process等
+* ```NGX_DIRECT_CONF```: 可以出现在配置文件中最外层。带有此标志的配置表明其可以直接被访问（其已经由create_conf回调函数所创建），而不是传递一个间接的指针给指令处理器（以允许指令处理器其本身来创建配置）例如已经提供的配置指令daemon，master_process等.
 
 * ```NGX_MAIN_CONF```: 主配置: http、mail、events、error_log等
 
@@ -176,7 +176,7 @@ http {
 
 <br />
 
-**2) 其他**
+**2) 其他配置相关宏定义**
 {% highlight string %}
 // 表示当前某一种类型的配置项未设置
 #define NGX_CONF_UNSET       -1
@@ -224,6 +224,14 @@ http {
 * ngx_thread_pool_module
 
 
+<br />
+
+## 2. 相关数据结构定义
+
+**1) ngx_command_s数据结构**
+{% highlight string %}
+{% endhighlight %}
+
 
 <br />
 <br />
@@ -234,6 +242,13 @@ http {
 
 2. [Nginx配置参数说明](https://www.cnblogs.com/fansik/p/6952453.html)
 
+3. [Nginx 源码分析：从模块到配置（下）](https://segmentfault.com/a/1190000002780254)
+
+4. [图解Nginx 中的4级指针](http://blog.chinaunix.net/uid-27767798-id-3840094.html)
+
+5. [nginx源码分析之配置图解](https://my.oschina.net/fqing/blog/80867)
+
+6. [Difference between NGX_DIRECT_CONF and NGX_MAIN_CONF](http://nginx-devel.nginx.narkive.com/va8Fwi2S/difference-between-ngx-direct-conf-and-ngx-main-conf)
 <br />
 <br />
 <br />
