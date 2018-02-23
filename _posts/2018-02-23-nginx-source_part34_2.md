@@ -29,8 +29,13 @@ description: nginx源代码分析
 
 #define NGX_CONF_BUFFER  4096
 
+// 对指令的解析校验等方面的处理
 static ngx_int_t ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last);
+
+// 读取配置文件并进行词法分析
 static ngx_int_t ngx_conf_read_token(ngx_conf_t *cf);
+
+// 主要用于nginx配置模块在退出时刷新相应的打开文件
 static void ngx_conf_flush_files(ngx_cycle_t *cycle);
 {% endhighlight %}
 
