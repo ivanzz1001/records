@@ -109,7 +109,7 @@ static ngx_uint_t argument_number[] = {
 
 ## 3. 配置解析相关函数实现
 
-**1) 函数ngx_conf_param()**
+#### 3.1 函数ngx_conf_param()
 
 本函数主要用于处理通过nginx命令行的```-g```选项传递进来的参数。```-g directives```是用于设置全局配置指令的，例如：
 <pre>
@@ -170,7 +170,7 @@ typedef struct {
 
 <br />
 
-**2) 函数ngx_conf_parse()**
+#### 3.2 函数ngx_conf_parse()
 {% highlight string %}
 char *
 ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
