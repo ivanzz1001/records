@@ -67,8 +67,47 @@ include mime.types;
 include vhosts/*.conf
 </pre>
 
+<br />
 
+**2) nginx配置模块**
+{% highlight string %}
+ngx_module_t  ngx_conf_module = {
+    NGX_MODULE_V1,
+    NULL,                                  /* module context */
+    ngx_conf_commands,                     /* module directives */
+    NGX_CONF_MODULE,                       /* module type */
+    NULL,                                  /* init master */
+    NULL,                                  /* init module */
+    NULL,                                  /* init process */
+    NULL,                                  /* init thread */
+    NULL,                                  /* exit thread */
+    ngx_conf_flush_files,                  /* exit process */
+    NULL,                                  /* exit master */
+    NGX_MODULE_V1_PADDING
+};
+{% endhighlight %}
 
+这里```ngx_conf_module```并不需要任何模块上下文```module context```，所支持的模块指令为```ngx_conf_commands```，模块类型为```NGX_CONF_MODULE```，在进程退出时的回调函数为```ngx_conf_flush_files```。
+
+<br />
+
+**3) 配置指令参数数组**
+{% highlight string %}
+/* The eight fixed arguments */
+
+static ngx_uint_t argument_number[] = {
+    NGX_CONF_NOARGS,
+    NGX_CONF_TAKE1,
+    NGX_CONF_TAKE2,
+    NGX_CONF_TAKE3,
+    NGX_CONF_TAKE4,
+    NGX_CONF_TAKE5,
+    NGX_CONF_TAKE6,
+    NGX_CONF_TAKE7
+};
+{% endhighlight %}
+
+## 3. 配置解析相关函数实现
 
 
 <br />
