@@ -41,7 +41,7 @@ static void ngx_conf_flush_files(ngx_cycle_t *cycle);
 
 ## 2. 相关变量定义
 
-**1) nginx配置命令**
+**1) nginx配置模块支持的指令**
 {% highlight string %}
 static ngx_command_t  ngx_conf_commands[] = {
 
@@ -55,6 +55,21 @@ static ngx_command_t  ngx_conf_commands[] = {
       ngx_null_command
 };
 {% endhighlight %}
+
+这里nginx配置模块(conf module)当前只支持一个```include```指令。其携带一个参数，可以放置于nginx配置文件的任意位置。在解析```include```指令时，通过调用```ngx_conf_include()```来完成。```include```指令语法如下：
+{% highlight string %}
+include file | mask
+{% endhighlight %}
+通过```include```指令将```file```文件，或者满足```mask```匹配的文件包含到配置文件中来。所包含进来的文件必须满足nginx定义的相关语法。例如：
+<pre>
+include mime.types;
+
+include vhosts/*.conf
+</pre>
+
+
+
+
 
 <br />
 <br />
