@@ -573,7 +573,7 @@ char *ngx_conf_check_num_bounds(ngx_conf_t *cf, void *post, void *data);
 
 ## 4. 相关函数声明
 {% highlight string %}
-// 处理命令行传递的配置
+// 主要是用来处理通过命令行-g选项传递进来的“全局配置指令”
 char *ngx_conf_param(ngx_conf_t *cf);
 
 // 用于解析配置信息

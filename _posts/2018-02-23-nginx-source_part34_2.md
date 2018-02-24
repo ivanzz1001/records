@@ -110,6 +110,12 @@ static ngx_uint_t argument_number[] = {
 ## 3. 配置解析相关函数实现
 
 **1) 函数ngx_conf_param()**
+
+本函数主要用于处理通过nginx命令行的```-g```选项传递进来的参数。```-g directives```是用于设置全局配置指令的，例如：
+<pre>
+# nginx -g "pid /var/run/nginx.pid; worker_processes `sysctl -n hw.ncpu`;"
+</pre>
+
 {% highlight string %}
 char *
 ngx_conf_param(ngx_conf_t *cf)
@@ -163,6 +169,8 @@ ngx_conf_param(ngx_conf_t *cf)
 3. [Nginx开发从入门到精通](http://tengine.taobao.org/book/)
 
 4. [Nginx-------配置文件解析ngx_conf_handler](http://blog.csdn.net/jackywgw/article/details/48786429)
+
+5. [Command-line parameters](http://nginx.org/en/docs/switches.html)
 <br />
 <br />
 <br />
