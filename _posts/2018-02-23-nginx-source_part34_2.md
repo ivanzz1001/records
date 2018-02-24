@@ -109,6 +109,48 @@ static ngx_uint_t argument_number[] = {
 
 ## 3. 配置解析相关函数实现
 
+**1) 函数ngx_conf_param()**
+{% highlight string %}
+char *
+ngx_conf_param(ngx_conf_t *cf)
+{
+    char             *rv;
+    ngx_str_t        *param;
+    ngx_buf_t         b;
+    ngx_conf_file_t   conf_file;
+
+    param = &cf->cycle->conf_param;
+
+    if (param->len == 0) {
+        return NGX_CONF_OK;
+    }
+
+    ngx_memzero(&conf_file, sizeof(ngx_conf_file_t));
+
+    ngx_memzero(&b, sizeof(ngx_buf_t));
+
+    b.start = param->data;
+    b.pos = param->data;
+    b.last = param->data + param->len;
+    b.end = b.last;
+    b.temporary = 1;
+
+    conf_file.file.fd = NGX_INVALID_FILE;
+    conf_file.file.name.data = NULL;
+    conf_file.line = 0;
+
+    cf->conf_file = &conf_file;
+    cf->conf_file->buffer = &b;
+
+    rv = ngx_conf_parse(cf, NULL);
+
+    cf->conf_file = NULL;
+
+    return rv;
+}
+{% endhighlight %}
+
+
 
 <br />
 <br />
