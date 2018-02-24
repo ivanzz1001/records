@@ -156,6 +156,240 @@ ngx_conf_param(ngx_conf_t *cf)
 }
 {% endhighlight %}
 
+通过nginx命令行```-g```选项传递进来的参数保存在```cf->cycle->conf_param```中。函数首先构造一个conf_file对象，用于表示当前的一个配置文件：
+{% highlight string %}
+typedef struct {
+    ngx_file_t            file;      // 当前数据存在于内存，因此此字段暂时不用
+    ngx_buf_t            *buffer;    // 指向一个临时的内存
+    ngx_buf_t            *dump;      // NULL
+    ngx_uint_t            line;      // 0
+} ngx_conf_file_t;
+{% endhighlight %}
+
+再接着调用```ngx_conf_parse()```当前的配置对象.
+
+<br />
+
+**2) 函数ngx_conf_parse()**
+{% highlight string %}
+char *
+ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
+{
+    char             *rv;
+    u_char           *p;
+    off_t             size;
+    ngx_fd_t          fd;
+    ngx_int_t         rc;
+    ngx_buf_t         buf, *tbuf;
+    ngx_conf_file_t  *prev, conf_file;
+    ngx_conf_dump_t  *cd;
+    enum {
+        parse_file = 0,
+        parse_block,
+        parse_param
+    } type;
+
+#if (NGX_SUPPRESS_WARN)
+    fd = NGX_INVALID_FILE;
+    prev = NULL;
+#endif
+
+    if (filename) {
+
+        /* open configuration file */
+
+        fd = ngx_open_file(filename->data, NGX_FILE_RDONLY, NGX_FILE_OPEN, 0);
+        if (fd == NGX_INVALID_FILE) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, ngx_errno,
+                               ngx_open_file_n " \"%s\" failed",
+                               filename->data);
+            return NGX_CONF_ERROR;
+        }
+
+        prev = cf->conf_file;
+
+        cf->conf_file = &conf_file;
+
+        if (ngx_fd_info(fd, &cf->conf_file->file.info) == NGX_FILE_ERROR) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
+                          ngx_fd_info_n " \"%s\" failed", filename->data);
+        }
+
+        cf->conf_file->buffer = &buf;
+
+        buf.start = ngx_alloc(NGX_CONF_BUFFER, cf->log);
+        if (buf.start == NULL) {
+            goto failed;
+        }
+
+        buf.pos = buf.start;
+        buf.last = buf.start;
+        buf.end = buf.last + NGX_CONF_BUFFER;
+        buf.temporary = 1;
+
+        cf->conf_file->file.fd = fd;
+        cf->conf_file->file.name.len = filename->len;
+        cf->conf_file->file.name.data = filename->data;
+        cf->conf_file->file.offset = 0;
+        cf->conf_file->file.log = cf->log;
+        cf->conf_file->line = 1;
+
+        type = parse_file;
+
+        if (ngx_dump_config
+#if (NGX_DEBUG)
+            || 1
+#endif
+           )
+        {
+            p = ngx_pstrdup(cf->cycle->pool, filename);
+            if (p == NULL) {
+                goto failed;
+            }
+
+            size = ngx_file_size(&cf->conf_file->file.info);
+
+            tbuf = ngx_create_temp_buf(cf->cycle->pool, (size_t) size);
+            if (tbuf == NULL) {
+                goto failed;
+            }
+
+            cd = ngx_array_push(&cf->cycle->config_dump);
+            if (cd == NULL) {
+                goto failed;
+            }
+
+            cd->name.len = filename->len;
+            cd->name.data = p;
+            cd->buffer = tbuf;
+
+            cf->conf_file->dump = tbuf;
+
+        } else {
+            cf->conf_file->dump = NULL;
+        }
+
+    } else if (cf->conf_file->file.fd != NGX_INVALID_FILE) {
+
+        type = parse_block;
+
+    } else {
+        type = parse_param;
+    }
+
+
+    for ( ;; ) {
+        rc = ngx_conf_read_token(cf);
+
+        /*
+         * ngx_conf_read_token() may return
+         *
+         *    NGX_ERROR             there is error
+         *    NGX_OK                the token terminated by ";" was found
+         *    NGX_CONF_BLOCK_START  the token terminated by "{" was found
+         *    NGX_CONF_BLOCK_DONE   the "}" was found
+         *    NGX_CONF_FILE_DONE    the configuration file is done
+         */
+
+        if (rc == NGX_ERROR) {
+            goto done;
+        }
+
+        if (rc == NGX_CONF_BLOCK_DONE) {
+
+            if (type != parse_block) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "unexpected \"}\"");
+                goto failed;
+            }
+
+            goto done;
+        }
+
+        if (rc == NGX_CONF_FILE_DONE) {
+
+            if (type == parse_block) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "unexpected end of file, expecting \"}\"");
+                goto failed;
+            }
+
+            goto done;
+        }
+
+        if (rc == NGX_CONF_BLOCK_START) {
+
+            if (type == parse_param) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "block directives are not supported "
+                                   "in -g option");
+                goto failed;
+            }
+        }
+
+        /* rc == NGX_OK || rc == NGX_CONF_BLOCK_START */
+
+        if (cf->handler) {
+
+            /*
+             * the custom handler, i.e., that is used in the http's
+             * "types { ... }" directive
+             */
+
+            if (rc == NGX_CONF_BLOCK_START) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "unexpected \"{\"");
+                goto failed;
+            }
+
+            rv = (*cf->handler)(cf, NULL, cf->handler_conf);
+            if (rv == NGX_CONF_OK) {
+                continue;
+            }
+
+            if (rv == NGX_CONF_ERROR) {
+                goto failed;
+            }
+
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, rv);
+
+            goto failed;
+        }
+
+
+        rc = ngx_conf_handler(cf, rc);
+
+        if (rc == NGX_ERROR) {
+            goto failed;
+        }
+    }
+
+failed:
+
+    rc = NGX_ERROR;
+
+done:
+
+    if (filename) {
+        if (cf->conf_file->buffer->start) {
+            ngx_free(cf->conf_file->buffer->start);
+        }
+
+        if (ngx_close_file(fd) == NGX_FILE_ERROR) {
+            ngx_log_error(NGX_LOG_ALERT, cf->log, ngx_errno,
+                          ngx_close_file_n " %s failed",
+                          filename->data);
+            rc = NGX_ERROR;
+        }
+
+        cf->conf_file = prev;
+    }
+
+    if (rc == NGX_ERROR) {
+        return NGX_CONF_ERROR;
+    }
+
+    return NGX_CONF_OK;
+}
+{% endhighlight %}
 
 
 <br />
