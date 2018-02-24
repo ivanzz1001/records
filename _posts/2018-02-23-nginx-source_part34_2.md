@@ -39,6 +39,23 @@ static ngx_int_t ngx_conf_read_token(ngx_conf_t *cf);
 static void ngx_conf_flush_files(ngx_cycle_t *cycle);
 {% endhighlight %}
 
+## 2. 相关变量定义
+
+**1) nginx配置命令**
+{% highlight string %}
+static ngx_command_t  ngx_conf_commands[] = {
+
+    { ngx_string("include"),
+      NGX_ANY_CONF|NGX_CONF_TAKE1,
+      ngx_conf_include,
+      0,
+      0,
+      NULL },
+
+      ngx_null_command
+};
+{% endhighlight %}
+
 <br />
 <br />
 **[参看]**
