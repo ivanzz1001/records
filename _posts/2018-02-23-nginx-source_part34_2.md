@@ -109,7 +109,7 @@ static ngx_uint_t argument_number[] = {
 
 ## 3. 配置解析相关函数实现
 
-#### 3.1 函数ngx_conf_param()
+### 3.1 函数ngx_conf_param()
 
 本函数主要用于处理通过nginx命令行的```-g```选项传递进来的参数。```-g directives```是用于设置全局配置指令的，例如：
 <pre>
@@ -170,7 +170,7 @@ typedef struct {
 
 <br />
 
-#### 3.2 函数ngx_conf_parse()
+### 3.2 函数ngx_conf_parse()
 {% highlight string %}
 char *
 ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
@@ -388,6 +388,55 @@ done:
     }
 
     return NGX_CONF_OK;
+}
+{% endhighlight %}
+在nginx_auto_config.h头文件中，我们有如下定义：
+<pre>
+#ifndef NGX_SUPPRESS_WARN
+#define NGX_SUPPRESS_WARN  1
+#endif
+</pre>
+接下来我们分几个部分来对```ngx_conf_parse()```进行讲解：
+
+**1) 判断解析类型**
+
+ngx_conf_parse()函数支持解析三种类型的配置： parse_file、parse_block、parse_param。
+
+* parse_file类型: 当```filename```不为NULL时，表示要解析的是一个配置文件。此时需要进行一些相应的前期处理：
+{% highlight string %}
+char *
+ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
+{
+    ....
+
+    if(filename)
+    {
+        // 1: 打开filename文件
+        fd = ngx_open_file(filename->data, NGX_FILE_RDONLY, NGX_FILE_OPEN, 0);
+
+        // 2: 保留cf中原来的conf_file，以便后续恢复
+        prev = cf->conf_file;
+
+        //3: 构造一个新的conf_file
+        cf->conf_file = &conf_file;
+        cf->conf_file->buffer = &buf;   //此处构造一个4096字节的空间，主要是用于在指令解析时用到
+
+        //4: 如果nginx启动时携带-T选项，以检查并dump出配置的话，则执行如下：
+        if (ngx_dump_config
+         #if (NGX_DEBUG)
+            || 1
+         #endif
+           )
+         {
+             //1) 创建一个名称为filename,大小为filename文件大小的dump缓存
+             size = ngx_file_size(&cf->conf_file->file.info);
+
+             tbuf = ngx_create_temp_buf(cf->cycle->pool, (size_t) size);
+
+             //2) 将该缓存配置为conf_file->dump
+             cf->conf_file->dump = tbuf;
+         }
+    }
 }
 {% endhighlight %}
 
