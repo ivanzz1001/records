@@ -419,7 +419,7 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
 
         //3: 构造一个新的conf_file
         cf->conf_file = &conf_file;
-        cf->conf_file->buffer = &buf;   //此处构造一个4096字节的空间，主要是用于在指令解析时用到
+        cf->conf_file->buffer = &buf;   //此处构造一个4096字节的空间(注意这里并不是在内存池中分配的)，主要是用于在指令解析时用到
 
         //4: 如果nginx启动时携带-T选项，以检查并dump出配置的话，则执行如下：
         if (ngx_dump_config
@@ -471,16 +471,208 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
 
          if(rc == NGX_CONF_BLOCK_DONE)
          {
-             //如若当前解析类型不是parse_block，则返回错误，否则goto done
+             //如若当前解析类型不是parse_block，则goto failed，否则goto done
              if(type != parse_block)
              {
-                 return error;
+                 goto failed;
              }
              goto done;
          }
 
-         
+        if(rc == NGX_CONF_FILE_DONE)
+        {
+            //如若当前解析类型为parse_block，则goto failed，否则goto done
+            if(type == parse_block)
+            {
+                goto failed;
+            }
+            goto done;
+        }
+   
+        if(rc == NGX_CONF_BLOCK_START)
+        {
+            //如果当前解析类型为parse_param，则goto failed,否则goto done
+            // 这里不支持通过-g选项传递“块指令”
+            if(type == parse_param)
+            {
+                goto failed;
+            }
+        }
+
+        //3) 针对rc返回值为NGX_OK或者NGX_CONF_BLOCK_START情况，调用cf->handler进行处理
+        // 是一个定制的handler，例如： http的"types {...}"指令
+        if(cf->handler)
+        {
+           //调用cf->handler()进行处理
+        }
+
+        //4) 调用ngx_conf_handler()对上述获取到的token进行处理
+        rc = ngx_conf_handler(); 
+        if(rc == NGX_ERROR)
+            goto failed;
     }
+
+failed:
+    rc = NGX_ERROR;
+done:
+    //5) 如果filename不为NULL，需要进行相应的关闭文件操作
+    if(filename)
+    {
+        //恢复现场
+    }
+
+    if(rc == NGX_ERROR)
+       return NGX_CONF_ERROR;
+    return NGX_CONF_OK;
+}
+{% endhighlight %}
+
+### 3.3 函数ngx_conf_handler()
+{% highlight string %}
+static ngx_int_t
+ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
+{
+    char           *rv;
+    void           *conf, **confp;
+    ngx_uint_t      i, found;
+    ngx_str_t      *name;
+    ngx_command_t  *cmd;
+
+    name = cf->args->elts;
+
+    found = 0;
+
+    for (i = 0; cf->cycle->modules[i]; i++) {
+
+        cmd = cf->cycle->modules[i]->commands;
+        if (cmd == NULL) {
+            continue;
+        }
+
+        for ( /* void */ ; cmd->name.len; cmd++) {
+
+            if (name->len != cmd->name.len) {
+                continue;
+            }
+
+            if (ngx_strcmp(name->data, cmd->name.data) != 0) {
+                continue;
+            }
+
+            found = 1;
+
+            if (cf->cycle->modules[i]->type != NGX_CONF_MODULE
+                && cf->cycle->modules[i]->type != cf->module_type)
+            {
+                continue;
+            }
+
+            /* is the directive's location right ? */
+
+            if (!(cmd->type & cf->cmd_type)) {
+                continue;
+            }
+
+            if (!(cmd->type & NGX_CONF_BLOCK) && last != NGX_OK) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                  "directive \"%s\" is not terminated by \";\"",
+                                  name->data);
+                return NGX_ERROR;
+            }
+
+            if ((cmd->type & NGX_CONF_BLOCK) && last != NGX_CONF_BLOCK_START) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "directive \"%s\" has no opening \"{\"",
+                                   name->data);
+                return NGX_ERROR;
+            }
+
+            /* is the directive's argument count right ? */
+
+            if (!(cmd->type & NGX_CONF_ANY)) {
+
+                if (cmd->type & NGX_CONF_FLAG) {
+
+                    if (cf->args->nelts != 2) {
+                        goto invalid;
+                    }
+
+                } else if (cmd->type & NGX_CONF_1MORE) {
+
+                    if (cf->args->nelts < 2) {
+                        goto invalid;
+                    }
+
+                } else if (cmd->type & NGX_CONF_2MORE) {
+
+                    if (cf->args->nelts < 3) {
+                        goto invalid;
+                    }
+
+                } else if (cf->args->nelts > NGX_CONF_MAX_ARGS) {
+
+                    goto invalid;
+
+                } else if (!(cmd->type & argument_number[cf->args->nelts - 1]))
+                {
+                    goto invalid;
+                }
+            }
+
+            /* set up the directive's configuration context */
+
+            conf = NULL;
+
+            if (cmd->type & NGX_DIRECT_CONF) {
+                conf = ((void **) cf->ctx)[cf->cycle->modules[i]->index];
+
+            } else if (cmd->type & NGX_MAIN_CONF) {
+                conf = &(((void **) cf->ctx)[cf->cycle->modules[i]->index]);
+
+            } else if (cf->ctx) {
+                confp = *(void **) ((char *) cf->ctx + cmd->conf);
+
+                if (confp) {
+                    conf = confp[cf->cycle->modules[i]->ctx_index];
+                }
+            }
+
+            rv = cmd->set(cf, cmd, conf);
+
+            if (rv == NGX_CONF_OK) {
+                return NGX_OK;
+            }
+
+            if (rv == NGX_CONF_ERROR) {
+                return NGX_ERROR;
+            }
+
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "\"%s\" directive %s", name->data, rv);
+
+            return NGX_ERROR;
+        }
+    }
+
+    if (found) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "\"%s\" directive is not allowed here", name->data);
+
+        return NGX_ERROR;
+    }
+
+    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                       "unknown directive \"%s\"", name->data);
+
+    return NGX_ERROR;
+
+invalid:
+
+    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                       "invalid number of arguments in \"%s\" directive",
+                       name->data);
+
+    return NGX_ERROR;
 }
 {% endhighlight %}
 
