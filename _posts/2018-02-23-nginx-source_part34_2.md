@@ -952,7 +952,8 @@ static char *
 ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ...
-
+    
+    //这里构建了一个无名指针，主要是为了与http类型的模块兼容
 	ctx = ngx_pcalloc(cf->pool, sizeof(void *));
 	if (ctx == NULL) {
 	    return NGX_CONF_ERROR;
@@ -966,6 +967,8 @@ ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 	*(void **) conf = ctx;
 
     ...
+
+    cf->ctx = ctx;     //注意这里，后面关系到event模块地址的计算
 }
 {% endhighlight %}
 这里创建了一个二级指针数组，来存放上下文。
@@ -1032,8 +1035,43 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 通过上面的分析，我们可以刻画出4级指针的一个整体结构：
 
+![ngx-conf-ctx](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_conf_ctx.jpg)
 
+<pre>
+注意： 上述ctx_index的初始化是在src/core/ngx_module.c的ngx_count_modules()中完成
+</pre>
 
+**6) 建立指令上下文部分代码分析**
+{% highlight string %}
+static ngx_int_t
+ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
+{
+    /* set up the directive's configuration context */
+
+    conf = NULL;
+
+    if (cmd->type & NGX_DIRECT_CONF) {
+        conf = ((void **) cf->ctx)[cf->cycle->modules[i]->index];
+
+    } else if (cmd->type & NGX_MAIN_CONF) {
+        conf = &(((void **) cf->ctx)[cf->cycle->modules[i]->index]);
+
+    } else if (cf->ctx) {
+        confp = *(void **) ((char *) cf->ctx + cmd->conf);
+
+        if (confp) {
+            conf = confp[cf->cycle->modules[i]->ctx_index];
+        }
+    }
+
+    rv = cmd->set(cf, cmd, conf);
+}
+{% endhighlight %}
+对于```NGX_DIRECT_CONF```类型，例如上图中的```ngx_core_conf_t```，直接将4级指针强制转换成2级指针即可；
+
+ 对于```NGX_MAIN_CONF```类型，例如上图中的```ngx_events_module```以及```ngx_http_module```，则直接保存的地址是&conf_ctx[module_index]; 
+
+对于其他类型，则保存对应数组在```ctx_index```索引处的地址， 例如对于```ngx_event_core_module```,由于cf->ctx当前指向的就是上面所构建的这个```无名指针```,因此这里```confp```就是这个```无名指针指向的地址。
 
 <br />
 <br />
@@ -1048,6 +1086,8 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 4. [Nginx-------配置文件解析ngx_conf_handler](http://blog.csdn.net/jackywgw/article/details/48786429)
 
 5. [Command-line parameters](http://nginx.org/en/docs/switches.html)
+
+6. [](http://blog.chinaunix.net/uid-27767798-id-3840094.html)
 <br />
 <br />
 <br />
