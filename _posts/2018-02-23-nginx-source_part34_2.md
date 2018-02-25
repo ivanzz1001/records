@@ -924,7 +924,114 @@ ngx_module_t  ngx_core_module = {
 
 **4) ngx_events_module模块**
 {% highlight string %}
+static ngx_core_module_t  ngx_events_module_ctx = {
+    ngx_string("events"),
+    NULL,
+    ngx_event_init_conf
+};
+
+
+ngx_module_t  ngx_events_module = {
+    NGX_MODULE_V1,
+    &ngx_events_module_ctx,                /* module context */
+    ngx_events_commands,                   /* module directives */
+    NGX_CORE_MODULE,                       /* module type */
+    NULL,                                  /* init master */
+    NULL,                                  /* init module */
+    NULL,                                  /* init process */
+    NULL,                                  /* init thread */
+    NULL,                                  /* exit thread */
+    NULL,                                  /* exit process */
+    NULL,                                  /* exit master */
+    NGX_MODULE_V1_PADDING
+};
 {% endhighlight %}
+这里我们可以看到，并没有通过```module->create_conf```创建其配置指令上下文的，但是我们可以看到：
+{% highlight string %}
+static char *
+ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ...
+
+	ctx = ngx_pcalloc(cf->pool, sizeof(void *));
+	if (ctx == NULL) {
+	    return NGX_CONF_ERROR;
+	}
+	
+	*ctx = ngx_pcalloc(cf->pool, ngx_event_max_module * sizeof(void *));
+	if (*ctx == NULL) {
+	    return NGX_CONF_ERROR;
+	}
+	
+	*(void **) conf = ctx;
+
+    ...
+}
+{% endhighlight %}
+这里创建了一个二级指针数组，来存放上下文。
+
+**5) ngx_http_module模块**
+{% highlight string %}
+static ngx_core_module_t  ngx_http_module_ctx = {
+    ngx_string("http"),
+    NULL,
+    NULL
+};
+
+
+ngx_module_t  ngx_http_module = {
+    NGX_MODULE_V1,
+    &ngx_http_module_ctx,                  /* module context */
+    ngx_http_commands,                     /* module directives */
+    NGX_CORE_MODULE,                       /* module type */
+    NULL,                                  /* init master */
+    NULL,                                  /* init module */
+    NULL,                                  /* init process */
+    NULL,                                  /* init thread */
+    NULL,                                  /* exit thread */
+    NULL,                                  /* exit process */
+    NULL,                                  /* exit master */
+    NGX_MODULE_V1_PADDING
+};
+{% endhighlight %}
+这里我们可以看到，并没有通过```module->create_conf```创建其配置指令上下文，但是我们可以看到：
+{% highlight string %}
+typedef struct {
+    void        **main_conf;
+    void        **srv_conf;
+    void        **loc_conf;
+} ngx_http_conf_ctx_t;
+
+static char *
+ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ...
+    
+    /* the main http context */
+
+    ctx = ngx_pcalloc(cf->pool, sizeof(ngx_http_conf_ctx_t));
+    if (ctx == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    *(ngx_http_conf_ctx_t **) conf = ctx;
+
+    ....
+
+    ctx->main_conf = ngx_pcalloc(cf->pool,
+                                 sizeof(void *) * ngx_http_max_module);
+
+    ctx->srv_conf = ngx_pcalloc(cf->pool, sizeof(void *) * ngx_http_max_module);
+
+    ctx->loc_conf = ngx_pcalloc(cf->pool, sizeof(void *) * ngx_http_max_module);
+}
+{% endhighlight %}
+这里创建了一个ngx_http_conf_ctx_t作为其上下文，其中```main_conf```、```srv_conf```、```loc_conf```又是指向一个指针数组，最后再指向相应的上下文。
+
+**5) ngx_cycle_s.conf_ctx结构示意图**
+
+通过上面的分析，我们可以刻画出4级指针的一个整体结构：
+
 
 
 
