@@ -451,7 +451,36 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
 char *
 ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
 {
-    
+    for(;;)
+    {
+         //1) 从cf中读取到相应的token
+         rc = ngx_conf_read_token(cf);
+
+         /* 上述rc可能的返回值有：
+          * 
+          * NGX_ERROR: 表明解析出现错误
+          * NGX_OK: 表明成功解析到一个以";"结尾的token
+          * NGX_CONF_BLOCK_START: 表明成功解析到一个token，并且该token是一个块配置指令，后面跟随"{"
+          * NGX_CONF_BLOCK_DONE: 成功解析到"}"
+          * NGX_CONF_FILE_DONE: 成功解析完配置文件
+         */
+
+         //2)  根据返回值，对解析结果进行处理
+         if(rc == NGX_ERROR)
+            goto done;
+
+         if(rc == NGX_CONF_BLOCK_DONE)
+         {
+             //如若当前解析类型不是parse_block，则返回错误，否则goto done
+             if(type != parse_block)
+             {
+                 return error;
+             }
+             goto done;
+         }
+
+         
+    }
 }
 {% endhighlight %}
 
