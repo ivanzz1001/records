@@ -440,6 +440,21 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
 }
 {% endhighlight %}
 
+* parse_block类型： 当```conf_file->file.fd != NGX_INVALID_FILE```时，则为parse_block类型
+
+* parse_param类型
+
+<br />
+
+**2) 解析配置指令**
+{% highlight string %}
+char *
+ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
+{
+    
+}
+{% endhighlight %}
+
 
 <br />
 <br />
