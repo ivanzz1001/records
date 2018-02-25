@@ -867,6 +867,64 @@ ngx_module_t *ngx_modules[] = {
 };
 {% endhighlight %}
 
+从上面我们可以看到，首先建立了一个```ngx_max_module```大小的指针数组，然后再针对```NGX_CORE_MODULE```类型的模块调用:
+{% highlight string %}
+rv = module->create_conf(cycle);
+{% endhighlight %}
+来创建相应的上下文存放在该模块对应的索引处。属于```NGX_CORE_MODULE```的主要有以下几个：
+
+* ```ngx_core_module```
+
+* ```ngx_events_module```
+
+* ```ngx_openssl_module```
+
+* ```ngx_google_perftools_module```
+
+* ```ngx_http_module```
+
+* ```ngx_errlog_module```
+
+* ```ngx_mail_module```
+
+* ```ngx_regex_module```
+
+* ```ngx_stream_module```
+
+* ```ngx_thread_pool_module```
+
+下面我们就来简单的分析```ngx_core_module```、```ngx_events_module```、```ngx_http_module```这三个比较有代表性的模块,看其create_conf()到底是怎么创建起```配置上下文```的。
+
+**3) ngx_core_module模块**
+{% highlight string %}
+static ngx_core_module_t  ngx_core_module_ctx = {
+    ngx_string("core"),
+    ngx_core_module_create_conf,
+    ngx_core_module_init_conf
+};
+
+
+ngx_module_t  ngx_core_module = {
+    NGX_MODULE_V1,
+    &ngx_core_module_ctx,                  /* module context */
+    ngx_core_commands,                     /* module directives */
+    NGX_CORE_MODULE,                       /* module type */
+    NULL,                                  /* init master */
+    NULL,                                  /* init module */
+    NULL,                                  /* init process */
+    NULL,                                  /* init thread */
+    NULL,                                  /* exit thread */
+    NULL,                                  /* exit process */
+    NULL,                                  /* exit master */
+    NGX_MODULE_V1_PADDING
+};
+
+{% endhighlight %}
+通过查看源代码，我们可以看到其实是创建了一个```ngx_core_conf_t```数据结构，以此作为该模块配置指令上下文的。
+
+**4) ngx_events_module模块**
+{% highlight string %}
+{% endhighlight %}
 
 
 
