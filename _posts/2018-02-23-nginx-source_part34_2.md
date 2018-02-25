@@ -675,7 +675,91 @@ invalid:
     return NGX_ERROR;
 }
 {% endhighlight %}
+下面我们简要分析一下该函数(这里注意cf->args包含了指令及参数部分)：
+{% highlight string %}
+static ngx_int_t
+ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
+{
+    //1) 循环遍历ngx_modules数组，在modules数组中找出与当前指令相同的command配置，然后进行检查
+    for(i=0; cf->cycle->modulesi];i++)
+    {
+         cmd = cf->cycle->modules[i]->commands;
 
+         //2) 循环遍历该模块下的所有commands
+         for(; cmd->name.len;cmd++)
+         {
+              //3) 找到对应的command
+              
+              //4) 判断当前配置指令是否在正确的配置模块中（判断模块类型）
+              // 注意NGX_CONF_MODULE可以出现在任意位置
+
+              //5) 判断实际命令类型与当前配置命令类型是否一致
+
+              
+              //6)  如果当前配置指令不是一个“块配置”指令，则必须以";"结尾
+              if (!(cmd->type & NGX_CONF_BLOCK) && last != NGX_OK) {
+              }
+     
+
+              //7) 如果当前配置指令是一个“块配置”指令，则后续必须跟一个"{"
+              if ((cmd->type & NGX_CONF_BLOCK) && last != NGX_CONF_BLOCK_START) {
+              }
+
+             //8) 判断指令的参数个数是否合法
+             if(!(cmd->type & NGX_CONF_ANY))
+             {
+                 if(cmd->type & NGX_CONF_FLAG)
+                 {
+                     //后续只能跟on/off一个参数
+                 }
+                 else if(cmd->type & NGX_CONF_1MORE)
+                 {
+                     //至少携带一个参数
+                 }
+                 else if(cmd->type & NGX_CONF_2MORE)
+                 {
+                     //至少携带2个参数
+                 }
+                 else if(cf->args->nelts > NGX_CONF_MAX_ARGS)
+                 {
+                     //指令+参数部分不能超过NGX_CONF_MAX_ARGS
+                 }
+                 else if (!(cmd->type & argument_number[cf->args->nelts - 1]))
+                 {
+                     //判断当前携带参数个数是否合法
+                 }
+            
+             }
+
+            
+             //9) 建立指令的配置上下文
+             /* set up the directive's configuration context */
+            
+             conf = NULL;
+             if (cmd->type & NGX_DIRECT_CONF) 
+             {
+                 conf = ((void **) cf->ctx)[cf->cycle->modules[i]->index];
+             } 
+             else if (cmd->type & NGX_MAIN_CONF) 
+             {
+                 conf = &(((void **) cf->ctx)[cf->cycle->modules[i]->index]);
+             } 
+             else if (cf->ctx)
+             {
+                 confp = *(void **) ((char *) cf->ctx + cmd->conf);
+                 if (confp) {
+                     conf = confp[cf->cycle->modules[i]->ctx_index];
+                 }
+             }
+
+            rv = cmd->set(cf, cmd, conf);
+
+         }
+    }
+
+
+}
+{% endhighlight %}
 
 <br />
 <br />
