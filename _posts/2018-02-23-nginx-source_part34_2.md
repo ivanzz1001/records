@@ -675,6 +675,8 @@ invalid:
     return NGX_ERROR;
 }
 {% endhighlight %}
+
+**1) 函数流程分析**
 下面我们简要分析一下该函数(这里注意cf->args包含了指令及参数部分)：
 {% highlight string %}
 static ngx_int_t
@@ -764,6 +766,109 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
     return NGX_ERROR;
 }
 {% endhighlight %}
+
+**2） 指令的配置上下文**
+
+上面说道```建立指令的配置上下文```，下面我们来看一下```cf->ctx```这个数据结构是如何建立的，这个```ctx```大概是一个怎样的数据结构。主要参考代码位置src/core/ngx_cycle.c源文件的ngx_init_cycle()函数：
+{% highlight string %}
+//头文件：src/core/ngx/cycle.h
+struct ngx_cycle_s {
+    void                  ****conf_ctx;
+
+    ....
+}
+
+ngx_cycle_t *
+ngx_init_cycle(ngx_cycle_t *old_cycle)
+{
+     ....
+   
+    cycle->conf_ctx = ngx_pcalloc(pool, ngx_max_module * sizeof(void *));
+    if (cycle->conf_ctx == NULL) {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+
+    ....
+
+    for (i = 0; cycle->modules[i]; i++) {
+        if (cycle->modules[i]->type != NGX_CORE_MODULE) {
+            continue;
+        }
+
+        module = cycle->modules[i]->ctx;
+
+        if (module->create_conf) {
+            rv = module->create_conf(cycle);
+            if (rv == NULL) {
+                ngx_destroy_pool(pool);
+                return NULL;
+            }
+            cycle->conf_ctx[cycle->modules[i]->index] = rv;
+        }
+    }
+   
+    ....
+}
+
+//源文件： objs/ngx_modules.c
+ngx_module_t *ngx_modules[] = {
+    &ngx_core_module,
+    &ngx_errlog_module,
+    &ngx_conf_module,
+    &ngx_openssl_module,
+    &ngx_regex_module,
+    &ngx_events_module,
+    &ngx_event_core_module,
+    &ngx_epoll_module,
+    &ngx_http_module,
+    &ngx_http_core_module,
+    &ngx_http_log_module,
+    &ngx_http_upstream_module,
+    &ngx_http_static_module,
+    &ngx_http_autoindex_module,
+    &ngx_http_index_module,
+    &ngx_http_auth_basic_module,
+    &ngx_http_access_module,
+    &ngx_http_limit_conn_module,
+    &ngx_http_limit_req_module,
+    &ngx_http_geo_module,
+    &ngx_http_map_module,
+    &ngx_http_split_clients_module,
+    &ngx_http_referer_module,
+    &ngx_http_rewrite_module,
+    &ngx_http_ssl_module,
+    &ngx_http_proxy_module,
+    &ngx_http_fastcgi_module,
+    &ngx_http_uwsgi_module,
+    &ngx_http_scgi_module,
+    &ngx_http_memcached_module,
+    &ngx_http_empty_gif_module,
+    &ngx_http_browser_module,
+    &ngx_http_upstream_hash_module,
+    &ngx_http_upstream_ip_hash_module,
+    &ngx_http_upstream_least_conn_module,
+    &ngx_http_upstream_keepalive_module,
+    &ngx_http_upstream_zone_module,
+    &ngx_http_write_filter_module,
+    &ngx_http_header_filter_module,
+    &ngx_http_chunked_filter_module,
+    &ngx_http_range_header_filter_module,
+    &ngx_http_gzip_filter_module,
+    &ngx_http_postpone_filter_module,
+    &ngx_http_ssi_filter_module,
+    &ngx_http_charset_filter_module,
+    &ngx_http_userid_filter_module,
+    &ngx_http_headers_filter_module,
+    &ngx_http_copy_filter_module,
+    &ngx_http_range_body_filter_module,
+    &ngx_http_not_modified_filter_module,
+    NULL
+};
+{% endhighlight %}
+
+
+
 
 <br />
 <br />
