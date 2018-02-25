@@ -732,7 +732,7 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
              }
 
             
-             //9) 建立指令的配置上下文
+             //9) 建立指令的配置上下文（关于配置指令上下文的问题，我们后面会继续进行详细讲解）
              /* set up the directive's configuration context */
             
              conf = NULL;
@@ -752,12 +752,16 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
                  }
              }
 
-            rv = cmd->set(cf, cmd, conf);
-
+             rv = cmd->set(cf, cmd, conf);
+             if(rv == NGX_CONF_OK)
+                return NGX_OK;
+              
+             return NGX_ERROR;
          }
     }
 
-
+    //10) 返回错误
+    return NGX_ERROR;
 }
 {% endhighlight %}
 
