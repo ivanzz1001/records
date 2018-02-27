@@ -1081,7 +1081,7 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
 
 首先在```ngx_init_cycle()```中为cycle->conf_ctx分配空间，然后针对ngx_modules[]数组中的每一个```NGX_CORE_MODULE```类型的元素，调用其cycle->modules[i]->ctx的create_conf()来创建context； 再接着完成nginx ```-g```选项传递进来的全局指令的解析，然后完成nginx配置文件的解析； 最后再针对ngx_modules[]数组中每一个```NGX_CORE_MODULE```类型的元素调用cycle->modules[i]->ctx的init_conf()来完成最后配置的一个初始化。
 
-针对非```NGX_CORE_MODULE```类型的module，则在解析到对应配置块时调用该模块的相应函数完成相应上下文的建立。
+针对非```NGX_CORE_MODULE```类型的module，则在解析到对应配置块时调用该模块的ngx_module_s.ctx结构来完成上下文的建立。
 
 {% highlight string %}
 struct ngx_cycle_s {
