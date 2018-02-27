@@ -754,7 +754,10 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
                  }
              }
 
-             rv = cmd->set(cf, cmd, conf);
+             //注意此处调用相应模块钩子函数，然后进入对应的配置块解析，调用完成后恢复cf对象
+             //例如，解析到ngx_events_module模块的event指令，调用ngx_events_block()函数
+             //注意： ngx_events_block()函数中的上下文恢复：*cf = pcf;
+             rv = cmd->set(cf, cmd, conf);    
              if(rv == NGX_CONF_OK)
                 return NGX_OK;
               
@@ -1073,6 +1076,62 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
 
 对于其他类型，则保存对应数组在```ctx_index```索引处的地址， 例如对于```ngx_event_core_module```,由于cf->ctx当前指向的就是上面所构建的这个```无名指针```,因此这里```confp```就是这个```无名指针指向的地址。
 
+
+**7) nginx module的启动流程**
+
+首先在```ngx_init_cycle()```中为cycle->conf_ctx分配空间，然后针对ngx_modules[]数组中的每一个```NGX_CORE_MODULE```类型的元素，调用其cycle->modules[i]->ctx的create_conf()来创建context； 再接着完成nginx ```-g```选项传递进来的全局指令的解析，然后完成nginx配置文件的解析； 最后再针对ngx_modules[]数组中每一个```NGX_CORE_MODULE```类型的元素调用cycle->modules[i]->ctx的init_conf()来完成最后配置的一个初始化。
+
+针对非```NGX_CORE_MODULE```类型的module，则在解析过程中完成相应的启动过程。下面列出相应的结构：
+
+{% highlight string %}
+struct ngx_cycle_s {
+    void                  ****conf_ctx;
+    ...
+}；
+struct ngx_module_s {
+    ngx_uint_t            ctx_index;
+    ngx_uint_t            index;
+
+    char                 *name;
+
+    ....
+
+    void                 *ctx;     //用户基于此来创建对应module上下文
+    ngx_command_t        *commands;
+    ngx_uint_t            type;
+    
+    ...
+};
+
+//针对核心模块，上述ngx_module_s.ctx指向的就是如下这样一个上下文
+typedef struct {
+    ngx_str_t             name;
+    void               *(*create_conf)(ngx_cycle_t *cycle);
+    char               *(*init_conf)(ngx_cycle_t *cycle, void *conf);
+} ngx_core_module_t;
+
+//针对配置文件解析，生成相应的ngx_conf_s对象，该对象关联着ngx_conf_file_t对象
+struct ngx_conf_s {
+    char                 *name;
+    ngx_array_t          *args;
+
+    ngx_cycle_t          *cycle;
+    ngx_pool_t           *pool;
+    ngx_pool_t           *temp_pool;
+    ngx_conf_file_t      *conf_file;
+    ngx_log_t            *log;
+
+    void                 *ctx;           //指向cycle->conf_ctx
+    ngx_uint_t            module_type;   //解析到的当前指令属于哪一个module
+    ngx_uint_t            cmd_type;      //当前解析到哪一个配置块的配置(NGX_MAIN_CONF/NGX_HTTP_MAIN_CONF等)
+
+    ngx_conf_handler_pt   handler;       //指令解析钩子函数
+    char                 *handler_conf;
+};
+{% endhighlight %}
+
+
+
 <br />
 <br />
 **[参看]**
@@ -1087,7 +1146,7 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
 
 5. [Command-line parameters](http://nginx.org/en/docs/switches.html)
 
-6. [](http://blog.chinaunix.net/uid-27767798-id-3840094.html)
+6. [图解Nginx 中的4级指针](http://blog.chinaunix.net/uid-27767798-id-3840094.html)
 <br />
 <br />
 <br />
