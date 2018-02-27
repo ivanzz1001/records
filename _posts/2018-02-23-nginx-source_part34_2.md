@@ -168,7 +168,6 @@ typedef struct {
 
 再接着调用```ngx_conf_parse()```当前的配置对象.
 
-<br />
 
 ### 3.2 函数ngx_conf_parse()
 {% highlight string %}
@@ -444,7 +443,6 @@ ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename)
 
 * parse_param类型
 
-<br />
 
 **2) 解析配置指令**
 {% highlight string %}
@@ -677,6 +675,7 @@ invalid:
 {% endhighlight %}
 
 **1) 函数流程分析**
+
 下面我们简要分析一下该函数(这里注意cf->args包含了指令及参数部分)：
 {% highlight string %}
 static ngx_int_t
