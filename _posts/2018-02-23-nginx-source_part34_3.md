@@ -19,7 +19,7 @@ description: nginx源代码分析
 
 ## 1. 配置解析相关函数实现
 
-### 1.1 函数ngx_conf_read_token()
+**1) 函数ngx_conf_read_token()**
 {% highlight string %}
 static ngx_int_t
 ngx_conf_read_token(ngx_conf_t *cf)
@@ -385,7 +385,9 @@ ngx_conf_read_token(ngx_conf_t *cf)
 }
 {% endhighlight %}
 
-### 1.2 函数ngx_conf_include()
+<br />
+
+**2) 函数ngx_conf_include()**
 {% highlight string %}
 char *
 ngx_conf_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
@@ -454,7 +456,10 @@ ngx_conf_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {% endhighlight %}
 这里处理```include```配置指令。如果不包含"*?["这样的模式匹配字符串，则可以直接打开相应的文件进行ngx_conf_parse()处理，否则这里用到glob()函数匹配文件，再分别对每一个文件进行处理。
 
-### 1.3 函数ngx_conf_full_name()
+<br />
+
+
+**3) 函数ngx_conf_full_name()**
 {% highlight string %}
 ngx_int_t
 ngx_conf_full_name(ngx_cycle_t *cycle, ngx_str_t *name, ngx_uint_t conf_prefix)
@@ -470,7 +475,7 @@ ngx_conf_full_name(ngx_cycle_t *cycle, ngx_str_t *name, ngx_uint_t conf_prefix)
 nginx中有一个```NGX_PREFIX```和```NGX_CONF_PREFIX```，这里用于配置文件地址。如果没有指定```NGX_CONF_PREFIX```，则默认的配置文件地址为```NGX_PREFIX/conf/nginx.conf```。
 
 
-### 1.4 函数ngx_conf_open_file()
+**4) 函数ngx_conf_open_file()**
 {% highlight string %}
 ngx_open_file_t *
 ngx_conf_open_file(ngx_cycle_t *cycle, ngx_str_t *name)
@@ -538,7 +543,9 @@ ngx_conf_open_file(ngx_cycle_t *cycle, ngx_str_t *name)
 
 这里如果提供了```name```的话(即name->len>0)，则首先从```cycle->open_files```链表中查看该文件是否打开过，如果找到则直接返回该文件；否则向该链表中添加一条记录。这里```name->len```为0的话，则表明打开的是一个标准错误输出文件。
 
-### 1.5 函数ngx_conf_flush_files()
+<br />
+
+**5) 函数ngx_conf_flush_files()**
 {% highlight string %}
 static void
 ngx_conf_flush_files(ngx_cycle_t *cycle)
@@ -571,7 +578,10 @@ ngx_conf_flush_files(ngx_cycle_t *cycle)
 {% endhighlight %}
 对所有已打开文件调用对应的flush()方法刷新文件。
 
-### 1.6 函数ngx_conf_log_error()
+<br />
+
+
+**6) 函数ngx_conf_log_error()**
 {% highlight string %}
 void ngx_cdecl
 ngx_conf_log_error(ngx_uint_t level, ngx_conf_t *cf, ngx_err_t err,
@@ -608,7 +618,9 @@ ngx_conf_log_error(ngx_uint_t level, ngx_conf_t *cf, ngx_err_t err,
 {% endhighlight %}
 用于打印配置文件检查时发现的相应错误。
 
-### 1.7 函数ngx_conf_set_flag_slot()
+<br />
+
+**7) 函数ngx_conf_set_flag_slot()**
 {% highlight string %}
 char *
 ngx_conf_set_flag_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
@@ -653,7 +665,9 @@ ngx_conf_set_flag_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 这里即通过命令设置conf对应字段的值。
 
-### 1.8 函数ngx_conf_set_str_slot()
+<br />
+
+**8) 函数ngx_conf_set_str_slot()**
 {% highlight string %}
 char *
 ngx_conf_set_str_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
@@ -683,7 +697,9 @@ ngx_conf_set_str_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {% endhighlight %}
 设置字符串字段的值。
 
-### 1.9 函数ngx_conf_set_str_array_slot()
+<br />
+
+**9) 函数ngx_conf_set_str_array_slot()**
 {% highlight string %}
 char *
 ngx_conf_set_str_array_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
@@ -722,7 +738,9 @@ ngx_conf_set_str_array_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {% endhighlight %}
 conf上下文中某个字段类型为字符串数组类型，通过此函数往该数组中添加元素。
 
-### 1.10 函数ngx_conf_set_keyval_slot()
+<br />
+
+**10) 函数ngx_conf_set_keyval_slot()**
 {% highlight string %}
 char *
 ngx_conf_set_keyval_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
@@ -763,7 +781,9 @@ ngx_conf_set_keyval_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {% endhighlight %}
 设置key/value值。
 
-### 1.11 函数ngx_conf_set_num_slot()
+<br />
+
+**11) 函数ngx_conf_set_num_slot()**
 {% highlight string %}
 char *
 ngx_conf_set_num_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
@@ -797,7 +817,9 @@ ngx_conf_set_num_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {% endhighlight %}
 conf上下文中某个字段类型为```ngx_int_t```类型，通过本函数设置cmd所关联的上下文该字段的值。
 
-### 1.12 函数ngx_conf_set_size_slot()
+<br />
+
+**12) 函数ngx_conf_set_size_slot()**
 {% highlight string %}
 char *
 ngx_conf_set_size_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
@@ -836,7 +858,7 @@ conf上下文中某个字段类型为size类型，通过本函数设置cmd所关
 比如设置某一个字段为： 10K，则最后会被转换为10*1024
 </pre>
 
-### 1.13 函数ngx_conf_set_off_slot()
+**13) 函数ngx_conf_set_off_slot()**
 {% highlight string %}
 char *
 ngx_conf_set_off_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
@@ -871,7 +893,7 @@ ngx_conf_set_off_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 conf上下文中某个字段类型为offset类型，通过本函数设置cmd所关联的上下文该字段的值。当前支持的单位有：K/M/G
 
 
-### 1.14 函数ngx_conf_set_msec_slot()
+**14) 函数ngx_conf_set_msec_slot()**
 {% highlight string %}
 char *
 ngx_conf_set_msec_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
@@ -903,7 +925,234 @@ ngx_conf_set_msec_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     return NGX_CONF_OK;
 }
 {% endhighlight %}
-conf上下文中某个字段类型为```时间```类型，通过本函数设置cmd所关联的上下文该字段的值。例如：```2001y1M1d```表示为2001年1月1日
+conf上下文中某个字段类型为```时间```类型，通过本函数设置cmd所关联的上下文该字段的值。例如：```2001y 1M 1d```表示为2001年1月1日。
+
+<br />
+
+**15) 函数ngx_conf_set_sec_slot()**
+{% highlight string %}
+char *
+ngx_conf_set_sec_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char  *p = conf;
+
+    time_t           *sp;
+    ngx_str_t        *value;
+    ngx_conf_post_t  *post;
+
+
+    sp = (time_t *) (p + cmd->offset);
+    if (*sp != NGX_CONF_UNSET) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    *sp = ngx_parse_time(&value[1], 1);
+    if (*sp == (time_t) NGX_ERROR) {
+        return "invalid value";
+    }
+
+    if (cmd->post) {
+        post = cmd->post;
+        return post->post_handler(cf, post, sp);
+    }
+
+    return NGX_CONF_OK;
+}
+{% endhighlight %}
+conf上下文中某个字段类型为```时间```类型，通过本函数设置cmd所关联的上下文该字段的值。
+
+<br />
+
+**16) 函数ngx_conf_set_bufs_slot()**
+{% highlight string %}
+char *
+ngx_conf_set_bufs_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char *p = conf;
+
+    ngx_str_t   *value;
+    ngx_bufs_t  *bufs;
+
+
+    bufs = (ngx_bufs_t *) (p + cmd->offset);
+    if (bufs->num) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    bufs->num = ngx_atoi(value[1].data, value[1].len);
+    if (bufs->num == NGX_ERROR || bufs->num == 0) {
+        return "invalid value";
+    }
+
+    bufs->size = ngx_parse_size(&value[2]);
+    if (bufs->size == (size_t) NGX_ERROR || bufs->size == 0) {
+        return "invalid value";
+    }
+
+    return NGX_CONF_OK;
+}
+{% endhighlight %}
+设置一个```ngx_bufs_t```数据。
+
+<br />
+
+**17) 函数ngx_conf_set_enum_slot()**
+{% highlight string %}
+char *
+ngx_conf_set_enum_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char  *p = conf;
+
+    ngx_uint_t       *np, i;
+    ngx_str_t        *value;
+    ngx_conf_enum_t  *e;
+
+    np = (ngx_uint_t *) (p + cmd->offset);
+
+    if (*np != NGX_CONF_UNSET_UINT) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+    e = cmd->post;
+
+    for (i = 0; e[i].name.len != 0; i++) {
+        if (e[i].name.len != value[1].len
+            || ngx_strcasecmp(e[i].name.data, value[1].data) != 0)
+        {
+            continue;
+        }
+
+        *np = e[i].value;
+
+        return NGX_CONF_OK;
+    }
+
+    ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+                       "invalid value \"%s\"", value[1].data);
+
+    return NGX_CONF_ERROR;
+}
+{% endhighlight %}
+设置一个枚举类型值。
+
+<br />
+
+**18） 函数ngx_conf_set_bitmask_slot()**
+{% highlight string %}
+char *
+ngx_conf_set_bitmask_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char  *p = conf;
+
+    ngx_uint_t          *np, i, m;
+    ngx_str_t           *value;
+    ngx_conf_bitmask_t  *mask;
+
+
+    np = (ngx_uint_t *) (p + cmd->offset);
+    value = cf->args->elts;
+    mask = cmd->post;
+
+    for (i = 1; i < cf->args->nelts; i++) {
+        for (m = 0; mask[m].name.len != 0; m++) {
+
+            if (mask[m].name.len != value[i].len
+                || ngx_strcasecmp(mask[m].name.data, value[i].data) != 0)
+            {
+                continue;
+            }
+
+            if (*np & mask[m].mask) {
+                ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+                                   "duplicate value \"%s\"", value[i].data);
+
+            } else {
+                *np |= mask[m].mask;
+            }
+
+            break;
+        }
+
+        if (mask[m].name.len == 0) {
+            ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+                               "invalid value \"%s\"", value[i].data);
+
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    return NGX_CONF_OK;
+}
+{% endhighlight %}
+设置掩码位。
+
+**19） 函数ngx_conf_deprecated()**
+{% highlight string %}
+#if 0
+
+char *
+ngx_conf_unsupported(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    return "unsupported on this platform";
+}
+
+#endif
+
+
+char *
+ngx_conf_deprecated(ngx_conf_t *cf, void *post, void *data)
+{
+    ngx_conf_deprecated_t  *d = post;
+
+    ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+                       "the \"%s\" directive is deprecated, "
+                       "use the \"%s\" directive instead",
+                       d->old_name, d->new_name);
+
+    return NGX_CONF_OK;
+}
+{% endhighlight %}
+这里主要是打印相关提示，说明某一个指令已经过时。
+
+<br />
+
+**20) 函数ngx_conf_check_num_bounds()**
+{% highlight string %}
+char *
+ngx_conf_check_num_bounds(ngx_conf_t *cf, void *post, void *data)
+{
+    ngx_conf_num_bounds_t  *bounds = post;
+    ngx_int_t  *np = data;
+
+    if (bounds->high == -1) {
+        if (*np >= bounds->low) {
+            return NGX_CONF_OK;
+        }
+
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "value must be equal to or greater than %i",
+                           bounds->low);
+
+        return NGX_CONF_ERROR;
+    }
+
+    if (*np >= bounds->low && *np <= bounds->high) {
+        return NGX_CONF_OK;
+    }
+
+    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                       "value must be between %i and %i",
+                       bounds->low, bounds->high);
+
+    return NGX_CONF_ERROR;
+}
+{% endhighlight %}
+主要是用于检查所设定的值是否在某个区间范围内。
 
 
 <br />
