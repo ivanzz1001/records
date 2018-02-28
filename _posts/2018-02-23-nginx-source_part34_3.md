@@ -13,7 +13,8 @@ description: nginx源代码分析
 
 
 <!-- more -->
-
+<br />
+<br />
 
 
 ## 1. 配置解析相关函数实现
@@ -609,7 +610,300 @@ ngx_conf_log_error(ngx_uint_t level, ngx_conf_t *cf, ngx_err_t err,
 
 ### 1.7 函数ngx_conf_set_flag_slot()
 {% highlight string %}
+char *
+ngx_conf_set_flag_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char  *p = conf;
+
+    ngx_str_t        *value;
+    ngx_flag_t       *fp;
+    ngx_conf_post_t  *post;
+
+    fp = (ngx_flag_t *) (p + cmd->offset);
+
+    if (*fp != NGX_CONF_UNSET) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    if (ngx_strcasecmp(value[1].data, (u_char *) "on") == 0) {
+        *fp = 1;
+
+    } else if (ngx_strcasecmp(value[1].data, (u_char *) "off") == 0) {
+        *fp = 0;
+
+    } else {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                     "invalid value \"%s\" in \"%s\" directive, "
+                     "it must be \"on\" or \"off\"",
+                     value[1].data, cmd->name.data);
+        return NGX_CONF_ERROR;
+    }
+
+    if (cmd->post) {
+        post = cmd->post;
+        return post->post_handler(cf, post, fp);
+    }
+
+    return NGX_CONF_OK;
+}
 {% endhighlight %}
+这里```conf```是该命令对应模块所关联着的上下文对象，例如对于```ngx_core_module```，其所关联的上下文对象就为ngx_core_conf_t。请参看：```conf_ctx 4级指针结构```。
+
+这里即通过命令设置conf对应字段的值。
+
+### 1.8 函数ngx_conf_set_str_slot()
+{% highlight string %}
+char *
+ngx_conf_set_str_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char  *p = conf;
+
+    ngx_str_t        *field, *value;
+    ngx_conf_post_t  *post;
+
+    field = (ngx_str_t *) (p + cmd->offset);
+
+    if (field->data) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    *field = value[1];
+
+    if (cmd->post) {
+        post = cmd->post;
+        return post->post_handler(cf, post, field);
+    }
+
+    return NGX_CONF_OK;
+}
+{% endhighlight %}
+设置字符串字段的值。
+
+### 1.9 函数ngx_conf_set_str_array_slot()
+{% highlight string %}
+char *
+ngx_conf_set_str_array_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char  *p = conf;
+
+    ngx_str_t         *value, *s;
+    ngx_array_t      **a;
+    ngx_conf_post_t   *post;
+
+    a = (ngx_array_t **) (p + cmd->offset);
+
+    if (*a == NGX_CONF_UNSET_PTR) {
+        *a = ngx_array_create(cf->pool, 4, sizeof(ngx_str_t));
+        if (*a == NULL) {
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    s = ngx_array_push(*a);
+    if (s == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    value = cf->args->elts;
+
+    *s = value[1];
+
+    if (cmd->post) {
+        post = cmd->post;
+        return post->post_handler(cf, post, s);
+    }
+
+    return NGX_CONF_OK;
+}
+{% endhighlight %}
+conf上下文中某个字段类型为字符串数组类型，通过此函数往该数组中添加元素。
+
+### 1.10 函数ngx_conf_set_keyval_slot()
+{% highlight string %}
+char *
+ngx_conf_set_keyval_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char  *p = conf;
+
+    ngx_str_t         *value;
+    ngx_array_t      **a;
+    ngx_keyval_t      *kv;
+    ngx_conf_post_t   *post;
+
+    a = (ngx_array_t **) (p + cmd->offset);
+
+    if (*a == NULL) {
+        *a = ngx_array_create(cf->pool, 4, sizeof(ngx_keyval_t));
+        if (*a == NULL) {
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    kv = ngx_array_push(*a);
+    if (kv == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    value = cf->args->elts;
+
+    kv->key = value[1];
+    kv->value = value[2];
+
+    if (cmd->post) {
+        post = cmd->post;
+        return post->post_handler(cf, post, kv);
+    }
+
+    return NGX_CONF_OK;
+}
+{% endhighlight %}
+设置key/value值。
+
+### 1.11 函数ngx_conf_set_num_slot()
+{% highlight string %}
+char *
+ngx_conf_set_num_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char  *p = conf;
+
+    ngx_int_t        *np;
+    ngx_str_t        *value;
+    ngx_conf_post_t  *post;
+
+
+    np = (ngx_int_t *) (p + cmd->offset);
+
+    if (*np != NGX_CONF_UNSET) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+    *np = ngx_atoi(value[1].data, value[1].len);
+    if (*np == NGX_ERROR) {
+        return "invalid number";
+    }
+
+    if (cmd->post) {
+        post = cmd->post;
+        return post->post_handler(cf, post, np);
+    }
+
+    return NGX_CONF_OK;
+}
+{% endhighlight %}
+conf上下文中某个字段类型为```ngx_int_t```类型，通过本函数设置cmd所关联的上下文该字段的值。
+
+### 1.12 函数ngx_conf_set_size_slot()
+{% highlight string %}
+char *
+ngx_conf_set_size_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char  *p = conf;
+
+    size_t           *sp;
+    ngx_str_t        *value;
+    ngx_conf_post_t  *post;
+
+
+    sp = (size_t *) (p + cmd->offset);
+    if (*sp != NGX_CONF_UNSET_SIZE) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    *sp = ngx_parse_size(&value[1]);
+    if (*sp == (size_t) NGX_ERROR) {
+        return "invalid value";
+    }
+
+    if (cmd->post) {
+        post = cmd->post;
+        return post->post_handler(cf, post, sp);
+    }
+
+    return NGX_CONF_OK;
+}
+{% endhighlight %}
+conf上下文中某个字段类型为size类型，通过本函数设置cmd所关联的上下文该字段的值。
+<pre>
+查看ngx_parse_size()函数，目前支持的单位有： K/k, M/m，默认的字节单位
+
+比如设置某一个字段为： 10K，则最后会被转换为10*1024
+</pre>
+
+### 1.13 函数ngx_conf_set_off_slot()
+{% highlight string %}
+char *
+ngx_conf_set_off_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char  *p = conf;
+
+    off_t            *op;
+    ngx_str_t        *value;
+    ngx_conf_post_t  *post;
+
+
+    op = (off_t *) (p + cmd->offset);
+    if (*op != NGX_CONF_UNSET) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    *op = ngx_parse_offset(&value[1]);
+    if (*op == (off_t) NGX_ERROR) {
+        return "invalid value";
+    }
+
+    if (cmd->post) {
+        post = cmd->post;
+        return post->post_handler(cf, post, op);
+    }
+
+    return NGX_CONF_OK;
+}
+{% endhighlight %}
+conf上下文中某个字段类型为offset类型，通过本函数设置cmd所关联的上下文该字段的值。当前支持的单位有：K/M/G
+
+
+### 1.14 函数ngx_conf_set_msec_slot()
+{% highlight string %}
+char *
+ngx_conf_set_msec_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char  *p = conf;
+
+    ngx_msec_t       *msp;
+    ngx_str_t        *value;
+    ngx_conf_post_t  *post;
+
+
+    msp = (ngx_msec_t *) (p + cmd->offset);
+    if (*msp != NGX_CONF_UNSET_MSEC) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    *msp = ngx_parse_time(&value[1], 0);
+    if (*msp == (ngx_msec_t) NGX_ERROR) {
+        return "invalid value";
+    }
+
+    if (cmd->post) {
+        post = cmd->post;
+        return post->post_handler(cf, post, msp);
+    }
+
+    return NGX_CONF_OK;
+}
+{% endhighlight %}
+conf上下文中某个字段类型为```时间```类型，通过本函数设置cmd所关联的上下文该字段的值。例如：```2001y1M1d```表示为2001年1月1日
 
 
 <br />
