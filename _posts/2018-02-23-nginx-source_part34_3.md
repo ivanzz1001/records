@@ -468,6 +468,150 @@ ngx_conf_full_name(ngx_cycle_t *cycle, ngx_str_t *name, ngx_uint_t conf_prefix)
 
 nginx中有一个```NGX_PREFIX```和```NGX_CONF_PREFIX```，这里用于配置文件地址。如果没有指定```NGX_CONF_PREFIX```，则默认的配置文件地址为```NGX_PREFIX/conf/nginx.conf```。
 
+
+### 1.4 函数ngx_conf_open_file()
+{% highlight string %}
+ngx_open_file_t *
+ngx_conf_open_file(ngx_cycle_t *cycle, ngx_str_t *name)
+{
+    ngx_str_t         full;
+    ngx_uint_t        i;
+    ngx_list_part_t  *part;
+    ngx_open_file_t  *file;
+
+#if (NGX_SUPPRESS_WARN)
+    ngx_str_null(&full);
+#endif
+
+    if (name->len) {
+        full = *name;
+
+        if (ngx_conf_full_name(cycle, &full, 0) != NGX_OK) {
+            return NULL;
+        }
+
+        part = &cycle->open_files.part;
+        file = part->elts;
+
+        for (i = 0; /* void */ ; i++) {
+
+            if (i >= part->nelts) {
+                if (part->next == NULL) {
+                    break;
+                }
+                part = part->next;
+                file = part->elts;
+                i = 0;
+            }
+
+            if (full.len != file[i].name.len) {
+                continue;
+            }
+
+            if (ngx_strcmp(full.data, file[i].name.data) == 0) {
+                return &file[i];
+            }
+        }
+    }
+
+    file = ngx_list_push(&cycle->open_files);
+    if (file == NULL) {
+        return NULL;
+    }
+
+    if (name->len) {
+        file->fd = NGX_INVALID_FILE;
+        file->name = full;
+
+    } else {
+        file->fd = ngx_stderr;
+        file->name = *name;
+    }
+
+    file->flush = NULL;
+    file->data = NULL;
+
+    return file;
+}
+{% endhighlight %}
+
+这里如果提供了```name```的话(即name->len>0)，则首先从```cycle->open_files```链表中查看该文件是否打开过，如果找到则直接返回该文件；否则向该链表中添加一条记录。这里```name->len```为0的话，则表明打开的是一个标准错误输出文件。
+
+### 1.5 函数ngx_conf_flush_files()
+{% highlight string %}
+static void
+ngx_conf_flush_files(ngx_cycle_t *cycle)
+{
+    ngx_uint_t        i;
+    ngx_list_part_t  *part;
+    ngx_open_file_t  *file;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_CORE, cycle->log, 0, "flush files");
+
+    part = &cycle->open_files.part;
+    file = part->elts;
+
+    for (i = 0; /* void */ ; i++) {
+
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+            part = part->next;
+            file = part->elts;
+            i = 0;
+        }
+
+        if (file[i].flush) {
+            file[i].flush(&file[i], cycle->log);
+        }
+    }
+}
+{% endhighlight %}
+对所有已打开文件调用对应的flush()方法刷新文件。
+
+### 1.6 函数ngx_conf_log_error()
+{% highlight string %}
+void ngx_cdecl
+ngx_conf_log_error(ngx_uint_t level, ngx_conf_t *cf, ngx_err_t err,
+    const char *fmt, ...)
+{
+    u_char   errstr[NGX_MAX_CONF_ERRSTR], *p, *last;
+    va_list  args;
+
+    last = errstr + NGX_MAX_CONF_ERRSTR;
+
+    va_start(args, fmt);
+    p = ngx_vslprintf(errstr, last, fmt, args);
+    va_end(args);
+
+    if (err) {
+        p = ngx_log_errno(p, last, err);
+    }
+
+    if (cf->conf_file == NULL) {
+        ngx_log_error(level, cf->log, 0, "%*s", p - errstr, errstr);
+        return;
+    }
+
+    if (cf->conf_file->file.fd == NGX_INVALID_FILE) {
+        ngx_log_error(level, cf->log, 0, "%*s in command line",
+                      p - errstr, errstr);
+        return;
+    }
+
+    ngx_log_error(level, cf->log, 0, "%*s in %s:%ui",
+                  p - errstr, errstr,
+                  cf->conf_file->file.name.data, cf->conf_file->line);
+}
+{% endhighlight %}
+用于打印配置文件检查时发现的相应错误。
+
+### 1.7 函数ngx_conf_set_flag_slot()
+{% highlight string %}
+{% endhighlight %}
+
+
 <br />
 <br />
 **[参看]**
