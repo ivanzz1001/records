@@ -35,20 +35,21 @@ description: nginx源代码分析
 typedef struct ngx_listening_s  ngx_listening_t;
 
 struct ngx_listening_s {
-    ngx_socket_t        fd;
+    ngx_socket_t        fd;                        //代表当前监听socket句柄
 
-    struct sockaddr    *sockaddr;
-    socklen_t           socklen;    /* size of sockaddr */
-    size_t              addr_text_max_len;
-    ngx_str_t           addr_text;
+    struct sockaddr    *sockaddr;                  //代表当前监听socket的地址
+    socklen_t           socklen;                   //地址大小 size of sockaddr
+    size_t              addr_text_max_len;         //字符串表示的ip地址的最大长度限制
+    ngx_str_t           addr_text;                 //字符串表示的ip地址
 
-    int                 type;
+    int                 type;                      //socket类型，当type值为SOCK_STREAM,表示的tcp；
 
-    int                 backlog;
-    int                 rcvbuf;
-    int                 sndbuf;
-#if (NGX_HAVE_KEEPALIVE_TUNABLE)
-    int                 keepidle;
+    //TCP实现监听时的backlog队列，它表示允许正在通过三次握手建立tcp连接但还没有任何进程开始处理的连接最大个数
+    int                 backlog;                   
+    int                 rcvbuf;                    //接收缓存大小
+    int                 sndbuf;                    //发送缓存大小
+#if (NGX_HAVE_KEEPALIVE_TUNABLE)                   //当前我们支持keepalive特性
+    int                 keepidle;                  
     int                 keepintvl;
     int                 keepcnt;
 #endif
@@ -96,7 +97,6 @@ struct ngx_listening_s {
 
 #if (NGX_HAVE_DEFERRED_ACCEPT)
     unsigned            deferred_accept:1;
-    unsigned            delete_deferred:1;
     unsigned            add_deferred:1;
 #ifdef SO_ACCEPTFILTER
     char               *accept_filter;
@@ -113,6 +113,16 @@ struct ngx_listening_s {
 };
 {% endhighlight %}
 
+
+
+
+
+<br />
+<br />
+
+**[参考]:**
+
+1. [TCP KeepAlive的几个附加选项](https://www.cnblogs.com/cobbliu/p/4655542.html)
 
 
 
