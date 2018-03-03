@@ -54,13 +54,23 @@ struct ngx_listening_s {
     int                 keepcnt;
 #endif
 
-    /* handler of accepted connection */
+    /* handler of accepted connection （对新建立连接的处理方法）
+     * 
+     * 例如：
+     * 对于http连接，其handler指定为ngx_http_init_connection
+     * 对于mail连接，其handler指定为ngx_mail_init_connection
+     * 对于stream连接，其handler指定为ngx_stream_init_connection
+     */
     ngx_connection_handler_pt   handler;
 
-    void               *servers;  /* array of ngx_http_in_addr_t, for example */
 
-    ngx_log_t           log;
-    ngx_log_t          *logp;
+    /* array of ngx_http_in_addr_t, for example
+     * 主要用于http/mail/stream等模块，保存当前监听端口对应的所有主机名 
+     */
+    void               *servers;  
+
+    ngx_log_t           log;                  //log是自身携带的一个日志，主要用于各个模块的日志信息格式化
+    ngx_log_t          *logp;                 //通过error log命令配置的日志
 
     size_t              pool_size;
     /* should be here because of the AcceptEx() preread */
@@ -113,6 +123,16 @@ struct ngx_listening_s {
 };
 {% endhighlight %}
 
+注意：
+<pre>
+关于TCP keepalive有如下几个选项：
+
+1) TCP_KEEPIDLE: 设置连接上如果没有数据发送的话，多久后发送keepalive探测分组，单位是秒
+
+2) TCP_KEEPINTVL: 前后两侧探测之间的时间间隔，单位是秒
+
+3) TCP_KEEPCNT: 关闭一个非活跃连接之前的最大重试次数
+</pre>
 
 
 
@@ -123,6 +143,8 @@ struct ngx_listening_s {
 **[参考]:**
 
 1. [TCP KeepAlive的几个附加选项](https://www.cnblogs.com/cobbliu/p/4655542.html)
+
+2. [nginx源码初读](http://blog.csdn.net/wuchunlai_2012/article/details/50732741)
 
 
 
