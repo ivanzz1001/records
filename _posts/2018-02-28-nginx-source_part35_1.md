@@ -146,7 +146,7 @@ struct ngx_listening_s {
 
 2. [nginx源码初读](http://blog.csdn.net/wuchunlai_2012/article/details/50732741)
 
-
+3. [nginx学习十 ngx_cycle_t 、ngx_connection_t 和ngx_listening_t](http://blog.csdn.net/xiaoliangsky/article/details/39831035)
 
 <br />
 <br />
