@@ -201,84 +201,166 @@ typedef enum {
 
 
 ## 3. ngx_connection_s数据结构
+下面我们对```ngx_connection_s```数据结构做一个简单的介绍：
 {% highlight string %}
 struct ngx_connection_s {
+    /*
+     *  指向任意的连接上下文类型。通常其是指向一个建立在连接上的更高层对象，比如一个http请求或者stream session。
+     *  而在连接未建立时，data域一般充当连接链表中的next指针
+    */
     void               *data;
-    ngx_event_t        *read;
-    ngx_event_t        *write;
+    ngx_event_t        *read;        //连接对应的读事件
+    ngx_event_t        *write;       //连接对应的写事件
 
-    ngx_socket_t        fd;
+    ngx_socket_t        fd;          //连接对应的socket句柄
 
-    ngx_recv_pt         recv;
-    ngx_send_pt         send;
-    ngx_recv_chain_pt   recv_chain;
+    /*如下是针对该连接的IO操作*/
+    ngx_recv_pt         recv;        
+    ngx_send_pt         send;        
+    ngx_recv_chain_pt   recv_chain;  
     ngx_send_chain_pt   send_chain;
 
+    //这个链接对应的listening_t监听对象，此链接由ngx_listening_t监听的事件建立 
     ngx_listening_t    *listening;
 
-    off_t               sent;
+    off_t               sent;         //这个连接已经发送出去的字节数
 
-    ngx_log_t          *log;
+    ngx_log_t          *log;          //用于记录日志
 
+    //在accept一个新连接的时候,会创建一个内存池,而这个连接结束时候,会销毁一个内存池.  
+    //这里所说的连接是成功建立的tcp连接.内存池的大小由pool_size决定  
+    //所有的ngx_connect_t结构体都是预分配的
     ngx_pool_t         *pool;
 
-    int                 type;
+    int                 type;         //类型，一般与ngx_listening_s.type字段含义相同
 
+    //连接的远程地址的二进制表示及文本表示
     struct sockaddr    *sockaddr;
     socklen_t           socklen;
     ngx_str_t           addr_text;
 
-    ngx_str_t           proxy_protocol_addr;
+    ngx_str_t           proxy_protocol_addr;    //此处指定代理协议的客户端地址
 
-#if (NGX_SSL)
-    ngx_ssl_connection_t  *ssl;
+#if (NGX_SSL)                                   //当前在ngx_auto_config.h头文件中支持此特性
+    ngx_ssl_connection_t  *ssl;                //连接所关联的SSL上下文
 #endif
 
+    /*
+     * 二进制形式表示的本地地址。刚开始，这些字段为空
+     * 使用ngx_connection_local_sockaddr()函数该socket本地地址
+    */
     struct sockaddr    *local_sockaddr;
     socklen_t           local_socklen;
 
-    ngx_buf_t          *buffer;
+    ngx_buf_t          *buffer;       //用于接收和缓存客户端发来的字节流
 
+    //该字段表示将该连接以双向链表形式添加到cycle结构体中的  
+    //reusable_connections_queen双向链表中,表示可以重用的连接
     ngx_queue_t         queue;
 
+    //连接使用次数,每次建立一条来自客户端的连接,  
+    //或者建立一条与后端服务器的连接,number+1  
     ngx_atomic_uint_t   number;
 
-    ngx_uint_t          requests;
+    ngx_uint_t          requests;       //处理请求的次数
 
-    unsigned            buffered:8;
+    unsigned            buffered:8;     //缓存中的业务类型
 
-    unsigned            log_error:3;     /* ngx_connection_log_error_e */
+    unsigned            log_error:3;    // ngx_connection_log_error_e 枚举类型
 
-    unsigned            unexpected_eof:1;
-    unsigned            timedout:1;
-    unsigned            error:1;
-    unsigned            destroyed:1;
+    unsigned            unexpected_eof:1;  //表示不期待字符流结束
+    unsigned            timedout:1;        //连接超时
+    unsigned            error:1;           //连接处理过程中出现错误
+    unsigned            destroyed:1;       //标识此链接已经销毁,内存池,套接字等都不可用
 
-    unsigned            idle:1;
-    unsigned            reusable:1;
-    unsigned            close:1;
-    unsigned            shared:1;
+    unsigned            idle:1;            //连接处于空闲状态
+    unsigned            reusable:1;        //连接可以重用
+    unsigned            close:1;           //为1，表示连接关闭
+    unsigned            shared:1;          //是否在多线程、多进程之间共享
 
-    unsigned            sendfile:1;
+    unsigned            sendfile:1;        //正在将文件中的数据发往另一端
+
+    /连接中发送缓冲区的数据高于低水位时,才发送数据.  
+    //与ngx_handle_write_event方法中的lowat相对应
     unsigned            sndlowat:1;
-    unsigned            tcp_nodelay:2;   /* ngx_connection_tcp_nodelay_e */
-    unsigned            tcp_nopush:2;    /* ngx_connection_tcp_nopush_e */
+    unsigned            tcp_nodelay:2;   /* ngx_connection_tcp_nodelay_e 使用tcp的nodely特性 */
+    unsigned            tcp_nopush:2;    /* ngx_connection_tcp_nopush_e 使用tcp的nopush特性*/
 
-    unsigned            need_last_buf:1;
+    unsigned            need_last_buf:1;  //主要用于http filter模块
 
-#if (NGX_HAVE_IOCP)
+#if (NGX_HAVE_IOCP)                       //当前不支持此特性
     unsigned            accept_context_updated:1;
 #endif
 
-#if (NGX_HAVE_AIO_SENDFILE)
+#if (NGX_HAVE_AIO_SENDFILE)               //当前不支持此特性
     unsigned            busy_count:2;
 #endif
 
-#if (NGX_THREADS)
+#if (NGX_THREADS)                         //当前未开启多线程文件发送
     ngx_thread_task_t  *sendfile_task;
 #endif
 };
 
+{% endhighlight %}
+
+
+## 4. ngx_set_connection_log宏
+{% highlight string %}
+#define ngx_set_connection_log(c, l)                                         \
+                                                                             \
+    c->log->file = l->file;                                                  \
+    c->log->next = l->next;                                                  \
+    c->log->writer = l->writer;                                              \
+    c->log->wdata = l->wdata;                                                \
+    if (!(c->log->log_level & NGX_LOG_DEBUG_CONNECTION)) {                   \
+        c->log->log_level = l->log_level;                                    \
+    }
+{% endhighlight %}
+用于设置一个连接所对应的日志操作
+
+## 5. 相关函数声明
+{% highlight string %}
+//1: 创建一个监听socket
+ngx_listening_t *ngx_create_listening(ngx_conf_t *cf, void *sockaddr,
+    socklen_t socklen);
+
+//2: 根据ls复制监听socket
+ngx_int_t ngx_clone_listening(ngx_conf_t *cf, ngx_listening_t *ls);
+
+//3: 设置继承过来的socket
+ngx_int_t ngx_set_inherited_sockets(ngx_cycle_t *cycle);
+
+//4: 打开监听socket
+ngx_int_t ngx_open_listening_sockets(ngx_cycle_t *cycle);
+
+//5: 配置监听socket
+void ngx_configure_listening_sockets(ngx_cycle_t *cycle);
+
+//6: 关闭监听socket
+void ngx_close_listening_sockets(ngx_cycle_t *cycle);
+
+//7: 关闭连接
+void ngx_close_connection(ngx_connection_t *c);
+
+//8: 关闭所有空闲连接
+void ngx_close_idle_connections(ngx_cycle_t *cycle);
+
+//9: 获得一个连接的本地地址
+ngx_int_t ngx_connection_local_sockaddr(ngx_connection_t *c, ngx_str_t *s,
+    ngx_uint_t port);
+
+//10: 打印连接错误的日志信息
+ngx_int_t ngx_connection_error(ngx_connection_t *c, ngx_err_t err, char *text);
+
+
+//11: 返回一个connection对象
+ngx_connection_t *ngx_get_connection(ngx_socket_t s, ngx_log_t *log);
+
+//12: 释放一个connection对象
+void ngx_free_connection(ngx_connection_t *c);
+
+//13: 设置一个连接未reusable
+void ngx_reusable_connection(ngx_connection_t *c, ngx_uint_t reusable);
 {% endhighlight %}
 
 <br />
@@ -300,6 +382,11 @@ struct ngx_connection_s {
 
 7. [accept filter](http://blog.chinaunix.net/uid-317451-id-92697.html)
 
+8. [nginx学习十 ngx_cycle_t 、ngx_connection_t 和ngx_listening_t](http://blog.csdn.net/xiaoliangsky/article/details/39831035)
+
+9. [nginx源码分析—处理继承的sockets](http://blog.csdn.net/livelylittlefish/article/details/7277607)
+
+10. [nginx继承socket 和 热代码替换](http://blog.csdn.net/jiaoyongqing134/article/details/52127732)
 <br />
 <br />
 <br />
