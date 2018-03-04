@@ -423,6 +423,25 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
     return NGX_OK;
 }
 {% endhighlight %}
+本函数主要用于平滑升级时，设置继承而来的socket。在objs/ngx_auto_config.h头文件中我们有如下定义：
+<pre>
+#ifndef NGX_HAVE_DEFERRED_ACCEPT
+#define NGX_HAVE_DEFERRED_ACCEPT  1
+#endif
+
+#ifndef NGX_HAVE_TCP_FASTOPEN
+#define NGX_HAVE_TCP_FASTOPEN  1
+#endif
+
+#ifndef NGX_HAVE_REUSEPORT
+#define NGX_HAVE_REUSEPORT  1
+#endif
+</pre>
+并且支持```SO_ACCEPTFILTER```与```TCP_DEFER_ACCEPT```。
+
+本函数是受ngx_add_inherited_sockets()函数调用的，并且在该函数中通过继承已经设置了```ngx_listening_t```对象的fd字段。接下来我们分析一下本函数的实现：
+{% highlight string %}
+{% endhighlight %}
 
 
 
