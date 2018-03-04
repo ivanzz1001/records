@@ -387,6 +387,8 @@ void ngx_reusable_connection(ngx_connection_t *c, ngx_uint_t reusable);
 9. [nginx源码分析—处理继承的sockets](http://blog.csdn.net/livelylittlefish/article/details/7277607)
 
 10. [nginx继承socket 和 热代码替换](http://blog.csdn.net/jiaoyongqing134/article/details/52127732)
+
+11. [close_on_exec标志位的作用](https://www.cnblogs.com/zhangxuan/p/6297617.html)
 <br />
 <br />
 <br />
