@@ -30,7 +30,7 @@ description: nginx源代码分析
 
 ngx_os_io_t  ngx_io;
 
-
+//从reusable_connections_queue队列中释放一些长连接
 static void ngx_drain_connections(void);
 
 
@@ -108,7 +108,21 @@ ngx_create_listening(ngx_conf_t *cf, void *sockaddr, socklen_t socklen)
 }
 {% endhighlight %}
 
+这里主要是根据```sockaddr```地址构建一个```ngx_listening_t```结构体对象，存放于cycle->listening数组中。这里并未真正创建socket：
+{% highlight string %}
+ls->fd = (ngx_socket_t) -1;
+ls->type = SOCK_STREAM;
 
+ls->backlog = NGX_LISTEN_BACKLOG;
+ls->rcvbuf = -1;
+ls->sndbuf = -1;
+{% endhighlight %}
+注意这里将二进制形式表示的socket地址```sockaddr```转换为字符串形式时长度的确定。
+
+
+## 2. 
+{% highlight string %}
+{% endhighlight %}
 
 <br />
 <br />
