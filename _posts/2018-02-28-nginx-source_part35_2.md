@@ -751,7 +751,13 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
     return NGX_OK;
 }
 {% endhighlight %}
-
+本函数用于打开cycle->listening.elts中符合要求的所有监听sockets。下面我们来简单分析一下该函数：
+{% highlight string %}
+ngx_int_t
+ngx_open_listening_sockets(ngx_cycle_t *cycle)
+{
+}
+{% endhighlight %}
 
 <br />
 <br />
