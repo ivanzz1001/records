@@ -3,7 +3,7 @@ layout: post
 title: go开发环境的搭建
 tags:
 - go-language
-categories: go语言
+categories: go-language
 description: go开发环境的搭建
 ---
 
