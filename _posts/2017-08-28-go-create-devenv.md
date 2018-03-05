@@ -42,6 +42,8 @@ http://www.cnblogs.com/caiyezi/p/5641363.html
 
 2. [GoLand软件的免激活使用](http://blog.csdn.net/benben_2015/article/details/78725467)
 
+3. [Go语言集成开发环境 JetBrains GoLand 2017.3.2 官方最新版 含激活补丁](http://www.sdbeta.com/xiazai/2017/1204/216304.html)
+
 <br />
 <br />
 <br />

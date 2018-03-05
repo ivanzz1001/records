@@ -2,7 +2,7 @@
 layout: post
 title: (转）分布式系统理论基础 -- 一致性、2PC和3PC
 tags:
-- 分布式系统
+- distribute-systems
 categories: distribute-systems
 description: 分布式系统理论
 ---
