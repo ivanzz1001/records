@@ -2,7 +2,7 @@
 layout: post
 title: go开发环境的搭建
 tags:
-- go语言
+- go-language
 categories: go语言
 description: go开发环境的搭建
 ---
@@ -36,8 +36,11 @@ IDE工具：**JetBrains Gogland**
 
 <br />
 <br />
-参看：http://www.cnblogs.com/caiyezi/p/5641363.html
+**[参看]：**
 
+http://www.cnblogs.com/caiyezi/p/5641363.html
+
+2. [GoLand软件的免激活使用](http://blog.csdn.net/benben_2015/article/details/78725467)
 
 <br />
 <br />
