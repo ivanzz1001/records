@@ -441,6 +441,18 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
 
 本函数是受ngx_add_inherited_sockets()函数调用的，并且在该函数中通过继承已经设置了```ngx_listening_t```对象的fd字段。接下来我们分析一下本函数的实现：
 {% highlight string %}
+ngx_int_t
+ngx_set_inherited_sockets(ngx_cycle_t *cycle)
+{
+	 for (i = 0; i < cycle->listening.nelts; i++) 
+     {
+         //1: 通过fd获得绑定的地址信息： 二进制表示形式以及字符串表示形式
+         getsockname(fd,&sockaddr,&socklen);
+
+         //2: 获得相应socket的设置选项
+         
+     }
+}
 {% endhighlight %}
 
 
