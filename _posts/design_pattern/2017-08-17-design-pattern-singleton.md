@@ -3,8 +3,8 @@ layout: post
 title: 设计模式之singleton
 tags:
 - c/c++
-- 设计模式
-categories: 设计模式
+- design-pattern
+categories: design-pattern
 description: 设计模式之singleton
 ---
 
