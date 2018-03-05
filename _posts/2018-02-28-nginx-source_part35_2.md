@@ -450,12 +450,307 @@ ngx_set_inherited_sockets(ngx_cycle_t *cycle)
          getsockname(fd,&sockaddr,&socklen);
 
          //2: 获得相应socket的设置选项
-         
+         getsockopt(ls[i].fd, SOL_SOCKET, SO_TYPE, (void *) &ls[i].type,&olen); //获取失败，则忽略当前继承过来的这个listening socket
+
+         getsockopt(ls[i].fd, SOL_SOCKET, SO_RCVBUF, (void *) &ls[i].rcvbuf,&olen);
+
+         getsockopt(ls[i].fd, SOL_SOCKET, SO_SNDBUF, (void *) &ls[i].sndbuf, &olen);
+
+         #if (NGX_HAVE_REUSEPORT)
+             //是否支持端口复用
+		     getsockopt(ls[i].fd, SOL_SOCKET, SO_REUSEPORT,(void *) &reuseport, &olen);
+         #endif
+
+        //3: 针对TCP的选项设置
+        if (ls[i].type != SOCK_STREAM) {
+            continue;                 //非TCP类型，则continue，不在进行如下的检测
+        }
+
+        #if (NGX_HAVE_TCP_FASTOPEN)
+           getsockopt(ls[i].fd, IPPROTO_TCP, TCP_FASTOPEN,(void *) &ls[i].fastopen, &olen);
+        #endif
+      
+        #if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
+            getsockopt(ls[i].fd, SOL_SOCKET, SO_ACCEPTFILTER, &af, &olen);
+        #endif
+
+        #if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT)
+            getsockopt(ls[i].fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &timeout, &olen);
+        #endif
      }
 }
 {% endhighlight %}
 
+## 4. 函数ngx_open_listening_sockets()
+{% highlight string %}
+ngx_int_t
+ngx_open_listening_sockets(ngx_cycle_t *cycle)
+{
+    int               reuseaddr;
+    ngx_uint_t        i, tries, failed;
+    ngx_err_t         err;
+    ngx_log_t        *log;
+    ngx_socket_t      s;
+    ngx_listening_t  *ls;
 
+    reuseaddr = 1;
+#if (NGX_SUPPRESS_WARN)
+    failed = 0;
+#endif
+
+    log = cycle->log;
+
+    /* TODO: configurable try number */
+
+    for (tries = 5; tries; tries--) {
+        failed = 0;
+
+        /* for each listening socket */
+
+        ls = cycle->listening.elts;
+        for (i = 0; i < cycle->listening.nelts; i++) {
+
+            if (ls[i].ignore) {
+                continue;
+            }
+
+#if (NGX_HAVE_REUSEPORT)
+
+            if (ls[i].add_reuseport) {
+
+                /*
+                 * to allow transition from a socket without SO_REUSEPORT
+                 * to multiple sockets with SO_REUSEPORT, we have to set
+                 * SO_REUSEPORT on the old socket before opening new ones
+                 */
+
+                int  reuseport = 1;
+
+                if (setsockopt(ls[i].fd, SOL_SOCKET, SO_REUSEPORT,
+                               (const void *) &reuseport, sizeof(int))
+                    == -1)
+                {
+                    ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                                  "setsockopt(SO_REUSEPORT) %V failed, ignored",
+                                  &ls[i].addr_text);
+                }
+
+                ls[i].add_reuseport = 0;
+            }
+#endif
+
+            if (ls[i].fd != (ngx_socket_t) -1) {
+                continue;
+            }
+
+            if (ls[i].inherited) {
+
+                /* TODO: close on exit */
+                /* TODO: nonblocking */
+                /* TODO: deferred accept */
+
+                continue;
+            }
+
+            s = ngx_socket(ls[i].sockaddr->sa_family, ls[i].type, 0);
+
+            if (s == (ngx_socket_t) -1) {
+                ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                              ngx_socket_n " %V failed", &ls[i].addr_text);
+                return NGX_ERROR;
+            }
+
+            if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
+                           (const void *) &reuseaddr, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                              "setsockopt(SO_REUSEADDR) %V failed",
+                              &ls[i].addr_text);
+
+                if (ngx_close_socket(s) == -1) {
+                    ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                  ngx_close_socket_n " %V failed",
+                                  &ls[i].addr_text);
+                }
+
+                return NGX_ERROR;
+            }
+
+#if (NGX_HAVE_REUSEPORT)
+
+            if (ls[i].reuseport) {
+                int  reuseport;
+
+                reuseport = 1;
+
+                if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT,
+                               (const void *) &reuseport, sizeof(int))
+                    == -1)
+                {
+                    ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                  "setsockopt(SO_REUSEPORT) %V failed, ignored",
+                                  &ls[i].addr_text);
+
+                    if (ngx_close_socket(s) == -1) {
+                        ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                      ngx_close_socket_n " %V failed",
+                                      &ls[i].addr_text);
+                    }
+
+                    return NGX_ERROR;
+                }
+            }
+#endif
+
+#if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
+
+            if (ls[i].sockaddr->sa_family == AF_INET6) {
+                int  ipv6only;
+
+                ipv6only = ls[i].ipv6only;
+
+                if (setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY,
+                               (const void *) &ipv6only, sizeof(int))
+                    == -1)
+                {
+                    ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                  "setsockopt(IPV6_V6ONLY) %V failed, ignored",
+                                  &ls[i].addr_text);
+                }
+            }
+#endif
+            /* TODO: close on exit */
+
+            if (!(ngx_event_flags & NGX_USE_IOCP_EVENT)) {
+                if (ngx_nonblocking(s) == -1) {
+                    ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                  ngx_nonblocking_n " %V failed",
+                                  &ls[i].addr_text);
+
+                    if (ngx_close_socket(s) == -1) {
+                        ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                      ngx_close_socket_n " %V failed",
+                                      &ls[i].addr_text);
+                    }
+
+                    return NGX_ERROR;
+                }
+            }
+
+            ngx_log_debug2(NGX_LOG_DEBUG_CORE, log, 0,
+                           "bind() %V #%d ", &ls[i].addr_text, s);
+
+            if (bind(s, ls[i].sockaddr, ls[i].socklen) == -1) {
+                err = ngx_socket_errno;
+
+                if (err != NGX_EADDRINUSE || !ngx_test_config) {
+                    ngx_log_error(NGX_LOG_EMERG, log, err,
+                                  "bind() to %V failed", &ls[i].addr_text);
+                }
+
+                if (ngx_close_socket(s) == -1) {
+                    ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                  ngx_close_socket_n " %V failed",
+                                  &ls[i].addr_text);
+                }
+
+                if (err != NGX_EADDRINUSE) {
+                    return NGX_ERROR;
+                }
+
+                if (!ngx_test_config) {
+                    failed = 1;
+                }
+
+                continue;
+            }
+
+#if (NGX_HAVE_UNIX_DOMAIN)
+
+            if (ls[i].sockaddr->sa_family == AF_UNIX) {
+                mode_t   mode;
+                u_char  *name;
+
+                name = ls[i].addr_text.data + sizeof("unix:") - 1;
+                mode = (S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
+
+                if (chmod((char *) name, mode) == -1) {
+                    ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                                  "chmod() \"%s\" failed", name);
+                }
+
+                if (ngx_test_config) {
+                    if (ngx_delete_file(name) == NGX_FILE_ERROR) {
+                        ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                                      ngx_delete_file_n " %s failed", name);
+                    }
+                }
+            }
+#endif
+
+            if (ls[i].type != SOCK_STREAM) {
+                ls[i].fd = s;
+                continue;
+            }
+
+            if (listen(s, ls[i].backlog) == -1) {
+                err = ngx_socket_errno;
+
+                /*
+                 * on OpenVZ after suspend/resume EADDRINUSE
+                 * may be returned by listen() instead of bind(), see
+                 * https://bugzilla.openvz.org/show_bug.cgi?id=2470
+                 */
+
+                if (err != NGX_EADDRINUSE || !ngx_test_config) {
+                    ngx_log_error(NGX_LOG_EMERG, log, err,
+                                  "listen() to %V, backlog %d failed",
+                                  &ls[i].addr_text, ls[i].backlog);
+                }
+
+                if (ngx_close_socket(s) == -1) {
+                    ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                  ngx_close_socket_n " %V failed",
+                                  &ls[i].addr_text);
+                }
+
+                if (err != NGX_EADDRINUSE) {
+                    return NGX_ERROR;
+                }
+
+                if (!ngx_test_config) {
+                    failed = 1;
+                }
+
+                continue;
+            }
+
+            ls[i].listen = 1;
+
+            ls[i].fd = s;
+        }
+
+        if (!failed) {
+            break;
+        }
+
+        /* TODO: delay configurable */
+
+        ngx_log_error(NGX_LOG_NOTICE, log, 0,
+                      "try again to bind() after 500ms");
+
+        ngx_msleep(500);
+    }
+
+    if (failed) {
+        ngx_log_error(NGX_LOG_EMERG, log, 0, "still could not bind()");
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+{% endhighlight %}
 
 
 <br />
