@@ -751,11 +751,76 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
     return NGX_OK;
 }
 {% endhighlight %}
-本函数用于打开cycle->listening.elts中符合要求的所有监听sockets。下面我们来简单分析一下该函数：
+本函数用于打开cycle->listening.elts中符合要求的所有监听sockets。我们在objs/ngx_auto_config.h头文件中有如下定义：
+<pre>
+#ifndef NGX_HAVE_REUSEPORT
+#define NGX_HAVE_REUSEPORT  1
+#endif
+</pre>
+下面我们来简单分析一下该函数：
 {% highlight string %}
 ngx_int_t
 ngx_open_listening_sockets(ngx_cycle_t *cycle)
 {
+    // 循环检查5次，直到所有都已经打开
+    for (tries = 5; tries; tries--) 
+    {
+        for (i = 0; i < cycle->listening.nelts; i++)
+        {
+            //1: 对于标记为ignore的ngx_listening_t对象，则直接忽略
+             
+            //2: 这里主要是为了将一个未被设置为SO_REUSEPORT的socket转化为REUSEPORT类型的socket
+            #if (NGX_HAVE_REUSEPORT)
+                if (ls[i].add_reuseport)
+                {
+                    setsockopt(ls[i].fd, SOL_SOCKET, SO_REUSEPORT,(const void *) &reuseport, sizeof(int));
+                    ls[i].add_reuseport = 0;
+                }
+            #endif
+          
+           //3: 如果fd不为-1，则表示此socket已经处于监听状态，不再继续后续的流程
+           if (ls[i].fd != (ngx_socket_t) -1) {
+                continue;
+            }
+
+           //4: 如果是继承而来的socket，也不再继续后面的流程
+           if (ls[i].inherited) {
+                continue;
+            }
+
+           //5: 创建socket，并设置相关属性
+           s = ngx_socket(ls[i].sockaddr->sa_family, ls[i].type, 0);
+           setsockopt(s, SOL_SOCKET, SO_REUSEADDR,(const void *) &reuseaddr, sizeof(int))
+        
+           #if (NGX_HAVE_REUSEPORT)
+               setsockopt(s, SOL_SOCKET, SO_REUSEPORT,(const void *) &reuseport, sizeof(int));
+           #endif
+ 
+           #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
+               setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY,(const void *) &ipv6only, sizeof(int))
+           #endif
+
+           //如果采用的事件模型不是IOCP模型，则这里设置为非阻塞
+           ngx_nonblocking();
+
+           //绑定
+           bind(s, ls[i].sockaddr, ls[i].socklen)；
+
+           //6: unix domain socket的处理
+           // 对于unix domain socket，会在本地创建出一个unix域文件，这里更改相应的权限设置
+
+           //7: 对于非TCP类型socket，则不再需要后续操作
+           if (ls[i].type != SOCK_STREAM) {
+                ls[i].fd = s;
+                continue;
+            }
+
+           //8: 监听
+           listen(s, ls[i].backlog);
+           ls[i].listen = 1;
+           ls[i].fd = s;
+        }
+    }
 }
 {% endhighlight %}
 
