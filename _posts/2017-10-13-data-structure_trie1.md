@@ -2,7 +2,7 @@
 layout: post
 title: 数据结构之Trie
 tags:
-- 数据结构
+- data-structure
 categories: 数据结构
 description: 数据结构之Trie
 ---
