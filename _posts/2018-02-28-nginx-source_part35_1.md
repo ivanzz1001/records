@@ -123,6 +123,7 @@ struct ngx_listening_s {
 
 #if (NGX_HAVE_DEFERRED_ACCEPT)                    //在ngx_auto_config.h中我们支持此选项  
     unsigned            deferred_accept:1;        //当前socket延迟接受的状态
+    unsigned            delete_deferred:1;        //当前socket是否需要被取消延迟接受
     unsigned            add_deferred:1;           //当前socket是否需要被设置为延迟接受
 #ifdef SO_ACCEPTFILTER
     char               *accept_filter;            //代表accept filter参数
