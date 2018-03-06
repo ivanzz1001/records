@@ -202,7 +202,26 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 
 ![ngx-cycle](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_get_connection.jpg)
 
+下面我们对该函数进行简单的解释：
+{% highlight string %}
+ngx_connection_t *
+ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
+{
+   //1: socket句柄s不能大于ngx_cycle->files_n，否则是没有地方存放的，也不可能会出现这种情况。若出现，则肯定发生了错误
 
+   //2: 从free_connections中取出一个ngx_connection_t对象，如果当前已经没有空闲，则通过ngx_drain_connections()释放长连接的
+   //方式来获得空闲连接。如果还是不能或者，直接返回NULL
+   
+   //3: 将获取到的长连接存放进ngx_cycle->files[s]中
+
+   //4: 设置instance(??)
+   rev->instance = !instance;
+   wev->instance = !instance;
+  
+   //5: 获取到空闲连接，设置为可写状态
+   wev->write = 1;
+}
+{% endhighlight %}
 
 <br />
 <br />
@@ -210,6 +229,8 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 **[参看]:**
 
 1. [setsockopt](https://www.freebsd.org/cgi/man.cgi?query=setsockopt&sektion=2)
+
+2. [nginx源码初读（8）--让烦恼从数据结构开始(ngx_event)](http://blog.csdn.net/wuchunlai_2012/article/details/50731037)
 
 <br />
 <br />
