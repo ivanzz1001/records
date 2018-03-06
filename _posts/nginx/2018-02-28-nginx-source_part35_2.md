@@ -800,11 +800,9 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
                setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY,(const void *) &ipv6only, sizeof(int))
            #endif
 
-           //如果采用的事件模型不是IOCP模型，则这里设置为非阻塞
-           ngx_nonblocking();
+           ngx_nonblocking();        //如果采用的事件模型不是IOCP模型，则这里设置为非阻塞
 
-           //绑定
-           bind(s, ls[i].sockaddr, ls[i].socklen)；
+           bind(s, ls[i].sockaddr, ls[i].socklen)；   //绑定
 
            //6: unix domain socket的处理
            // 对于unix domain socket，会在本地创建出一个unix域文件，这里更改相应的权限设置
@@ -823,6 +821,404 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
     }
 }
 {% endhighlight %}
+
+## 5. 函数ngx_configure_listening_sockets()
+{% highlight string %}
+void
+ngx_configure_listening_sockets(ngx_cycle_t *cycle)
+{
+    int                        value;
+    ngx_uint_t                 i;
+    ngx_listening_t           *ls;
+
+#if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
+    struct accept_filter_arg   af;
+#endif
+
+    ls = cycle->listening.elts;
+    for (i = 0; i < cycle->listening.nelts; i++) {
+
+        ls[i].log = *ls[i].logp;
+
+        if (ls[i].rcvbuf != -1) {
+            if (setsockopt(ls[i].fd, SOL_SOCKET, SO_RCVBUF,
+                           (const void *) &ls[i].rcvbuf, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(SO_RCVBUF, %d) %V failed, ignored",
+                              ls[i].rcvbuf, &ls[i].addr_text);
+            }
+        }
+
+        if (ls[i].sndbuf != -1) {
+            if (setsockopt(ls[i].fd, SOL_SOCKET, SO_SNDBUF,
+                           (const void *) &ls[i].sndbuf, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(SO_SNDBUF, %d) %V failed, ignored",
+                              ls[i].sndbuf, &ls[i].addr_text);
+            }
+        }
+
+        if (ls[i].keepalive) {
+            value = (ls[i].keepalive == 1) ? 1 : 0;
+
+            if (setsockopt(ls[i].fd, SOL_SOCKET, SO_KEEPALIVE,
+                           (const void *) &value, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(SO_KEEPALIVE, %d) %V failed, ignored",
+                              value, &ls[i].addr_text);
+            }
+        }
+
+#if (NGX_HAVE_KEEPALIVE_TUNABLE)
+
+        if (ls[i].keepidle) {
+            value = ls[i].keepidle;
+
+#if (NGX_KEEPALIVE_FACTOR)
+            value *= NGX_KEEPALIVE_FACTOR;
+#endif
+
+            if (setsockopt(ls[i].fd, IPPROTO_TCP, TCP_KEEPIDLE,
+                           (const void *) &value, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(TCP_KEEPIDLE, %d) %V failed, ignored",
+                              value, &ls[i].addr_text);
+            }
+        }
+
+        if (ls[i].keepintvl) {
+            value = ls[i].keepintvl;
+
+#if (NGX_KEEPALIVE_FACTOR)
+            value *= NGX_KEEPALIVE_FACTOR;
+#endif
+
+            if (setsockopt(ls[i].fd, IPPROTO_TCP, TCP_KEEPINTVL,
+                           (const void *) &value, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                             "setsockopt(TCP_KEEPINTVL, %d) %V failed, ignored",
+                             value, &ls[i].addr_text);
+            }
+        }
+
+        if (ls[i].keepcnt) {
+            if (setsockopt(ls[i].fd, IPPROTO_TCP, TCP_KEEPCNT,
+                           (const void *) &ls[i].keepcnt, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(TCP_KEEPCNT, %d) %V failed, ignored",
+                              ls[i].keepcnt, &ls[i].addr_text);
+            }
+        }
+
+#endif
+
+#if (NGX_HAVE_SETFIB)
+        if (ls[i].setfib != -1) {
+            if (setsockopt(ls[i].fd, SOL_SOCKET, SO_SETFIB,
+                           (const void *) &ls[i].setfib, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(SO_SETFIB, %d) %V failed, ignored",
+                              ls[i].setfib, &ls[i].addr_text);
+            }
+        }
+#endif
+
+#if (NGX_HAVE_TCP_FASTOPEN)
+        if (ls[i].fastopen != -1) {
+            if (setsockopt(ls[i].fd, IPPROTO_TCP, TCP_FASTOPEN,
+                           (const void *) &ls[i].fastopen, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(TCP_FASTOPEN, %d) %V failed, ignored",
+                              ls[i].fastopen, &ls[i].addr_text);
+            }
+        }
+#endif
+
+#if 0
+        if (1) {
+            int tcp_nodelay = 1;
+
+            if (setsockopt(ls[i].fd, IPPROTO_TCP, TCP_NODELAY,
+                       (const void *) &tcp_nodelay, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(TCP_NODELAY) %V failed, ignored",
+                              &ls[i].addr_text);
+            }
+        }
+#endif
+
+        if (ls[i].listen) {
+
+            /* change backlog via listen() */
+
+            if (listen(ls[i].fd, ls[i].backlog) == -1) {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "listen() to %V, backlog %d failed, ignored",
+                              &ls[i].addr_text, ls[i].backlog);
+            }
+        }
+
+        /*
+         * setting deferred mode should be last operation on socket,
+         * because code may prematurely continue cycle on failure
+         */
+
+#if (NGX_HAVE_DEFERRED_ACCEPT)
+
+#ifdef SO_ACCEPTFILTER
+
+        if (ls[i].delete_deferred) {
+            if (setsockopt(ls[i].fd, SOL_SOCKET, SO_ACCEPTFILTER, NULL, 0)
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(SO_ACCEPTFILTER, NULL) "
+                              "for %V failed, ignored",
+                              &ls[i].addr_text);
+
+                if (ls[i].accept_filter) {
+                    ngx_log_error(NGX_LOG_ALERT, cycle->log, 0,
+                                  "could not change the accept filter "
+                                  "to \"%s\" for %V, ignored",
+                                  ls[i].accept_filter, &ls[i].addr_text);
+                }
+
+                continue;
+            }
+
+            ls[i].deferred_accept = 0;
+        }
+
+        if (ls[i].add_deferred) {
+            ngx_memzero(&af, sizeof(struct accept_filter_arg));
+            (void) ngx_cpystrn((u_char *) af.af_name,
+                               (u_char *) ls[i].accept_filter, 16);
+
+            if (setsockopt(ls[i].fd, SOL_SOCKET, SO_ACCEPTFILTER,
+                           &af, sizeof(struct accept_filter_arg))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(SO_ACCEPTFILTER, \"%s\") "
+                              "for %V failed, ignored",
+                              ls[i].accept_filter, &ls[i].addr_text);
+                continue;
+            }
+
+            ls[i].deferred_accept = 1;
+        }
+
+#endif
+
+#ifdef TCP_DEFER_ACCEPT
+
+        if (ls[i].add_deferred || ls[i].delete_deferred) {
+
+            if (ls[i].add_deferred) {
+                /*
+                 * There is no way to find out how long a connection was
+                 * in queue (and a connection may bypass deferred queue at all
+                 * if syncookies were used), hence we use 1 second timeout
+                 * here.
+                 */
+                value = 1;
+
+            } else {
+                value = 0;
+            }
+
+            if (setsockopt(ls[i].fd, IPPROTO_TCP, TCP_DEFER_ACCEPT,
+                           &value, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(TCP_DEFER_ACCEPT, %d) for %V failed, "
+                              "ignored",
+                              value, &ls[i].addr_text);
+
+                continue;
+            }
+        }
+
+        if (ls[i].add_deferred) {
+            ls[i].deferred_accept = 1;
+        }
+
+#endif
+
+#endif /* NGX_HAVE_DEFERRED_ACCEPT */
+
+#if (NGX_HAVE_IP_RECVDSTADDR)
+
+        if (ls[i].wildcard
+            && ls[i].type == SOCK_DGRAM
+            && ls[i].sockaddr->sa_family == AF_INET)
+        {
+            value = 1;
+
+            if (setsockopt(ls[i].fd, IPPROTO_IP, IP_RECVDSTADDR,
+                           (const void *) &value, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(IP_RECVDSTADDR) "
+                              "for %V failed, ignored",
+                              &ls[i].addr_text);
+            }
+        }
+
+#elif (NGX_HAVE_IP_PKTINFO)
+
+        if (ls[i].wildcard
+            && ls[i].type == SOCK_DGRAM
+            && ls[i].sockaddr->sa_family == AF_INET)
+        {
+            value = 1;
+
+            if (setsockopt(ls[i].fd, IPPROTO_IP, IP_PKTINFO,
+                           (const void *) &value, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(IP_PKTINFO) "
+                              "for %V failed, ignored",
+                              &ls[i].addr_text);
+            }
+        }
+
+#endif
+
+#if (NGX_HAVE_INET6 && NGX_HAVE_IPV6_RECVPKTINFO)
+
+        if (ls[i].wildcard
+            && ls[i].type == SOCK_DGRAM
+            && ls[i].sockaddr->sa_family == AF_INET6)
+        {
+            value = 1;
+
+            if (setsockopt(ls[i].fd, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+                           (const void *) &value, sizeof(int))
+                == -1)
+            {
+                ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_socket_errno,
+                              "setsockopt(IPV6_RECVPKTINFO) "
+                              "for %V failed, ignored",
+                              &ls[i].addr_text);
+            }
+        }
+
+#endif
+    }
+
+    return;
+}
+{% endhighlight %}
+本函数用于配置监听sockets。在objs/ngx_auto_config.h头文件中我们有如下宏定义：
+<pre>
+#ifndef NGX_HAVE_DEFERRED_ACCEPT
+#define NGX_HAVE_DEFERRED_ACCEPT  1
+#endif
+
+#ifndef NGX_HAVE_KEEPALIVE_TUNABLE
+#define NGX_HAVE_KEEPALIVE_TUNABLE  1
+#endif
+
+#ifndef NGX_HAVE_TCP_FASTOPEN
+#define NGX_HAVE_TCP_FASTOPEN  1
+#endif
+
+#ifndef NGX_HAVE_IP_PKTINFO
+#define NGX_HAVE_IP_PKTINFO  1
+#endif
+</pre>
+接下来我们来简要分析一下该函数：
+{% highlight string %}
+void
+ngx_configure_listening_sockets(ngx_cycle_t *cycle)
+{
+	for (i = 0; i < cycle->listening.nelts; i++) 
+    {
+		//1: 根据ls[i].rcvbuf条件，设置接收缓冲区
+        setsockopt(ls[i].fd, SOL_SOCKET, SO_RCVBUF,(const void *) &ls[i].rcvbuf, sizeof(int))
+
+        //2: 根据ls[i].sndbuf条件，设置发送缓冲区
+        setsockopt(ls[i].fd, SOL_SOCKET, SO_SNDBUF,(const void *) &ls[i].sndbuf, sizeof(int))
+
+        //3: 根据ls[i].keepalive条件，设置socket的keepalive属性
+        setsockopt(ls[i].fd, SOL_SOCKET, SO_KEEPALIVE,(const void *) &value, sizeof(int))
+        #if (NGX_HAVE_KEEPALIVE_TUNABLE)
+           setsockopt(ls[i].fd, IPPROTO_TCP, TCP_KEEPIDLE,(const void *) &value, sizeof(int))
+           
+           setsockopt(ls[i].fd, IPPROTO_TCP, TCP_KEEPINTVL,(const void *) &value, sizeof(int))
+
+           setsockopt(ls[i].fd, IPPROTO_TCP, TCP_KEEPCNT,(const void *) &ls[i].keepcnt, sizeof(int))
+        #endif 
+      
+        //4: 当前并不支持setfib: 设置该socket的关联路由表
+        #if (NGX_HAVE_SETFIB)
+           setsockopt(ls[i].fd, SOL_SOCKET, SO_SETFIB,(const void *) &ls[i].setfib, sizeof(int))
+        #endif
+
+        //5: 根据ls[i].fastopen条件，设置socket快速打开
+        #if (NGX_HAVE_TCP_FASTOPEN)
+            setsockopt(ls[i].fd, IPPROTO_TCP, TCP_FASTOPEN,(const void *) &ls[i].fastopen, sizeof(int))
+        #endif
+
+        //6: 根据ls[i].listen条件，更改listen的backlog队列
+        listen(ls[i].fd, ls[i].backlog)
+
+        //7: 设置延迟接收,设置失败则continue，跳过本次循环
+        #if (NGX_HAVE_DEFERRED_ACCEPT)
+           if (ls[i].delete_deferred) {
+              setsockopt(ls[i].fd, SOL_SOCKET, SO_ACCEPTFILTER, NULL, 0)
+           }
+           if (ls[i].add_deferred) {
+              setsockopt(ls[i].fd, SOL_SOCKET, SO_ACCEPTFILTER,&af, sizeof(struct accept_filter_arg))
+           }
+
+           setsockopt(ls[i].fd, IPPROTO_TCP, TCP_DEFER_ACCEPT,&value, sizeof(int))
+        #endif
+
+        //8: 获得路由目的地址选项设置
+        #if (NGX_HAVE_IP_RECVDSTADDR)
+            setsockopt(ls[i].fd, IPPROTO_IP, IP_RECVDSTADDR,(const void *) &value, sizeof(int))
+        #elif (NGX_HAVE_IP_PKTINFO)
+            setsockopt(ls[i].fd, IPPROTO_IP, IP_PKTINFO,(const void *) &value, sizeof(int))
+        #endif
+
+        #if (NGX_HAVE_INET6 && NGX_HAVE_IPV6_RECVPKTINFO)   //当前并未定义NGX_HAVE_INET6宏定义，
+           setsockopt(ls[i].fd, IPPROTO_IPV6, IPV6_RECVPKTINFO, (const void *) &value, sizeof(int))
+        #endif
+    }
+}
+{% endhighlight %}
+
+
+
+<br />
+<br />
+
+**[参看]:**
+
+1. [setsockopt](https://www.freebsd.org/cgi/man.cgi?query=setsockopt&sektion=2)
 
 <br />
 <br />
