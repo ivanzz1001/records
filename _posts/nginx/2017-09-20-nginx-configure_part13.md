@@ -1405,7 +1405,26 @@ ngx_feature_test="setsockopt(0, IPPROTO_IP, IP_RECVDSTADDR, NULL, 0)"
 
 该选项导致所接收到的UDP数据报的目的IP地址由函数recvmsg作为辅助数据返回。主要是在BSD操作系统上使用。
 
-**(18) 检查是否支持IPV6_RECVPKTINFO特性**
+**(18) 检查是否支持IP_PKTINFO特性**
+{% highlight string %}
+# Linux way to get IPv4 datagram destination address
+
+ngx_feature="IP_PKTINFO"
+ngx_feature_name="NGX_HAVE_IP_PKTINFO"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/socket.h>
+                  #include <netinet/in.h>"
+ngx_feature_path=
+ngx_feature_libs=
+ngx_feature_test="setsockopt(0, IPPROTO_IP, IP_PKTINFO, NULL, 0)"
+. auto/feature
+{% endhighlight %}
+该选项导致所接收到的UDP数据包的目的IP地址由函数recvmsg作为辅助数据返回。主要是在Linux操作系统上使用。
+
+参看: [IP套接口选项（转）](http://blog.chinaunix.net/uid-20249205-id-1713888.html)
+
+
+**(19) 检查是否支持IPV6_RECVPKTINFO特性**
 {% highlight string %}
 # RFC 3542 way to get IPv6 datagram destination address
 
@@ -1424,7 +1443,7 @@ ngx_feature_test="setsockopt(0, IPPROTO_IPV6, IPV6_RECVPKTINFO, NULL, 0)"
 请参看：[Linux Programmer's Manual](http://www.man7.org/linux/man-pages/man7/ipv6.7.html)
 
 
-**(19) 检查是否支持TCP_DEFER_ACCEPT特性**
+**(20) 检查是否支持TCP_DEFER_ACCEPT特性**
 {% highlight string %}
 ngx_feature="TCP_DEFER_ACCEPT"
 ngx_feature_name="NGX_HAVE_DEFERRED_ACCEPT"
@@ -1448,7 +1467,7 @@ This option should not be used in code intended to be portable.
 参看：[Linux TCP_DEFER_ACCEPT的作用](http://blog.csdn.net/for_tech/article/details/54175571)
 
 
-**(20) 检查是否支持TCP_KEEPIDLE特性**
+**(21) 检查是否支持TCP_KEEPIDLE特性**
 {% highlight string %}
 ngx_feature="TCP_KEEPIDLE"
 ngx_feature_name="NGX_HAVE_KEEPALIVE_TUNABLE"
@@ -1475,7 +1494,7 @@ ngx_feature_test="setsockopt(0, IPPROTO_TCP, TCP_KEEPIDLE, NULL, 0);
 2. [TCP Keepalive HOWTO](http://www.tldp.org/HOWTO/html_single/TCP-Keepalive-HOWTO/)
 
 
-**(21) 检测是否支持TCP_FASTOPEN特性**
+**(22) 检测是否支持TCP_FASTOPEN特性**
 {% highlight string %}
 ngx_feature="TCP_FASTOPEN"
 ngx_feature_name="NGX_HAVE_TCP_FASTOPEN"
@@ -1494,7 +1513,7 @@ ngx_feature_test="setsockopt(0, IPPROTO_TCP, TCP_FASTOPEN, NULL, 0)"
 
 2. [TCP Fast Open](https://en.wikipedia.org/wiki/TCP_Fast_Open)
 
-**(22) 检测是否支持TCP_INFO特性**
+**(23) 检测是否支持TCP_INFO特性**
 {% highlight string %}
 ngx_feature="TCP_INFO"
 ngx_feature_name="NGX_HAVE_TCP_INFO"
@@ -1518,7 +1537,7 @@ ngx_feature_test="socklen_t optlen = sizeof(struct tcp_info);
 参看：[打印输出tcp拥塞窗口](http://www.cnblogs.com/mydomain/archive/2013/04/18/3027664.html)
 
 
-**(23) 检测是否支持ACCEPT4特性**
+**(24) 检测是否支持ACCEPT4特性**
 {% highlight string %}
 ngx_feature="accept4()"
 ngx_feature_name="NGX_HAVE_ACCEPT4"
@@ -1540,7 +1559,7 @@ SOCK_CLOEXEC    Set  the close-on-exec (FD_CLOEXEC) flag on the new file descrip
 
 
 
-**(24) 检测是否支持FILE_AIO特性**
+**(25) 检测是否支持FILE_AIO特性**
 {% highlight string %}
 if [ $NGX_FILE_AIO = YES ]; then
 
@@ -1640,7 +1659,7 @@ fi
 （注：在auto/options脚本中，```NGX_FILE_AIO```默认被设置为no，可以通过```--with-file-aio```进行设置)
 
 
-**(25) 设定UNIX_DOMAIN并清空ngx_feature_libs**
+**(26) 设定UNIX_DOMAIN并清空ngx_feature_libs**
 {% highlight string %}
 have=NGX_HAVE_UNIX_DOMAIN . auto/have
 
@@ -1649,7 +1668,7 @@ ngx_feature_libs=
 
 
 
-**(26) 检查C类型**
+**(27) 检查C类型**
 {% highlight string %}
 # C types
 
@@ -1666,7 +1685,7 @@ ngx_param=NGX_PTR_SIZE; ngx_value=$ngx_size; . auto/types/value
 
 
 
-**(27) 检查posix类型**
+**(28) 检查posix类型**
 {% highlight string %}
 # POSIX types
 
@@ -1724,7 +1743,7 @@ ngx_param=NGX_MAX_TIME_T_VALUE; ngx_value=$ngx_max_value; . auto/types/value
 
 ```如下主要是检测syscalls, libc calls and some features```
 
-**(28) 检测是否支持IPv6**
+**(29) 检测是否支持IPv6**
 
 检查是否支持IPv6 socket地址：
 {% highlight string %}
@@ -1744,7 +1763,7 @@ fi
 {% endhighlight %}
 
 
-**(29) 检测是否支持setproctitle()**
+**(30) 检测是否支持setproctitle()**
 {% highlight string %}
 ngx_feature="setproctitle()"
 ngx_feature_name="NGX_HAVE_SETPROCTITLE"
@@ -1758,7 +1777,7 @@ ngx_feature_test="setproctitle(\"test\");"
 setproctitle()用于修改一个进程的名称，其最开始是在FreeBSD 2.2开始引入的。
 
 
-**(30) 检测是否支持pread()**
+**(31) 检测是否支持pread()**
 {% highlight string %}
 ngx_feature="pread()"
 ngx_feature_name="NGX_HAVE_PREAD"
@@ -1785,7 +1804,7 @@ Feature Test Macro Requirements for glibc (see feature_test_macros(7)):
 参看：[FEATURE_TEST_MACRO(7)](http://www.man7.org/linux/man-pages/man7/feature_test_macros.7.html)
 
 
-**（31） 检测是否支持pwrite()**
+**（32） 检测是否支持pwrite()**
 {% highlight string %}
 ngx_feature="pwrite()"
 ngx_feature_name="NGX_HAVE_PWRITE"
@@ -1801,7 +1820,7 @@ ngx_feature_test="char buf[1]; ssize_t n; n = pwrite(1, buf, 1, 0);
 pwrite()将buffer中的缓存数据写入到文件中。pwrite()系统调用在多线程应用程序中很有作用，它允许多线程同时对同一个文件句柄fd进行IO操作，而并不会影响到其他线程中该文件的offset。注意fd所引用的文件必须是```seekable```的.
 
 
-**(32) 检测是否支持pwritev()**
+**(33) 检测是否支持pwritev()**
 {% highlight string %}
 # pwritev() was introduced in FreeBSD 6 and Linux 2.6.30, glibc 2.10
 
@@ -1820,7 +1839,7 @@ ngx_feature_test="char buf[1]; struct iovec vec[1]; ssize_t n;
 {% endhighlight %}
 与pwrite()类似，但是可以支持分散写操作。
 
-**(33) 检查是否支持SYS_NERR特性**
+**(34) 检查是否支持SYS_NERR特性**
 {% highlight string %}
 ngx_feature="sys_nerr"
 ngx_feature_name="NGX_SYS_NERR"
@@ -1879,7 +1898,7 @@ fi
 sys_nerr为当前系统定义的error个数。
 参看：[sys_nerr(3)](https://linux.die.net/man/3/sys_nerr)
 
-**(34) 检查是否支持localtime_r()**
+**(35) 检查是否支持localtime_r()**
 {% highlight string %}
 ngx_feature="localtime_r()"
 ngx_feature_name="NGX_HAVE_LOCALTIME_R"
@@ -1892,7 +1911,7 @@ ngx_feature_test="struct tm t; time_t c=0; localtime_r(&c, &t)"
 {% endhighlight %}
 localtime_r()与localtime()类似，但是前者是线程安全的，而后者由于将数据保存在一个全局struct tm类型的静态变量中，因此是非线程安全的。
 
-**(35) 检查是否支持posix_memalign()**
+**(36) 检查是否支持posix_memalign()**
 {% highlight string %}
 ngx_feature="posix_memalign()"
 ngx_feature_name="NGX_HAVE_POSIX_MEMALIGN"
@@ -1915,7 +1934,7 @@ can later be successfully passed to free(3).
 </pre>
 
 
-**(36) 检测是否支持memalign()**
+**(37) 检测是否支持memalign()**
 {% highlight string %}
 ngx_feature="memalign()"
 ngx_feature_name="NGX_HAVE_MEMALIGN"
@@ -1930,7 +1949,7 @@ ngx_feature_test="void *p; p = memalign(4096, 4096);
 {% endhighlight %}
 与```posix_memalign()```类似，是一个obsolete function （即过时函数)。此外对于posix_memalign()函数，其会检查传入的alignment参数是否合法，而memalign()函数可能不会检查。
 
-**(37) 检测是否支持MAP_ANON特性**
+**(38) 检测是否支持MAP_ANON特性**
 {% highlight string %}
 ngx_feature="mmap(MAP_ANON|MAP_SHARED)"
 ngx_feature_name="NGX_HAVE_MAP_ANON"
@@ -1948,7 +1967,7 @@ ngx_feature_test="void *p;
 
 注意：```MAP_ANON```已过时。
 
-**(38) 检查是否支持MAP_DEVZERO特性**
+**(39) 检查是否支持MAP_DEVZERO特性**
 {% highlight string %}
 ngx_feature='mmap("/dev/zero", MAP_SHARED)'
 ngx_feature_name="NGX_HAVE_MAP_DEVZERO"
@@ -1968,7 +1987,7 @@ ngx_feature_test='void *p; int  fd;
 
 参看：[Linux 下的两个特殊的文件 -- /dev/null 和 /dev/zero 简介及对比](http://blog.csdn.net/pi9nc/article/details/18257593)
 
-**(39) 检测是否支持SYSVSHM特性**
+**(40) 检测是否支持SYSVSHM特性**
 {% highlight string %}
 ngx_feature="System V shared memory"
 ngx_feature_name="NGX_HAVE_SYSVSHM"
@@ -1986,7 +2005,7 @@ ngx_feature_test="int  id;
 
 检测是否支持System V 共享内存。
 
-**(40) 检测是否支持POSIX_SEM特性**
+**(41) 检测是否支持POSIX_SEM特性**
 {% highlight string %}
 ngx_feature="POSIX semaphores"
 ngx_feature_name="NGX_HAVE_POSIX_SEM"
@@ -2028,7 +2047,7 @@ fi
 
 检测是否支持Posix信号量。一般如果操作系统没有提供独立的Posix信号量的话，那么在Linux操作系统下会放在libpthread库中，而在Solaris操作系统下会放在librt库中。
 
-**(41) 检测是否支持MSGHDR_MSG_CONTROL特性**
+**(42) 检测是否支持MSGHDR_MSG_CONTROL特性**
 {% highlight string %}
 ngx_feature="struct msghdr.msg_control"
 ngx_feature_name="NGX_HAVE_MSGHDR_MSG_CONTROL"
@@ -2043,7 +2062,7 @@ ngx_feature_test="struct msghdr  msg;
 {% endhighlight %}
 msg_control用于存放辅助数据。
 
-**(42) 检测是否支持FIONBIO特性**
+**(43) 检测是否支持FIONBIO特性**
 {% highlight string %}
 ngx_feature="ioctl(FIONBIO)"
 ngx_feature_name="NGX_HAVE_FIONBIO"
@@ -2058,7 +2077,7 @@ ngx_feature_test="int i = FIONBIO; printf(\"%d\", i)"
 {% endhighlight %}
 检测是否可以通过ioctl(FIONBIO)来设置文件IO非阻塞。
 
-**(43) 检测是否支持GMTOFF特性**
+**(44) 检测是否支持GMTOFF特性**
 {% highlight string %}
 ngx_feature="struct tm.tm_gmtoff"
 ngx_feature_name="NGX_HAVE_GMTOFF"
@@ -2076,7 +2095,7 @@ tm_gmtoff指定了日期变更线东面时区中UTC东部时区正秒数或UTC�
 参看：[Linux系统中的时间处理](http://blog.csdn.net/cywosp/article/details/25839551)
 
 
-**(44) 检测是否支持D_NAMLEN特性**
+**(45) 检测是否支持D_NAMLEN特性**
 {% highlight string %}
 ngx_feature="struct dirent.d_namlen"
 ngx_feature_name="NGX_HAVE_D_NAMLEN"
@@ -2092,7 +2111,7 @@ ngx_feature_test="struct dirent  dir; dir.d_namlen = 0;
 检测是否具有d_namlen属性，可通过其返回d_name的长度。本属性并不是所有操作系统都支持
 
 
-**（45） 检测是否支持D_TYPE特性**
+**（46） 检测是否支持D_TYPE特性**
 {% highlight string %}
 ngx_feature="struct dirent.d_type"
 ngx_feature_name="NGX_HAVE_D_TYPE"
@@ -2108,7 +2127,7 @@ ngx_feature_test="struct dirent  dir; dir.d_type = DT_REG;
 
 检测是否有d_type属性。本属性并不是所有操作系统都支持。
 
-**(46) 检测是否支持_SC_NPROCESSORS_ONLN特性**
+**(47) 检测是否支持_SC_NPROCESSORS_ONLN特性**
 {% highlight string %}
 ngx_feature="sysconf(_SC_NPROCESSORS_ONLN)"
 ngx_feature_name="NGX_HAVE_SC_NPROCESSORS_ONLN"
@@ -2122,7 +2141,7 @@ ngx_feature_test="sysconf(_SC_NPROCESSORS_ONLN)"
 
 ```_SC_NPROCESSORS_ONLN```返回当前可用的CPU核数。
 
-**(47) 检测是否支持openat()**
+**(48) 检测是否支持openat()**
 {% highlight string %}
 ngx_feature="openat(), fstatat()"
 ngx_feature_name="NGX_HAVE_OPENAT"
@@ -2152,7 +2171,7 @@ If pathname is absolute, then dirfd is ignored.
 </pre>
 
 
-**(48) 检测是否支持getaddrinfo()**
+**(49) 检测是否支持getaddrinfo()**
 {% highlight string %}
 ngx_feature="getaddrinfo()"
 ngx_feature_name="NGX_HAVE_GETADDRINFO"
