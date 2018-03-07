@@ -214,7 +214,10 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
    
    //3: 将获取到的长连接存放进ngx_cycle->files[s]中
 
-   //4: 设置instance(??)
+   //4: 设置instance
+   // 一般情况下是用rev->instance与另外保存的一个instance进行对比，如果不相等，则说明是一个
+   // stale事件。因此这里对instance进行取反，表面当前指定的这个events是属于过期事件，不应该被处理。
+
    rev->instance = !instance;
    wev->instance = !instance;
   
