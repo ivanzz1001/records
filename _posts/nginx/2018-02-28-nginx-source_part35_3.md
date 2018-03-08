@@ -226,6 +226,303 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 }
 {% endhighlight %}
 
+
+## 3. 函数ngx_free_connection()
+{% highlight string %}
+void
+ngx_free_connection(ngx_connection_t *c)
+{
+    c->data = ngx_cycle->free_connections;
+    ngx_cycle->free_connections = c;
+    ngx_cycle->free_connection_n++;
+
+    if (ngx_cycle->files && ngx_cycle->files[c->fd] == c) {
+        ngx_cycle->files[c->fd] = NULL;
+    }
+}
+{% endhighlight %}
+此函数用于释放```ngx_connection_t```连接，将其插入到```ngx_cycle->free_connections```链表头，并且如果该connection存放在```ngx_cycle->files[c->fd]```中,则从该位置移除。
+
+## 4. 函数ngx_close_connection()
+{% highlight string %}
+void
+ngx_close_connection(ngx_connection_t *c)
+{
+    ngx_err_t     err;
+    ngx_uint_t    log_error, level;
+    ngx_socket_t  fd;
+
+    if (c->fd == (ngx_socket_t) -1) {
+        ngx_log_error(NGX_LOG_ALERT, c->log, 0, "connection already closed");
+        return;
+    }
+
+    if (c->read->timer_set) {
+        ngx_del_timer(c->read);
+    }
+
+    if (c->write->timer_set) {
+        ngx_del_timer(c->write);
+    }
+
+    if (!c->shared) {
+        if (ngx_del_conn) {
+            ngx_del_conn(c, NGX_CLOSE_EVENT);
+
+        } else {
+            if (c->read->active || c->read->disabled) {
+                ngx_del_event(c->read, NGX_READ_EVENT, NGX_CLOSE_EVENT);
+            }
+
+            if (c->write->active || c->write->disabled) {
+                ngx_del_event(c->write, NGX_WRITE_EVENT, NGX_CLOSE_EVENT);
+            }
+        }
+    }
+
+    if (c->read->posted) {
+        ngx_delete_posted_event(c->read);
+    }
+
+    if (c->write->posted) {
+        ngx_delete_posted_event(c->write);
+    }
+
+    c->read->closed = 1;
+    c->write->closed = 1;
+
+    ngx_reusable_connection(c, 0);
+
+    log_error = c->log_error;
+
+    ngx_free_connection(c);
+
+    fd = c->fd;
+    c->fd = (ngx_socket_t) -1;
+
+    if (c->shared) {
+        return;
+    }
+
+    if (ngx_close_socket(fd) == -1) {
+
+        err = ngx_socket_errno;
+
+        if (err == NGX_ECONNRESET || err == NGX_ENOTCONN) {
+
+            switch (log_error) {
+
+            case NGX_ERROR_INFO:
+                level = NGX_LOG_INFO;
+                break;
+
+            case NGX_ERROR_ERR:
+                level = NGX_LOG_ERR;
+                break;
+
+            default:
+                level = NGX_LOG_CRIT;
+            }
+
+        } else {
+            level = NGX_LOG_CRIT;
+        }
+
+        /* we use ngx_cycle->log because c->log was in c->pool */
+
+        ngx_log_error(level, ngx_cycle->log, err,
+                      ngx_close_socket_n " %d failed", fd);
+    }
+}
+{% endhighlight %}
+下面我们来简单介绍一下ngx_close_connection()函数的实现：
+{% highlight string %}
+void
+ngx_close_connection(ngx_connection_t *c)
+{
+    //1: 如果c->fd == -1，说明连接已经关闭
+
+    //2: 移除connection上关联的读写定时器事件
+
+    //3: 如果不是共享connection的话，移除该connection上关联的读写事件
+
+    //4: 移除该连接已经投递到队列中的事件
+
+    //5: 回收连接
+    ngx_reusable_connection(c,0);
+    ngx_free_connection(c);
+
+    //6: 非共享connection的话，需要关闭对应的fd
+}
+{% endhighlight %}
+
+## 5. 函数ngx_reusable_connection()
+{% highlight string %}
+void
+ngx_reusable_connection(ngx_connection_t *c, ngx_uint_t reusable)
+{
+    ngx_log_debug1(NGX_LOG_DEBUG_CORE, c->log, 0,
+                   "reusable connection: %ui", reusable);
+
+    if (c->reusable) {
+        ngx_queue_remove(&c->queue);
+
+#if (NGX_STAT_STUB)
+        (void) ngx_atomic_fetch_add(ngx_stat_waiting, -1);
+#endif
+    }
+
+    c->reusable = reusable;
+
+    if (reusable) {
+        /* need cast as ngx_cycle is volatile */
+
+        ngx_queue_insert_head(
+            (ngx_queue_t *) &ngx_cycle->reusable_connections_queue, &c->queue);
+
+#if (NGX_STAT_STUB)
+        (void) ngx_atomic_fetch_add(ngx_stat_waiting, 1);
+#endif
+    }
+}
+{% endhighlight %}
+此函数主要用于在```reusable```为true，即表示该连接需要马上被复用，因此这里会先从队列中移除，然后再重新加入到可复用连接队列中。
+
+其中```ngx->reusable_connections_queue```是一个双端队列，如下图所示：
+
+![ngx-cycle](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_reusable_connqueue.jpg)
+
+
+## 6. 函数ngx_drain_connections()
+{% highlight string %}
+static void
+ngx_drain_connections(void)
+{
+    ngx_int_t          i;
+    ngx_queue_t       *q;
+    ngx_connection_t  *c;
+
+    for (i = 0; i < 32; i++) {
+        if (ngx_queue_empty(&ngx_cycle->reusable_connections_queue)) {
+            break;
+        }
+
+        q = ngx_queue_last(&ngx_cycle->reusable_connections_queue);
+        c = ngx_queue_data(q, ngx_connection_t, queue);
+
+        ngx_log_debug0(NGX_LOG_DEBUG_CORE, c->log, 0,
+                       "reusing connection");
+
+        c->close = 1;
+        c->read->handler(c->read);
+    }
+}
+{% endhighlight %}
+这里主要是从```ngx_cycle->reusable_connections_queue```中释放长连接，释放完成后加入到空闲连接池，以供后续新连接使用。
+<pre>
+注意： 这里只有在ngx_http_set_keepalive()中会将connection->reusable置为1，因此这里可复用的连接绑定的read->handler
+为ngx_http_keepalive_handler()
+</pre>
+
+## 7. 函数ngx_close_idle_connections()
+{% highlight string %}
+void
+ngx_close_idle_connections(ngx_cycle_t *cycle)
+{
+    ngx_uint_t         i;
+    ngx_connection_t  *c;
+
+    c = cycle->connections;
+
+    for (i = 0; i < cycle->connection_n; i++) {
+
+        /* THREAD: lock */
+
+        if (c[i].fd != (ngx_socket_t) -1 && c[i].idle) {
+            c[i].close = 1;
+            c[i].read->handler(c[i].read);
+        }
+    }
+}
+{% endhighlight %}
+这里遍历cycle->connections链表，关闭所有空闲连接。
+
+## 8. 函数ngx_connection_local_sockaddr()
+{% highlight string %}
+ngx_int_t
+ngx_connection_local_sockaddr(ngx_connection_t *c, ngx_str_t *s,
+    ngx_uint_t port)
+{
+    socklen_t             len;
+    ngx_uint_t            addr;
+    u_char                sa[NGX_SOCKADDRLEN];
+    struct sockaddr_in   *sin;
+#if (NGX_HAVE_INET6)
+    ngx_uint_t            i;
+    struct sockaddr_in6  *sin6;
+#endif
+
+    addr = 0;
+
+    if (c->local_socklen) {
+        switch (c->local_sockaddr->sa_family) {
+
+#if (NGX_HAVE_INET6)
+        case AF_INET6:
+            sin6 = (struct sockaddr_in6 *) c->local_sockaddr;
+
+            for (i = 0; addr == 0 && i < 16; i++) {
+                addr |= sin6->sin6_addr.s6_addr[i];
+            }
+
+            break;
+#endif
+
+#if (NGX_HAVE_UNIX_DOMAIN)
+        case AF_UNIX:
+            addr = 1;
+            break;
+#endif
+
+        default: /* AF_INET */
+            sin = (struct sockaddr_in *) c->local_sockaddr;
+            addr = sin->sin_addr.s_addr;
+            break;
+        }
+    }
+
+    if (addr == 0) {
+
+        len = NGX_SOCKADDRLEN;
+
+        if (getsockname(c->fd, (struct sockaddr *) &sa, &len) == -1) {
+            ngx_connection_error(c, ngx_socket_errno, "getsockname() failed");
+            return NGX_ERROR;
+        }
+
+        c->local_sockaddr = ngx_palloc(c->pool, len);
+        if (c->local_sockaddr == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_memcpy(c->local_sockaddr, &sa, len);
+
+        c->local_socklen = len;
+    }
+
+    if (s == NULL) {
+        return NGX_OK;
+    }
+
+    s->len = ngx_sock_ntop(c->local_sockaddr, c->local_socklen,
+                           s->data, s->len, port);
+
+    return NGX_OK;
+}
+{% endhighlight %}
+
+
+
 <br />
 <br />
 
@@ -234,6 +531,8 @@ ngx_get_connection(ngx_socket_t s, ngx_log_t *log)
 1. [setsockopt](https://www.freebsd.org/cgi/man.cgi?query=setsockopt&sektion=2)
 
 2. [nginx源码初读（8）--让烦恼从数据结构开始(ngx_event)](http://blog.csdn.net/wuchunlai_2012/article/details/50731037)
+
+3. [nginx keepalive连接回收机制](http://blog.csdn.net/brainkick/article/details/7321894)
 
 <br />
 <br />
