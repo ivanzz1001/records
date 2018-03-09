@@ -270,7 +270,7 @@ struct ngx_connection_s {
 
     unsigned            buffered:8;     //缓存中的业务类型
 
-    unsigned            log_error:3;    // ngx_connection_log_error_e 枚举类型
+    unsigned            log_error:3;    // ngx_connection_log_error_e 枚举类型，定义了ngx_connection_t中的日志打印级别
 
     unsigned            unexpected_eof:1;  //表示不期待字符流结束
     unsigned            timedout:1;        //连接超时

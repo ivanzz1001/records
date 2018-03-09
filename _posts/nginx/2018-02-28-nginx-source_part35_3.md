@@ -520,6 +520,88 @@ ngx_connection_local_sockaddr(ngx_connection_t *c, ngx_str_t *s,
     return NGX_OK;
 }
 {% endhighlight %}
+在当前我们的配置当中，并不支持```NGX_HAVE_INET6```，但是在obs/ngx_auto_config.h头文件中有如下宏定义：
+<pre>
+#ifndef NGX_HAVE_UNIX_DOMAIN
+#define NGX_HAVE_UNIX_DOMAIN  1
+#endif
+</pre>
+本函数用于获取```ngx_connection_t```所绑定的本地socket地址，将其转化成字符串表示形式返回。下面简要解释一下：
+{% highlight string %}
+ngx_int_t
+ngx_connection_local_sockaddr(ngx_connection_t *c, ngx_str_t *s,
+    ngx_uint_t port)
+{
+    //1: 收件检查c->local_sockaddr保存的是否是一个有效的IP地址(addr不为0）
+
+    //2: 如果是无效的IP地址，则通过getsockname()来获取，保存到c->local_sockaddr
+
+    //3: 将c->local_sockaddr地址通过ngx_sock_ntop()函数转换成字符串表示形式，返回
+}
+{% endhighlight %}
+
+
+## 9. 函数ngx_connection_error()
+{% highlight string %}
+ngx_int_t
+ngx_connection_error(ngx_connection_t *c, ngx_err_t err, char *text)
+{
+    ngx_uint_t  level;
+
+    /* Winsock may return NGX_ECONNABORTED instead of NGX_ECONNRESET */
+
+    if ((err == NGX_ECONNRESET
+#if (NGX_WIN32)
+         || err == NGX_ECONNABORTED
+#endif
+        ) && c->log_error == NGX_ERROR_IGNORE_ECONNRESET)
+    {
+        return 0;
+    }
+
+#if (NGX_SOLARIS)
+    if (err == NGX_EINVAL && c->log_error == NGX_ERROR_IGNORE_EINVAL) {
+        return 0;
+    }
+#endif
+
+    if (err == 0
+        || err == NGX_ECONNRESET
+#if (NGX_WIN32)
+        || err == NGX_ECONNABORTED
+#else
+        || err == NGX_EPIPE
+#endif
+        || err == NGX_ENOTCONN
+        || err == NGX_ETIMEDOUT
+        || err == NGX_ECONNREFUSED
+        || err == NGX_ENETDOWN
+        || err == NGX_ENETUNREACH
+        || err == NGX_EHOSTDOWN
+        || err == NGX_EHOSTUNREACH)
+    {
+        switch (c->log_error) {
+
+        case NGX_ERROR_IGNORE_EINVAL:
+        case NGX_ERROR_IGNORE_ECONNRESET:
+        case NGX_ERROR_INFO:
+            level = NGX_LOG_INFO;
+            break;
+
+        default:
+            level = NGX_LOG_ERR;
+        }
+
+    } else {
+        level = NGX_LOG_ALERT;
+    }
+
+    ngx_log_error(level, c->log, err, text);
+
+    return NGX_ERROR;
+}
+{% endhighlight %}
+当前我们运行在Linux环境下，因此不支持```NGX_WIN32```与```NGX_SOLARIS```。此函数主要用于打印```ngx_connection_t```中的日志信息。```ngx_connection_t.log_error```定义了一个连接中的日志打印级别。
 
 
 
