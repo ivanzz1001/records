@@ -115,8 +115,8 @@ tar
 xz
 rpmlib(PayloadIsXz) <= 5.2-1
 
-# yum deplist docker-ce            //此种方法也能查看依赖包
-# yumdownloader package-name       //用此下载指定的包
+# yum deplist docker-ce              //此种方法也能查看依赖包
+# yumdownloader <package-name>       //用此下载指定名称的包
 
 //http://rpmfind.net/linux/rpm2html/search.php?query=libltdl.so.7()(64bit)
 # wget http://rpmfind.net/linux/centos/7.4.1708/os/x86_64/Packages/libtool-ltdl-2.4.2-22.el7_3.x86_64.rpm
