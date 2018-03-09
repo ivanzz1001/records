@@ -143,6 +143,10 @@ root     10911 10904  0 15:13 ?        00:00:03 docker-containerd --config /var/
 
 ## 2. docker启动配置
 
+设置docker开机自动启动：
+<pre>
+# systemctl enable docker
+</pre>
 
 
 
@@ -209,9 +213,29 @@ registry-2.6.2.tar.gz
 
 <pre>
 # docker load -i registry-2.6.2.tar.gz
+# docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+registry            2.6.2               3ebefe7c539b        5 months ago        33.2MB
 </pre>
 
+**3) 为镜像仓库挂载一块硬盘**
 
+如下先将一块硬盘格式化，然后挂载到我们指定的目录
+<pre>
+# lsblk         
+# mkfs.ext4 /dev/vdb
+# mkdir /opt/docker-registry
+# mount -t ext4 /dev/vdb /registry
+
+# blkid
+/dev/sr0: UUID="2018-03-09-10-24-55-00" LABEL="config-2" TYPE="iso9660" 
+/dev/vda1: UUID="f31c1eba-0729-4c4a-959f-d1bb6a2623aa" TYPE="ext4" 
+/dev/vdb: UUID="639cc105-d6a9-43af-8036-3462b450ea5c" TYPE="ext4"
+</pre>
+然后在操作系统/etc/fstab文件中添加如下：
+<pre>
+UUID=639cc105-d6a9-43af-8036-3462b450ea5c /opt/docker-registry    ext4    defaults        2 2
+</pre>
 
 
 
