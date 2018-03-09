@@ -142,6 +142,8 @@ root     10911 10904  0 15:13 ?        00:00:03 docker-containerd --config /var/
 <br />
 <br />
 
+**[参看]:**
+
 1. [Docker CE安装及配置国内镜像加速教程](http://blog.csdn.net/jackyzhousales/article/details/77995135)
 
 2. [配置docker官方源并用yum安装docker](https://www.cnblogs.com/JiangLe/p/6921320.html)
