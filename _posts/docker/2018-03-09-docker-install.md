@@ -143,9 +143,74 @@ root     10911 10904  0 15:13 ?        00:00:03 docker-containerd --config /var/
 
 ## 2. docker启动配置
 
-设置docker开机自动启动：
+**1） 设置docker开机自动启动**
 <pre>
 # systemctl enable docker
+</pre>
+
+**2） 配置开放管理端口映射**
+
+管理端口在 /lib/systemd/system/docker.service 文件中：
+{% highlight string %}
+[Unit]
+Description=Docker Application Container Engine
+Documentation=https://docs.docker.com
+After=network-online.target firewalld.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+# the default is not to use systemd for cgroups because the delegate issues still
+# exists and systemd currently does not support the cgroup feature set required
+# for containers run by docker
+ExecStart=/usr/bin/dockerd
+ExecReload=/bin/kill -s HUP $MAINPID
+# Having non-zero Limit*s causes performance problems due to accounting overhead
+# in the kernel. We recommend using cgroups to do container-local accounting.
+LimitNOFILE=infinity
+LimitNPROC=infinity
+LimitCORE=infinity
+# Uncomment TasksMax if your systemd version supports it.
+# Only systemd 226 and above support this version.
+#TasksMax=infinity
+TimeoutStartSec=0
+# set delegate yes so that systemd does not reset the cgroups of docker containers
+Delegate=yes
+# kill only the docker process, not all processes in the cgroup
+KillMode=process
+# restart the docker process if it exits prematurely
+Restart=on-failure
+StartLimitBurst=3
+StartLimitInterval=60s
+
+[Install]
+WantedBy=multi-user.target
+{% endhighlight %}
+将上面的```ExecStart=/usr/bin/dockerd``` 替换为：
+<pre>
+ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H unix://var/run/docker.sock -H tcp://0.0.0.0:7654
+</pre>
+（此处默认2375为主管理端口，unix:///var/run/docker.sock用于本地管理，7654是备用的端口）
+    
+配置完成之后，重新启动：
+<pre>
+# systemctl daemon-reload && systemctl restart docker
+
+//查看docker进程，发现docker守护进程在已经监听2375的tcp端口
+# ps -ef | grep docker
+root      9431     1  0 20:30 ?        00:00:00 /usr/bin/dockerd -H tcp://0.0.0.0:2375 -H unix://var/run/docker.sock -H tcp://0.0.0.0:7654
+root      9438  9431  0 20:30 ?        00:00:00 docker-containerd --config /var/run/docker/containerd/containerd.toml
+
+
+//查看系统的网络端口，发现tcp的2375端口，的确是docker的守护进程在监听
+# netstat -nlp | grep docker
+tcp6       0      0 :::7654                 :::*                    LISTEN      9431/dockerd        
+tcp6       0      0 :::2375                 :::*                    LISTEN      9431/dockerd        
+unix  2      [ ACC ]     STREAM     LISTENING     30464    9431/dockerd         /run/docker/libnetwork/a83e1600984942bbacfc8587ff54aee0625550bb918af4a05ed26ba9a1eed24d.sock
+unix  2      [ ACC ]     STREAM     LISTENING     31763    9431/dockerd         var/run/docker.sock
+unix  2      [ ACC ]     STREAM     LISTENING     31770    9431/dockerd         /var/run/docker/metrics.sock
+unix  2      [ ACC ]     STREAM     LISTENING     30455    9438/docker-contain  /var/run/docker/containerd/docker-containerd-debug.sock
+unix  2      [ ACC ]     STREAM     LISTENING     30457    9438/docker-contain  /var/run/docker/containerd/docker-containerd.sock
 </pre>
 
 
@@ -238,6 +303,43 @@ UUID=639cc105-d6a9-43af-8036-3462b450ea5c /opt/docker-registry    ext4    defaul
 </pre>
 
 
+**4) 设置开机自动启动私有镜像仓库**
+
+编写docker-registry.service文件：
+{% highlight string %}
+[Unit]
+Description=Docker Registry
+After=network-online.target docker.service
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/docker run -d -p 5000:5000 --privileged=true -v /opt/docker-registry:/tmp/registry registry:2.6.2
+ExecStop=
+Restart=on-failure
+StartLimitBurst=3
+StartLimitInterval=60s
+
+[Install]
+WantedBy=multi-user.target
+{% endhighlight %}
+将该文件拷贝到/lib/systemd/system/目录下，执行：
+<pre>
+# cp docker-registry.service /lib/systemd/system/
+# systemctl daemon-reload
+# systemctl enable docker-registry
+# sudo journalctl -n 20                          //查看日志
+# systemctl status docker-registry.service
+</pre>
+
+这里配置iptables，以允许5000端口：
+<pre>
+# iptables -I INPUT 1 -p tcp --dport 5000 -j ACCEPT
+
+# iptables -L -n -v                                       //可以看到iptables添加成功
+Chain INPUT (policy ACCEPT 43 packets, 3432 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+    0     0 ACCEPT     tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            tcp dpt:5000
+</pre>
 
 <br />
 <br />
@@ -247,6 +349,14 @@ UUID=639cc105-d6a9-43af-8036-3462b450ea5c /opt/docker-registry    ext4    defaul
 1. [Docker CE安装及配置国内镜像加速教程](http://blog.csdn.net/jackyzhousales/article/details/77995135)
 
 2. [配置docker官方源并用yum安装docker](https://www.cnblogs.com/JiangLe/p/6921320.html)
+
+3. [centos7安装docker并设置开机启动](https://www.cnblogs.com/rwxwsblog/p/5436445.html)
+
+4. [CentOS7安装Docker全程并启动](http://blog.csdn.net/wangfei0904306/article/details/62046753)
+
+5. [CentOS 7 : Docker私有仓库搭建和使用](http://blog.csdn.net/fgf00/article/details/52040492)
+
+6. [CentOS环境下Docker私有仓库搭建](https://www.cnblogs.com/kangoroo/p/7994801.html)
 <br />
 <br />
 <br />
