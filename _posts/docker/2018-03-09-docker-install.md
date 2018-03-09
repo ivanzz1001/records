@@ -74,7 +74,7 @@ docker-ce.x86_64                                                          17.12.
 </pre>
 
 另外还会依赖于```libltdl.so.7()(64bit)```与```libseccomp.so.2()(64bit)```，可以按如下方式下载：
-<pre>
+{% highlight string %}
 //通过如下方法查看rpm包的依赖关系
 # rpm -qpR ./docker-ce-17.12.0.ce-1.el7.centos.x86_64.rpm 
 warning: ./docker-ce-17.12.0.ce-1.el7.centos.x86_64.rpm: Header V4 RSA/SHA512 Signature, key ID 621e9f35: NOKEY
@@ -116,13 +116,14 @@ xz
 rpmlib(PayloadIsXz) <= 5.2-1
 
 # yum deplist docker-ce            //此种方法也能查看依赖包
+# yumdownloader package-name       //用此下载指定的包
 
 //http://rpmfind.net/linux/rpm2html/search.php?query=libltdl.so.7()(64bit)
 # wget http://rpmfind.net/linux/centos/7.4.1708/os/x86_64/Packages/libtool-ltdl-2.4.2-22.el7_3.x86_64.rpm
 
 //http://www.rpmfind.net/linux/rpm2html/search.php?query=libseccomp.so.2()(64bit)
 # wget http://www.rpmfind.net/linux/centos/7.4.1708/os/x86_64/Packages/libseccomp-2.3.1-3.el7.x86_64.rpm
-</pre>
+{% endhighlight %}
 
 下载完成后，拷贝到对应的离线主机上进行安装：
 <pre>
