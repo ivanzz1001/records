@@ -217,6 +217,8 @@ unix  2      [ ACC ]     STREAM     LISTENING     30457    9438/docker-contain  
 
 ## 3. 搭建私有镜像仓库
 
+我们当前私有镜像仓库搭建在：```10.17.153.196```。 
+
 **1) 下载私有镜像仓库**
 
 可以到如下两个地址：
@@ -341,6 +343,101 @@ Chain INPUT (policy ACCEPT 43 packets, 3432 bytes)
     0     0 ACCEPT     tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            tcp dpt:5000
 </pre>
 
+
+
+## 3. 测试
+
+**1) push镜像到私有镜像仓库**
+
+接下来，我们就要操作把一个本地镜像push到私有仓库中。在内网的任意一台装有docker机器下pull一个比较小的镜像来测试（此处使用busybox):
+<pre>
+# docker pull busybox
+</pre>
+
+然后再修改一下该镜像的tag:
+<pre>
+//此处前缀为我们的私有镜像库地址
+# docker tag busybox 10.17.153.196:5000/busybox   
+
+# docker images
+REPOSITORY                   TAG                 IMAGE ID            CREATED             SIZE
+10.17.153.196:5000/busybox   latest              f6e427c148a7        9 days ago          1.15MB
+busybox                      latest              f6e427c148a7        9 days ago          1.15MB         
+</pre>
+
+接着再push到我们的私有镜像仓库：
+<pre>
+# docker push 10.17.153.196:5000/busybox
+The push refers to repository [10.17.153.196:5000/busybox]
+Get https://10.17.153.196:5000/v2/: http: server gave HTTP response to HTTPS client
+</pre>
+上面我们看到，出现了错误，提示说： 服务端给了一个http响应到客户端。
+
+<br />
+
+**2） 配置docker以支持http方式push**
+
+之所以出现上面的错误提示，是因为docker从1.3.x之后，与docker registry交互默认使用的是https，然而此处搭建的私有仓库只提供http服务，所以当与私有仓库交互时就会报上面的错误。
+
+这里修改docker的启动配置文件```/lib/systemd/system/docker.service```，在其中添加:
+<pre>
+--insecure-registry=10.17.153.196:5000
+</pre>
+修改后如下所示：
+{% highlight string %}
+[Unit]
+Description=Docker Application Container Engine
+Documentation=https://docs.docker.com
+After=network-online.target firewalld.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+# the default is not to use systemd for cgroups because the delegate issues still
+# exists and systemd currently does not support the cgroup feature set required
+# for containers run by docker
+ExecStart=/usr/bin/dockerd \
+		--insecure-registry=10.17.153.196:5000 \
+		-H tcp://0.0.0.0:2375 \ 
+		-H unix://var/run/docker.sock \ 
+		-H tcp://0.0.0.0:7654
+
+ExecReload=/bin/kill -s HUP $MAINPID
+
+# Having non-zero Limit*s causes performance problems due to accounting overhead
+# in the kernel. We recommend using cgroups to do container-local accounting.
+LimitNOFILE=infinity
+LimitNPROC=infinity
+LimitCORE=infinity
+# Uncomment TasksMax if your systemd version supports it.
+# Only systemd 226 and above support this version.
+#TasksMax=infinity
+TimeoutStartSec=0
+# set delegate yes so that systemd does not reset the cgroups of docker containers
+Delegate=yes
+# kill only the docker process, not all processes in the cgroup
+KillMode=process
+# restart the docker process if it exits prematurely
+Restart=on-failure
+StartLimitBurst=3
+StartLimitInterval=60s
+
+[Install]
+WantedBy=multi-user.target
+{% endhighlight %}
+修改完成后(注意上面ExecStart分多行写时，前面为tab键)，重启docker，然后再push镜像：
+<pre>
+# systemctl daemon-reload && systemctl restart docker
+
+# docker push 10.17.153.196:5000/busybox
+The push refers to repository [10.17.153.196:5000/busybox]
+c5183829c43c: Pushed 
+latest: digest: sha256:c7b0a24019b0e6eda714ec0fa137ad42bc44a754d9cea17d14fba3a80ccc1ee4 size: 527
+</pre>
+
+
+
+
 <br />
 <br />
 
@@ -357,6 +454,8 @@ Chain INPUT (policy ACCEPT 43 packets, 3432 bytes)
 5. [CentOS 7 : Docker私有仓库搭建和使用](http://blog.csdn.net/fgf00/article/details/52040492)
 
 6. [CentOS环境下Docker私有仓库搭建](https://www.cnblogs.com/kangoroo/p/7994801.html)
+
+7. [docker 私有镜像仓库搭建](http://blog.csdn.net/wu_di_xiao_wei/article/details/54755475)
 <br />
 <br />
 <br />
