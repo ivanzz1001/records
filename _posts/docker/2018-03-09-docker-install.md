@@ -314,17 +314,70 @@ Description=Docker Registry
 After=network-online.target docker.service
 
 [Service]
-Type=notify
-ExecStart=/usr/bin/docker run -d -p 5000:5000 --privileged=true -v /opt/docker-registry:/tmp/registry registry:2.6.2
-ExecStop=
-Restart=on-failure
-StartLimitBurst=3
-StartLimitInterval=60s
+Type=oneshot
+# ExecStart=/usr/bin/docker run -d -p 5000:5000 --privileged=true \
+#       -v /opt/docker-registry:/var/lib/registry --name Test-registry registry:2.6.2
+ExecStart=/opt/registry-manager.sh start
+ExecReload=/opt/registry-manager.sh restart
+ExecStop=/opt/registry-manager.sh stop
+RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
 {% endhighlight %}
-将该文件拷贝到/lib/systemd/system/目录下，执行：
+说明：
+
+* ```-d```: 作为daemon进程启动，也就是后台启动
+
+* ```-v```: 默认情况下，早期docker会将仓库存放于容器的/tmp/registry目录下，而当前版本docker存放的位置是/var/lib/registry,因此这里我们将我们的外部硬盘/opt/docker-registry挂在到/var/lib/registry目录下。
+
+* ```-p```: 前一个5000是host的端口，后一个是容器的端口。这里将容器的5000端口映射到host的5000端口.
+
+/opt/registry-manager.sh代码如下：
+{% highlight string %}
+#!/bin/sh
+
+registry_name=Test-registry
+
+function docker_registry_start {
+    registry_container=`docker ps -a | grep $registry_name`
+    
+    if [ -z "$registry_container" ]
+    then
+       /usr/bin/docker run -d -p 5000:5000 --privileged=true  -v /opt/docker-registry:/var/lib/registry --name $registry_name registry:2.6.2
+    else
+       /usr/bin/docker start $registry_name
+    fi 
+   
+}
+
+function docker_registry_stop {
+    /usr/bin/docker stop $registry_name
+}
+
+if [ $# -ne 1 ]
+then
+   echo "invalid parameter number"
+   exit 1
+fi
+
+if [ $1 = "start" ]
+then
+   docker_registry_start
+elif [ $1 = "stop" ]
+then 
+    docker_registry_stop
+elif [ $1 = "restart" ]
+then
+    docker_registry_stop
+    docker_registry_start
+else
+    echo "unsupported command"
+fi
+{% endhighlight %}
+
+
+接下来，将该文件拷贝到/lib/systemd/system/目录下，执行：
 <pre>
 # cp docker-registry.service /lib/systemd/system/
 # systemctl daemon-reload
@@ -435,8 +488,26 @@ c5183829c43c: Pushed
 latest: digest: sha256:c7b0a24019b0e6eda714ec0fa137ad42bc44a754d9cea17d14fba3a80ccc1ee4 size: 527
 </pre>
 
+**3） 查看我们push到私有镜像仓库中的镜像**
 
+登录到私有镜像仓库服务器，查看我们push上去的busybox镜像:
+<pre>
+# docker exec -it MyRegistry /bin/sh
 
+# find / -name busybox
+/bin/busybox
+/var/lib/registry/docker/registry/v2/repositories/busybox
+</pre>
+上面我们看到，我们push上去的busybox镜像存放在/var/lib/registry目录下。
+
+通过curl命令查看当前镜像仓库中的镜像：
+<pre>
+# curl -XGET http://10.17.153.196:5000/v2/_catalog  
+{"repositories":["busybox"]}
+
+# curl -XGET http://10.17.153.196:5000/v2/busybox/tags/list 
+{"name":"busybox","tags":["latest"]}
+</pre>
 
 <br />
 <br />
@@ -456,6 +527,14 @@ latest: digest: sha256:c7b0a24019b0e6eda714ec0fa137ad42bc44a754d9cea17d14fba3a80
 6. [CentOS环境下Docker私有仓库搭建](https://www.cnblogs.com/kangoroo/p/7994801.html)
 
 7. [docker 私有镜像仓库搭建](http://blog.csdn.net/wu_di_xiao_wei/article/details/54755475)
+
+8. [Docker搭建本地私有仓库](http://blog.csdn.net/ronnyjiang/article/details/71189392)
+
+9. [centos7 Docker私有仓库搭建及删除镜像](https://www.cnblogs.com/Tempted/p/7768694.html)
+
+9. [Centos7创建支持ssh服务器的docker容器](http://blog.csdn.net/xizaihui/article/details/52960604)
+
+10. [[docker]privileged参数](http://blog.csdn.net/halcyonbaby/article/details/43499409)
 <br />
 <br />
 <br />
