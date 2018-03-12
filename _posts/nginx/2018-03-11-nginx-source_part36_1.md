@@ -154,6 +154,8 @@ ngx_crc(u_char *data, size_t len)
 4. [[转载]CRC32加密算法原理](https://www.cnblogs.com/dacainiao/p/5565046.html)
 
 5. [循环冗余检验 (CRC) 算法原理](https://www.cnblogs.com/esestt/archive/2007/08/09/848856.html)
+
+6. [CRC查找表法推导及代码实现比较](http://blog.csdn.net/huang_shiyang/article/details/50881305)
 <br />
 <br />
 <br />
