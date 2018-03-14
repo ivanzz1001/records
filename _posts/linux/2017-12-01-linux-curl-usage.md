@@ -414,7 +414,21 @@ HTTP协议文件上传的标准方法是使用PUT，此时curl命令使用```-T`
 
 
 
+## 14. 示例
 
+通过脚本，向curl传递复杂参数：
+{% highlight string %}
+#!/bin/sh
+
+pic_name=id-card.jpg
+pic_base64=`base64 -w 0 $pic_name > id_card.base64`
+pic_encodeurl=`./urlencode id_card.base64`
+
+echo "request={\"param1\":\"value1\",\"param2\":\"value2\",\"data\":{\"param3\":\"value3\",\"image\":\"$pic_encodeurl\"}}" > curl_data.dat
+
+url=http://example.com/query
+echo "curl -X POST -H 'Content-Type:application/x-www-form-urlencoded' --data @curl_data.dat $url"
+{% endhighlight %}
 
 <br />
 <br />
