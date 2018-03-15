@@ -231,6 +231,9 @@ ngx_crypt_apr1(ngx_pool_t *pool, u_char *key, u_char *salt, u_char **encrypted)
     return NGX_OK;
 }
 {% endhighlight %}
+这是Apache服务器能够识别的一种专用的加密算法。
+
+### 2.4 
 
 
 
