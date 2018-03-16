@@ -329,6 +329,46 @@ ngx_crypt_ssha(ngx_pool_t *pool, u_char *key, u_char *salt, u_char **encrypted)
 }
 #endif
 {% endhighlight %}
+当前我们支持```NGX_HAVE_SHA1```宏定义。ssha加密算法的基本步骤是：```base64(SHA1(key salt) salt)```。
+
+### 2.7 函数
+{% highlight string %}
+#if (NGX_HAVE_SHA1)
+static ngx_int_t
+ngx_crypt_sha(ngx_pool_t *pool, u_char *key, u_char *salt, u_char **encrypted)
+{
+    size_t      len;
+    ngx_str_t   encoded, decoded;
+    ngx_sha1_t  sha1;
+    u_char      digest[20];
+
+    /* "{SHA}" base64(SHA1(key)) */
+
+    decoded.len = sizeof(digest);
+    decoded.data = digest;
+
+    ngx_sha1_init(&sha1);
+    ngx_sha1_update(&sha1, key, ngx_strlen(key));
+    ngx_sha1_final(digest, &sha1);
+
+    len = sizeof("{SHA}") - 1 + ngx_base64_encoded_length(decoded.len) + 1;
+
+    *encrypted = ngx_pnalloc(pool, len);
+    if (*encrypted == NULL) {
+        return NGX_ERROR;
+    }
+
+    encoded.data = ngx_cpymem(*encrypted, "{SHA}", sizeof("{SHA}") - 1);
+    ngx_encode_base64(&encoded, &decoded);
+    encoded.data[encoded.len] = '\0';
+
+    return NGX_OK;
+}
+
+#endif /* NGX_HAVE_SHA1 */
+{% endhighlight %}
+当前我们支持```NGX_HAVE_SHA1```宏定义。nginx中```SHA```加密算法的基本步骤是：```base64(SHA1(key))```。
+
 
 <br />
 <br />
