@@ -231,11 +231,104 @@ ngx_crypt_apr1(ngx_pool_t *pool, u_char *key, u_char *salt, u_char **encrypted)
     return NGX_OK;
 }
 {% endhighlight %}
-这是Apache服务器能够识别的一种专用的加密算法。
+这是Apache服务器能够识别的一种专用的加密算法，称作Apache apr1加密.
 
-### 2.4 
+### 2.4 函数ngx_crypt_to64()
+{% highlight string %}
+static u_char *
+ngx_crypt_to64(u_char *p, uint32_t v, size_t n)
+{
+    static u_char   itoa64[] =
+        "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
+    while (n--) {
+        *p++ = itoa64[v & 0x3f];
+        v >>= 6;
+    }
 
+    return p;
+}
+{% endhighlight %}
+本函数主要用于将```uint32_t```类型的整数转换成长度为```n```的64进制字串。
+
+### 2.5 函数ngx_crypt_plain()
+{% highlight string %}
+static ngx_int_t
+ngx_crypt_plain(ngx_pool_t *pool, u_char *key, u_char *salt, u_char **encrypted)
+{
+    size_t   len;
+    u_char  *p;
+
+    len = ngx_strlen(key);
+
+    *encrypted = ngx_pnalloc(pool, sizeof("{PLAIN}") - 1 + len + 1);
+    if (*encrypted == NULL) {
+        return NGX_ERROR;
+    }
+
+    p = ngx_cpymem(*encrypted, "{PLAIN}", sizeof("{PLAIN}") - 1);
+    ngx_memcpy(p, key, len + 1);
+
+    return NGX_OK;
+}
+{% endhighlight %}
+函数ngx_crypt_plain()主要是再```key```前面加上```{PLAIN}```头。
+
+### 2.6 函数ngx_crypt_ssha()
+{% highlight string %}
+#if (NGX_HAVE_SHA1)
+static ngx_int_t
+ngx_crypt_ssha(ngx_pool_t *pool, u_char *key, u_char *salt, u_char **encrypted)
+{
+    size_t       len;
+    ngx_int_t    rc;
+    ngx_str_t    encoded, decoded;
+    ngx_sha1_t   sha1;
+
+    /* "{SSHA}" base64(SHA1(key salt) salt) */
+
+    /* decode base64 salt to find out true salt */
+
+    encoded.data = salt + sizeof("{SSHA}") - 1;
+    encoded.len = ngx_strlen(encoded.data);
+
+    len = ngx_max(ngx_base64_decoded_length(encoded.len), 20);
+
+    decoded.data = ngx_pnalloc(pool, len);
+    if (decoded.data == NULL) {
+        return NGX_ERROR;
+    }
+
+    rc = ngx_decode_base64(&decoded, &encoded);
+
+    if (rc != NGX_OK || decoded.len < 20) {
+        decoded.len = 20;
+    }
+
+    /* update SHA1 from key and salt */
+
+    ngx_sha1_init(&sha1);
+    ngx_sha1_update(&sha1, key, ngx_strlen(key));
+    ngx_sha1_update(&sha1, decoded.data + 20, decoded.len - 20);
+    ngx_sha1_final(decoded.data, &sha1);
+
+    /* encode it back to base64 */
+
+    len = sizeof("{SSHA}") - 1 + ngx_base64_encoded_length(decoded.len) + 1;
+
+    *encrypted = ngx_pnalloc(pool, len);
+    if (*encrypted == NULL) {
+        return NGX_ERROR;
+    }
+
+    encoded.data = ngx_cpymem(*encrypted, "{SSHA}", sizeof("{SSHA}") - 1);
+    ngx_encode_base64(&encoded, &decoded);
+    encoded.data[encoded.len] = '\0';
+
+    return NGX_OK;
+}
+#endif
+{% endhighlight %}
 
 <br />
 <br />
