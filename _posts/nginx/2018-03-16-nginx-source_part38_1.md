@@ -55,5 +55,15 @@ description: nginx源代码分析
 
 <br />
 <br />
+
+1. [nginx共享内存：共享内存的实现](http://blog.csdn.net/wgwgnihao/article/details/37838837)
+
+2. [Nginx内存管理及数据结构浅析–共享内存的实现](http://www.colaghost.net/web-server/246)
+
+3. [nginx之共享内存](http://blog.csdn.net/evsqiezi/article/details/51785093)
+
+
+<br />
+<br />
 <br />
 
