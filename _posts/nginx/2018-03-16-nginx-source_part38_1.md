@@ -133,7 +133,10 @@ struct ngx_cycle_s {
 
 下面我们再针对各个字段，做一个简要的介绍：
 
-* **conf_ctx**: 
+* **conf_ctx**: 本字段是一个4级指针结构，实际使用时可能当做2级指针来用，也可能当做4级指针来用。下面给出一个```conf_ctx```指针的一个大体结构：
+![ngx-conf-ctx](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_conf_ctx.jpg)
+
+* **pool**: 
 
 <br />
 <br />
