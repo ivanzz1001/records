@@ -52,6 +52,38 @@ description: nginx源代码分析
 </pre>
 
 
+## 2. ngx_shm_zone_t数据结构
+{% highlight string %}
+typedef struct ngx_shm_zone_s  ngx_shm_zone_t;
+
+typedef ngx_int_t (*ngx_shm_zone_init_pt) (ngx_shm_zone_t *zone, void *data);
+
+struct ngx_shm_zone_s {
+    void                     *data;
+    ngx_shm_t                 shm;
+    ngx_shm_zone_init_pt      init;
+    void                     *tag;
+    ngx_uint_t                noreuse;  /* unsigned  noreuse:1; */
+};
+{% endhighlight %}
+```ngx_shm_zone_s```代表一块内存共享区域。下面我们对其中各个字段做一个简要的说明：
+
+* **data**: 这里```data```可以指向自定义的一个数据结构，主要是为了在数据初始化的时候用到，或通过共享内存直接拿到与共享内存相关的数据，它不一定指向共享内存中的地址。
+
+* **shm**: 实际的共享内存结构
+
+* **init**: 共享内存初始化函数
+
+* **tag**: 这里tag是一个标志，区别于shm.name。 shm.name没法让nginx区分到底是想新创建一个共享内存，还是使用已存在的旧的共享内存，因此这里引入tag字段来解决该问题。tag一般指向当前模块的```ngx_module_t```变量，例如：
+<pre>
+ngx_shared_memory_add(cf, &value[1], 0, &ngx_http_fastcgi_module);
+</pre>
+
+这里再对tag字段解释一下，因为看上去它和name字段有点重复，而事实上，name字段主要用作共享内存的唯一标识，它能让nginx知道我想使用哪个共享内存，但它没办法让nginx区分到底是想新创建一个共享内存，还是使用那个已存在的旧的共享内存。举个例子，模块A创建了共享内存sa,模块A或者另外一个模块B再以同样的名称sa去获取共享内存，那么此时nginx是返回模块A已创建的那个共享内存sa给模块A/模块B，还是直接以共享内存名重复提示模块A/模块B出错呢？ 不管nginx采用哪种做法都有另外一种情况出错，所以新增一个tag字段做冲突标识，该字段一般指向当前模块的 ```ngx_module_t```变量即可。这样在上面的例子中，通过tag字段的帮助，如果模块A/模块B再以同样的名称去获取模块A已创建的共享内存sa，则模块A将获得它之前创建的共享内存的引用（因为模块A前后两次请求的tag相同），而模块B将获得共享内存已作他用的错误提示（因为模块B请求的tag与之前模块A请求的tag不同）。
+
+* **noreuse**: 取值为0时，则表示可以对此共享内存进行复用；否则不能对此共享内存进行复用。一般用在系统升级时，表示是否可以复用前面创建的共享内存。
+
+## 3. 
 
 <br />
 <br />
