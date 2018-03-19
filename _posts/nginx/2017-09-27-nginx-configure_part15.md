@@ -459,6 +459,7 @@ fi
 
 6. [Nginx开发从入门到精通](http://tengine.taobao.org/book/chapter_02.html#nginx)
 
+7. [NGINX 加载动态模块（NGINX 1.9.11开始增加加载动态模块支持）](https://www.cnblogs.com/tinywan/p/6965467.html)
 <br />
 <br />
 <br />
