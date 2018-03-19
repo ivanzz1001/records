@@ -149,6 +149,106 @@ Default:	error_log logs/error.log error;
 Context:	main, http, mail, stream, server, location
 </pre>
 
+* **files**： 预先建立的```ngx_connection_t```类型的指针数组。每当一个连接建立，就从free_connections中获取到一个空闲的```ngx_connection_t```对象，然后将该对象存放到files对应的索引处（根据连接句柄fd）
+
+* **free_connections**: 当前处于空闲状态的```ngx_connection_t```类型对象。假如当前并没有空闲连接的话，nginx工作进程会拒绝接受新的客户端连接或者连接到upstream服务器。
+
+* **free_connection_n**： 当前处于空想状态的```ngx_connection_t```类型对象的个数。
+
+* **modules**: 指向当前nginx内部的所有module。包括objs/ngx_modules.c中定义的modules，以及后面动态加载的modules.
+
+* **modules_n**： 当前总的module的个数
+
+* **modules_used**: 指示modules是否加载完成，处于使用当中。如果是，则会禁止加载。主要是为了防止在使用过程中在错误的时间加载动态模块。
+
+
+* **reusable_connections_queue**: 可复用连接队列。（一般对于http长连接会设置为可复用。在当前连接紧张时，nginx会自动释放掉一些本队列中的连接，以用于接受更多http短连接）
+
+* **listening**: 监听端口数组，元素类型为```ngx_listening_t```类型。通常在遇到不同模块的```listen```指令时，会调用```ngx_create_listening()```函数来加载监听对象。监听socket会依据```ngx_listening_t```对象来创建。
+
+* **paths**: 保存着nginx所有要操作的目录。路径会在相应的模块通过调用```ngx_add_path()```函数来进行添加。这些路径在读取nginx配置文件时，如果不存在的话则会被创建。对于每一个路径，可以关联两个handlers:
+<pre>
+1) path loader: 在nginx启动或重启的60s内执行一次。通常情况下，path loader会读取该目录，然后将读取到的数据存放在nginx共享内存中。
+                本handler一般是由nginx专用进程“nginx cache loader”来调用
+
+2) path manager: 会周期性的执行。通常情况下，该manager会移除对应目录下的一些过时文件，然后更新内存以反应相应的变化情况。该handler一般是由nginx
+                 专用进程“nginx cache manager”来调用。
+</pre>
+
+* **config_dump**： 保存```ngx_conf_dump_t```对象的数组。在Nginx对配置文件进行检查时，会将读取到的配置文件拷贝到```ngx_conf_dump_t.buffer```,后续再dump出来。
+
+
+* **open_files**: 元素类型为```ngx_open_file_t```的数组对象，通过```ngx_conf_open_file()```函数打开的文件都会存入该数组。当前，nginx采用该类型的打开文件来记录日志。在读取完配置文件之后，nginx会打开```open_files```列表中的所有文件，然后将每一个打开文件的句柄存放在```ngx_open_file_s.fd```中。文件是以追加方式打开的，而如果文件不存在还会进行创建。在Nginx的worker进程接收到reopen信号(通常是```USR1```信号）时，worker进程会对该列表中的文件进行重新打开，在这种情况下，fd域将会被改变成一个新的值。
+
+* **shared_memory**: 共享内存列表，元素类型为```ngx_shm_zone_s```。通过ngx_shared_memory_add()函数将共享内存加到此列表中。共享内存在nginx的所有进程中都被映射到相同的地址，通常被用于共享一些常用的数据，例如HTTP内存缓存树。
+
+* **connection_n**: nginx配置文件中的worker_connection指令指定```connection_n```的值，从而决定每一个worker进程所应该创建的```ngx_connection_t```对象的个数（注意这不是实际的连接数，只是预先创建的ngx_connection_t对象）。
+
+* **files_n**: 当前上面```files```数组中实际的连接个数
+
+* **connections**: 元素类型为```ngx_connection_t```的数组，通常在nginx worker进程初始化时由对应的事件模块所创建。
+
+* **read_events**: 当前进程中的所有读事件对象。每个网络连接关联着一个读事件
+
+* **write_events**: 当前进程中的所有写事件对象。每个网络连接关联着一个写事件
+
+* **old_cycle**: 用于引用上一个```ngx_cycle_t```类型对象。例如ngx_init_cycle()方法，在启动初期，需要建立一个临时的ngx_cycle_t对象保存一些一些变量，在调用ngx_init_cycle()方法时，就可以把旧的ngx_cycle_t对象传进去。
+
+* **conf_file**: 配置文件的存放路径
+
+* **conf_param**： 存放nginx启动时，通过```-g```选项传递进来的参数
+
+* **conf_prefix**: 存放nginx配置文件路径前缀（一般是通过```-p```选项来指定nginx的工作路径，然后使用该路径下的配置文件）
+
+* **prefix**： nginx路径前缀（后续如日志，pid等都会参考该前缀）
+
+* **lock_file**： nginx使用锁机制来实现```accept mutex```，并且顺序的来访问共享内存。在大多数的系统上，锁都是通过原子操作来实现的，因此会忽略配置文件中的```lock_file file```指令；而对于其他的一些系统，```lock file```机制会被使用。
+
+* **hostname**: gethostname()得到的主机名称
+
+这里对于connections、free_connections、files、read_events、write_events，我们给出如下一副图：
+
+![ngx-cycle](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_get_connection.jpg)
+
+## 4. ngx_core_conf_t数据结构
+{% highlight string %}
+typedef struct {
+    ngx_flag_t                daemon;
+    ngx_flag_t                master;
+
+    ngx_msec_t                timer_resolution;
+
+    ngx_int_t                 worker_processes;
+    ngx_int_t                 debug_points;
+
+    ngx_int_t                 rlimit_nofile;
+    off_t                     rlimit_core;
+
+    int                       priority;
+
+    ngx_uint_t                cpu_affinity_auto;
+    ngx_uint_t                cpu_affinity_n;
+    ngx_cpuset_t             *cpu_affinity;
+
+    char                     *username;
+    ngx_uid_t                 user;
+    ngx_gid_t                 group;
+
+    ngx_str_t                 working_directory;
+    ngx_str_t                 lock_file;
+
+    ngx_str_t                 pid;
+    ngx_str_t                 oldpid;
+
+    ngx_array_t               env;
+    char                    **environment;
+} ngx_core_conf_t;
+{% endhighlight %}
+
+
+
+
+
 
 <br />
 <br />
@@ -166,6 +266,8 @@ Context:	main, http, mail, stream, server, location
 6. [nginx学习十 ngx_cycle_t 、ngx_connection_t 和ngx_listening_t](http://blog.csdn.net/xiaoliangsky/article/details/39831035)
 
 7. [ngx_cycle_s](http://blog.csdn.net/yzt33/article/details/47087943)
+
+8. [NGINX 加载动态模块（NGINX 1.9.11开始增加加载动态模块支持）](https://www.cnblogs.com/tinywan/p/6965467.html)
 <br />
 <br />
 <br />
