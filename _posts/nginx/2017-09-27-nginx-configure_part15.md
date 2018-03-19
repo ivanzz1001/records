@@ -350,6 +350,12 @@ fi
 
 其他库一般需要用户自己提供，然后在编译时告诉编译器进行链接。
 
+{% highlight string %}
+注意：
+
+内部动态加载模块其实也是用本段脚本进行处理，只是内部动态加载不需要跑到对应的目录下去执行config脚本（这在auto/modules脚本中对这两种情况已经做了区分）。
+{% endhighlight %}
+
 ### 1.4 处理内部静态模块
 {% highlight string %}
 if [ "$ngx_module_link" = DYNAMIC ]; then
