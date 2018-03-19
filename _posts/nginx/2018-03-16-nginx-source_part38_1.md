@@ -136,7 +136,19 @@ struct ngx_cycle_s {
 * **conf_ctx**: 本字段是一个4级指针结构，实际使用时可能当做2级指针来用，也可能当做4级指针来用。下面给出一个```conf_ctx```指针的一个大体结构：
 ![ngx-conf-ctx](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_conf_ctx.jpg)
 
-* **pool**: 
+* **pool**: 本cycle所关联的内存池对象。针对每一个新的cycle对象，都会创建一个相应的内存池对象。
+
+* **log**: 本cycle所关联的日志对象。初始时，会从原来老的cycle继承而来；而当配置文件成功读取完成之后，```log```指针会指向```new_log```。
+
+* **new_log**: 本cycle所关联的日志对象，在读取完配置文件时进行创建。其受到nginx配置文件一级配置(root-scope)error_log指令的影响。
+
+* **log_use_stderr**: 主要用于指示当前配置文件中error_log指令的日志输出是否配置为stderr。```error_log```指令用法如下：
+<pre>
+Syntax:	error_log file [level];
+Default:	error_log logs/error.log error;
+Context:	main, http, mail, stream, server, location
+</pre>
+
 
 <br />
 <br />
@@ -148,6 +160,12 @@ struct ngx_cycle_s {
 3. [nginx之共享内存](http://blog.csdn.net/evsqiezi/article/details/51785093)
 
 4. [Nginx Cycle](http://nginx.org/en/docs/dev/development_guide.html#cycle)
+
+5. [Nginx源码分析： 3张图看懂启动及进程工作原理](http://www.360doc.com/content/16/0220/10/30291625_535903478.shtml)
+
+6. [nginx学习十 ngx_cycle_t 、ngx_connection_t 和ngx_listening_t](http://blog.csdn.net/xiaoliangsky/article/details/39831035)
+
+7. [ngx_cycle_s](http://blog.csdn.net/yzt33/article/details/47087943)
 <br />
 <br />
 <br />
