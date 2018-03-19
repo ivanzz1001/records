@@ -83,7 +83,57 @@ ngx_shared_memory_add(cf, &value[1], 0, &ngx_http_fastcgi_module);
 
 * **noreuse**: 取值为0时，则表示可以对此共享内存进行复用；否则不能对此共享内存进行复用。一般用在系统升级时，表示是否可以复用前面创建的共享内存。
 
-## 3. 
+## 3. ngx_cycle_s数据结构
+{% highlight string %}
+struct ngx_cycle_s {
+    void                  ****conf_ctx;
+    ngx_pool_t               *pool;
+
+    ngx_log_t                *log;
+    ngx_log_t                 new_log;
+
+    ngx_uint_t                log_use_stderr;  /* unsigned  log_use_stderr:1; */
+
+    ngx_connection_t        **files;
+    ngx_connection_t         *free_connections;
+    ngx_uint_t                free_connection_n;
+
+    ngx_module_t            **modules;
+    ngx_uint_t                modules_n;
+    ngx_uint_t                modules_used;    /* unsigned  modules_used:1; */
+
+    ngx_queue_t               reusable_connections_queue;
+
+    ngx_array_t               listening;
+    ngx_array_t               paths;
+    ngx_array_t               config_dump;
+    ngx_list_t                open_files;
+    ngx_list_t                shared_memory;
+
+    ngx_uint_t                connection_n;
+    ngx_uint_t                files_n;
+
+    ngx_connection_t         *connections;
+    ngx_event_t              *read_events;
+    ngx_event_t              *write_events;
+
+    ngx_cycle_t              *old_cycle;
+
+    ngx_str_t                 conf_file;
+    ngx_str_t                 conf_param;
+    ngx_str_t                 conf_prefix;
+    ngx_str_t                 prefix;
+    ngx_str_t                 lock_file;
+    ngx_str_t                 hostname;
+};
+{% endhighlight %}
+```ngx_cycle_s```是一个总控型数据结构。一个```cycle```对象存放着从某个配置创建而来的nginx运行时上下文。我们可以通过全局变量```ngx_cycle```来引用到当前进程的cycle上下文（对于worker进程，在创建时也会继承得到该上下文）。每一次重新加载nginx配置文件时，都会从该配置文件重新创建出一个新的cycle对象；而原来老的cycle对象则会在新的cycle成功创建之后被删除掉。
+
+一个cycle对象通常是由```ngx_init_cycle()```函数所创建，该函数以一个```previous cycle```作为其参数。函数首先会定位到```previous cycle```的配置文件，然后尽可能的从previous cycle继承相应的资源。在nginx启动时，首先会创建一个```init_cycle```占位符，然后会用一个从配置文件创建而来的cycle来替换该```init_cycle```。
+
+下面我们再针对各个字段，做一个简要的介绍：
+
+* **conf_ctx**: 
 
 <br />
 <br />
@@ -94,7 +144,7 @@ ngx_shared_memory_add(cf, &value[1], 0, &ngx_http_fastcgi_module);
 
 3. [nginx之共享内存](http://blog.csdn.net/evsqiezi/article/details/51785093)
 
-
+4. [Nginx Cycle](http://nginx.org/en/docs/dev/development_guide.html#cycle)
 <br />
 <br />
 <br />
