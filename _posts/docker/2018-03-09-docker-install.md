@@ -344,7 +344,7 @@ function docker_registry_start {
     
     if [ -z "$registry_container" ]
     then
-       /usr/bin/docker run -d -p 5000:5000 --privileged=true  -v /opt/docker-registry:/var/lib/registry --name $registry_name registry:2.6.2
+       /usr/bin/docker run -d -p 5000:5000 --privileged=true  --restart=always -v /opt/docker-registry:/var/lib/registry --name $registry_name registry:2.6.2
     else
        /usr/bin/docker start $registry_name
     fi 
@@ -394,6 +394,15 @@ fi
 Chain INPUT (policy ACCEPT 43 packets, 3432 bytes)
  pkts bytes target     prot opt in     out     source               destination         
     0     0 ACCEPT     tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            tcp dpt:5000
+
+//这里iptables配置保存有些问题(service iptables save)，需要安装iptables-services
+# sudo yum install --downloadonly --downloaddir=./ iptables-services
+# ls
+iptables-1.4.21-18.3.el7_4.x86_64.rpm           iptables-services-1.4.21-18.3.el7_4.x86_64.rpm  
+
+# yum localinstall *.rpm
+
+# service iptables save
 </pre>
 
 
@@ -535,6 +544,8 @@ latest: digest: sha256:c7b0a24019b0e6eda714ec0fa137ad42bc44a754d9cea17d14fba3a80
 9. [Centos7创建支持ssh服务器的docker容器](http://blog.csdn.net/xizaihui/article/details/52960604)
 
 10. [[docker]privileged参数](http://blog.csdn.net/halcyonbaby/article/details/43499409)
+
+11. [Docker之Centos7 Docker私有仓库搭建](http://blog.csdn.net/mmd0308/article/details/77162004)
 <br />
 <br />
 <br />
