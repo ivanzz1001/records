@@ -290,14 +290,203 @@ timer_resolution 100ms;
 
 **4) worker_processes字段**
 
+```worker_processes```指令用于指定工作进程的数目。最佳的worker processes数目受很多因素的影响，包括但不限于CPU核数，存储数据的硬盘驱动器数目以及加载模式等。当并不是很确定的时候，开始设置woker processes数目等于CPU核数(或设置为auto）将会获得一个较好的效果。配置语法如下：
+<pre>
+Syntax:	worker_processes number | auto;
+Default:	worker_processes 1;
+Context:	main
+</pre>
+注意：```auto参数值从1.3.8版本开始支持```
+
+**5） debug_points字段**
+
+```debug_points```指令的配置语法如下：
+<pre>
+Syntax:	debug_points abort | stop;
+Default:	—
+Context:	main
+</pre>
+本指令主要用于调试作用。当一个内部错误被检测到时，例如当woker进程重启时sockets泄露，此时enable debug_points会导致产生一个core dump文件（设置为abort时）或者停止进程的执行（设置为stop时），因此我们可以使用系统调试器进行进一步的分析。
+
+**6) rlimit_nofile字段**
+
+```worker_rlimit_nofile```指令的配置语法如下：
+<pre>
+Syntax:	worker_rlimit_nofile number;
+Default:	—
+Context:	main
+</pre>
+为worker进程改变打开文件的最大限制数(RLIMIT_NOFILE)。主要用于在不重启主进程的情况下，增加可打开文件的限制数。
 
 
+**7) rlimit_core字段**
+
+```worker_rlimit_core```指令的配置语法如下：
+<pre>
+Syntax:	worker_rlimit_core size;
+Default:	—
+Context:	main
+</pre>
+改变worker进程产生core dump文件的最大大小限制。主要用于在不重启主进程的情况下，增加产生core dump文件大小的上限值。
+
+**8) priority字段**
+
+```worker_priority```指令的配置语法如下：
+<pre>
+Syntax:	worker_priority number;
+Default:	
+worker_priority 0;
+Context:	main
+</pre>
+用于定义worker进程的调度优先级，类似于```nice```命令： 一个负的```number```值具有较高的优先级。这里```number```的取值范围通常在-20到20之间。
+
+<br />
+
+**9) cpu_affinity_auto字段**
+
+表明当前是否自动设置进程的CPU亲和性。
+
+**10) cpu_affinity_n字段**
+
+表明当前所设置的CPU亲和性字段的个数。
+
+**11) cpu_affinity字段**
+
+```worker_cpu_affinity```指令用于设置worker进程的CPU亲和性。指令的配置语法如下：
+<pre>
+Syntax:	worker_cpu_affinity cpumask ...;
+worker_cpu_affinity auto [cpumask];
+Default:	—
+Context:	main
+</pre>
+
+绑定worker进程到CPU集上。每一个CPU集都由一个bitmask来表示。一般来说，针对每一个worker进程，都应该有一个单独的CPU集。默认情况下，worker进程并不会绑定到任何一个CPU上。如下给出一个配置样例：
+{% highlight string %}
+worker_processes    4;
+worker_cpu_affinity 0001 0010 0100 1000;
+{% endhighlight %}
+上面对于每一个worker进程，都绑定到一个单独的CPU上。而对于如下：
+{% highlight string %}
+worker_processes    2;
+worker_cpu_affinity 0101 1010;
+{% endhighlight %}
+会绑定第一个worker进程到CPU0/CPU2上；第二个worker进程会被绑定到CPU1/CPU3上。第二个示例比较适合用在超线程架构的cpu上（hyper-threading)。
+
+而```auto```参数值（1.9.10版开始)允许自动的绑定worker进程到可用的CPU上：
+{% highlight string %}
+worker_processes auto;
+worker_cpu_affinity auto;
+{% endhighlight %}
+此种情况下，可选的```mask```参数可以限制自动绑定的CPU集：
+{% highlight string %}
+worker_cpu_affinity auto 01010101;
+{% endhighlight %}
+
+注意： ```worker_cpu_affinity```指令只能用在FreeBSD和Linux系统上
+
+<br />
+
+**12) username/user/group字段**
+
+用于设置nginx以某个用户/用户组方式运行。指令的配置语法如下：
+<pre>
+Syntax:	user user [group];
+Default:	user nobody nobody;
+Context:	main
+</pre>
+定义worker进程运行所使用的```user```及```group```身份。假如```group```缺省的话，则会采用组名与```user```相同的组。
+
+**13) working_directory字段**
+
+```working_directory```指令用于配置worker进程的工作目录。配置语法如下：
+<pre>
+Syntax:	working_directory directory;
+Default:	—
+Context:	main
+</pre>
+定义worker子进程的当前工作目录。主要用于写一个core文件时，worker进程应该要有该特定目录的访问权限。
+
+**14) lock_file字段**
+
+```lock_file```指令的语法如下：
+<pre>
+Syntax:	lock_file file;
+Default:	
+lock_file logs/nginx.lock;
+Context:	main
+</pre>
+nginx使用锁机制来实现```accept mutex```，并且顺序的来访问共享内存。在大多数的系统上，锁都是通过原子操作来实现的，因此会忽略配置文件中的```lock_file file```指令；而对于其他的一些系统，```lock file```机制会被使用。
+
+**15) pid/oldpid字段**
+
+```pid```指令的语法如下：
+<pre>
+Syntax:	pid file;
+Default:	pid logs/nginx.pid;
+Context:	main
+</pre>
+定义在什么地方存储主进程的pid。
+
+**16) env/environment字段**
+
+```env```指令语法如下：
+<pre>
+Syntax:	env variable[=value];
+Default:	env TZ;
+Context:	main
+</pre>
+默认情况下，nginx会移除所有从父进程继承而来的环境变量（除了TZ环境变量外）。本指令允许保留一些继承而来的变量，改变它们的值，或者创建新的环境变量。这些环境变量将会被用在：
+
+* 在进行```live upgrade```(热升级）时会被继承
+
+* 被```ngx_http_perl_module```模块所使用
+
+* 被worker进程所使用。有一点需要记住的是:想要通过此来控制一些系统库(system libraries),有时候可能并不能达到想要的效果。原因是很多的系统库是在初始化的时候会检查这些变量。（其中的一个例外情况是上面提到的live upgrade操作）
+
+```TZ```环境变量总是会被继承，并且可以在```ngx_http_perl_module```中使用。
+
+使用范例：
+{% highlight string %}
+env MALLOC_OPTIONS;
+env PERL5LIB=/data/site/modules;
+env OPENSSL_ALLOW_PROXY_CERTS=1;
+{% endhighlight %}
+
+注意： ```nginx环境变量是在nginx内部所使用，不应该由用户来直接进行设置。```
+
+## 5. 相关函数定义
+{% highlight string %}
+#define ngx_is_init_cycle(cycle)  (cycle->conf_ctx == NULL)
+
+
+ngx_cycle_t *ngx_init_cycle(ngx_cycle_t *old_cycle);
+ngx_int_t ngx_create_pidfile(ngx_str_t *name, ngx_log_t *log);
+void ngx_delete_pidfile(ngx_cycle_t *cycle);
+ngx_int_t ngx_signal_process(ngx_cycle_t *cycle, char *sig);
+void ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user);
+char **ngx_set_environment(ngx_cycle_t *cycle, ngx_uint_t *last);
+ngx_pid_t ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv);
+ngx_cpuset_t *ngx_get_cpu_affinity(ngx_uint_t n);
+ngx_shm_zone_t *ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name,
+{% endhighlight %}
+
+
+## 6. 相关变量声明
+{% highlight string %}
+extern volatile ngx_cycle_t  *ngx_cycle;
+extern ngx_array_t            ngx_old_cycles;
+extern ngx_module_t           ngx_core_module;
+extern ngx_uint_t             ngx_test_config;
+extern ngx_uint_t             ngx_dump_config;
+extern ngx_uint_t             ngx_quiet_mode;
+{% endhighlight %}
 
 
 <br />
 <br />
 
-1. [nginx共享内存：共享内存的实现](http://blog.csdn.net/wgwgnihao/article/details/37838837)
+1. [nginx共享内存：共享内存的实现](http://b
+2. log.csdn.net/wgwgnihao/article/details/37838837)
 
 2. [Nginx内存管理及数据结构浅析–共享内存的实现](http://www.colaghost.net/web-server/246)
 
