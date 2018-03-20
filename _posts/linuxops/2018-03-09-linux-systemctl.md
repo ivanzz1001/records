@@ -22,6 +22,7 @@ description: Linux下systemd的用法
 
 3. [Systemd 入门教程：命令篇](http://www.ruanyifeng.com/blog/2016/03/systemd-tutorial-commands.html)
 
+4. [systemd](http://blog.51cto.com/12550795/1948348)
 <br />
 <br />
 <br />

@@ -245,6 +245,50 @@ typedef struct {
 } ngx_core_conf_t;
 {% endhighlight %}
 
+```ngx_core_conf_t```是nginx的一个核心配置，主要对应于配置文件的主上下文。下面我们对其中相关字段进行简单讲解：
+
+**1) daemon字段**
+
+```daemon```指令的配置语法如下：
+<pre>
+Syntax:	daemon on | off;
+Default:	daemon on;
+Context:	main
+</pre>
+
+用于决定nginx是否作为一个daemon进程运行。
+
+**2) master字段**
+
+```master```指令的配置语法如下：
+<pre>
+Syntax:	master_process on | off;
+Default:	master_process on;
+Context:	main
+</pre>
+用于决定nginx是否以master方式工作。
+
+**3)  timer_resolution字段**
+
+```timer_resolution```指令的配置语法如下：
+<pre>
+Syntax:	timer_resolution interval;
+Default:	—
+Context:	main
+</pre>
+在nginx worker进程中降低```timer resolution```的话，就可以减少```gettimeofday()```函数的系统调用。默认情况下，在每一次接收到内核事件的情况下都会调用一次```gettimeofday()```。而当指定了timer resolution的话，则每```interval```时间内会调用一次gettimeofday()。例如：
+{% highlight string %}
+timer_resolution 100ms;
+{% endhighlight %}
+而内部如何实现这样一个时间间隔，主要依赖于nginx所采用的事件方式：
+
+* 假如所采用的事件模型是```kqueue```，则使用```EVENT_TIMER```过滤器来实现
+
+* 假如所采用的事件模型是```eventport```，则使用```timer_create()```来实现
+
+* 其他情况使用setitimer()函数来实现
+
+**4) worker_processes字段**
 
 
 
@@ -268,6 +312,10 @@ typedef struct {
 7. [ngx_cycle_s](http://blog.csdn.net/yzt33/article/details/47087943)
 
 8. [NGINX 加载动态模块（NGINX 1.9.11开始增加加载动态模块支持）](https://www.cnblogs.com/tinywan/p/6965467.html)
+
+9. [nginx conf相关](http://blog.csdn.net/cschengvdn/article/details/25273541)
+
+10. [Core Functionality](http://nginx.org/en/docs/ngx_core_module.html)
 <br />
 <br />
 <br />
