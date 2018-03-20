@@ -525,6 +525,108 @@ latest: digest: sha256:c7b0a24019b0e6eda714ec0fa137ad42bc44a754d9cea17d14fba3a80
 {"name":"busybox","tags":["latest"]}
 </pre>
 
+
+## 4. 配置仓库认证
+
+私有仓库搭建以后其他所有客户端均可以push、pull，docker官方提供认证方法对docker仓库进行权限保护.我们这里只添加用户权限限制：
+
+**1) 删除原来启动的仓库容器**
+{% highlight string %}
+# docker ps -a
+CONTAINER ID        IMAGE                            COMMAND                  CREATED             STATUS                         PORTS                    NAMES
+cba959ec5852        registry:2.6.2                   "/entrypoint.sh /etc…"   43 seconds ago      Up 42 seconds                  0.0.0.0:5000->5000/tcp   Test-registry
+
+# docker stop Test-registry
+# docker rm Test-registry
+{% endhighlight %}
+
+**2) 创建存放账号的文件**
+{% highlight string %}
+# mkdir /opt/docker-auth
+
+//这里添加一个admin账号，密码设置为123
+# docker run --entrypoint htpasswd registry:2.6.2 -Bbn admin 123 >> /opt/docker-auth/htpasswd
+# cat /opt/docker-auth/htpasswd
+admin:$2y$05$AWp/QM9DPRvOgwv9iNjxlO3juhHqj/ANzmxsPvV3nsQBZpcy1x62C
+{% endhighlight %}
+
+**3) 修改docker registry的启动参数，并启动**
+
+这里我们修改上文的registry-manager.sh:
+{% highlight string %}
+# cat registry-manager.sh 
+#!/bin/sh
+
+registry_name=test-registry
+
+volume_opts="-v /opt/docker-registry:/var/lib/registry -v /opt/docker-auth:/auth"
+auth_opts='-e "REGISTRY_AUTH=htpasswd" -e "REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm" -e REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd'
+run_opts="-d -p 5000:5000 --privileged=true --restart=always $volume_opts $auth_opts --name $registry_name registry:2.6.2"
+
+function docker_registry_start {
+    registry_container=`docker ps -a | grep $registry_name`
+    
+    if [ -z "$registry_container" ]
+    then
+       echo $run_opts | xargs /usr/bin/docker run    
+    else
+       /usr/bin/docker start $registry_name
+    fi 
+   
+}
+
+function docker_registry_stop {
+    /usr/bin/docker stop $registry_name
+}
+
+function docker_registry_remove {
+    /usr/bin/docker stop $registry_name
+    /usr/bin/docker rm $registry_name
+}
+
+if [ $# -ne 1 ]
+then
+   echo "invalid parameter number"
+   exit 1
+fi
+
+if [ $1 = "start" ]
+then
+   docker_registry_start
+elif [ $1 = "stop" ]
+then 
+    docker_registry_stop
+elif [ $1 = "restart" ]
+then
+    docker_registry_stop
+    docker_registry_start
+elif [ $1 == "remove" ]
+then
+    docker_registry_remove
+else
+    echo "unsupported command"
+fi
+{% endhighlight %}
+
+**4) 测试**
+{% highlight string %}
+# docker pull 10.17.153.196:5000/busybox
+Using default tag: latest
+Error response from daemon: Get http://10.17.153.196:5000/v2/busybox/manifests/latest: no basic auth credentials
+
+# docker login http://10.17.153.196:5000 
+Username: admin
+Password: 
+Login Succeeded
+
+# docker pull  10.17.153.196:5000/busybox
+Using default tag: latest
+latest: Pulling from busybox
+d070b8ef96fc: Pull complete 
+Digest: sha256:c7b0a24019b0e6eda714ec0fa137ad42bc44a754d9cea17d14fba3a80ccc1ee4
+Status: Downloaded newer image for 10.17.153.196:5000/busybox:latest
+{% endhighlight %}
+
 <br />
 <br />
 
@@ -553,6 +655,12 @@ latest: digest: sha256:c7b0a24019b0e6eda714ec0fa137ad42bc44a754d9cea17d14fba3a80
 10. [[docker]privileged参数](http://blog.csdn.net/halcyonbaby/article/details/43499409)
 
 11. [Docker之Centos7 Docker私有仓库搭建](http://blog.csdn.net/mmd0308/article/details/77162004)
+
+12. [Docker学习笔记六：Docker搭建企业级私有仓库](https://www.cnblogs.com/sishang/p/6511420.html)
+
+13. [Docker搭建带有访问认证的私有仓库](http://blog.csdn.net/yuhaitao8922/article/details/72996993)
+
+14. [docker私有仓库搭建并且配置仓库认证](https://www.jianshu.com/p/7918c9af45a3)
 <br />
 <br />
 <br />
