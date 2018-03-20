@@ -403,6 +403,13 @@ iptables-1.4.21-18.3.el7_4.x86_64.rpm           iptables-services-1.4.21-18.3.el
 # yum localinstall *.rpm
 
 # service iptables save
+
+# systemctl is-active iptables
+inactive
+# systemctl unmask iptables
+Removed symlink /etc/systemd/system/iptables.service.
+# systemctl enable iptables
+Created symlink from /etc/systemd/system/basic.target.wants/iptables.service to /usr/lib/systemd/system/iptables.service.
 </pre>
 
 
