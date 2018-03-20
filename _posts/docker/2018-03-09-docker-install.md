@@ -559,16 +559,20 @@ admin:$2y$05$AWp/QM9DPRvOgwv9iNjxlO3juhHqj/ANzmxsPvV3nsQBZpcy1x62C
 
 registry_name=test-registry
 
-volume_opts="-v /opt/docker-registry:/var/lib/registry -v /opt/docker-auth:/auth"
-auth_opts='-e "REGISTRY_AUTH=htpasswd" -e "REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm" -e REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd'
-run_opts="-d -p 5000:5000 --privileged=true --restart=always $volume_opts $auth_opts --name $registry_name registry:2.6.2"
 
 function docker_registry_start {
     registry_container=`docker ps -a | grep $registry_name`
     
     if [ -z "$registry_container" ]
     then
-       echo $run_opts | xargs /usr/bin/docker run    
+/usr/bin/docker run -d -p 5000:5000 --privileged=true --restart=always \
+ -v /opt/docker-registry:/var/lib/registry -v /opt/docker-auth:/auth \
+ -e "REGISTRY_AUTH=htpasswd" \
+ -e "REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm" \
+ -e REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd \
+ --name $registry_name \
+ registry:2.6.2
+    
     else
        /usr/bin/docker start $registry_name
     fi 
