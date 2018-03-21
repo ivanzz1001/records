@@ -455,29 +455,65 @@ env OPENSSL_ALLOW_PROXY_CERTS=1;
 注意： ```nginx环境变量是在nginx内部所使用，不应该由用户来直接进行设置。```
 
 ## 5. 相关函数定义
+
+下面对相关函数做一个简单的说明：
 {% highlight string %}
+//判断cycle是否已经初始化
 #define ngx_is_init_cycle(cycle)  (cycle->conf_ctx == NULL)
 
 
+
+//初始化cycle
 ngx_cycle_t *ngx_init_cycle(ngx_cycle_t *old_cycle);
+
+//创建进程pid文件
 ngx_int_t ngx_create_pidfile(ngx_str_t *name, ngx_log_t *log);
+
+//删除进程pid文件
 void ngx_delete_pidfile(ngx_cycle_t *cycle);
+
+//向master进程发送信号
 ngx_int_t ngx_signal_process(ngx_cycle_t *cycle, char *sig);
+
+//以user用户身份打开或创建文件
 void ngx_reopen_files(ngx_cycle_t *cycle, ngx_uid_t user);
+
+//设置一些环境变量
 char **ngx_set_environment(ngx_cycle_t *cycle, ngx_uint_t *last);
+
+//进行nginx热升级
 ngx_pid_t ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv);
+
+//获得进程CPU亲和性
 ngx_cpuset_t *ngx_get_cpu_affinity(ngx_uint_t n);
+
+//添加一个共享内存
 ngx_shm_zone_t *ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name,
+    size_t size, void *tag);
 {% endhighlight %}
+
+
+
 
 
 ## 6. 相关变量声明
 {% highlight string %}
-extern volatile ngx_cycle_t  *ngx_cycle;
+// 指向当前nginx运行上下文
+extern volatile ngx_cycle_t  *ngx_cycle;      
+
+// 所有旧的nginx运行上下文     
 extern ngx_array_t            ngx_old_cycles;
+
+// nginx核心模块
 extern ngx_module_t           ngx_core_module;
+
+//测试nginx配置文件(一般为nginx -t/-T选项时）
 extern ngx_uint_t             ngx_test_config;
+
+// dump nginx配置文件（一般为nginx -T选项时）
 extern ngx_uint_t             ngx_dump_config;
+
+//在测试配置文件时，抑制一些非错误消息的输出
 extern ngx_uint_t             ngx_quiet_mode;
 {% endhighlight %}
 
