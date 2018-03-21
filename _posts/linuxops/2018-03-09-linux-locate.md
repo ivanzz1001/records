@@ -35,9 +35,30 @@ locate命令用于在文件系统中通过名字来查找文件。
 
 默认情况下，locate命令并不会检查数据库中的文件是否仍然存在，也不会报告在上一次更新数据库之后产生的文件。
 
+### 1.2 用法
+<pre>
+locate [OPTION]... [PATTERN]...
+</pre>
 
-
-
+### 1.3 选项
+{% highlight string %}
+-A, --all               打印所有匹配PATTERNs的文件
+-b, --basename          只名称与PATTERNs匹配的文件（例如/test/test.txt，则basename为test.txt)
+-c, --count             只打印匹配到的文件数目，而不是文件名本身
+-d, --database DBPATH   用DBPATH来代替默认的数据库。DBPATH是一个以：（冒号）分割的数据库名称列表
+-e, --existing          只打印在调用locate时存在的文件
+-L, --follow            当和-e选项一起使用时，如果该文件是一个软链接文件，则会获取到该软链接对应的实际文件（此为locate命令默认行文）。
+-h, --help              打印帮助文档信息
+-i, --ignore-case       当进行文件模式匹配时，忽略大小写
+-l, --limit, -n LIMIT   当成功匹配到LIMIT数量的文件时，退出
+-P, --nofollow, -H      当和-e选项一起使用时，如果该文件是一个软链接文件，此时不跟随链接的实际文件
+-0, --null              输出时以ASCII NUL作为分隔符
+-S, --statistics        获得每一个搜索数据库的统计信息
+-q, --quiet             当在读取和处理数据库时，遇到错误也不打印相关信息
+-r, --regexp REGEXP     查找一个基本的模式匹配REGEXP。此选项情况下，不能出现PATTERNs
+-V, --version           打印locate的版本信息和license信息
+-w, --wholename         匹配完整路径名（默认）
+{% endhighlight %}
 
 
 
