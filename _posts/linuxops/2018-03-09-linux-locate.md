@@ -131,6 +131,11 @@ locate [OPTION]... [PATTERN]...
 ....
 {% endhighlight %}
 
+**5) 判断某一目录下的文件是否存在（软链接）**
+{% highlight string %}
+# ls ../lib | while read line; do if [ -f ../lib/$line ]; then  temp="$(locate "$line")"; if [ -n "$temp" ]; then  echo $line; fi fi done
+{% endhighlight %}
+
 ### 1.5 updatedb的配置文件/etc/updatedb.conf
 {% highlight string %}
 PRUNE_BIND_MOUNTS = "yes"
@@ -149,6 +154,19 @@ PRUNEPATHS = "/afs /media /mnt /net /sfs /tmp /udev /var/cache/ccache /var/lib/y
 * ```PRUNEPATHS```: 表示排除检索的文件目录
 
 ## 2. Linux下which/whereis/locate/find命令的区别
+
+我们经常在Linux下要查找某个文件，但不知道放哪里了，可以使用下面的一些命令来搜索。
+
+* **which**: 查看可执行文件的位置。which是通过 PATH环境变量到该路径内查找可执行文件，所以基本的功能是寻找可执行文件
+
+* **whereis**: 查看文件的位置。也是从一个数据库中来进行查找，与下面的```locate```有些类似
+
+* **locate**: 配合数据库查看文件位置
+
+* **find**: 实际搜寻硬盘查询文件名称
+
+
+
 
 <br />
 <br />
