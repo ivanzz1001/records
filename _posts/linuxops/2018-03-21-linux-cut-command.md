@@ -4,7 +4,7 @@ title: linux中cut命令的用法
 tags:
 - LinuxOps
 categories: linuxOps
-description: linux中cur命令的用法
+description: linux中cut命令的用法
 ---
 
 
