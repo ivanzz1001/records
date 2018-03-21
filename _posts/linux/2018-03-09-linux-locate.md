@@ -41,7 +41,7 @@ locate [OPTION]... [PATTERN]...
 </pre>
 
 ### 1.3 选项
-<pre>
+{% highlight string %}
 -A, --all               打印所有匹配PATTERNs的文件
 -b, --basename          只名称与PATTERNs匹配的文件（例如/test/test.txt，则basename为test.txt)
 -c, --count             只打印匹配到的文件数目，而不是文件名本身
@@ -58,10 +58,10 @@ locate [OPTION]... [PATTERN]...
 -r, --regexp REGEXP     查找一个基本的模式匹配REGEXP。此选项情况下，不能出现PATTERNs
 -V, --version           打印locate的版本信息和license信息
 -w, --wholename         匹配完整路径名（默认）
-</pre>
+{% endhighlight %}
 例如查找一个文件名称为```NAME（并不是*NAME*)```的文件,可以使用如下：
 {% highlight string %}
-# locate -b '\NAME'
+ff
 {% endhighlight %}
 
 
