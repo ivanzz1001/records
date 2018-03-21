@@ -63,7 +63,7 @@ locate [OPTION]... [PATTERN]...
 {% highlight string %}
 # locate -b '\NAME'
 {% endhighlight %}
-因为```\```是一个匹配字符，因此这里会禁止被替换为```*NAME*```.
+
 
 ### 1.4 示例
 
