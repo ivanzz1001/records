@@ -2,8 +2,8 @@
 layout: post
 title: linux操作系统中locate命令的使用
 tags:
-- LinuxOps
-categories: LinuxOps
+- linuxOps
+categories: linuxOps
 description: linux操作系统中locate命令的使用
 ---
 
