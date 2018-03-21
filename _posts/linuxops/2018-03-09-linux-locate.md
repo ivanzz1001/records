@@ -59,7 +59,14 @@ locate [OPTION]... [PATTERN]...
 -V, --version           打印locate的版本信息和license信息
 -w, --wholename         匹配完整路径名（默认）
 {% endhighlight %}
+例如查找一个文件名称为```NAME（并不是*NAME*)```的文件,可以使用如下：
+{% highlight string %}
+# locate -b '\NAME'
+{% endhighlight %}
 
+应为```\```本身是一个通配字符，因此这里会禁止隐式的转化为```*NAME*```.
+
+### 1.4 示例
 
 
 <br />
