@@ -66,8 +66,89 @@ locate [OPTION]... [PATTERN]...
 
 应为```\```本身是一个通配字符，因此这里会禁止隐式的转化为```*NAME*```.
 
-### 1.4 示例
+### 1.4 使用范例
 
+**1) 搜索目录下所有以sh开头的文件**
+<pre>
+# locate /etc/sh
+/etc/shadow
+/etc/shadow-
+/etc/shells
+</pre>
+
+**2) 包含某个字符串的相关文件**
+<pre>
+# locate passwd
+/etc/passwd
+/etc/passwd-
+/etc/pam.d/passwd
+/etc/security/opasswd
+/usr/bin/gpasswd
+/usr/bin/grub2-mkpasswd-pbkdf2
+/usr/bin/kpasswd
+/usr/bin/lppasswd
+/usr/bin/passwd
+/usr/bin/smbpasswd
+....
+</pre>
+
+**3) 限定显示数量**
+
+如果显示的内容过多，可以使用```-n```选项来限定显示数量。
+<pre>
+# locate -n 5 passwd
+/etc/passwd
+/etc/passwd-
+/etc/pam.d/passwd
+/etc/security/opasswd
+/usr/bin/gpasswd
+</pre>
+
+**4) 使用正则表达式** 
+
+当需要查找符合特定规则的信息时，可以使用```-r```选项匹配相应的正则表达式
+{% highlight string %}
+//查找以 /var/lib/rpm 开头的文件
+# locate -r ^/var/lib/rpm
+/var/lib/rpm
+/var/lib/rpm-state
+/var/lib/rpm/.dbenv.lock
+/var/lib/rpm/.rpm.lock
+....
+
+
+//查找以 zip 结尾的文件
+# locate -r zip$
+/usr/bin/funzip
+/usr/bin/gpg-zip
+/usr/bin/gunzip
+/usr/bin/gzip
+/usr/bin/mzip
+/usr/bin/unzip
+/usr/bin/zip
+/usr/lib64/libreoffice/share/config/images.zip
+/usr/lib64/libreoffice/share/config/images_crystal.zip
+....
+{% endhighlight %}
+
+### 1.5 updatedb的配置文件/etc/updatedb.conf
+{% highlight string %}
+PRUNE_BIND_MOUNTS = "yes"
+PRUNEFS = "9p afs anon_inodefs auto autofs bdev binfmt_misc cgroup cifs coda configfs cpuset debugfs devpts ecryptfs exofs fuse fuse.sshfs fusectl gfs gfs2 gpfs
+ hugetlbfs inotifyfs iso9660 jffs2 lustre mqueue ncpfs nfs nfs4 nfsd pipefs proc ramfs rootfs rpc_pipefs securityfs selinuxfs sfs sockfs sysfs tmpfs ubifs udf usbfs"
+PRUNENAMES = ".git .hg .svn"
+PRUNEPATHS = "/afs /media /mnt /net /sfs /tmp /udev /var/cache/ccache /var/lib/yum/yumdb /var/spool/cups /var/spool/squid /var/tmp"
+{% endhighlight %}
+
+* ```PRUNE_BIND_MOUNTS```: 表示是否进行限制搜索
+
+* ```PRUNEFS```: 表示排除检索的文件系统类型
+
+* ```PRUNENAME```: 表示排除检索的文件类型
+
+* ```PRUNEPATHS```: 表示排除检索的文件目录
+
+## 2. Linux下which/whereis/locate/find命令的区别
 
 <br />
 <br />
