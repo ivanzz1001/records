@@ -24,7 +24,21 @@ description: 部署分布式docker registry
 
 1. [基于OSS搭建私有（跨区域）Docker镜像仓库](https://zhuanlan.zhihu.com/p/26953037)
 
+2. [可能是最详细的部署:Docker Registry企业级私有镜像仓库Harbor管理WEB UI](https://yq.aliyun.com/articles/337795)
 
+3. [构建docker高可用私有仓库基于Harbor开源系统](https://yq.aliyun.com/articles/531039?spm=a2c4e.11153940.blogcont337795.27.7005143f7ccfYI)
+
+4. [多种方法创建docker registry](http://blog.csdn.net/u010305706/article/details/53466681)
+
+5. [registry](https://hub.docker.com/_/registry/)
+
+6. [轻松搭建Docker Registry运行环境](https://www.cnblogs.com/xcloudbiz/articles/5497464.html)
+
+7. [部署私有Docker Registry](https://www.cnblogs.com/xcloudbiz/articles/5526262.html)
+
+8. [http://www.ywnds.com/?p=7411](http://www.ywnds.com/?p=7411)
+
+9. [轻松搭建Docker Registry运行环境](http://qinghua.github.io/docker-registry/?utm_source=tuicool&utm_medium=referral)
 <br />
 <br />
 <br />
