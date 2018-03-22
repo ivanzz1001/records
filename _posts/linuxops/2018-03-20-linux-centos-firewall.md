@@ -26,6 +26,8 @@ description: Centos7 中防火墙的关闭问题
 1. [centos 7 中防火墙的关闭问题](http://blog.csdn.net/song_csdn1550/article/details/51768671)
 
 2. [CentOS7.3下的一个iptables配置](https://www.cnblogs.com/alwu007/p/6693822.html)
+
+3. [Linux查看、修改SELinux的状态](http://blog.csdn.net/l18637220680/article/details/70231989)
 <br />
 <br />
 <br />
