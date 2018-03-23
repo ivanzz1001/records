@@ -108,7 +108,7 @@ Invalid command '--help'; type "help" for a list.
 
 ## 3. 示例
 
-### 2.1 RSA秘钥操作
+### 3.1 RSA秘钥操作
 默认情况下，openssl输出格式为： ```PKCS#1-PEM```
 
 1) **生成RSA私钥(无加密)**
@@ -151,7 +151,7 @@ rsa_aes_private.key
 # openssl rsa -in rsa_aes_private.key -passin pass:111111 -pubout -out rsa_public.key
 </pre>
 
-### 2.2 openssl转换命令
+### 3.2 openssl转换命令
 
 1) **对加密的私钥进行解密**
 
@@ -232,14 +232,14 @@ modulus:
 <pre>
 # openssl genrsa -out rsa_private.key 2048         //产生一个明文私钥(传统私钥格式PKCS#1,即rsa)
 # openssl pkcs8 -topk8 -in rsa_private.key -passout pass:111111 -out pkcs8_private.key  (rsa转PKCS#8)
-{% endhighlight %}
+</pre>
 其中-passout指定了密码，输出的pkcs8格式密钥为加密形式，pkcs8默认采用des3 加密算法。使用```-nocrypt```参数可以输出无加密的pkcs8密钥，如下：
-{% highlight string %}
+<pre>
 # openssl pkcs8 -topk8 -in rsa_private.key -nocrypt -out nocrypt_pkcs8_private.key
 </pre>
 
 
-### 2.3 生成自签名证书
+### 3.3 生成自签名证书
 
 1) **生成RSA私钥和自签名证书**
 <pre>
@@ -304,7 +304,7 @@ cert.crt  rsa_private.key
 ```-new```指生成证书请求，加上-x509 表示直接输出证书，```-key```指定私钥文件，其余选项与上述命令相同
 
 
-### 2.4 生成签名求情及CA签名
+### 3.4 生成签名求情及CA签名
 
 1) **使用RSA私钥生成CSR签名请求**
 <pre>
@@ -359,7 +359,7 @@ server.csr  server.key
 
 
 2) **查看CSR 的细节**
-{% highlight string %}
+<pre>
 # cat server.csr
 -----BEGIN CERTIFICATE REQUEST-----
 MIIC0jCCAboCAQAwgYwxCzAJBgNVBAYTAkNOMRIwEAYDVQQIDAlHdWFuZ2Rvbmcx
@@ -381,11 +381,11 @@ YapUplH4
 -----END CERTIFICATE REQUEST-----
 
 # openssl req -noout -text -in server.csr
-{% endhighlight %}
+</pe>
 
 
 3) **使用 CA 证书及CA密钥 对请求签发证书进行签发，生成 x509证书**
-{% highlight string %}
+<pre>
 //首先我们产生一个自签名的CA证书及CA秘钥
 # openssl req -newkey rsa:2048 -nodes -keyout rsa_private.key -x509 -days 365 -out cert.crt -subj "/C=CN/ST=Guangdong/L=Shenzhen/O=test_company/OU=IT/CN=ivan1001/emailAddress=1181891136@qq.com"
 Generating a 2048 bit RSA private key
@@ -409,10 +409,10 @@ cert.crt  cert.srl  rsa_private.key  server.crt  server.csr  server.key
 //用CA根证书对我们签发的x509证书进行校验
 # openssl verify -CAfile cert.crt server.crt 
 server.crt: OK
-{% endhighlight %}
+</pre>
 其中```CAxxx```选项用于指定```CA```参数输入。上面我们对server.csr进行了签发，生成了```server.crt``` x509证书。(注意这里```-CAkey```是证书签发机构的私钥）
 
-### 2.5 证书查看及转换
+### 3.5 证书查看及转换
 
 1） **查看证书细节**
 <pre>
@@ -513,7 +513,7 @@ MAC verified OK
 # openssl pkcs12 -in server-all.p12 -password pass:111111 -nokeys -clcerts -out out/cert.pem 
 </pre>
 
-## 3. openssl 命令参考
+## 4. openssl 命令参考
 {% highlight string %}
 1. openssl list-standard-commands(标准命令)
     1) asn1parse: asn1parse用于解释用ANS.1语法书写的语句(ASN一般用于定义语法的构成) 
