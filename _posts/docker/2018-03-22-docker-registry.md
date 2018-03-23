@@ -39,6 +39,8 @@ description: 部署分布式docker registry
 8. [http://www.ywnds.com/?p=7411](http://www.ywnds.com/?p=7411)
 
 9. [轻松搭建Docker Registry运行环境](http://qinghua.github.io/docker-registry/?utm_source=tuicool&utm_medium=referral)
+
+10. [木精灵的技术博客](https://blog.csdn.net/shlazww/article/category/2551955)
 <br />
 <br />
 <br />
