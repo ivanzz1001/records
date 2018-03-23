@@ -278,6 +278,7 @@ http {
 
 3. [添加自签发的 SSL 证书为受信任的根证书](http://cnzhx.net/blog/self-signed-certificate-as-trusted-root-ca-in-windows/)
 
+4. [nginx的https和http共存反向代理配置](https://www.cnblogs.com/madyina/p/7735545.html)
 
 
 <br />
