@@ -51,7 +51,62 @@ openssl是目前最流行的SSL密码库工具，其提供了一个通用、健�
 
 例如12306网站，它使用自签名的证书，所以浏览器会提示证书有问题，在12306的网站上有提示下载安装根证书，其用户就是把该根证书安装到用户的内置证书中，这样浏览器就不会报证书错误。但是注意，除非特别相信某个机构，否则不要在机器上随便导入证书，很危险。
 
-## 2. 示例
+## 2. openssl安装
+
+这里我们讲述一下Openssl的源代码安装（Centos7.4):
+
+1） **下载源代码**
+
+到openssl官方网站:[https://www.openssl.org/source/](https://www.openssl.org/source/)，下载稳定版本的openssl。当前稳定版本为```1.1.0```:
+<pre>
+# wget https://www.openssl.org/source/openssl-1.1.0g.tar.gz
+# tar -zxvf openssl-1.1.0g.tar.gz
+# cd openssl-1.1.0g/
+</pre>
+
+2) **编译**
+<pre>
+# mkdir -p /usr/local/openssl
+# ./config -fPIC --prefix=/usr/local/openssl/ enable-shared   
+
+# make
+# make install
+# ls /usr/local/openssl
+bin  include  lib  share  ssl
+</pre>
+这里：
+* ```--prefix```：指定安装目录
+
+* ```-fPIC```:编译openssl的静态库
+
+* ```enable-shared```:编译动态库
+
+3) **查看openssl依赖关系**
+<pre>
+# /usr/local/openssl/bin/openssl --help
+/usr/local/openssl/bin/openssl: error while loading shared libraries: libssl.so.1.1: cannot open shared object file: No such file or directory
+# ldd /usr/local/openssl/bin/openssl 
+        linux-vdso.so.1 =>  (0x00007ffc0d5f6000)
+        libssl.so.1.1 => not found
+        libcrypto.so.1.1 => not found
+        libdl.so.2 => /lib64/libdl.so.2 (0x00007f819423a000)
+        libpthread.so.0 => /lib64/libpthread.so.0 (0x00007f819401e000)
+        libc.so.6 => /lib64/libc.so.6 (0x00007f8193c5c000)
+        /lib64/ld-linux-x86-64.so.2 (0x00007f8194454000)
+</pre>
+这里我们看到，有一些库并没有找到。因此这里我们需要设定环境变量:
+<pre>
+# export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/openssl/lib
+# /usr/local/openssl/bin/openssl --help
+Invalid command '--help'; type "help" for a list.
+</pre>
+因为这里我们系统中有另外一个openssl，这里我们就不真正把该路径配置到配置文件中了：
+<pre>
+# which openssl
+/usr/bin/openssl
+</pre>
+
+## 3. 示例
 
 ### 2.1 RSA秘钥操作
 默认情况下，openssl输出格式为： ```PKCS#1-PEM```
@@ -773,6 +828,8 @@ MAC verified OK
 3. [使用 openssl 生成证书](https://www.cnblogs.com/littleatp/p/5878763.html)
 
 4. [Nginx+Https配置](https://segmentfault.com/a/1190000004976222)
+
+5. [Linux下OpenSSL 源码安装的9个步骤](https://blog.csdn.net/chengqiuming/article/details/70139714)
 
 <br />
 <br />
