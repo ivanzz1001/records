@@ -36,7 +36,7 @@ description: 部署分布式docker registry
 
 7. [部署私有Docker Registry](https://www.cnblogs.com/xcloudbiz/articles/5526262.html)
 
-8. [http://www.ywnds.com/?p=7411](http://www.ywnds.com/?p=7411)
+8. [Docker：搭建私有仓库（Registry 2.4）](http://www.ywnds.com/?p=7411)
 
 9. [轻松搭建Docker Registry运行环境](http://qinghua.github.io/docker-registry/?utm_source=tuicool&utm_medium=referral)
 
