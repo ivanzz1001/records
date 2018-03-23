@@ -252,12 +252,13 @@ server.csr  server.key
 {% endhighlight %}
 如上分别输入了解密```server.key```的密码```111111```; 然后是```subject```主题信息；再接着会要求输入一个```challenge```密码（此密码可以为空）。也可以采用如下命令，简化输入：
 {% highlight string %}
+# openssl genrsa -aes256 -passout pass:111111 -out server.key 2048 
+
 # openssl req -new -key server.key -passin pass:111111 -out server.csr -subj "/C=CN/ST=Guangdong/L=Shenzhen/O=test_company/OU=IT/CN=test_name/emailAddress=11111111@qq.com"
 {% endhighlight %}
 
 ***```此时生成的 csr签名请求文件可提交至 CA进行签发```***
 
-<br />
 
 2) **查看CSR 的细节**
 {% highlight string %}
@@ -305,12 +306,114 @@ subject=/C=CN/ST=Guangdong/L=Shenzhen/O=test_company/OU=IT/CN=test_name/emailAdd
 Getting CA Private Key
 # ls
 cert.crt  cert.srl  rsa_private.key  server.crt  server.csr  server.key
+
+
+//用CA根证书对我们签发的x509证书进行校验
+# openssl verify -CAfile cert.crt server.crt 
+server.crt: OK
 {% endhighlight %}
 其中```CAxxx```选项用于指定```CA```参数输入。上面我们对server.csr进行了签发，生成了```server.crt``` x509证书。(注意这里```-CAkey```是证书签发机构的私钥）
 
+### 1.5 证书查看及转换
+
+1） **查看证书细节**
+{% highlight string %}
+# openssl x509 -in cert.crt -noout -text           //查看我们上面产生的自签名证书细节
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            d0:81:5a:0e:1f:64:77:92
+    Signature Algorithm: sha256WithRSAEncryption
+        Issuer: C=CN, ST=Guangdong, L=Shenzhen, O=test_company, OU=IT, CN=ivan1001/emailAddress=1181891136@qq.com
+        Validity
+            Not Before: Mar 23 02:17:39 2018 GMT
+            Not After : Mar 23 02:17:39 2019 GMT
+        Subject: C=CN, ST=Guangdong, L=Shenzhen, O=test_company, OU=IT, CN=ivan1001/emailAddress=1181891136@qq.com
+        Subject Public Key Info:
+
+# openssl x509 -in server.crt -noout -text         //查看我们上面产生的CA签名证书细节
+Certificate:
+    Data:
+        Version: 1 (0x0)
+        Serial Number:
+            d6:81:fa:f4:ad:fd:48:19
+    Signature Algorithm: sha256WithRSAEncryption
+        Issuer: C=CN, ST=Guangdong, L=Shenzhen, O=test_company, OU=IT, CN=ivan1001/emailAddress=1181891136@qq.com
+        Validity
+            Not Before: Mar 23 02:19:12 2018 GMT
+            Not After : Mar 20 02:19:12 2028 GMT
+        Subject: C=CN, ST=Guangdong, L=Shenzhen, O=test_company, OU=IT, CN=test_name/emailAddress=11111111@qq.com
+        Subject Public Key Info:
+{% endhighlight %}
+
+2） **转换证书编码格式**
+{% highlight string %}
+# openssl x509 -in cert.crt -inform PEM -outform DER -out cert.der
+# ls
+cert.crt  cert.der  cert.srl  rsa_private.key  server.crt  server.csr  server.key
+{% endhighlight %}
+默认产生的证书格式是```PEM```格式。
+
+3) **合成 pkcs#12 证书(含私钥)**
+
+* 将 pem 证书和私钥转 pkcs#12 证书
+{% highlight string %}
+//将server的pem证书和私钥进行转换
+# openssl pkcs12 -export -in server.crt -inkey server.key -passin pass:111111 -password pass:111111 -out server.p12
+# ls
+cert.crt  cert.der  cert.srl  rsa_private.key  server.crt  server.csr  server.key  server.p12
+
+//将自签名的pem证书和私钥进行转换(因为这里自签名的pem证书并没有密码，因此这里不需要-passin选项）
+# openssl pkcs12 -export -in cert.crt -inkey rsa_private.key  -password pass:111111 -out cert.p12
+# ls
+cert.crt  cert.der  cert.p12  cert.srl  rsa_private.key  server.crt  server.csr  server.key  server.p12
+{% endhighlight %}
+其中```-export```指导出pkcs#12 证书，```-inkey``` 指定了私钥文件，```-passin``` 为私钥(文件)密码(nodes为无加密)，```-password``` 指定 p12文件的密码(导入导出)
+
+* 将pem 证书和私钥/CA 证书 合成pkcs#12 证书
+{% highlight string %}
+# openssl pkcs12 -export -in server.crt -inkey server.key -passin pass:111111 -chain -CAfile cert.crt -password pass:111111 -out server-all.p12
+# ls
+cert.crt  cert.der  cert.p12  cert.srl  rsa_private.key  server-all.p12  server.crt  server.csr  server.key  server.p12
+{% endhighlight %}
+
+其中```-chain```指示同时添加证书链，```-CAfile``` 指定了CA证书，导出的p12文件将包含多个证书。(其他选项：```-name```可用于指定server证书别名；```-caname```用于指定ca证书别名)
+
+* pcks#12 提取PEM文件(含私钥)
+<pre>
+# mkdir out
+# openssl pkcs12 -in server.p12 -password pass:111111 -passout pass:111111 -out out/server.pem
+MAC verified OK
+# ls out/
+server.pem
+
+# cat out/server.pem
+</pre>
+其中```-password```指定 p12文件的密码(导入导出)，```-passout```指输出私钥的加密密码(nodes为无加密)导出的文件为pem格式，同时包含证书和私钥(pkcs#8)：
+
+4) **从pkcs#12证书中提取私钥**
+<pre>
+# openssl pkcs12 -in server.p12 -password pass:111111 -passout pass:111111 -nocerts -out out/key.pem
+MAC verified OK
+</pre>
 
 
+5) **仅提取证书（所有证书）**
+<pre>
+# openssl pkcs12 -in server.p12 -password pass:111111 -nokeys -out out/server_all.crt
+MAC verified OK
+</pre>
 
+6) **仅提取CA证书**
+<pre>
+# openssl pkcs12 -in server-all.p12 -password pass:111111 -nokeys -cacerts -out out/cacert.pem
+</pre>
+
+7) **仅提取server证书**
+<pre>
+# openssl pkcs12 -in server-all.p12 -password pass:111111 -nokeys -clcerts -out out/cert.pem 
+</pre>
 
 <br />
 <br />
