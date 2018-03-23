@@ -317,7 +317,7 @@ server.crt: OK
 ### 1.5 证书查看及转换
 
 1） **查看证书细节**
-{% highlight string %}
+<pre>
 # openssl x509 -in cert.crt -noout -text           //查看我们上面产生的自签名证书细节
 Certificate:
     Data:
@@ -345,20 +345,20 @@ Certificate:
             Not After : Mar 20 02:19:12 2028 GMT
         Subject: C=CN, ST=Guangdong, L=Shenzhen, O=test_company, OU=IT, CN=test_name/emailAddress=11111111@qq.com
         Subject Public Key Info:
-{% endhighlight %}
+</pre>
 
 2） **转换证书编码格式**
-{% highlight string %}
+<pre>
 # openssl x509 -in cert.crt -inform PEM -outform DER -out cert.der
 # ls
 cert.crt  cert.der  cert.srl  rsa_private.key  server.crt  server.csr  server.key
-{% endhighlight %}
+</pre>
 默认产生的证书格式是```PEM```格式。
 
 3) **合成 pkcs#12 证书(含私钥)**
 
 * 将 pem 证书和私钥转 pkcs#12 证书
-{% highlight string %}
+<pre>
 //将server的pem证书和私钥进行转换
 # openssl pkcs12 -export -in server.crt -inkey server.key -passin pass:111111 -password pass:111111 -out server.p12
 # ls
@@ -368,15 +368,15 @@ cert.crt  cert.der  cert.srl  rsa_private.key  server.crt  server.csr  server.ke
 # openssl pkcs12 -export -in cert.crt -inkey rsa_private.key  -password pass:111111 -out cert.p12
 # ls
 cert.crt  cert.der  cert.p12  cert.srl  rsa_private.key  server.crt  server.csr  server.key  server.p12
-{% endhighlight %}
+</pre>
 其中```-export```指导出pkcs#12 证书，```-inkey``` 指定了私钥文件，```-passin``` 为私钥(文件)密码(nodes为无加密)，```-password``` 指定 p12文件的密码(导入导出)
 
 * 将pem 证书和私钥/CA 证书 合成pkcs#12 证书
-{% highlight string %}
+<pre>
 # openssl pkcs12 -export -in server.crt -inkey server.key -passin pass:111111 -chain -CAfile cert.crt -password pass:111111 -out server-all.p12
 # ls
 cert.crt  cert.der  cert.p12  cert.srl  rsa_private.key  server-all.p12  server.crt  server.csr  server.key  server.p12
-{% endhighlight %}
+</pre>
 
 其中```-chain```指示同时添加证书链，```-CAfile``` 指定了CA证书，导出的p12文件将包含多个证书。(其他选项：```-name```可用于指定server证书别名；```-caname```用于指定ca证书别名)
 
