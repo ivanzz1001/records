@@ -8,20 +8,42 @@ description: Linux中openssl的使用
 ---
 
 
-本文主要记录一下Linux操作系统中openssl的使用。
+openssl是目前最流行的SSL密码库工具，其提供了一个通用、健壮、功能完备的工具套件，用以支持SSL/TLS协议的实现。官网：[https://www.openssl.org/source/](https://www.openssl.org/source/)。其主要有以下借个部分构成：
+
+* 密码算法库
+
+* 秘钥和证书封装管理功能
+
+* SSL通信API接口
+
+主要用途有：
+
+* 建立 RSA、DH、DSA key 参数
+
+* 建立X.509证书、证书签名请求（CSR）和CRLs（证书回收列表）
+
+* 计算消息摘要
+
+* 使用各种Cipher加密/解密
+
+* SSL/TLS客户端以及服务器的测试
+
+* Https/MIME或者邮件加密
+
 
 <!-- more -->
 
+## 1. 密钥、证书请求、证书概要说明
 
 
 
-## 1. 示例
+## 2. 示例
 
-### 1.1 RSA秘钥操作
+### 2.1 RSA秘钥操作
 默认情况下，openssl输出格式为： ```PKCS#1-PEM```
 
 1) **生成RSA私钥(无加密)**
-{% highlight string %}
+<pre>
 # openssl genrsa -out rsa_private.key 2048
 Generating RSA private key, 2048 bit long modulus
 ..............................+++
@@ -31,21 +53,21 @@ e is 65537 (0x10001)
 //生成的私钥文件
 # ls
 rsa_private.key
-{% endhighlight %}
+</pre>
 
 2) **生成RSA公钥**
-{% highlight string %}
+<pre>
 # openssl rsa -in rsa_private.key -pubout -out rsa_public.key
 writing RSA key
 
 # ls
 rsa_private.key  rsa_public.key
-{% endhighlight %}
+</pre>
 
 3) **生成RSA私钥（使用aes256加密)**
 
 因为有时候我们不想别人看到我们的明文私钥，这时候我们可以对产生的RSA私钥进行加密。这样即使我们的私钥加密文件泄露，私钥还是安全的：
-{% highlight string %}
+<pre>
 # openssl genrsa -aes256 -passout pass:111111 -out rsa_aes_private.key 2048
 Generating RSA private key, 2048 bit long modulus
 ............+++
@@ -54,18 +76,18 @@ e is 65537 (0x10001)
 
 # ls
 rsa_aes_private.key  
-{% endhighlight %}
+</pre>
 其中 passout 代替shell 进行密码输入，否则会提示输入密码。此时如果基于此，要生成**公钥**，需要提供密码：
-{% highlight string %}
+<pre>
 # openssl rsa -in rsa_aes_private.key -passin pass:111111 -pubout -out rsa_public.key
-{% endhighlight %}
+</pre>
 
-### 1.2 openssl转换命令
+### 2.2 openssl转换命令
 
 1) **对加密的私钥进行解密**
 
 首先我们使用```aec256方法```，产生一个加密的私钥，然后再对其进行解密：
-{% highlight string %}
+<pre>
 # ls
 
 # openssl genrsa -aes256 -passout pass:111111 -out rsa_aes_private.key 2048         //产生加密私钥
@@ -76,12 +98,12 @@ rsa_aes_private.key
 writing RSA key
 # ls
 rsa_aes_private.key  rsa_private.key
-{% endhighlight %}
+</pre>
 
 2) **对明文私钥进行加密**
 
 这里我们对上文解密后的私钥```rsa_private.key```再进行手动加密，看得出的结果是否与原来的```rsa_aes_private.key```一致：
-{% highlight string %}
+<pre>
 # ls
 
 # openssl genrsa -out rsa_private.key 2048                        //产生明文私
@@ -99,7 +121,7 @@ rsa_aes_private.key  rsa_private.key
 writing RSA key
 
 # diff rsa_private.key rsa_private_2.key                                //对比，发现一模一样
-{% endhighlight %}
+</pre>
 
 3) **私钥PEM转DER**
 
@@ -148,7 +170,7 @@ modulus:
 {% endhighlight %}
 
 
-### 1.3 生成自签名证书
+### 2.3 生成自签名证书
 
 1) **生成RSA私钥和自签名证书**
 {% highlight string %}
