@@ -210,6 +210,106 @@ cert.crt  rsa_private.key
 cert.crt  rsa_private.key
 {% endhighlight %}
 
+```-new```指生成证书请求，加上-x509 表示直接输出证书，```-key```指定私钥文件，其余选项与上述命令相同
+
+
+### 1.4 生成签名求情及CA签名
+
+1) **使用RSA私钥生成CSR签名请求**
+{% highlight string %}
+# openssl genrsa -aes256 -passout pass:111111 -out server.key 2048      //生成aes256加密的rsa私钥
+# ls
+server.key
+
+# openssl req -new -key server.key -out server.csr                  //申城CSR签名请求
+Enter pass phrase for server.key:
+unable to load Private Key
+139621627549600:error:06065064:digital envelope routines:EVP_DecryptFinal_ex:bad decrypt:evp_enc.c:592:
+139621627549600:error:0906A065:PEM routines:PEM_do_header:bad decrypt:pem_lib.c:488:
+[root@localhost test-src]# openssl req -new -key server.key  -out server.csr
+Enter pass phrase for server.key:
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [XX]:CN
+State or Province Name (full name) []:Guangdong
+Locality Name (eg, city) [Default City]:Shenzhen
+Organization Name (eg, company) [Default Company Ltd]:test_company
+Organizational Unit Name (eg, section) []:IT
+Common Name (eg, your name or your server's hostname) []:test_name
+Email Address []:11111111@qq.com
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:
+An optional company name []:
+[root@localhost test-src]# ls
+server.csr  server.key
+{% endhighlight %}
+如上分别输入了解密```server.key```的密码```111111```; 然后是```subject```主题信息；再接着会要求输入一个```challenge```密码（此密码可以为空）。也可以采用如下命令，简化输入：
+{% highlight string %}
+# openssl req -new -key server.key -passin pass:111111 -out server.csr -subj "/C=CN/ST=Guangdong/L=Shenzhen/O=test_company/OU=IT/CN=test_name/emailAddress=11111111@qq.com"
+{% endhighlight %}
+
+***```此时生成的 csr签名请求文件可提交至 CA进行签发```***
+
+<br />
+
+2) **查看CSR 的细节**
+{% highlight string %}
+# cat server.csr
+-----BEGIN CERTIFICATE REQUEST-----
+MIIC0jCCAboCAQAwgYwxCzAJBgNVBAYTAkNOMRIwEAYDVQQIDAlHdWFuZ2Rvbmcx
+ETAPBgNVBAcMCFNoZW56aGVuMRUwEwYDVQQKDAx0ZXN0X2NvbXBhbnkxCzAJBgNV
+BAsMAklUMRIwEAYDVQQDDAl0ZXN0X25hbWUxHjAcBgkqhkiG9w0BCQEWDzExMTEx
+MTExQHFxLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMjMzntn
+V8IeDtOq78iVnaUtrtEfho2ugzD3ozV7/YQVwpj8NLK8tNKzL84kqENBFDExWGZv
+eo1/eSpxrSOE36QLrjlizhT365B9bRXUyqlg53J6EvecVxCmhTfaYNIu0LVtJSdw
+IGhBjjfOL004xPkwOvaGvQs149G6lADH+lIJPJVlOPb3OcLoZUJka96c4699REmI
+M9RJIGuiltix7TLLrQhjRh9U/jAO/s9K7VdezAzO2N+7ObY27I9HHhjmZ9wPMPlJ
+Ffo20kpGRgdwc8VOPmAxtvBe8e9ih9NcS1SH5KyQH9z1sCU9WnIz2BEwI1OiW4/6
+Nr+jW5DyYl0wiT8CAwEAAaAAMA0GCSqGSIb3DQEBCwUAA4IBAQBZj3eFle1V3UQO
+wlh7oyez/lNpf1W/bO3FIVb8hJhFmnGTIOdypT2t5wSJpChOKqSn2D6Jyd91ccd6
+9FvXISA5s0Jkq8pmgLbt3cjQ2civFhCI0meX7FGGO3ArwWsbbiGJWZqZuxfZWWr6
+oKuOtYq7EWie2dcz4rSpiVc3twfU4+vuInOIUGM5jTCsVRalHqcms1WwOBrP6+Vu
+i2kMzA51FSfmB71x69MT41bYDwn40D3EDRdF9d9ly8v+TGAY84BIoyW+qwOkFd7r
+8o+IwQsoVA4QJzsr9yoPB3m5aF+rDJf4mU1/UwNTOjCKgx/SqT1TI/j7tPsguQ0K
+YapUplH4
+-----END CERTIFICATE REQUEST-----
+
+# openssl req -noout -text -in server.csr
+{% endhighlight %}
+
+
+3) **使用 CA 证书及CA密钥 对请求签发证书进行签发，生成 x509证书**
+{% highlight string %}
+//首先我们产生一个自签名的CA证书及CA秘钥
+# openssl req -newkey rsa:2048 -nodes -keyout rsa_private.key -x509 -days 365 -out cert.crt -subj "/C=CN/ST=Guangdong/L=Shenzhen/O=test_company/OU=IT/CN=ivan1001/emailAddress=1181891136@qq.com"
+Generating a 2048 bit RSA private key
+......................................+++
+...+++
+writing new private key to 'rsa_private.key'
+-----
+# ls
+cert.crt  rsa_private.key  server.csr  server.key
+
+
+//然后采用上述自签名的CA证书及CA秘钥，对请求签发证书进行签发
+# openssl x509 -req -days 3650 -in server.csr -CA cert.crt -CAkey rsa_private.key -passin pass:111111 -CAcreateserial -out server.crt
+Signature ok
+subject=/C=CN/ST=Guangdong/L=Shenzhen/O=test_company/OU=IT/CN=test_name/emailAddress=11111111@qq.com
+Getting CA Private Key
+# ls
+cert.crt  cert.srl  rsa_private.key  server.crt  server.csr  server.key
+{% endhighlight %}
+其中```CAxxx```选项用于指定```CA```参数输入。上面我们对server.csr进行了签发，生成了```server.crt``` x509证书。(注意这里```-CAkey```是证书签发机构的私钥）
+
+
+
 
 
 <br />
