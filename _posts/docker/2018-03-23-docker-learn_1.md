@@ -19,6 +19,11 @@ description: docker学习资料
 
 2. [木精灵的技术博客](https://blog.csdn.net/shlazww/article/category/2551955)
 
+3. [深入理解 Docker 镜像 json 文件](https://blog.csdn.net/shlazww/article/details/48208445)
+
+4. [Docker Registry v2 + Token Auth Server （Registry v2 认证）](http://dockone.io/article/845)
+
+5. [Docker Registry V2 Auth Server](https://hui.lu/docker-registry-v2-auth-server-with-python/#code)
 
 <br />
 <br />
