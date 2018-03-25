@@ -36,7 +36,9 @@ static ngx_int_t ngx_init_zone_pool(ngx_cycle_t *cycle,
     ngx_shm_zone_t *shm_zone);
 
 
-//nginx.lock是nginx为了保证只有一个服务运行的锁文件，这里该锁文件是否存在以及是否有权限创建
+//nginx使用锁机制来实现accept mutex，并且顺序的来访问共享内存。在大多数的系统上，锁都是通过原子操作来实现的，
+//因此会忽略配置文件中的lock_file file指令；而对于其他的一些系统，lock file机制会被使用
+//默认的lock文件存放位置为logs/nginx.lock
 static ngx_int_t ngx_test_lockfile(u_char *file, ngx_log_t *log);
 
 //清除老的nginx cycle上下文
@@ -957,8 +959,114 @@ ngx_time_update(void)
 可以看到，在```sec```相同的情况下，```ngx_time_update()```并不会对所有缓存的内容进行更新，这是为了效率方面的考虑。而```tp->sec=0```，能够确保实现对所有缓存时间的更新。
 
 
+### 3.2 配置文件路径相关初始化
+{% highlight string %}
+ngx_cycle_t *
+ngx_init_cycle(ngx_cycle_t *old_cycle)
+{
+    log = old_cycle->log;
+
+    pool = ngx_create_pool(NGX_CYCLE_POOL_SIZE, log);
+    if (pool == NULL) {
+        return NULL;
+    }
+    pool->log = log;
+
+    cycle = ngx_pcalloc(pool, sizeof(ngx_cycle_t));
+    if (cycle == NULL) {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+
+    cycle->pool = pool;
+    cycle->log = log;
+    cycle->old_cycle = old_cycle;
+
+    cycle->conf_prefix.len = old_cycle->conf_prefix.len;
+    cycle->conf_prefix.data = ngx_pstrdup(pool, &old_cycle->conf_prefix);
+    if (cycle->conf_prefix.data == NULL) {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+
+    cycle->prefix.len = old_cycle->prefix.len;
+    cycle->prefix.data = ngx_pstrdup(pool, &old_cycle->prefix);
+    if (cycle->prefix.data == NULL) {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+
+    cycle->conf_file.len = old_cycle->conf_file.len;
+    cycle->conf_file.data = ngx_pnalloc(pool, old_cycle->conf_file.len + 1);
+    if (cycle->conf_file.data == NULL) {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+    ngx_cpystrn(cycle->conf_file.data, old_cycle->conf_file.data,
+                old_cycle->conf_file.len + 1);
+
+    cycle->conf_param.len = old_cycle->conf_param.len;
+    cycle->conf_param.data = ngx_pstrdup(pool, &old_cycle->conf_param);
+    if (cycle->conf_param.data == NULL) {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
 
 
+    n = old_cycle->paths.nelts ? old_cycle->paths.nelts : 10;
+
+    cycle->paths.elts = ngx_pcalloc(pool, n * sizeof(ngx_path_t *));
+    if (cycle->paths.elts == NULL) {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+
+    cycle->paths.nelts = 0;
+    cycle->paths.size = sizeof(ngx_path_t *);
+    cycle->paths.nalloc = n;
+    cycle->paths.pool = pool;
+
+
+    if (ngx_array_init(&cycle->config_dump, pool, 1, sizeof(ngx_conf_dump_t))
+        != NGX_OK)
+    {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+
+    if (old_cycle->open_files.part.nelts) {
+        n = old_cycle->open_files.part.nelts;
+        for (part = old_cycle->open_files.part.next; part; part = part->next) {
+            n += part->nelts;
+        }
+
+    } else {
+        n = 20;
+    }
+
+    if (ngx_list_init(&cycle->open_files, pool, n, sizeof(ngx_open_file_t))
+        != NGX_OK)
+    {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+}
+{% endhighlight %}
+这里首先为新创建的nginx cycle创建一个```NGX_CYCLE_POOL_SIZE```(默认16KB)大小的内存池，然后完成配置路径等数据的相关初始化：
+
+* ```conf_prefix```: 存放nginx配置文件路径前缀（一般是通过```-p```选项来指定nginx的工作路径，然后使用该路径下的配置文件），这里从old_cycle中进行复制。
+
+* ```prefix```: nginx路径前缀（后续如日志，pid等都会参考该前缀），这里从old_cycle中进行复制
+
+* ```conf_file```: nginx配置文件路径。注意到这里并不是用```ngx_pstrdup()```函数来进行复制，这里conf_file符合标准的C语言字符串形式，以```\0```方式结尾。从old_cycle中进行复制
+
+* ```conf_param```: 存放nginx启动时，通过-g选项传递进来的参数。这里从old_cycle中进行复制
+
+* ```paths```: 这里主要是分配一个```ngx_path_t *```类型的数组空间，在后续主要是解析配置文件时遇到要打开的文件路径，则把该路径加入到```paths```中。
+
+* ```config_dump```: 初始化config_dump数组。```config_dump```主要是为了在检查nginx配置文件时，将相应的配置dump出来.
+
+* ```open_files```： 这里为所有以后要打开的文件(用ngx_open_file_t来抽象）分配链表空间
 
 
 
