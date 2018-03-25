@@ -168,6 +168,10 @@ Get https://129.144.150.111:5000/v1/_ping:x509: certificate signed by unknown au
 2. [docker registry v2 ssl 环境搭建](https://blog.csdn.net/wanglei_storage/article/details/53126690)
 
 3. [docker registry_v2 部署过程中遇到的坑](https://blog.csdn.net/xiaolummhae/article/details/51833354)
+
+4. [Token Authentication Specification](https://docs.docker.com/registry/spec/auth/token/)
+
+5. [Docker glossary](https://docs.docker.com/glossary/?term=on-prem)
 <br />
 <br />
 <br />
