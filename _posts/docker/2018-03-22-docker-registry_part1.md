@@ -172,6 +172,22 @@ Get https://129.144.150.111:5000/v1/_ping:x509: certificate signed by unknown au
 4. [Token Authentication Specification](https://docs.docker.com/registry/spec/auth/token/)
 
 5. [Docker glossary](https://docs.docker.com/glossary/?term=on-prem)
+
+6. [Docker Registry + docker_auth 使用mongodb 存储](https://blog.csdn.net/qq_21398167/article/details/54616186)
+
+7. [Docker Registry v2 + Token Auth Server （Registry v2 认证）实例 ](http://dockone.io/article/845)
+
+8. [从源码看Docker Registry v2中的Token认证实现机制](https://blog.csdn.net/horsefoot/article/details/51657322)
+
+9. [Docker Register部署与基本认证](https://www.cnblogs.com/feinian/p/7857430.html)
+
+10. [Docker Registry服务器部署配置](https://www.myfreax.com/deploying-a-registry-server/)
+
+11. [docker私有仓库搭建及认证](https://www.cnblogs.com/wsy1030/p/8431837.html)
+
+12. [Deploy a registry server](https://docs.docker.com/registry/deploying/)
+
+13. [Docker--Harbor registry安全认证搭建](http://www.mamicode.com/info-detail-1855980.html)
 <br />
 <br />
 <br />
