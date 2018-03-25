@@ -300,6 +300,9 @@ ngx_timezone_update()函数用于更新时区。在不同的操作系统上，�
 
 * **Linux操作系统**: Linux操作系统在调用localtime()的时候也并不会检测/etc/localtime的更改情况，但是在每一次调用strftime()函数的时候会多次stat("/etc/localtime")，因此我们可以此来更新timezone。在ngx_auto_headers.h头文件中，我们有如下定义：
 <pre>
+#ifndef NGX_LINUX
+#define NGX_LINUX  1
+#endif
 </pre>
 
 * **Solaris操作系统**: 对于Solaris操作系统，也并不会检测/etc/localtime文件的变化情况，到目前为止并没有一些技巧来感知到其变化情况。
