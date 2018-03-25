@@ -918,7 +918,43 @@ failed:
 
 函数```ngx_init_cycle()```很长，下面我们分成几个部分来进行讲解：
 
-### 3.1 
+### 3.1 更新当前时间
+{% highlight string %}
+ngx_cycle_t *
+ngx_init_cycle(ngx_cycle_t *old_cycle)
+{
+    ngx_time_t          *tp;
+
+
+    ngx_timezone_update();
+
+    /* force localtime update with a new timezone */
+
+    tp = ngx_timeofday();
+    tp->sec = 0;
+
+    ngx_time_update();
+}
+{% endhighlight %}
+
+这里首先更新```时区(timezone)```,然后更新时间。这里tp是nginx缓存的最新时间，只所有有```tp->sec=0```,主要是跟nginx时间更新的实现策略有关：
+{% highlight string %}
+void
+ngx_time_update(void)
+{
+    ...
+   
+    tp = &cached_time[slot];
+
+    if (tp->sec == sec) {
+        tp->msec = msec;
+        ngx_unlock(&ngx_time_lock);
+        return;
+    }
+    ...
+}
+{% endhighlight %}
+可以看到，在```sec```相同的情况下，```ngx_time_update()```并不会对所有缓存的内容进行更新，这是为了效率方面的考虑。而```tp->sec=0```，能够确保实现对所有缓存时间的更新。
 
 
 
