@@ -1068,6 +1068,58 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
 * ```open_files```： 这里为所有以后要打开的文件(用ngx_open_file_t来抽象）分配链表空间
 
+### 3.3 共享内存抽象数据结构初始化
+{% highlight string %}
+ngx_cycle_t *
+ngx_init_cycle(ngx_cycle_t *old_cycle)
+{
+
+    if (old_cycle->shared_memory.part.nelts) {
+        n = old_cycle->shared_memory.part.nelts;
+        for (part = old_cycle->shared_memory.part.next; part; part = part->next)
+        {
+            n += part->nelts;
+        }
+
+    } else {
+        n = 1;
+    }
+
+    if (ngx_list_init(&cycle->shared_memory, pool, n, sizeof(ngx_shm_zone_t))
+        != NGX_OK)
+    {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+}
+{% endhighlight %}
+这里为存放```ngx_shm_zone_t```数据结构，开辟一个链表空间。
+
+### 3.4 监听结构数组空间初始化
+{% highlight string %}
+ngx_cycle_t *
+ngx_init_cycle(ngx_cycle_t *old_cycle)
+{
+   n = old_cycle->listening.nelts ? old_cycle->listening.nelts : 10;
+
+    cycle->listening.elts = ngx_pcalloc(pool, n * sizeof(ngx_listening_t));
+    if (cycle->listening.elts == NULL) {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+
+    cycle->listening.nelts = 0;
+    cycle->listening.size = sizeof(ngx_listening_t);
+    cycle->listening.nalloc = n;
+    cycle->listening.pool = pool;
+
+
+    ngx_queue_init(&cycle->reusable_connections_queue);
+
+}
+{% endhighlight %}
+这里为存放```ngx_listening_t```数据结构，开辟一个数组空间。另外初始化```可复用连接```(一般为http长连接）队列。
+
 
 
 <br />
