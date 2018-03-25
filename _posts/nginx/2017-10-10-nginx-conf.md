@@ -368,7 +368,7 @@ http
 
 1. [Nginx配置文件详解](https://www.cnblogs.com/hunttown/p/5759959.html)
 
-
+2. [Nginx 服务器安装及配置文件详解](https://www.cnblogs.com/bluestorm/p/4574688.html)
 
 <br />
 <br />
