@@ -1120,7 +1120,62 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 {% endhighlight %}
 这里为存放```ngx_listening_t```数据结构，开辟一个数组空间。另外初始化```可复用连接```(一般为http长连接）队列。
 
+### 3.5 nginx模块相关数据结构初始化
+{% highlight string %}
+ngx_cycle_t *
+ngx_init_cycle(ngx_cycle_t *old_cycle)
+{
+    cycle->conf_ctx = ngx_pcalloc(pool, ngx_max_module * sizeof(void *));
+    if (cycle->conf_ctx == NULL) {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
 
+
+    if (gethostname(hostname, NGX_MAXHOSTNAMELEN) == -1) {
+        ngx_log_error(NGX_LOG_EMERG, log, ngx_errno, "gethostname() failed");
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+
+    /* on Linux gethostname() silently truncates name that does not fit */
+
+    hostname[NGX_MAXHOSTNAMELEN - 1] = '\0';
+    cycle->hostname.len = ngx_strlen(hostname);
+
+    cycle->hostname.data = ngx_pnalloc(pool, cycle->hostname.len);
+    if (cycle->hostname.data == NULL) {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+
+    ngx_strlow(cycle->hostname.data, (u_char *) hostname, cycle->hostname.len);
+
+
+    if (ngx_cycle_modules(cycle) != NGX_OK) {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+
+
+    for (i = 0; cycle->modules[i]; i++) {
+        if (cycle->modules[i]->type != NGX_CORE_MODULE) {
+            continue;
+        }
+
+        module = cycle->modules[i]->ctx;
+
+        if (module->create_conf) {
+            rv = module->create_conf(cycle);
+            if (rv == NULL) {
+                ngx_destroy_pool(pool);
+                return NULL;
+            }
+            cycle->conf_ctx[cycle->modules[i]->index] = rv;
+        }
+    }
+}
+{% endhighlight %}
 
 <br />
 <br />
