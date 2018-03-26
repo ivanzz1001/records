@@ -156,6 +156,10 @@ Get https://129.144.150.111:5000/v1/_ping:x509: certificate signed by unknown au
 
 
 
+## 3. nginx https代理方式访问docker registry
+
+
+
 
 
 <br />
