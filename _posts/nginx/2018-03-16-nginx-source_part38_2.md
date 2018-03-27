@@ -1177,7 +1177,13 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 }
 {% endhighlight %}
 
-这里首先为```cycle->conf_ctx```四级指针分配足够大的空间，来存储各个模块对应的上下文指针。
+这里首先为```cycle->conf_ctx```四级指针分配足够大的空间，来存储各个模块对应的上下文指针； 然后获得当前nginx运行的主机名；再接着为当前```cycle```拷贝一份modules指针：
+
+![ngx-cycle-modules](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_cycle_modules.jpg)
+
+对于核心模块，调用```module->create_conf```来创建上下文对象。例如对于上图所示的```ngx_core_module```，则会创建出```ngx_core_conf_t```上下文。然后将上下文保存到cycle->conf_ctx的对应索引处。
+
+
 
 <br />
 <br />
