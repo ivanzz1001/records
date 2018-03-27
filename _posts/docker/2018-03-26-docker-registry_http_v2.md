@@ -227,6 +227,8 @@ Accept: application/vnd.docker.distribution.manifest.v2+json
 
 2. [centos7 Docker私有仓库搭建及删除镜像](https://www.cnblogs.com/Tempted/p/7768694.html)
 
+3. [docker registry 镜像删除](https://blog.csdn.net/l6807718/article/details/52886546)
+
 <br />
 <br />
 <br />

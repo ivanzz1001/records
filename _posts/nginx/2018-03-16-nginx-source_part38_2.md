@@ -1177,6 +1177,8 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 }
 {% endhighlight %}
 
+这里首先为```cycle->conf_ctx```四级指针分配足够大的空间，来存储各个模块对应的上下文指针。
+
 <br />
 <br />
 
