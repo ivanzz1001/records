@@ -1183,6 +1183,81 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 
 对于核心模块，调用```module->create_conf```来创建上下文对象。例如对于上图所示的```ngx_core_module```，则会创建出```ngx_core_conf_t```上下文。然后将上下文保存到cycle->conf_ctx的对应索引处。
 
+### 3.7 配置文件初始化
+{% highlight string %}
+ngx_cycle_t *
+ngx_init_cycle(ngx_cycle_t *old_cycle)
+{
+senv = environ;
+
+
+    ngx_memzero(&conf, sizeof(ngx_conf_t));
+    /* STUB: init array ? */
+    conf.args = ngx_array_create(pool, 10, sizeof(ngx_str_t));
+    if (conf.args == NULL) {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+
+    conf.temp_pool = ngx_create_pool(NGX_CYCLE_POOL_SIZE, log);
+    if (conf.temp_pool == NULL) {
+        ngx_destroy_pool(pool);
+        return NULL;
+    }
+
+
+    conf.ctx = cycle->conf_ctx;
+    conf.cycle = cycle;
+    conf.pool = pool;
+    conf.log = log;
+    conf.module_type = NGX_CORE_MODULE;
+    conf.cmd_type = NGX_MAIN_CONF;
+
+#if 0
+    log->log_level = NGX_LOG_DEBUG_ALL;
+#endif
+
+    if (ngx_conf_param(&conf) != NGX_CONF_OK) {
+        environ = senv;
+        ngx_destroy_cycle_pools(&conf);
+        return NULL;
+    }
+
+    if (ngx_conf_parse(&conf, &cycle->conf_file) != NGX_CONF_OK) {
+        environ = senv;
+        ngx_destroy_cycle_pools(&conf);
+        return NULL;
+    }
+
+    if (ngx_test_config && !ngx_quiet_mode) {
+        ngx_log_stderr(0, "the configuration file %s syntax is ok",
+                       cycle->conf_file.data);
+    }
+
+    for (i = 0; cycle->modules[i]; i++) {
+        if (cycle->modules[i]->type != NGX_CORE_MODULE) {
+            continue;
+        }
+
+        module = cycle->modules[i]->ctx;
+
+        if (module->init_conf) {
+            if (module->init_conf(cycle,
+                                  cycle->conf_ctx[cycle->modules[i]->index])
+                == NGX_CONF_ERROR)
+            {
+                environ = senv;
+                ngx_destroy_cycle_pools(&conf);
+                return NULL;
+            }
+        }
+    }
+
+    if (ngx_process == NGX_PROCESS_SIGNALLER) {
+        return cycle;
+    }
+}
+{% endhighlight %}
 
 
 <br />
