@@ -72,7 +72,7 @@ hash: { name: Steve, foo: bar }
 </pre>
 转换成JavaScript如下：
 <pre>
-[ Cat, Dog, Goldfish ]
+[ 'Cat', 'Dog', 'Goldfish' ]
 </pre>
 如果数据结构的子成员是一个数组，则可以在该项下缩进一个空格(```缩进多个空格也可以，只不过子项要对齐```）：
 <pre>
@@ -83,20 +83,81 @@ hash: { name: Steve, foo: bar }
 </pre>
 转换成JavaScript如下：
 <pre>
-[ [ Cat, Dog, Goldfish ] ]
+[ [ 'Cat', 'Dog', 'Goldfish' ] ]
 </pre>
 
 数组也可以采用行内表示法：
 <pre>
-animal: [ Cat, Dog ]
+animal: [ 'Cat', 'Dog' ]
 </pre>
 转换成JavaScript如下：
 <pre>
-{ animal: [ Cat, Dog ] }
+{ animal: [ 'Cat', 'Dog' ] }
 </pre>
 
 
-## 4. 
+## 4. 复合结构
+对象和数组可以结合使用，形成复合结构。例如：
+<pre>
+languages:
+ - Ruby
+ - Perl
+ - Python
+Websites:
+ YAML: yaml.org
+ Ruby: ruby-lang.org
+ Python: python.org
+ Perl: use.perl.org
+</pre>
+转换成JavaScript如下：
+<pre>
+{ languages: [ 'Ruby', 'Perl', 'Python' ],
+  Websites: 
+   { YAML: 'yaml.org',
+     Ruby: 'ruby-lang.org',
+     Python: 'python.org',
+     Perl: 'use.perl.org' } }
+</pre>
+
+## 5. 纯量
+纯量是最基本的、不可再分的值。以下数据类型都属于JavaScript纯量。
+
+* 字符串
+
+* 布尔值
+
+* 整数
+
+* 浮点数
+
+* Null
+
+* 时间
+
+* 日期
+
+1) **数值直接以字面量的形式表示**
+
+例如：
+<pre>
+number: 12.30
+</pre>
+转换成JavaScript如下：
+<pre>
+{ number: 12.30 }
+<pre> 
+
+2) **布尔值用```true```和```false```表示**
+
+例如：
+<pre>
+isSet: true
+</pre>
+转换成JavaScript如下：
+<pre>
+{ isSet: true }
+</pre>
+
 
 
 
