@@ -262,9 +262,146 @@ str: 这是一段
 { str: '这是一段 多行 字符串' }
 </pre>
 
+多行可以使用```|```保留换行符，也可以使用```>```折叠换行。例如：
+{% highlight string %}
+this: |
+ Foo
+ Bar
+that: >
+ Foo
+ Bar
+{% endhighlight %}
+转换成JavaScript如下：
+<pre>
+{ this: 'Foo\nBar\n', that: 'Foo Bar\n' }
+</pre>
+
+```+```表示保留文字块末尾的换行，```-```表示删除字符串末尾的换行。例如：
+<pre>
+s1: |
+ Foo
+
+S2: |+
+ Foo
+
+
+s3: |-
+ Foo
+</pre>
+转换成JavaScript如下(注意上面s2 ```Foo```下有两个换行）：
+<pre>
+{ s1: 'Foo\n', S2: 'Foo\n\n\n', s3: 'Foo' }
+</pre>
+
+5) **字符串之中可以插入HTML标记**
+
+例如：
+{% highlight string %}
+message: |
+ 
+ <p style="color=red">
+  段落
+ </p>
+{% endhighlight %}
+转换成JavaScript如下：
+{% highlight string %}
+{ message: '\n<p style="color=red">\n 段落\n</p>\n' }
+{% endhighlight %}
 
 
 
+## 7. 引用
+锚点```&```和别名```*```，可以用来引用。例如：
+{% highlight string %}
+defaults: &defaults
+ adapter: postgres
+ host:    localhost
+
+development:
+ dababase: myapp_development
+ <<: *defaults
+
+test:
+ database: myapp_test
+ <<: *defaults
+{% endhighlight %}
+等同于下面代码：
+{% highlight string %}
+defaults: 
+ adapter: postgres
+ host:    localhost
+
+develoment:
+ database: myapp_development
+ adapter: postgres
+ host:    localhost
+
+test:
+ database: myapp_test
+ adapter: postgres
+ host:    localhost
+{% endhighlight %}
+上面```&```用来建立锚点(defaults)，```<<```表示合并到当前数据，```*```用来引用锚点。
+
+下面是另一个例子：
+{% highlight string %}
+- &showell Steve
+- Clark
+- Brain
+- Oren
+- *showell
+{% endhighlight %}
+转换为JavaScript代码如下：
+{% highlight string %}
+[ 'Steve', 'Clark', 'Brain', 'Oren', 'Steve' ]
+{% endhighlight %}
+
+## 9 函数和正则表达式的转换
+
+这是[JS-YAML](https://github.com/nodeca/js-yaml)库特有功能，可以把函数和正则表达式转换为字符串。
+
+例如：
+{% highlight string %}
+# example.yml
+fn: function () { return 1 }
+reg: /test/
+{% endhighlight %}
+
+解析上面yaml文件的代码如下：
+{% highlight string %}
+var yaml = require('js-yaml');
+var fs   = require('fs');
+
+try {
+  var doc = yaml.load(
+    fs.readFileSync('./example.yml', 'utf8')
+  );
+  console.log(doc);
+} catch (e) {
+  console.log(e);
+}
+{% endhighlight %}
+
+从JavaScript对象还原到yaml文件的代码如下：
+{% highlight string %}
+var yaml = require('js-yaml');
+var fs   = require('fs');
+
+var obj = {
+  fn: function () { return 1 },
+  reg: /test/
+};
+
+try {
+  fs.writeFileSync(
+    './example.yml',
+    yaml.dump(obj),
+    'utf8'
+  );
+} catch (e) {
+  console.log(e);
+}
+{% endhighlight %}
 
 
 <br />
@@ -278,6 +415,7 @@ str: 这是一段
 
 3. [YAML-JS在线转换](http://nodeca.github.io/js-yaml/)
 
+4. [YAML from Wikipedia](https://en.wikipedia.org/wiki/YAML)
 <br />
 <br />
 <br />
