@@ -167,7 +167,7 @@ services:
 
 redis服务使用Docker Hub镜像仓库中的公有镜像。
 
-### 4.3 使用Compose构建并运行
+### 4.4 使用Compose构建并运行
 
 1） **运行```docker compose up```命令构建并运行应用程序**
 <pre>
@@ -231,7 +231,89 @@ e38e7c842df1        redis:alpine                   "docker-entrypoint.s…"   Ab
 # docker inspect composetest_web_1
 </pre>
 
-### 4.4 
+### 4.5 修改Compose文件，以添加bind mount
+在工程目录修改docker-compose.yml文件，为```web```服务添加```bind mount```:
+<pre>
+version: '3'
+services:
+  web:
+    build: .
+    ports:
+     - "5000:5000"
+    volumes:
+     - .:/code
+  redis:
+    image: "redis:alpine"
+</pre>
+
+上面关键词```volumes```会将当前主机上的工程目录挂载到容器中的```/code```目录，这样就允许在不重新构建镜像的基础上，动态的修改代码。
+
+### 4.6 用docker compose重新构建并运行应用程序
+在工程目录针对修改后的docker-compose.yml文件，重新构建并运行应用程序：
+<pre>
+# docker-compose up
+Starting composetest_redis_1 ... done
+Recreating composetest_web_1 ... done
+Attaching to composetest_redis_1, composetest_web_1
+redis_1  | 1:C 28 Mar 01:32:37.726 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+redis_1  | 1:C 28 Mar 01:32:37.726 # Redis version=4.0.8, bits=64, commit=00000000, modified=0, pid=1, just started
+redis_1  | 1:C 28 Mar 01:32:37.726 # Warning: no config file specified, using the default config. In order to specify a config file use redis-server /path/to/redis.conf
+redis_1  | 1:M 28 Mar 01:32:37.733 * Running mode=standalone, port=6379.
+redis_1  | 1:M 28 Mar 01:32:37.733 # WARNING: The TCP backlog setting of 511 cannot be enforced because /proc/sys/net/core/somaxconn is set to the lower value of 128.
+redis_1  | 1:M 28 Mar 01:32:37.733 # Server initialized
+redis_1  | 1:M 28 Mar 01:32:37.734 # WARNING overcommit_memory is set to 0! Background save may fail under low memory condition. To fix this issue add 'vm.overcommit_memory = 1' to /etc/sysctl.conf and then reboot or run the command 'sysctl vm.overcommit_memory=1' for this to take effect.
+redis_1  | 1:M 28 Mar 01:32:37.734 # WARNING you have Transparent Huge Pages (THP) support enabled in your kernel. This will create latency and memory usage issues with Redis. To fix this issue run the command 'echo never > /sys/kernel/mm/transparent_hugepage/enabled' as root, and add it to your /etc/rc.local in order to retain the setting after a reboot. Redis must be restarted after THP is disabled.
+redis_1  | 1:M 28 Mar 01:32:37.734 * DB loaded from disk: 0.000 seconds
+redis_1  | 1:M 28 Mar 01:32:37.734 * Ready to accept connections
+web_1    |  * Running on http://0.0.0.0:5000/ (Press CTRL+C to quit)
+web_1    |  * Restarting with stat
+web_1    |  * Debugger is active!
+web_1    |  * Debugger PIN: 225-078-826
+</pre>
+通过如下命令进行测试：
+{% highlight string %}
+# curl -X GET http://192.168.69.128:5000 
+Hello World! I have been seen 4 times.
+# curl -X GET http://192.168.69.128:5000 
+Hello World! I have been seen 5 times.
+{% endhighlight %}
+这里我们可以看到```Redis```加载了以前的数据。
+
+### 4.7 更新应用程序
+
+因为当前使用一个volume将应用程序代码挂载到了容器中，因此我们可以直接修改应用程序代码，然后不需要经过重新构建即可看到相应的改变。
+
+1) **修改app.py代码**
+
+这里将```Hello World!```修改为```Hello from Docker!```:
+<pre>
+return 'Hello from Docker! I have been seen {} times.\n'.format(count)
+</pre>
+
+2) **测试**
+<pre>
+# curl -X GET http://192.168.69.128:5000 
+Hello from Docker! I have been seen 6 times.
+</pre>
+可以看到这里修改马上就生效了。
+
+
+### 4.8 测试一些其他的命令
+
+通过在运行时传递```-d```（detached模式）选项，可以使服务以后台的方式运行。使用```docker-compose ps```命令来查看当前有哪些服务在运行：
+{% highlight string %}
+# docker-compose up -d
+Starting composetest_redis_1 ... done
+Starting composetest_web_1   ... done
+# docker-compose ps
+       Name                      Command               State           Ports         
+-------------------------------------------------------------------------------------
+composetest_redis_1   docker-entrypoint.sh redis ...   Up      6379/tcp              
+composetest_web_1     python app.py                    Up      0.0.0.0:5000->5000/tcp
+{% endhighlight %}
+
+
+
 
 <br />
 <br />
