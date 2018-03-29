@@ -313,7 +313,26 @@ composetest_web_1     python app.py                    Up      0.0.0.0:5000->500
 {% endhighlight %}
 
 
+```docker-compose run```命令允许你为某个service运行一次性命令。例如，我们可以通过如下命令来查看```web```服务的环境变量：
+<pre>
+# docker-compose run web env
+PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HOSTNAME=c3648dbe964e
+TERM=xterm
+LANG=C.UTF-8
+GPG_KEY=97FC712E4C024BBEA48A61ED3A5CA953F73C700D
+PYTHON_VERSION=3.4.8
+PYTHON_PIP_VERSION=9.0.3
+HOME=/root
+</pre>
 
+
+假如你是通过```docker-compose up -d```来启动的服务，那么你可以通过如下方式停止他们：
+<pre>
+# docker-compose stop
+</pre>
+
+你也可以通过使用```docker-compose down```命令将所有服务都关掉，并且移除整个容器。通过传递```--volumes```参数来移除Redis容器所使用的数据卷。
 
 <br />
 <br />
