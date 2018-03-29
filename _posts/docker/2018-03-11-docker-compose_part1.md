@@ -333,6 +333,97 @@ HOME=/root
 </pre>
 
 你也可以通过使用```docker-compose down```命令将所有服务都关掉，并且移除整个容器。通过传递```--volumes```参数来移除Redis容器所使用的数据卷。
+<pre>
+# docker-compose down --volumes
+</pre>
+
+## 5. docker-compose基本命令
+
+相关命令选项：
+<pre>
+# docker-compose --help
+Define and run multi-container applications with Docker.
+
+Usage:
+  docker-compose [-f <arg>...] [options] [COMMAND] [ARGS...]
+  docker-compose -h|--help
+
+Options:
+  -f, --file FILE             Specify an alternate compose file
+                              (default: docker-compose.yml)
+  -p, --project-name NAME     Specify an alternate project name
+                              (default: directory name)
+  --verbose                   Show more output
+  --log-level LEVEL           Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  --no-ansi                   Do not print ANSI control characters
+  -v, --version               Print version and exit
+  -H, --host HOST             Daemon socket to connect to
+
+  --tls                       Use TLS; implied by --tlsverify
+  --tlscacert CA_PATH         Trust certs signed only by this CA
+  --tlscert CLIENT_CERT_PATH  Path to TLS certificate file
+  --tlskey TLS_KEY_PATH       Path to TLS key file
+  --tlsverify                 Use TLS and verify the remote
+  --skip-hostname-check       Don't check the daemon's hostname against the
+                              name specified in the client certificate
+  --project-directory PATH    Specify an alternate working directory
+                              (default: the path of the Compose file)
+  --compatibility             If set, Compose will attempt to convert deploy
+                              keys in v3 files to their non-Swarm equivalent
+
+Commands:
+  build              Build or rebuild services
+  bundle             Generate a Docker bundle from the Compose file
+  config             Validate and view the Compose file
+  create             Create services
+  down               Stop and remove containers, networks, images, and volumes
+  events             Receive real time events from containers
+  exec               Execute a command in a running container
+  help               Get help on a command
+  images             List images
+  kill               Kill containers
+  logs               View output from containers
+  pause              Pause services
+  port               Print the public port for a port binding
+  ps                 List containers
+  pull               Pull service images
+  push               Push service images
+  restart            Restart services
+  rm                 Remove stopped containers
+  run                Run a one-off command
+  scale              Set number of containers for a service
+  start              Start services
+  stop               Stop services
+  top                Display the running processes
+  unpause            Unpause services
+  up                 Create and start containers
+  version            Show the Docker-Compose version information
+</pre>
+
+### 5.1 指定Compose文件路径
+
+你可以使用```-f```选项指定一个或多个compose配置文件路径。
+
+1) **指定多个Compose文件**
+
+你可以使用多个```-f```选项来传递配置文件。当提供多个配置文件时，Compose会将这些传递进来的配置合并成一个配置。Compose会按传入的顺序来构建配置，后续的配置会覆盖前面的配置。例如：
+<pre>
+# docker-compose -f docker-compose.yml -f docker-compose.admin.yml run backup_db
+</pre>
+
+
+### 5.2 使用```-p```选项
+
+每一个配置都有一个工程名。你可以通过```-p```选项来指定一个工程名称。假如你并未指定该选项的话，Compose会使用当前的目录名称作为工程名。例如：
+<pre>
+# docker-compose -p pythonweb up
+
+# docker-compose -p pythonweb down --volumes
+</pre>
+
+### 5.3 设置环境变量
+你可以为docker compose的许多选项设置环境变量，包括```-f```选项和```-p```选项。例如你可以为```-f```选项设置```COMPOSE_FILE```环境变量；可以为```-p```选项设置```COMPOSE_PROJECT_NAME```环境变量。
+
 
 <br />
 <br />
