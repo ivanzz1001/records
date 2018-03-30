@@ -202,6 +202,8 @@ ENV ghi=$abc
 
 ## 5. ```.dockerignore```文件
 
+在Docker Client发送上下文给docker daemon之前，其会在上下文根目录寻找一个```.dockerignore```文件。假如该文件存在，Docker Client就会修改上下文以排除所匹配到的文件和目录。这可以避免发送一些不必要的大文件或敏感文件到docker daemon，并通过```ADD```或```COPY```命令添加到镜像中。
+
 可以通过```.dockerignore```文件定义所需要忽略的文件列表。例如：
 <pre>
 # comment
@@ -220,7 +222,101 @@ FROM <image>[:<tag>] [AS <name>]
 
 FROM <image>[@<digest>] [AS <name>]
 </pre>
-```FROM```指令初始化整个构建stage，并为后续的指令设置```Base Image```。FROM
+```FROM```指令初始化整个构建stage，并为后续的指令设置```Base Image```。通常情况下，一个Dockerfile文件以```FROM```指令起始，并且该基础镜像是可以为任何有效的镜像。
+
+* 在Dockerfile中，```ARG```指令是唯一可以放在```FROM```指令之前的指令
+
+* 在一个单独的Dockerfile中，```FROM```指令可以出现多次，以此来构建出多个镜像
+
+* 在```FROM```指令后可以为该构建stage命名（通过```AS name```)，并在后续的```FROM```指令或者```COPY --from=<name|index>```指令中来引用该stage构建出的镜像
+
+* 可以添加一个```tag```或者```digest```(可选），假如没有添加的话则默认为latest
+
+## 7. ARG指令与FROM指令的交互
+```FROM```指令支持由```ARG```指令所声明的变量。
+<pre>
+ARG  CODE_VERSION=latest
+FROM base:${CODE_VERSION}
+CMD  /code/run-app
+
+FROM extras:${CODE_VERSION}
+CMD  /code/run-extras
+</pre>
+
+在```FROM```指令之前的```ARG```指令是不属于当前构建stage的，因此其不能在```FROM```指令之后继续使用。而为了要继续使用```FROM```指令之前的```ARG```指令的默认值，我们可以再次声明：
+{% highlight string %}
+ARG VERSION=latest
+FROM busybox:$VERSION
+ARG VERSION
+RUN echo $VERSION > image_version
+{% endhighlight %}
+
+## 8. RUN指令
+```RUN```指令有两种形式：
+
+* ```RUN <command>```: 此种形式为shell形式，即该指令在shell环境中运行。在Linux操作系统上默认是```/bin/sh -c```来执行；在Windows上默认是```cmd -S -C```来执行
+
+* ```RUN ["executable","param1","param2"]```: 此种形式为exec形式
+
+```RUN```指令会在当前镜像基础上的一个新layer执行command，并且将结果提交到该新layer。产生的提交后的镜像又会被用于Dockerfile中的下一步。```exec```形式可以避免shell字符串整理，且可以指定在另外一种非默认shell环境下执行命令。例如：
+<pre>
+RUN ["/bin/bash", "-c", "echo hello"]
+</pre>
+说明： exec形式中，是以json形式来解析命令，因此必须使用双引号。
+
+## 9. CMD指令
+
+```CMD指令```有三种形式：
+
+* ```CMD ["executable","param1","param2"]```: exec形式，这也是我们所推荐的形式
+
+* ```CMD ["param1","param2"]```: 作为ENTRYPOINT的默认参数
+
+* ```CMD command param1 param2```: shell形式
+
+在一个Dockerfile中只能有一个```CMD```指令。假如有多个CMD指令的话，则只有最后一个CMD有效。```CMD指令```的主要目的提供一个默认操作。该默认操作可以包括一个可执行动作；或者为ENTRYPOINT提供相应的参数（形式2）
+
+对于```CMD```指令的shell形式，则```<command>```会在```/bin/sh -c```中执行：
+<pre>
+FROM ubuntu
+CMD echo "This is a test." | wc 
+</pre>
+
+假若你并不想要在shell中执行```<command>```，则必须指定可执行文件的全路径。这也是我们所推荐的形式：
+<pre>
+FROM ubuntu
+CMD ["/usr/bin/wc","--help"]
+</pre>
+
+
+假如你想要容器每次都运行同一个可执行文件，你应该考虑```CMD```结合```ENTRYPOINT```一起使用。
+
+假如你为```docker run```指定了相应的参数，则这些参数会覆盖默认的CMD指令。
+
+{% highlight string %}
+注意： 不要把RUN指令与CMD指令给搞混了。RUN指令会运行一个命令然后提交结果到layer；
+而CMD指令在构建时并不会执行任何东西，其只是为Image指定一个期望执行的命令
+{% endhighlight %}
+
+## 10. LABEL指令
+基本格式如下：
+{% highlight string %}
+LABEL <key>=<value> <key>=<value> <key>=<value> ...
+{% endhighlight %}
+
+```LABEL```指令为一个镜像添加元数据。一个LABEL是一个键值对。例如：
+<pre>
+LABEL "com.example.vendor"="ACME Incorporated"
+LABEL com.example.label-with-value="foo"
+LABEL version="1.0"
+LABEL description="This text illustrates \
+that label-values can span multiple lines."
+</pre>
+一个镜像可以有多个label，你可以在一行中指定多个label，也可以分开多行来指定。label是可以被继承的，```FROM```中镜像的label可以被子镜像继承。假如有两个labe的key相同，但是value不同，则后一个label会覆盖前一个label的值。
+
+## 11. MAINTAINER指令
+
+当前本指令已过时，请用```LABEL```指令代替。
 
 <br />
 <br />
