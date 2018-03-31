@@ -80,6 +80,8 @@ ADD test /absoluteDir/         # adds "test" to /absoluteDir/
 1. [habor](https://github.com/vmware/harbor)
 
 2. [企业级Docker Registry开源工具Harbor的介绍以及使用指南](https://my.oschina.net/xxbAndy/blog/786712)
+
+3. [docker registry接入ceph Swift API](http://blog.51cto.com/bingdian/1893658)
 <br />
 <br />
 <br />
