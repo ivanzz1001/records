@@ -1259,7 +1259,241 @@ senv = environ;
 }
 {% endhighlight %}
 
+这里首先创建出一个	```ngx_conf_t```对象，用于后面解析配置时使用。具体执行步骤如下：
 
+* 调用ngx_conf_param()解析从nginx命令行通过```-g```选项传递进来的参数(```-g```传递进来的参数保存在cycle->conf_param中）
+
+* 调用ngx_conf_parse()解析配置文件，配置文件名称保存在cycle->conf_file中
+
+在通过上面的方法解析完相关配置之后，如果是以```nginx -t/-T```形式执行，且并未添加```-q```参数抑制相关错误输出，则这里调用ngx_conf_parse()函数打印出相关配置文件信息
+
+再接着针对```cycle->modules```中的所有核心模块，会调用该核心模块所绑定上下文的init_conf函数指针完成相关的初始化（注意核心模块上下文所用到的数据结构会通过前面讲到的create_conf来完成）。
+
+最后如果ngx_process值为```NGX_PROCESS_SIGNALLER```,则到此为止完成了整个nginx cycle的初始化。
+
+
+### 3.8 完成相关文件及路径的创建
+{% highlight string %}
+ngx_cycle_t *
+ngx_init_cycle(ngx_cycle_t *old_cycle)
+{
+	   ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+
+    if (ngx_test_config) {
+
+        if (ngx_create_pidfile(&ccf->pid, log) != NGX_OK) {
+            goto failed;
+        }
+
+    } else if (!ngx_is_init_cycle(old_cycle)) {
+
+        /*
+         * we do not create the pid file in the first ngx_init_cycle() call
+         * because we need to write the demonized process pid
+         */
+
+        old_ccf = (ngx_core_conf_t *) ngx_get_conf(old_cycle->conf_ctx,
+                                                   ngx_core_module);
+        if (ccf->pid.len != old_ccf->pid.len
+            || ngx_strcmp(ccf->pid.data, old_ccf->pid.data) != 0)
+        {
+            /* new pid file name */
+
+            if (ngx_create_pidfile(&ccf->pid, log) != NGX_OK) {
+                goto failed;
+            }
+
+            ngx_delete_pidfile(old_cycle);
+        }
+    }
+
+
+    if (ngx_test_lockfile(cycle->lock_file.data, log) != NGX_OK) {
+        goto failed;
+    }
+
+
+    if (ngx_create_paths(cycle, ccf->user) != NGX_OK) {
+        goto failed;
+    }
+
+
+    if (ngx_log_open_default(cycle) != NGX_OK) {
+        goto failed;
+    }
+
+    /* open the new files */
+
+    part = &cycle->open_files.part;
+    file = part->elts;
+
+    for (i = 0; /* void */ ; i++) {
+
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+            part = part->next;
+            file = part->elts;
+            i = 0;
+        }
+
+        if (file[i].name.len == 0) {
+            continue;
+        }
+
+        file[i].fd = ngx_open_file(file[i].name.data,
+                                   NGX_FILE_APPEND,
+                                   NGX_FILE_CREATE_OR_OPEN,
+                                   NGX_FILE_DEFAULT_ACCESS);
+
+        ngx_log_debug3(NGX_LOG_DEBUG_CORE, log, 0,
+                       "log: %p %d \"%s\"",
+                       &file[i], file[i].fd, file[i].name.data);
+
+        if (file[i].fd == NGX_INVALID_FILE) {
+            ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
+                          ngx_open_file_n " \"%s\" failed",
+                          file[i].name.data);
+            goto failed;
+        }
+
+#if !(NGX_WIN32)
+        if (fcntl(file[i].fd, F_SETFD, FD_CLOEXEC) == -1) {
+            ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
+                          "fcntl(FD_CLOEXEC) \"%s\" failed",
+                          file[i].name.data);
+            goto failed;
+        }
+#endif
+    }
+
+    cycle->log = &cycle->new_log;
+    pool->log = &cycle->new_log;
+}
+{% endhighlight %}
+
+主要是完成如下事情：
+
+* pid文件： 如果只是测试配置文件(ngx_test_config)，则直接检测能否在指定的位置打开或创建pid文件；如果old_cycle没有初始化，则当前cycle会创建pid文件，并向该文件中写入当前nginx master进程的进程ID。
+
+* 测试锁文件： nginx使用锁机制来实现accept mutex，并且顺序的来访问共享内存。在大多数的系统上，锁都是通过原子操作来实现的，因此会忽略配置文件中的lock_file file指令；而对于其他的一些系统，lock file机制会被使用
+默认的lock文件存放位置为logs/nginx.lock
+
+* 创建相应的路径： 这里调用ngx_create_paths()函数来创建相应的路径。在Nginx配置文件中，会配置一些临时路径，在解析配置文件时会将这些路径保存起来，然后在这里统一创建。
+
+* 打开默认的日志文件
+
+* 打开所有配置文件中指定的相关文件，例如http log文件等，并设置```FD_CLOEXEC```属性，这使得通过exec调用之后，文件描述符会被关闭
+
+* 设置cycle->log与pool->log
+{% highlight string %}
+cycle->log = &cycle->new_log;
+pool->log = &cycle->new_log;
+{% endhighlight %}
+
+### 3.9 创建共享内存
+{% highlight string %}
+ngx_cycle_t *
+ngx_init_cycle(ngx_cycle_t *old_cycle)
+{
+/* create shared memory */
+
+    part = &cycle->shared_memory.part;
+    shm_zone = part->elts;
+
+    for (i = 0; /* void */ ; i++) {
+
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+            part = part->next;
+            shm_zone = part->elts;
+            i = 0;
+        }
+
+        if (shm_zone[i].shm.size == 0) {
+            ngx_log_error(NGX_LOG_EMERG, log, 0,
+                          "zero size shared memory zone \"%V\"",
+                          &shm_zone[i].shm.name);
+            goto failed;
+        }
+
+        shm_zone[i].shm.log = cycle->log;
+
+        opart = &old_cycle->shared_memory.part;
+        oshm_zone = opart->elts;
+
+        for (n = 0; /* void */ ; n++) {
+
+            if (n >= opart->nelts) {
+                if (opart->next == NULL) {
+                    break;
+                }
+                opart = opart->next;
+                oshm_zone = opart->elts;
+                n = 0;
+            }
+
+            if (shm_zone[i].shm.name.len != oshm_zone[n].shm.name.len) {
+                continue;
+            }
+
+            if (ngx_strncmp(shm_zone[i].shm.name.data,
+                            oshm_zone[n].shm.name.data,
+                            shm_zone[i].shm.name.len)
+                != 0)
+            {
+                continue;
+            }
+
+            if (shm_zone[i].tag == oshm_zone[n].tag
+                && shm_zone[i].shm.size == oshm_zone[n].shm.size
+                && !shm_zone[i].noreuse)
+            {
+                shm_zone[i].shm.addr = oshm_zone[n].shm.addr;
+#if (NGX_WIN32)
+                shm_zone[i].shm.handle = oshm_zone[n].shm.handle;
+#endif
+
+                if (shm_zone[i].init(&shm_zone[i], oshm_zone[n].data)
+                    != NGX_OK)
+                {
+                    goto failed;
+                }
+
+                goto shm_zone_found;
+            }
+
+            ngx_shm_free(&oshm_zone[n].shm);
+
+            break;
+        }
+
+        if (ngx_shm_alloc(&shm_zone[i].shm) != NGX_OK) {
+            goto failed;
+        }
+
+        if (ngx_init_zone_pool(cycle, &shm_zone[i]) != NGX_OK) {
+            goto failed;
+        }
+
+        if (shm_zone[i].init(&shm_zone[i], NULL) != NGX_OK) {
+            goto failed;
+        }
+
+    shm_zone_found:
+
+        continue;
+    }
+
+}
+{% endhighlight %}
+
+
+
+ 
 <br />
 <br />
 
