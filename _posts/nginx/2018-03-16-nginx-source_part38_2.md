@@ -1491,9 +1491,449 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 }
 {% endhighlight %}
 
+这里首先在解析配置文件时，遇到要开设相关的公共缓冲区，就会调用ngx_shared_memory_add()方法将添加到cycle->shared_memory链表中。在这里会根据共享内存```name```，```size```,```tag```以及```noreuse```等标志决定是否复用原来老的共享内存还是创建新的共享内存。
+
+### 3.10 处理listening sockets
+{% highlight string %}
+ngx_cycle_t *
+ngx_init_cycle(ngx_cycle_t *old_cycle)
+{
+	/* handle the listening sockets */
+
+    if (old_cycle->listening.nelts) {
+        ls = old_cycle->listening.elts;
+        for (i = 0; i < old_cycle->listening.nelts; i++) {
+            ls[i].remain = 0;
+        }
+
+        nls = cycle->listening.elts;
+        for (n = 0; n < cycle->listening.nelts; n++) {
+
+            for (i = 0; i < old_cycle->listening.nelts; i++) {
+                if (ls[i].ignore) {
+                    continue;
+                }
+
+                if (ls[i].remain) {
+                    continue;
+                }
+
+                if (ls[i].type != nls[n].type) {
+                    continue;
+                }
+
+                if (ngx_cmp_sockaddr(nls[n].sockaddr, nls[n].socklen,
+                                     ls[i].sockaddr, ls[i].socklen, 1)
+                    == NGX_OK)
+                {
+                    nls[n].fd = ls[i].fd;
+                    nls[n].previous = &ls[i];
+                    ls[i].remain = 1;
+
+                    if (ls[i].backlog != nls[n].backlog) {
+                        nls[n].listen = 1;
+                    }
+
+#if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
+
+                    /*
+                     * FreeBSD, except the most recent versions,
+                     * could not remove accept filter
+                     */
+                    nls[n].deferred_accept = ls[i].deferred_accept;
+
+                    if (ls[i].accept_filter && nls[n].accept_filter) {
+                        if (ngx_strcmp(ls[i].accept_filter,
+                                       nls[n].accept_filter)
+                            != 0)
+                        {
+                            nls[n].delete_deferred = 1;
+                            nls[n].add_deferred = 1;
+                        }
+
+                    } else if (ls[i].accept_filter) {
+                        nls[n].delete_deferred = 1;
+
+                    } else if (nls[n].accept_filter) {
+                        nls[n].add_deferred = 1;
+                    }
+#endif
+
+#if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT)
+
+                    if (ls[i].deferred_accept && !nls[n].deferred_accept) {
+                        nls[n].delete_deferred = 1;
+
+                    } else if (ls[i].deferred_accept != nls[n].deferred_accept)
+                    {
+                        nls[n].add_deferred = 1;
+                    }
+#endif
+
+#if (NGX_HAVE_REUSEPORT)
+                    if (nls[n].reuseport && !ls[i].reuseport) {
+                        nls[n].add_reuseport = 1;
+                    }
+#endif
+
+                    break;
+                }
+            }
+
+            if (nls[n].fd == (ngx_socket_t) -1) {
+                nls[n].open = 1;
+#if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
+                if (nls[n].accept_filter) {
+                    nls[n].add_deferred = 1;
+                }
+#endif
+#if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT)
+                if (nls[n].deferred_accept) {
+                    nls[n].add_deferred = 1;
+                }
+#endif
+            }
+        }
+
+    } else {
+        ls = cycle->listening.elts;
+        for (i = 0; i < cycle->listening.nelts; i++) {
+            ls[i].open = 1;
+#if (NGX_HAVE_DEFERRED_ACCEPT && defined SO_ACCEPTFILTER)
+            if (ls[i].accept_filter) {
+                ls[i].add_deferred = 1;
+            }
+#endif
+#if (NGX_HAVE_DEFERRED_ACCEPT && defined TCP_DEFER_ACCEPT)
+            if (ls[i].deferred_accept) {
+                ls[i].add_deferred = 1;
+            }
+#endif
+        }
+    }
+
+    if (ngx_open_listening_sockets(cycle) != NGX_OK) {
+        goto failed;
+    }
+
+    if (!ngx_test_config) {
+        ngx_configure_listening_sockets(cycle);
+    }
+
+}
+{% endhighlight %}
+这里分两种情况进行处理：
+
+* 如果old_cycle->listening.nelts不为0，则表明有遗留的监听socket。此种情况下分别遍历old_cyle->listening与ngx_cycle->listening，看old_cycle中是否有socket可以复用
 
 
+* 否则，直接遍历ngx_cycle->listening,设置相关属性
+
+再接着打开cycle->listening中符合条件的socket，然后再对cycle->listening的socket进行配置。
+
+### 3.11 提交cycle设置
+{% highlight string %}
+ngx_cycle_t *
+ngx_init_cycle(ngx_cycle_t *old_cycle)
+{
+    /* commit the new cycle configuration */
+
+    if (!ngx_use_stderr) {
+        (void) ngx_log_redirect_stderr(cycle);
+    }
+
+    pool->log = cycle->log;
+
+    if (ngx_init_modules(cycle) != NGX_OK) {
+        /* fatal */
+        exit(1);
+    }
+}
+{% endhighlight %}
+在重新加载配置文件时，调用```ngx_init_cycle()```，此时ngx_use_stderr变量为0，调用:
+<pre>
+ngx_log_redirect_stderr(cycle);
+</pre>
+重定向标准错误。再接着调用ngx_init_modules()完成各个模块的初始化。
+
+### 3.12 移除old cycle中的共享内存
+{% highlight string %}
+ngx_cycle_t *
+ngx_init_cycle(ngx_cycle_t *old_cycle)
+{
+	/* close and delete stuff that lefts from an old cycle */
+
+    /* free the unnecessary shared memory */
+
+    opart = &old_cycle->shared_memory.part;
+    oshm_zone = opart->elts;
+
+    for (i = 0; /* void */ ; i++) {
+
+        if (i >= opart->nelts) {
+            if (opart->next == NULL) {
+                goto old_shm_zone_done;
+            }
+            opart = opart->next;
+            oshm_zone = opart->elts;
+            i = 0;
+        }
+
+        part = &cycle->shared_memory.part;
+        shm_zone = part->elts;
+
+        for (n = 0; /* void */ ; n++) {
+
+            if (n >= part->nelts) {
+                if (part->next == NULL) {
+                    break;
+                }
+                part = part->next;
+                shm_zone = part->elts;
+                n = 0;
+            }
+
+            if (oshm_zone[i].shm.name.len == shm_zone[n].shm.name.len
+                && ngx_strncmp(oshm_zone[i].shm.name.data,
+                               shm_zone[n].shm.name.data,
+                               oshm_zone[i].shm.name.len)
+                == 0)
+            {
+                goto live_shm_zone;
+            }
+        }
+
+        ngx_shm_free(&oshm_zone[i].shm);
+
+    live_shm_zone:
+
+        continue;
+    }
+
+old_shm_zone_done:
+}
+{% endhighlight %}
+这里遍历old_cycle->shared_memory与cycle->shared_memory，找出可以删除掉的共享内存。
+
+### 3.13 关闭不必要的监听socket
+{% highlight string %}
+ngx_cycle_t *
+ngx_init_cycle(ngx_cycle_t *old_cycle)
+{
+	
+    /* close the unnecessary listening sockets */
+
+    ls = old_cycle->listening.elts;
+    for (i = 0; i < old_cycle->listening.nelts; i++) {
+
+        if (ls[i].remain || ls[i].fd == (ngx_socket_t) -1) {
+            continue;
+        }
+
+        if (ngx_close_socket(ls[i].fd) == -1) {
+            ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                          ngx_close_socket_n " listening socket on %V failed",
+                          &ls[i].addr_text);
+        }
+
+#if (NGX_HAVE_UNIX_DOMAIN)
+
+        if (ls[i].sockaddr->sa_family == AF_UNIX) {
+            u_char  *name;
+
+            name = ls[i].addr_text.data + sizeof("unix:") - 1;
+
+            ngx_log_error(NGX_LOG_WARN, cycle->log, 0,
+                          "deleting socket %s", name);
+
+            if (ngx_delete_file(name) == NGX_FILE_ERROR) {
+                ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_socket_errno,
+                              ngx_delete_file_n " %s failed", name);
+            }
+        }
+
+#endif
+    }
+
+}
+{% endhighlight %}
+这里关闭不能复用的监听socket.
+
+### 3.14 关闭不必要的打开文件
+{% highlight string %}
+ngx_cycle_t *
+ngx_init_cycle(ngx_cycle_t *old_cycle)
+{
+	
+    /* close the unnecessary open files */
+
+    part = &old_cycle->open_files.part;
+    file = part->elts;
+
+    for (i = 0; /* void */ ; i++) {
+
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+            part = part->next;
+            file = part->elts;
+            i = 0;
+        }
+
+        if (file[i].fd == NGX_INVALID_FILE || file[i].fd == ngx_stderr) {
+            continue;
+        }
+
+        if (ngx_close_file(file[i].fd) == NGX_FILE_ERROR) {
+            ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
+                          ngx_close_file_n " \"%s\" failed",
+                          file[i].name.data);
+        }
+    }
+}
+{% endhighlight %}
  
+这里关闭掉old_cycle中的打开文件。
+
+### 3.15 其他相关收尾操作
+{% highlight string %}
+ngx_cycle_t *
+ngx_init_cycle(ngx_cycle_t *old_cycle)
+{
+	ngx_destroy_pool(conf.temp_pool);
+
+    if (ngx_process == NGX_PROCESS_MASTER || ngx_is_init_cycle(old_cycle)) {
+
+        /*
+         * perl_destruct() frees environ, if it is not the same as it was at
+         * perl_construct() time, therefore we save the previous cycle
+         * environment before ngx_conf_parse() where it will be changed.
+         */
+
+        env = environ;
+        environ = senv;
+
+        ngx_destroy_pool(old_cycle->pool);
+        cycle->old_cycle = NULL;
+
+        environ = env;
+
+        return cycle;
+    }
+
+
+    if (ngx_temp_pool == NULL) {
+        ngx_temp_pool = ngx_create_pool(128, cycle->log);
+        if (ngx_temp_pool == NULL) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
+                          "could not create ngx_temp_pool");
+            exit(1);
+        }
+
+        n = 10;
+        ngx_old_cycles.elts = ngx_pcalloc(ngx_temp_pool,
+                                          n * sizeof(ngx_cycle_t *));
+        if (ngx_old_cycles.elts == NULL) {
+            exit(1);
+        }
+        ngx_old_cycles.nelts = 0;
+        ngx_old_cycles.size = sizeof(ngx_cycle_t *);
+        ngx_old_cycles.nalloc = n;
+        ngx_old_cycles.pool = ngx_temp_pool;
+
+        ngx_cleaner_event.handler = ngx_clean_old_cycles;
+        ngx_cleaner_event.log = cycle->log;
+        ngx_cleaner_event.data = &dumb;
+        dumb.fd = (ngx_socket_t) -1;
+    }
+
+    ngx_temp_pool->log = cycle->log;
+
+    old = ngx_array_push(&ngx_old_cycles);
+    if (old == NULL) {
+        exit(1);
+    }
+    *old = old_cycle;
+
+    if (!ngx_cleaner_event.timer_set) {
+        ngx_add_timer(&ngx_cleaner_event, 30000);
+        ngx_cleaner_event.timer_set = 1;
+    }
+
+    return cycle;
+}
+{% endhighlight %}
+在成功创建cycle上下文后，进行一些后续的收尾工作。
+
+### 3.16 失败情况下现场还原操作
+{% highlight string %}
+ngx_cycle_t *
+ngx_init_cycle(ngx_cycle_t *old_cycle)
+{
+	
+failed:
+
+    if (!ngx_is_init_cycle(old_cycle)) {
+        old_ccf = (ngx_core_conf_t *) ngx_get_conf(old_cycle->conf_ctx,
+                                                   ngx_core_module);
+        if (old_ccf->environment) {
+            environ = old_ccf->environment;
+        }
+    }
+
+    /* rollback the new cycle configuration */
+
+    part = &cycle->open_files.part;
+    file = part->elts;
+
+    for (i = 0; /* void */ ; i++) {
+
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+            part = part->next;
+            file = part->elts;
+            i = 0;
+        }
+
+        if (file[i].fd == NGX_INVALID_FILE || file[i].fd == ngx_stderr) {
+            continue;
+        }
+
+        if (ngx_close_file(file[i].fd) == NGX_FILE_ERROR) {
+            ngx_log_error(NGX_LOG_EMERG, log, ngx_errno,
+                          ngx_close_file_n " \"%s\" failed",
+                          file[i].name.data);
+        }
+    }
+
+    if (ngx_test_config) {
+        ngx_destroy_cycle_pools(&conf);
+        return NULL;
+    }
+
+    ls = cycle->listening.elts;
+    for (i = 0; i < cycle->listening.nelts; i++) {
+        if (ls[i].fd == (ngx_socket_t) -1 || !ls[i].open) {
+            continue;
+        }
+
+        if (ngx_close_socket(ls[i].fd) == -1) {
+            ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                          ngx_close_socket_n " %V failed",
+                          &ls[i].addr_text);
+        }
+    }
+
+    ngx_destroy_cycle_pools(&conf);
+
+    return NULL;
+}
+{% endhighlight %}
+这里在创建新的nginx cycle失败之后，进行相应的现场还原。
+
 <br />
 <br />
 
