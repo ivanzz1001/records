@@ -110,6 +110,49 @@ typedef struct {
 
 ![ngx-path-t](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_path_t.jpg)
 
+上图是nginx创建的临时文件结构。nginx在根目录下最多创建3层目录结构。例如：
+<pre>
+/home/nginx/tmpfile/9/32/198
+</pre>
+其中`home/nginx/tmpfile```为根目录，```9/32/198```则为3层子目录结构。
+
+```ngx_path_t```是用于初始时候的一个路径。
+
+## 3. ngx_temp_file_t数据结构
+{% highlight string %}
+typedef struct {
+    ngx_file_t                 file;        //文件结构
+    off_t                      offset;      //当前操作偏移
+    ngx_path_t                *path;        //临时文件所对应的路径
+    ngx_pool_t                *pool;        //所对应的缓冲池
+    char                      *warn;        //岁对应的警告信息
+
+    ngx_uint_t                 access;      //临时文件的访问权限
+
+    unsigned                   log_level:8;  //所对应的日志级别
+    unsigned                   persistent:1;  //是否需要对当前临时文件进行持久化
+    unsigned                   clean:1;       //退出时，临时文件是否要删除
+    unsigned                   thread_write:1; //是否开启多线程写
+} ngx_temp_file_t;
+{% endhighlight %}
+
+```ngx_temp_file_t```代表一个临时文件结构。
+
+## 4. ngx_ext_rename_file_t数据结构
+{% highlight string %}
+typedef struct {
+    ngx_uint_t                 access;
+    ngx_uint_t                 path_access;
+    time_t                     time;
+    ngx_fd_t                   fd;
+
+    unsigned                   create_path:1;
+    unsigned                   delete_file:1;
+
+    ngx_log_t                 *log;
+} ngx_ext_rename_file_t;
+
+{% endhighlight %}
 
 
 
