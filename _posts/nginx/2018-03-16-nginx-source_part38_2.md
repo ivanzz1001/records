@@ -1864,7 +1864,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
     return cycle;
 }
 {% endhighlight %}
-在成功创建cycle上下文后，进行一些后续的收尾工作。
+在成功创建cycle上下文后，进行一些后续的收尾工作。这里在处理```NGX_PROCESS_SINGLE```类型进程时，我们开启定时器来清除old_cycle，这是为了尽快使进程进入工作状态。
 
 ### 3.16 失败情况下现场还原操作
 {% highlight string %}
