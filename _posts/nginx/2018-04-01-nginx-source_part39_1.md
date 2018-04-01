@@ -141,21 +141,59 @@ typedef struct {
 ## 4. ngx_ext_rename_file_t数据结构
 {% highlight string %}
 typedef struct {
-    ngx_uint_t                 access;
-    ngx_uint_t                 path_access;
-    time_t                     time;
-    ngx_fd_t                   fd;
+    ngx_uint_t                 access;        //文件访问权限
+    ngx_uint_t                 path_access;   //路径访问权限
+    time_t                     time;          //重命名时间
+    ngx_fd_t                   fd;            //对应的文件句柄
 
-    unsigned                   create_path:1;
-    unsigned                   delete_file:1;
+    unsigned                   create_path:1;  //是否创建路径
+    unsigned                   delete_file:1;  //如果重命名失败，是否要删除文件
 
-    ngx_log_t                 *log;
+    ngx_log_t                 *log;            //所对应的日志
 } ngx_ext_rename_file_t;
 
 {% endhighlight %}
 
+## 5. ngx_copy_file_t数据结构
+{% highlight string %}
+typedef struct {
+    off_t                      size;           //要拷贝的文件大小
+    size_t                     buf_size;       //拷贝时新开临时缓冲区大小
+
+    ngx_uint_t                 access;         //新拷贝文件的访问权限
+    time_t                     time;           //新拷贝文件的最近访问时间和最近修改时间
+
+    ngx_log_t                 *log;
+} ngx_copy_file_t;
+{% endhighlight %}
 
 
+## 6. ngx_tree_ctx_s数据结构
+{% highlight string %}
+typedef struct ngx_tree_ctx_s  ngx_tree_ctx_t;
+
+typedef ngx_int_t (*ngx_tree_init_handler_pt) (void *ctx, void *prev);
+typedef ngx_int_t (*ngx_tree_handler_pt) (ngx_tree_ctx_t *ctx, ngx_str_t *name);
+
+struct ngx_tree_ctx_s {
+    off_t                      size;
+    off_t                      fs_size;
+    ngx_uint_t                 access;
+    time_t                     mtime;
+
+    ngx_tree_init_handler_pt   init_handler;
+    ngx_tree_handler_pt        file_handler;
+    ngx_tree_handler_pt        pre_tree_handler;
+    ngx_tree_handler_pt        post_tree_handler;
+    ngx_tree_handler_pt        spec_handler;
+
+    void                      *data;
+    size_t                     alloc;
+
+    ngx_log_t                 *log;
+};
+
+{% endhighlight %}
 
 <br />
 <br />
@@ -163,6 +201,8 @@ typedef struct {
 **[参考]**
 
 1. [nginx文件结构](https://blog.csdn.net/apelife/article/details/53043275)
+
+2. [Nginx中目录树的遍历](https://blog.csdn.net/weiyuefei/article/details/38313663)
 
 <br />
 <br />
