@@ -468,9 +468,68 @@ ngx_shared_memory_add(ngx_conf_t *cf, ngx_str_t *name, size_t size, void *tag)
     return shm_zone;
 }
 {% endhighlight %}
+这里向```cycle->shared_memory```链表中添加共享内存数据结构： 首先检查是否已经有相同名字的共享内存块，有的话则返回已经存在共享内存块（tag要相同）； 否则插入到cycle->shared_memory链表中。
 
+## 9. 函数ngx_clean_old_cycles()
+{% highlight string %}
+static void
+ngx_clean_old_cycles(ngx_event_t *ev)
+{
+    ngx_uint_t     i, n, found, live;
+    ngx_log_t     *log;
+    ngx_cycle_t  **cycle;
 
+    log = ngx_cycle->log;
+    ngx_temp_pool->log = log;
 
+    ngx_log_debug0(NGX_LOG_DEBUG_CORE, log, 0, "clean old cycles");
+
+    live = 0;
+
+    cycle = ngx_old_cycles.elts;
+    for (i = 0; i < ngx_old_cycles.nelts; i++) {
+
+        if (cycle[i] == NULL) {
+            continue;
+        }
+
+        found = 0;
+
+        for (n = 0; n < cycle[i]->connection_n; n++) {
+            if (cycle[i]->connections[n].fd != (ngx_socket_t) -1) {
+                found = 1;
+
+                ngx_log_debug1(NGX_LOG_DEBUG_CORE, log, 0, "live fd:%ui", n);
+
+                break;
+            }
+        }
+
+        if (found) {
+            live = 1;
+            continue;
+        }
+
+        ngx_log_debug1(NGX_LOG_DEBUG_CORE, log, 0, "clean old cycle: %ui", i);
+
+        ngx_destroy_pool(cycle[i]->pool);
+        cycle[i] = NULL;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_CORE, log, 0, "old cycles status: %ui", live);
+
+    if (live) {
+        ngx_add_timer(ev, 30000);
+
+    } else {
+        ngx_destroy_pool(ngx_temp_pool);
+        ngx_temp_pool = NULL;
+        ngx_old_cycles.nelts = 0;
+    }
+}
+{% endhighlight %}
+
+这里是定时器的一个回调函数，用于清理```old_cycle```。这里清理时会检查```cycle->connections```，如果还有连接没有关闭，则暂时不对该cycle对应的pool进行清理。
 
 <br />
 <br />
