@@ -1,0 +1,127 @@
+---
+layout: post
+title: core/ngx_file.h头文件分析
+tags:
+- nginx
+categories: nginx
+description: nginx源代码分析
+---
+
+
+本节我们讲述一下nginx中对所涉及到的文件操作的封装。
+
+
+<!-- more -->
+
+## 1. ngx_file_s数据结构
+{% highlight string %}
+
+/*
+ * Copyright (C) Igor Sysoev
+ * Copyright (C) Nginx, Inc.
+ */
+
+
+#ifndef _NGX_FILE_H_INCLUDED_
+#define _NGX_FILE_H_INCLUDED_
+
+
+#include <ngx_config.h>
+#include <ngx_core.h>
+
+
+struct ngx_file_s {
+    ngx_fd_t                   fd;
+    ngx_str_t                  name;
+    ngx_file_info_t            info;
+
+    off_t                      offset;
+    off_t                      sys_offset;
+
+    ngx_log_t                 *log;
+
+#if (NGX_THREADS)
+    ngx_int_t                (*thread_handler)(ngx_thread_task_t *task,
+                                               ngx_file_t *file);
+    void                      *thread_ctx;
+    ngx_thread_task_t         *thread_task;
+#endif
+
+#if (NGX_HAVE_FILE_AIO)
+    ngx_event_aio_t           *aio;
+#endif
+
+    unsigned                   valid_info:1;
+    unsigned                   directio:1;
+};
+{% endhighlight %}
+ngx_file_s数据结构是对打开的文件的一个封装：
+
+* ```fd```: 所打开文件对应的句柄
+
+* ```name```: 所打开文件的名称
+
+* ```info```: 所打开文件所对应的struct stat信息
+
+* ```offset```: 当前要操作的文件指针偏移
+
+* ```sys_offset```: 当前该打开文件的实际指针偏移
+
+* ```log```: 该打开文件所对应的log
+
+* ```thread_handler/thread_ctx/thread_task```: 当前我们并不支持多线程操作文件，这里暂不介绍
+
+* ```aio```: 这里我们暂不支持```NGX_HAVE_FILE_AIO```
+
+* ```valid_info```: 本字段暂时未能用到
+
+* ```directio```: 对于当前文件是否使用directio
+
+## 2. ngx_path_t相关数据结构
+{% highlight string %}
+#define NGX_MAX_PATH_LEVEL  3
+
+
+typedef time_t (*ngx_path_manager_pt) (void *data);
+typedef void (*ngx_path_loader_pt) (void *data);
+
+
+typedef struct {
+    ngx_str_t                  name;        //文件名
+    size_t                     len;         //level中3个数据之和
+    size_t                     level[3];    //每一层子目录的长度
+
+    //以下字段只在文件缓冲管理模块被使用
+    ngx_path_manager_pt        manager;     //文件缓冲管理回调     
+    ngx_path_loader_pt         loader;      //文件缓冲loader回调
+    void                      *data;        //回调上下文
+
+    u_char                    *conf_file;   //所关联的配置文件名称
+    ngx_uint_t                 line;        //所在配置文件的行数
+} ngx_path_t;
+
+
+typedef struct {
+    ngx_str_t                  name;
+    size_t                     level[3];
+} ngx_path_init_t;
+{% endhighlight %}
+```ngx_path_t```是一个目录对象结构:
+
+![ngx-path-t](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_path_t.jpg)
+
+
+
+
+
+<br />
+<br />
+
+**[参考]**
+
+1. [nginx文件结构](https://blog.csdn.net/apelife/article/details/53043275)
+
+<br />
+<br />
+<br />
+
