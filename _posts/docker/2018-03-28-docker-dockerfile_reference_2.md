@@ -17,9 +17,9 @@ description: Dockerfile参考（2）
 ## 1. EXPOSE指令
 
 指令格式如下：
-<pre>
+{% highlight string %}
 EXPOSE <port> [<port>/<protocol>...]
-</pre>
+{% endhighlight %}
 
 ```EXPOSE```指令用于通知docker，该容器在运行时监听了某个指定网络上的port。你可以指定是TCP端口还是UDP端口，假如没有指定的话，则默认为TCP端口。
 
@@ -32,10 +32,10 @@ EXPOSE 80/udp
 
 ## 2. ENV指令
 ```ENV```指令格式信息如下：
-<pre>
+{% highlight string %}
 ENV <key> <value>
 ENV <key>=<value> ...
-</pre>
+{% endhighlight %}
 ```ENV```指令用于设置环境变量的值，环境变量的值存在于后续的整个构建过程。通过ENV指令设置的环境变量将会持久化到一个运行的容器中，你可以通过```docker inspect```来查看。
 
 例子：
