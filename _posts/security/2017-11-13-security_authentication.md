@@ -26,10 +26,17 @@ description: 安全认证之kerberos协议
 
 * **User Client-based Logon**
 
+1. 在客户机上用户输入```用户名```,```密码```。(其他一些认证机制可能允许使用一个public key来代替密码）
 
+2. 客户端使用对称加密算法将```密码```(password)转换成```key```值。(可以使用内置的key产生算法，或者单向hash来产生，这取决于所使用的密码套件）
 
 
 * **Client Authentication**
+
+1. 客户端以明文```user ID```的方式发送消息到AS(Authentication Server)以请求相应的服务（注意：注意这里既不发送```secret key```，也不发送密码到AS)
+
+2. 
+
 
 
 
