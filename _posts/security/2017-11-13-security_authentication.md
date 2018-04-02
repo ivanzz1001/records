@@ -19,7 +19,7 @@ description: 安全认证之kerberos协议
 
 当客户端需要和
 
-
+![security-kerberos](https://ivanzz1001.github.io/records/assets/img/security/security_kerberos.jpg)
 
 
 
