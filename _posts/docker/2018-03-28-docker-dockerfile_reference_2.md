@@ -148,10 +148,10 @@ VOLUME ["/data"]
 
 ## 7. USER指令
 指令格式如下：
-<pre>
+{% highlight string %}
 USER <user>[:<group>] or
 USER <UID>[:<GID>]
-</pre>
+{% endhighlight %}
 ```USER```指令用于设置当你运行镜像时，以什么样的用户身份执行。它会影响到RUN、CMD、ENTRYPOINT指令。
 
 ## 8. WORKDIR指令
