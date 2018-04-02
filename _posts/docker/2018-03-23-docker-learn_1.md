@@ -25,7 +25,11 @@ description: docker学习资料
 
 5. [Docker Registry V2 Auth Server](https://hui.lu/docker-registry-v2-auth-server-with-python/#code)
 
+6. [实战docker+jenkins+git+registry构建持续集成环境](http://blog.51cto.com/ganbing/2085769?cid=702568)
 
+7. [Docker Registry v2源代码阅读](http://www.360doc.com/content/16/1122/16/17572791_608554926.shtml)
+
+8. [从源代码编译docker (moby) - 2018-03-27](https://blog.csdn.net/gogo_rock/article/details/79716716)
 <br />
 <br />
 
