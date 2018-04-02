@@ -138,9 +138,154 @@ FROM ubuntu
 ENTRYPOINT exec top -b
 {% endhighlight %}
 
-### 5.3 理解CMD与ENTRYPOINT的交互
+
+## 6. VOLUME指令
+VOLUME指令格式如下：
+<pre>
+VOLUME ["/data"]
+</pre>
+本指令用于在容器中创建挂载点
+
+## 7. USER指令
+指令格式如下：
+<pre>
+USER <user>[:<group>] or
+USER <UID>[:<GID>]
+</pre>
+```USER```指令用于设置当你运行镜像时，以什么样的用户身份执行。它会影响到RUN、CMD、ENTRYPOINT指令。
+
+## 8. WORKDIR指令
+指令格式如下：
+<pre>
+WORKDIR /path/to/workdir
+</pre>
+
+```WORKDIR```指令用于设置RUN、CMD、ENTRYPOINT、ADD、COPY指令的工作目录。
+
+## 9. ARG指令
+指令格式如下：
+{% highlight string %}
+ARG <name>[=<default value>]
+{% endhighlight %}
+```ARG```指令可以用于定义一个变量，用户在构建镜像时可以通过在```docker build```命令后添加```--build-arg <varname>=<value>```标志来传递参数。假如在构建时传递了在Dockerfile中不存在的参数，则在构建时可能输入如下警告：
+<pre>
+[Warning] One or more build-args [foo] were not consumed.
+</pre>
+一个Dockerfile可以包含1个或多个```ARG```指令，例如：
+{% highlight string %}
+FROM busybox
+ARG user1
+ARG buildno
+{% endhighlight %}
+
+### 9.1 ARG指令的使用
+你可以使用```ARG```指令或者```ENV```指令来为```RUN```指令指定参数，但假如ARG指令与ENV指令使用相同的变量名称，则ENV指令总是会覆盖ARG指令。 
+
+## 10. ONBUILD指令
+指令格式如下：
+<pre>
+ONBUILD [INSTRUCTION
+</pre>
+```ONBUILD```指令用于添加```trigger```指令到镜像A。后续如果构建镜像B，且以镜像A作为基础镜像(FROM A)的话，则会触发A中设置的ONBUILD指令。注意ONBUILD指令不会传递到```孙子```镜像的构建中。
+
+## 11. STOPSIGNAL指令
+指令格式如下：
+<pre>
+STOPSIGNAL signal
+</pre>
+用于设置传递何种信号以让容器退出。
+
+## 12. HEALTHCHECK指令
+HEALTHCHECK指令有两种形式：
+
+* ```HEALTHCHECK [OPTIONS] CMD command```: 通过在容器中运行一个命令来检查容器的健康状况
+
+* ```HEALTHCHECK NONE```: 禁止继承任何base image的health check
+
+HEALTHCHECK指令告诉docker如何检查container是否仍在工作。这可以用于检查如web服务器一直在主循环中卡住，从而不能接受新的连接，即使web server进程仍然在继续运行这种状况。
+
+当一个容器指定了HEALTHCHECK，容器就会多一个```health status```状态，该状态的初始值为```starting```。当健康检查通过，状态就会变成```healthy```，而在连续多次检测失败之后就会变为```unhealthy```。
+
+```[OPTIONS]```可以为：
+
+* ```--interval=DURATION```: 默认值为30s
+
+* ```--timeout=DURATION```: 默认值为30s
+
+* ```--start-period=DURATION```: 默认值为0
+
+* ```--retries=N```: 默认值为3
+
+在container启动之后interval时间内会进行第一次健康检查，之后每隔interval时间再进行一次检查。如果进行一次健康检查时在timeout时间内都没有返回结果，则认为此次检查失败。
+
+以cmd的退出状态作为容器的健康状态，可能的取值有：
+
+* 0: 成功，容器当前处于healthy状态，可以使用
+
+* 1: 容器当前处于unhealthy状态，当前不能正常工作
+
+* 2: 保留，暂未使用
+
+例如我们可以通过如下命令每隔5分钟检查当前web能否在3s内提供主页服务：
+<pre>
+HEALTHCHECK --interval=5m --timeout=3s \
+  CMD curl -f http://localhost/ || exit 1
+</pre>
+为了有助于调试，健康检查的标准输出及标准错误都会被存储到health status中，可以通过docker inspect来查看（当前只会保存钱4096个字节，因此这种输出尽量短）
 
 
+## 13. SHELL指令
+指令格式如下：
+<pre>
+SHELL ["executable", "parameters"]
+</pre>
+```SHELL```指令允许覆盖shell命令执行时所用的默认shell。默认情况下Linux中的shell为```["/bin/sh","-c"]```, 而windows中shell为```["cmd","/S","/C"]```。
+
+SHELL指令可以出现多次，每一次出现都会覆盖上一次。例如：
+{% highlight string %}
+FROM microsoft/windowsservercore
+
+# Executed as cmd /S /C echo default
+RUN echo default
+
+# Executed as cmd /S /C powershell -command Write-Host default
+RUN powershell -command Write-Host default
+
+# Executed as powershell -command Write-Host hello
+SHELL ["powershell", "-command"]
+RUN Write-Host hello
+
+# Executed as cmd /S /C echo hello
+SHELL ["cmd", "/S", "/C"]
+RUN echo hello
+{% endhighlight %}
+
+## 14. Dockerfile示例
+{% highlight string %}
+# Nginx
+#
+# VERSION               0.0.1
+
+FROM      ubuntu
+LABEL Description="This image is used to start the foobar executable" Vendor="ACME Products" Version="1.0"
+RUN apt-get update && apt-get install -y inotify-tools nginx apache2 openssh-server
+# Firefox over VNC
+#
+# VERSION               0.3
+
+FROM ubuntu
+
+# Install vnc, xvfb in order to create a 'fake' display and firefox
+RUN apt-get update && apt-get install -y x11vnc xvfb firefox
+RUN mkdir ~/.vnc
+# Setup a password
+RUN x11vnc -storepasswd 1234 ~/.vnc/passwd
+# Autostart firefox (might not be the best way, but it does the trick)
+RUN bash -c 'echo "firefox" >> /.bashrc'
+
+EXPOSE 5900
+CMD    ["x11vnc", "-forever", "-usepw", "-create"]
+{% endhighlight %}
 
 
 <br />
