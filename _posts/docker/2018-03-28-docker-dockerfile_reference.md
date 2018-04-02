@@ -215,13 +215,13 @@ temp?
 ## 6. FROM指令
 
 ```FROM```指令格式如下：
-<pre>
+{% highlight string %}
 FROM <image> [AS <name>]
 
 FROM <image>[:<tag>] [AS <name>]
 
 FROM <image>[@<digest>] [AS <name>]
-</pre>
+{% endhighlight %}
 ```FROM```指令初始化整个构建stage，并为后续的指令设置```Base Image```。通常情况下，一个Dockerfile文件以```FROM```指令起始，并且该基础镜像是可以为任何有效的镜像。
 
 * 在Dockerfile中，```ARG```指令是唯一可以放在```FROM```指令之前的指令
