@@ -15,6 +15,13 @@ description: http协议
 
 
 
+<br />
+<br />
+
+**[参考]**
+
+1. [HTTP协议的8种请求类型介绍](https://www.cnblogs.com/xuyuQAQ/p/8371559.html)
+
 
 <br />
 <br />
