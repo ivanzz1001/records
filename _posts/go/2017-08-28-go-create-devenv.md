@@ -14,7 +14,7 @@ description: go开发环境的搭建
 
 ## 1. go环境变量设置
 
-下载安装程序https://golang.org/dl/ (墙内下载地址http://www.golangtc.com/download)。Go开发环境的搭建比较简单，这里主要介绍一下需要配置的几个环境变量：
+下载安装程序```https://golang.org/dl/``` (墙内下载地址```http://www.golangtc.com/download```)。Go开发环境的搭建比较简单，这里主要介绍一下需要配置的几个环境变量：
 
 * ```GOROOT：``` Go的安装目录
 * ```GOPATH：``` go build时除了会查找GOROOT目录下的src目录，还会查找这里GOPATH指定的目录。因此这里GOPATH可用作我们的工作目录
