@@ -2,8 +2,8 @@
 layout: post
 title: mysql主从同步配置
 tags:
-- nginx
-categories: mysql
+- database
+categories: database
 description: mysql主从同步配置
 ---
 
