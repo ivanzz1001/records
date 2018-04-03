@@ -52,9 +52,9 @@ description: 安全认证之kerberos协议
 
 1) 当要请求```services```的时候，客户端发送如下消息到TGS
 
-* **Message C**: 将Message B返回过来的加密过的TGT以及所请求service的ID打包在一起
+* Message C: 将Message B返回过来的加密过的TGT以及所请求service的ID打包在一起
 
-* **Message D**: 使用```Client/TGS Session Key```加密过的Authenticator(包含了client ID以及timestamp)
+* Message D: 使用```Client/TGS Session Key```加密过的Authenticator(包含了client ID以及timestamp)
 
 
 2) 当TGS收到Message C和Message D之后，TGS首先从Message C中分离出Message B，然后使用TGS的```secret key```对Message B，这样就可以获得其中的```client/TGS session key```。然后TGS使用该key值来对Message D(Authenticator)进行解密，并且对比来自Message C和Message D中的client ID，假如匹配的话则发送如下两个消息到客户端：
