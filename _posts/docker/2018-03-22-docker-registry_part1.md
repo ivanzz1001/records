@@ -29,7 +29,7 @@ description: 让docker registry支持https
 <pre>
 [ v3_ca ] 
 
-subjectAltName = 10.17.153.196
+subjectAltName = IP:10.17.153.196
 </pre>
 
 2) **产生自签名证书**
