@@ -340,7 +340,7 @@ HOME=/root
 ## 5. docker-compose基本命令
 
 相关命令选项：
-<pre>
+{% highlight string %}
 # docker-compose --help
 Define and run multi-container applications with Docker.
 
@@ -398,7 +398,7 @@ Commands:
   unpause            Unpause services
   up                 Create and start containers
   version            Show the Docker-Compose version information
-</pre>
+{% endhighlight %}
 
 ### 5.1 指定Compose文件路径
 
