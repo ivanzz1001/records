@@ -135,7 +135,7 @@ Login Succeeded
 
 由于```cert.crt```是自签名证书，要让操作系统信任的话，我们必须要把我们的证书放入操作系统的CA bundle文件中，使操作系统信任我们的自签名证书：
 
-* 对于Centos6/7或者Redhat操作系统，bundle文件的位置在````/etc/pki/tls/certs/ca-bundle.crt```
+* 对于Centos6/7或者Redhat操作系统，bundle文件的位置在```/etc/pki/tls/certs/ca-bundle.crt```
 <pre>
 # cat cert.crt >> /etc/pki/tls/certs/ca-bundle.crt
 </pre>
