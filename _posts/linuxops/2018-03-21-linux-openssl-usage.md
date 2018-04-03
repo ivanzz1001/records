@@ -312,12 +312,7 @@ cert.crt  rsa_private.key
 # ls
 server.key
 
-# openssl req -new -key server.key -out server.csr                  //申城CSR签名请求
-Enter pass phrase for server.key:
-unable to load Private Key
-139621627549600:error:06065064:digital envelope routines:EVP_DecryptFinal_ex:bad decrypt:evp_enc.c:592:
-139621627549600:error:0906A065:PEM routines:PEM_do_header:bad decrypt:pem_lib.c:488:
-[root@localhost test-src]# openssl req -new -key server.key  -out server.csr
+# openssl req -new -key server.key  -out server.csr                //生成CSR签名请求
 Enter pass phrase for server.key:
 You are about to be asked to enter information that will be incorporated
 into your certificate request.
