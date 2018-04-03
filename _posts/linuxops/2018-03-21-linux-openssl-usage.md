@@ -376,7 +376,7 @@ YapUplH4
 -----END CERTIFICATE REQUEST-----
 
 # openssl req -noout -text -in server.csr
-</pe>
+</pre>
 
 
 3) **使用 CA 证书及CA密钥 对请求签发证书进行签发，生成 x509证书**
