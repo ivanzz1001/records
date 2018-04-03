@@ -57,7 +57,7 @@ description: 安全认证之kerberos协议
 * Message D: 使用```Client/TGS Session Key```加密过的Authenticator(包含了client ID以及timestamp)
 
 
-2) 当TGS收到Message C和Message D之后，TGS首先从Message C中分离出Message B，然后使用TGS的```secret key```对Message B，这样就可以获得其中的```client/TGS session key```。然后TGS使用该key值来对Message D(Authenticator)进行解密，并且对比来自Message C和Message D中的client ID，假如匹配的话则发送如下两个消息到客户端：
+2) 当TGS收到Message C和Message D之后，TGS首先从Message C中分离出Message B，然后使用TGS的```secret key```对Message B进行解密，这样就可以获得其中的```client/TGS session key```。然后TGS使用该key值来对Message D(Authenticator)进行解密，并且对比来自Message C和Message D中的client ID，假如匹配的话则发送如下两个消息到客户端：
 
 * Message E: ```Client-to-server ticket```(其中包括client ID，client network address, validity period, and client/Server Session Key)，该ticket被service的```secret key```加密过
 
@@ -85,6 +85,43 @@ description: 安全认证之kerberos协议
 
 4) Server向client提供所请求的服务
 
+
+## 1.5. Kerberos协议相关交互总结
+
+**1） 客户端相关概念**
+
+* client_name: 客户端的用户名
+
+* client_id: 用户登录时服务器根据用户名返回过来的用户ID
+
+* client_passwd: 用户输入的密码
+
+* client_secret: 根据用户输入的密码产生的秘钥,例如```client_secret = hash(client_passwd)```
+
+**2) TGS相关概念**
+
+```TGS```是ticket-granting service的缩写，提供TGT以及ticket相关的授予及校验服务： ```tgs_secret_key``` 以及相应service的```service_secret_key```
+  
+
+**3) 相关消息**
+
+Message A: TGS返回给Client的经过加密的```Client/TGS Session Key```
+<pre>
+Message A = Encrypt(Client/TGS Session key, client_secret)
+</pre>
+
+
+Message B: TGS返回给Client的经过加密的TGT
+<pre>
+TGT={client ID，client network address，ticket validity period, client/TGS session key}
+
+Message B = Encrypt(TGT,tgs_secret_key)
+<pre>
+
+Message C: 客户端发送给TGS的Message B以及相应服务的service ID
+<pre>
+Message C = {Message B, service ID}
+</pre>
 
 <br />
 <br />
