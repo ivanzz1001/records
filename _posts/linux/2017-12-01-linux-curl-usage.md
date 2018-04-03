@@ -430,6 +430,14 @@ url=http://example.com/query
 echo "curl -X POST -H 'Content-Type:application/x-www-form-urlencoded' --data @curl_data.dat $url"
 {% endhighlight %}
 
+
+关于HTTP请求中经常会用到的```Accept```与```Content-Type```头，这里做一个说明：
+<pre>
+Accept: 表示接口要返回给客户端的数据格式
+
+Content-Type: 表示客户端发送给服务器端的数据格式
+</pre>
+
 <br />
 <br />
 
