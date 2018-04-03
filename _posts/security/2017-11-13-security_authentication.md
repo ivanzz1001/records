@@ -116,7 +116,7 @@ Message B: TGS返回给Client的经过加密的TGT
 TGT={client ID，client network address，ticket validity period, client/TGS session key}
 
 Message B = Encrypt(TGT,tgs_secret_key)
-<pre>
+</pre>
 
 Message C: 客户端发送给TGS的Message B以及相应服务的service ID
 <pre>
