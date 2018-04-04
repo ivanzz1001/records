@@ -58,16 +58,21 @@ Harbor特性：
 docker 1.10.0+ and docker-compose 1.6.0+
 </pre>
 
-## 2.1 下载Harbor离线安装包
+### 2.1 下载Harbor离线安装包
 到[Harbor Release](https://github.com/vmware/harbor/releases)页面下载对应的离线安装包，目前我们下载最新版本```v1.4.0```:
 <pre>
-# mkdir /opt/harbor
-# cd /opt/harbor
+# mkdir /opt/harbor-inst
+# cd /opt/harbor-inst
 
 # wget https://storage.googleapis.com/harbor-releases/release-1.4.0/harbor-offline-installer-v1.4.0.tgz
 </pre>
 
-## 2.2 
+### 2.2 目标主机相关配置推荐
+
+Harbor部署完后会运行多个Docker containers，因此可以部署在任何支持docker的Linux发布版本上。部署的目标主机需要安装```Python```, ```Docker```和```Docker Compose```。
+
+硬件环境：
+
 
 
 <br />
