@@ -123,6 +123,48 @@ sizeof(float): 4
 sizeof(double): 8
 </pre>
 
+
+## 3. 类中静态成员的初始化时间
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+
+class A{
+public:
+   A()
+   {
+      printf("A constructor\n");
+   }
+};
+
+class B{
+public:
+   B()
+   {
+     printf("B constructor\n");
+   }
+private:
+   static A a;
+};
+
+A B::a;
+
+int main(int argc,char *argv[])
+{
+   printf("main ...\n");
+   return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o test test.cpp -lstdc++
+# ./test
+A constructor
+main ...
+</pre>
+由此我们得出，类的静态成员初始化时间发生在： ```从静态存储区加载到内存时```
+
+
 <br />
 <br />
 
