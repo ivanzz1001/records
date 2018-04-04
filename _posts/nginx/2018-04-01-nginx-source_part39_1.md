@@ -195,6 +195,68 @@ struct ngx_tree_ctx_s {
 
 {% endhighlight %}
 
+这里是nginx遍历目录的相关数据结构，下面我们简要介绍一下其中的各个字段：
+
+* ```size```: 遍历到的文件的大小
+
+* ```fs_size```: 指的是遍历到的文件所占磁盘块数目乘以512的值与```size```中的最大值，即fs_size = ngx_max(size,st_blocks*512)
+
+* ```access```: 指的是遍历到的文件的访问权限
+
+* ```mtime```: 指的是遍历到的文件上次被修改的时间
+
+* ```init_handler```: 与下面的```data```、```alloc```字段相关，用于初始化遍历过程中的相关数据结构。一般如果```alloc```字段不为0的话，表示要分配alloc大小的空间，此时会调用init_handler回调函数初始化。
+
+* ```file_handler```: 处理普通文件的回调函数
+
+* ```pre_tree_handler```: 进入一个目录前的回调函数
+
+* ```post_tree_handler```: 离开一个目录后的回调函数
+
+* ```spec_handler```: 处理特殊文件的回调函数，比如socket、FIFO等
+
+* ```data```: 传递一些数据结构，可以在不同的目录下使用相同的数据结构，或者也可以重新分配，前提是alloc不为0
+
+* ```alloc```: 如果需要分配一些数据结构，这里指定分配数据结构的大小，并由```init_handler```进行初始化
+
+* ```log```: 主要用于日志的记录
+
+
+## 7. 相关函数声明
+{% highlight string %}
+ngx_int_t ngx_get_full_name(ngx_pool_t *pool, ngx_str_t *prefix,
+    ngx_str_t *name);
+
+ssize_t ngx_write_chain_to_temp_file(ngx_temp_file_t *tf, ngx_chain_t *chain);
+ngx_int_t ngx_create_temp_file(ngx_file_t *file, ngx_path_t *path,
+    ngx_pool_t *pool, ngx_uint_t persistent, ngx_uint_t clean,
+    ngx_uint_t access);
+void ngx_create_hashed_filename(ngx_path_t *path, u_char *file, size_t len);
+ngx_int_t ngx_create_path(ngx_file_t *file, ngx_path_t *path);
+ngx_err_t ngx_create_full_path(u_char *dir, ngx_uint_t access);
+ngx_int_t ngx_add_path(ngx_conf_t *cf, ngx_path_t **slot);
+ngx_int_t ngx_create_paths(ngx_cycle_t *cycle, ngx_uid_t user);
+ngx_int_t ngx_ext_rename_file(ngx_str_t *src, ngx_str_t *to,
+    ngx_ext_rename_file_t *ext);
+ngx_int_t ngx_copy_file(u_char *from, u_char *to, ngx_copy_file_t *cf);
+ngx_int_t ngx_walk_tree(ngx_tree_ctx_t *ctx, ngx_str_t *tree);
+
+ngx_atomic_uint_t ngx_next_temp_number(ngx_uint_t collision);
+
+char *ngx_conf_set_path_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+char *ngx_conf_merge_path_value(ngx_conf_t *cf, ngx_path_t **path,
+    ngx_path_t *prev, ngx_path_init_t *init);
+char *ngx_conf_set_access_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+{% endhighlight %}
+
+
+
+## 8. 相关变量声明
+{% highlight string %}
+extern ngx_atomic_t      *ngx_temp_number;
+extern ngx_atomic_int_t   ngx_random_number;
+{% endhighlight %}
+
 <br />
 <br />
 
