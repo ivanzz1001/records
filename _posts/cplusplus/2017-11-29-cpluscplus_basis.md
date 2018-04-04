@@ -91,16 +91,46 @@ sizeF: 8
 </pre>
 
 
+## 2. 基本数据类型大小
 
+64bit操作系统：
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(int argc,char *argv[])
+{
+   printf("sizeof(char): %d\n",sizeof(char));
+   printf("sizeof(short): %d\n",sizeof(short));
+   printf("sizeof(int): %d\n",sizeof(int));
+   printf("sizeof(long): %d\n",sizeof(long));
+   printf("sizeof(long long): %d\n",sizeof(long long));
+   printf("sizeof(float): %d\n",sizeof(float));
+   printf("sizeof(double): %d\n",sizeof(double));
+   return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o test test.c
+# ./test
+sizeof(char): 1
+sizeof(short): 2
+sizeof(int): 4
+sizeof(long): 8
+sizeof(long long): 8
+sizeof(float): 4
+sizeof(double): 8
+</pre>
 
 <br />
 <br />
 
 **[参看]:**
 
-1. [ 网络带宽的测试算法研究](http://www.docin.com/p-575514222.html)
+1. [网络带宽的测试算法研究](http://www.docin.com/p-575514222.html)
 
-
+2. [C++静态变量内存分配，编译阶段，解密 ](http://blog.163.com/lucky_jeck/blog/static/12711474201311182464554/)
 <br />
 <br />
 <br />
