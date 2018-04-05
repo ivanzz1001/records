@@ -175,6 +175,98 @@ ngx_write_chain_to_temp_file(ngx_temp_file_t *tf, ngx_chain_t *chain)
     return ngx_write_chain_to_file(&tf->file, chain, tf->offset, tf->pool);
 }
 {% endhighlight %}
+这里首先判断```tf->file.fd```是否为一个有效的文件句柄，如果不是则先创建一个临时文件。接着将```chain```中的数据写入到```tf```临时文件中。
+
+## 5. 函数ngx_create_temp_file()
+{% highlight string %}
+ngx_int_t
+ngx_create_temp_file(ngx_file_t *file, ngx_path_t *path, ngx_pool_t *pool,
+    ngx_uint_t persistent, ngx_uint_t clean, ngx_uint_t access)
+{
+    uint32_t                  n;
+    ngx_err_t                 err;
+    ngx_pool_cleanup_t       *cln;
+    ngx_pool_cleanup_file_t  *clnf;
+
+    file->name.len = path->name.len + 1 + path->len + 10;
+
+    file->name.data = ngx_pnalloc(pool, file->name.len + 1);
+    if (file->name.data == NULL) {
+        return NGX_ERROR;
+    }
+
+#if 0
+    for (i = 0; i < file->name.len; i++) {
+        file->name.data[i] = 'X';
+    }
+#endif
+
+    ngx_memcpy(file->name.data, path->name.data, path->name.len);
+
+    n = (uint32_t) ngx_next_temp_number(0);
+
+    cln = ngx_pool_cleanup_add(pool, sizeof(ngx_pool_cleanup_file_t));
+    if (cln == NULL) {
+        return NGX_ERROR;
+    }
+
+    for ( ;; ) {
+        (void) ngx_sprintf(file->name.data + path->name.len + 1 + path->len,
+                           "%010uD%Z", n);
+
+        ngx_create_hashed_filename(path, file->name.data, file->name.len);
+
+        ngx_log_debug1(NGX_LOG_DEBUG_CORE, file->log, 0,
+                       "hashed path: %s", file->name.data);
+
+        file->fd = ngx_open_tempfile(file->name.data, persistent, access);
+
+        ngx_log_debug1(NGX_LOG_DEBUG_CORE, file->log, 0,
+                       "temp fd:%d", file->fd);
+
+        if (file->fd != NGX_INVALID_FILE) {
+
+            cln->handler = clean ? ngx_pool_delete_file : ngx_pool_cleanup_file;
+            clnf = cln->data;
+
+            clnf->fd = file->fd;
+            clnf->name = file->name.data;
+            clnf->log = pool->log;
+
+            return NGX_OK;
+        }
+
+        err = ngx_errno;
+
+        if (err == NGX_EEXIST_FILE) {
+            n = (uint32_t) ngx_next_temp_number(1);
+            continue;
+        }
+
+        if ((path->level[0] == 0) || (err != NGX_ENOPATH)) {
+            ngx_log_error(NGX_LOG_CRIT, file->log, err,
+                          ngx_open_tempfile_n " \"%s\" failed",
+                          file->name.data);
+            return NGX_ERROR;
+        }
+
+        if (ngx_create_path(file, path) == NGX_ERROR) {
+            return NGX_ERROR;
+        }
+    }
+}
+{% endhighlight %}
+本函数用于创建一个临时文件，具体创建步骤如下：
+
+* 为file->name分配空间，空间大小为：
+<pre>
+file->name.len = path->name.len + 1 + path->len + 10;
+</pre>
+这里path->len为文件的多级目录结构长度，之所以要再加10，是因为创建临时文件会加一个随机值到文件名后（uint32_t所表示的数最大长度为10个字节)
+
+* 接着创建一个ngx_pool_cleanup_t数据结构，以再后续对临时文件清除时调用
+
+* 产生临时文件名，并创建临时文件
 
 
 <br />
