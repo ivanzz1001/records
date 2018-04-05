@@ -282,6 +282,145 @@ file->fd = ngx_open_tempfile(file->name.data, persistent, access);
 
 ![ngx-file-data](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_file_data.jpg)
 
+然后创建hash文件名，最后再创建临时文件。
+
+## 6. 函数ngx_create_hashed_filename()
+{% highlight string %}
+void
+ngx_create_hashed_filename(ngx_path_t *path, u_char *file, size_t len)
+{
+    size_t      i, level;
+    ngx_uint_t  n;
+
+    i = path->name.len + 1;
+
+    file[path->name.len + path->len]  = '/';
+
+    for (n = 0; n < 3; n++) {
+        level = path->level[n];
+
+        if (level == 0) {
+            break;
+        }
+
+        len -= level;
+        file[i - 1] = '/';
+        ngx_memcpy(&file[i], &file[len], level);
+        i += level + 1;
+    }
+}
+{% endhighlight %}
+
+这里首先在```path->name.len+path->len```为止处添加'/'字符，然后分别产生每一级的Hash路径。
+
+## 7. 函数ngx_create_path()
+{% highlight string %}
+ngx_int_t
+ngx_create_path(ngx_file_t *file, ngx_path_t *path)
+{
+    size_t      pos;
+    ngx_err_t   err;
+    ngx_uint_t  i;
+
+    pos = path->name.len;
+
+    for (i = 0; i < 3; i++) {
+        if (path->level[i] == 0) {
+            break;
+        }
+
+        pos += path->level[i] + 1;
+
+        file->name.data[pos] = '\0';
+
+        ngx_log_debug1(NGX_LOG_DEBUG_CORE, file->log, 0,
+                       "temp file: \"%s\"", file->name.data);
+
+        if (ngx_create_dir(file->name.data, 0700) == NGX_FILE_ERROR) {
+            err = ngx_errno;
+            if (err != NGX_EEXIST) {
+                ngx_log_error(NGX_LOG_CRIT, file->log, err,
+                              ngx_create_dir_n " \"%s\" failed",
+                              file->name.data);
+                return NGX_ERROR;
+            }
+        }
+
+        file->name.data[pos] = '/';
+    }
+
+    return NGX_OK;
+}
+
+{% endhighlight %}
+这里分别创建path中的每一级路径。
+
+
+## 8. 函数ngx_create_full_path()
+{% highlight string %}
+ngx_err_t
+ngx_create_full_path(u_char *dir, ngx_uint_t access)
+{
+    u_char     *p, ch;
+    ngx_err_t   err;
+
+    err = 0;
+
+#if (NGX_WIN32)
+    p = dir + 3;
+#else
+    p = dir + 1;
+#endif
+
+    for ( /* void */ ; *p; p++) {
+        ch = *p;
+
+        if (ch != '/') {
+            continue;
+        }
+
+        *p = '\0';
+
+        if (ngx_create_dir(dir, access) == NGX_FILE_ERROR) {
+            err = ngx_errno;
+
+            switch (err) {
+            case NGX_EEXIST:
+                err = 0;
+            case NGX_EACCES:
+                break;
+
+            default:
+                return err;
+            }
+        }
+
+        *p = '/';
+    }
+
+    return err;
+}
+{% endhighlight %}
+
+这里以'/'作为分界符，分别创建每一级路径。
+
+## 9. 函数ngx_next_temp_number()
+{% highlight string %}
+ngx_atomic_uint_t
+ngx_next_temp_number(ngx_uint_t collision)
+{
+    ngx_atomic_uint_t  n, add;
+
+    add = collision ? ngx_random_number : 1;
+
+    n = ngx_atomic_fetch_add(ngx_temp_number, add);
+
+    return n + add;
+}
+{% endhighlight %}
+
+这里根据collision的条件，每次对```ngx_temp_number```增加一个值，然后返回.
+
 
 <br />
 <br />
