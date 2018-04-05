@@ -153,6 +153,7 @@ typedef struct {
 } ngx_ext_rename_file_t;
 
 {% endhighlight %}
+重命名文件所对应相关数据结构
 
 ## 5. ngx_copy_file_t数据结构
 {% highlight string %}
@@ -224,28 +225,57 @@ struct ngx_tree_ctx_s {
 
 ## 7. 相关函数声明
 {% highlight string %}
+//获得某个文件的全路径
 ngx_int_t ngx_get_full_name(ngx_pool_t *pool, ngx_str_t *prefix,
     ngx_str_t *name);
 
+
+//将buffer chain写入到temp文件
 ssize_t ngx_write_chain_to_temp_file(ngx_temp_file_t *tf, ngx_chain_t *chain);
+
+//创建temp文件
 ngx_int_t ngx_create_temp_file(ngx_file_t *file, ngx_path_t *path,
     ngx_pool_t *pool, ngx_uint_t persistent, ngx_uint_t clean,
     ngx_uint_t access);
+
+//创建hash文件名
 void ngx_create_hashed_filename(ngx_path_t *path, u_char *file, size_t len);
+
+//创建路径
 ngx_int_t ngx_create_path(ngx_file_t *file, ngx_path_t *path);
+
+//创建全路径
 ngx_err_t ngx_create_full_path(u_char *dir, ngx_uint_t access);
+
+//添加路径到cf->cycle->paths数组中
 ngx_int_t ngx_add_path(ngx_conf_t *cf, ngx_path_t **slot);
+
+//创建cycle->paths数组中的所有路径
 ngx_int_t ngx_create_paths(ngx_cycle_t *cycle, ngx_uid_t user);
+
+//重命名文件
 ngx_int_t ngx_ext_rename_file(ngx_str_t *src, ngx_str_t *to,
     ngx_ext_rename_file_t *ext);
+
+//拷贝文件
 ngx_int_t ngx_copy_file(u_char *from, u_char *to, ngx_copy_file_t *cf);
+
+//遍历某一目录下(tree目录)的文件
 ngx_int_t ngx_walk_tree(ngx_tree_ctx_t *ctx, ngx_str_t *tree);
 
+
+//获得下一个临时number值
 ngx_atomic_uint_t ngx_next_temp_number(ngx_uint_t collision);
 
+
+//设置某一模块中的路径指令
 char *ngx_conf_set_path_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+
+//合并路径值
 char *ngx_conf_merge_path_value(ngx_conf_t *cf, ngx_path_t **path,
     ngx_path_t *prev, ngx_path_init_t *init);
+
+//设置某一个文件的所有者、所属组、其他人的访问权限
 char *ngx_conf_set_access_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 {% endhighlight %}
 
@@ -253,7 +283,10 @@ char *ngx_conf_set_access_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
 ## 8. 相关变量声明
 {% highlight string %}
+//全局的临时值变量，主要用于产生临时文件名使用
 extern ngx_atomic_t      *ngx_temp_number;
+
+//nginx内部维持的一个随机值变量
 extern ngx_atomic_int_t   ngx_random_number;
 {% endhighlight %}
 
