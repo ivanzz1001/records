@@ -267,6 +267,20 @@ file->name.len = path->name.len + 1 + path->len + 10;
 * 接着创建一个ngx_pool_cleanup_t数据结构，以再后续对临时文件清除时调用
 
 * 产生临时文件名，并创建临时文件
+{% highlight string %}
+(void) ngx_sprintf(file->name.data + path->name.len + 1 + path->len,
+                           "%010uD%Z", n);
+
+ngx_create_hashed_filename(path, file->name.data, file->name.len);
+
+ngx_log_debug1(NGX_LOG_DEBUG_CORE, file->log, 0,
+               "hashed path: %s", file->name.data);
+
+file->fd = ngx_open_tempfile(file->name.data, persistent, access);
+{% endhighlight %}
+这里首先将产生的整数```n```格式化为宽度为10的字符串，以```'\0'```结尾，到目前为止,```file->name```为如下：
+
+![ngx-file-data](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_file_data.jpg)
 
 
 <br />
