@@ -8,7 +8,17 @@ description: nginx源代码分析
 ---
 
 
-本节我们讲述一下nginx中hash
+本节我们讲述一下nginx中hash。nginx中hash有三种类型：
+
+* 不带通配符的hash
+
+* 带前向通配符的hash
+
+* 带后向通配符的hash
+
+<pre>
+注意： 不支持同时带有前向通配符与后向通配符的hash
+</pre>
 
 
 <!-- more -->
