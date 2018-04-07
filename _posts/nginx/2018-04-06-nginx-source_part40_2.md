@@ -269,12 +269,401 @@ ngx_hash_find_wc_head(ngx_hash_wildcard_t *hwc, u_char *name, size_t len)
    return hwc->value;
 }
 {% endhighlight %}
-例如要在通配符哈希表中查找www.domain.com是否匹配*.domain.com，则从后往前查找每一个关键词。则查找过程如图所示:
+例如要在通配符哈希表中查找```www.domain.com```是否匹配```*.domain.com```，则从后往前查找每一个关键词。则查找过程如图所示:
 
 ![ngx-findwc-head](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_findwc_head.jpg)
 
 
-对于www.domain.com，则先在根哈希表中查找com，而com指向一级哈希表。然后在一级哈希表中查找domain,因为domain是叶子节点了，domain指向的空间就是用户数据，查找过程结束
+对于```www.domain.com```，则先在根哈希表中查找```com```，而```com```指向一级哈希表。然后在一级哈希表中查找```domain```,因为domain是叶子节点了，```domain```指向的空间就是用户数据，查找过程结束。
+
+
+## 3. 函数ngx_hash_find_wc_tail()
+{% highlight string %}
+void *
+ngx_hash_find_wc_tail(ngx_hash_wildcard_t *hwc, u_char *name, size_t len)
+{
+    void        *value;
+    ngx_uint_t   i, key;
+
+#if 0
+    ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0, "wct:\"%*s\"", len, name);
+#endif
+
+    key = 0;
+
+    for (i = 0; i < len; i++) {
+        if (name[i] == '.') {
+            break;
+        }
+
+        key = ngx_hash(key, name[i]);
+    }
+
+    if (i == len) {
+        return NULL;
+    }
+
+#if 0
+    ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0, "key:\"%ui\"", key);
+#endif
+
+    value = ngx_hash_find(&hwc->hash, key, name, i);
+
+#if 0
+    ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0, "value:\"%p\"", value);
+#endif
+
+    if (value) {
+
+        /*
+         * the 2 low bits of value have the special meaning:
+         *     00 - value is data pointer;
+         *     11 - value is pointer to wildcard hash allowing "example.*".
+         */
+
+        if ((uintptr_t) value & 2) {
+
+            i++;
+
+            hwc = (ngx_hash_wildcard_t *) ((uintptr_t) value & (uintptr_t) ~3);
+
+            value = ngx_hash_find_wc_tail(hwc, &name[i], len - i);
+
+            if (value) {
+                return value;
+            }
+
+            return hwc->value;
+        }
+
+        return value;
+    }
+
+    return hwc->value;
+}
+
+{% endhighlight %}
+
+后置通配符hash表查询操作，跟前置通配符查找操作基本类似。差别是后置通配符是从第一个关键字往后查询。例如查找```www.example.com```是否匹配```www.example.*```，则先查询```www```，接着查询```example```。函数```ngx_hash_find_wc_tail()```用来在后置通配符哈希表中查找到key对应的value值。
+
+下面我们就来介绍一下具体的查找过程：
+{% highlight string %}
+void *
+ngx_hash_find_wc_tail(ngx_hash_wildcard_t *hwc, u_char *name, size_t len)
+{
+    //1) 从前往后找，以.分隔每一个单词,并求得hash key值
+
+    //2) 进行hash查找
+    value = ngx_hash_find(&hwc->hash, key, name, i);
+
+    if(value)
+    {
+        //3) 这里根据value的最低2bit判断value属于哪一种情况：
+        // 00 --- value是一个data pointer
+        // 11 --- value是一个wildcard hash pointer，指向的是"example.*"这样的子级hash 表
+    }
+}
+{% endhighlight %}
+
+
+## 4. 函数ngx_hash_find_combined()
+{% highlight string %}
+void *
+ngx_hash_find_combined(ngx_hash_combined_t *hash, ngx_uint_t key, u_char *name,
+    size_t len)
+{
+    void  *value;
+
+    if (hash->hash.buckets) {
+        value = ngx_hash_find(&hash->hash, key, name, len);
+
+        if (value) {
+            return value;
+        }
+    }
+
+    if (len == 0) {
+        return NULL;
+    }
+
+    if (hash->wc_head && hash->wc_head->hash.buckets) {
+        value = ngx_hash_find_wc_head(hash->wc_head, name, len);
+
+        if (value) {
+            return value;
+        }
+    }
+
+    if (hash->wc_tail && hash->wc_tail->hash.buckets) {
+        value = ngx_hash_find_wc_tail(hash->wc_tail, name, len);
+
+        if (value) {
+            return value;
+        }
+    }
+
+    return NULL;
+}
+{% endhighlight %}
+这里首先进行全匹配hash查找；然后再进行前置通配hash查找；最后进行后置通配hash查找。
+
+## 5. NGX_HASH_ELT_SIZE宏定义
+{% highlight string %}
+#define NGX_HASH_ELT_SIZE(name)                                               \
+    (sizeof(void *) + ngx_align((name)->key.len + 2, sizeof(void *)))
+{% endhighlight %}
+这里求```ngx_hash_elt_t```结构体的大小。
+
+## 6. 函数ngx_hash_init()
+{% highlight string %}
+ngx_int_t
+ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
+{
+    u_char          *elts;
+    size_t           len;
+    u_short         *test;
+    ngx_uint_t       i, n, key, size, start, bucket_size;
+    ngx_hash_elt_t  *elt, **buckets;
+
+    if (hinit->max_size == 0) {
+        ngx_log_error(NGX_LOG_EMERG, hinit->pool->log, 0,
+                      "could not build %s, you should "
+                      "increase %s_max_size: %i",
+                      hinit->name, hinit->name, hinit->max_size);
+        return NGX_ERROR;
+    }
+
+    for (n = 0; n < nelts; n++) {
+        if (hinit->bucket_size < NGX_HASH_ELT_SIZE(&names[n]) + sizeof(void *))
+        {
+            ngx_log_error(NGX_LOG_EMERG, hinit->pool->log, 0,
+                          "could not build %s, you should "
+                          "increase %s_bucket_size: %i",
+                          hinit->name, hinit->name, hinit->bucket_size);
+            return NGX_ERROR;
+        }
+    }
+
+    test = ngx_alloc(hinit->max_size * sizeof(u_short), hinit->pool->log);
+    if (test == NULL) {
+        return NGX_ERROR;
+    }
+
+    bucket_size = hinit->bucket_size - sizeof(void *);
+
+    start = nelts / (bucket_size / (2 * sizeof(void *)));
+    start = start ? start : 1;
+
+    if (hinit->max_size > 10000 && nelts && hinit->max_size / nelts < 100) {
+        start = hinit->max_size - 1000;
+    }
+
+    for (size = start; size <= hinit->max_size; size++) {
+
+        ngx_memzero(test, size * sizeof(u_short));
+
+        for (n = 0; n < nelts; n++) {
+            if (names[n].key.data == NULL) {
+                continue;
+            }
+
+            key = names[n].key_hash % size;
+            test[key] = (u_short) (test[key] + NGX_HASH_ELT_SIZE(&names[n]));
+
+#if 0
+            ngx_log_error(NGX_LOG_ALERT, hinit->pool->log, 0,
+                          "%ui: %ui %ui \"%V\"",
+                          size, key, test[key], &names[n].key);
+#endif
+
+            if (test[key] > (u_short) bucket_size) {
+                goto next;
+            }
+        }
+
+        goto found;
+
+    next:
+
+        continue;
+    }
+
+    size = hinit->max_size;
+
+    ngx_log_error(NGX_LOG_WARN, hinit->pool->log, 0,
+                  "could not build optimal %s, you should increase "
+                  "either %s_max_size: %i or %s_bucket_size: %i; "
+                  "ignoring %s_bucket_size",
+                  hinit->name, hinit->name, hinit->max_size,
+                  hinit->name, hinit->bucket_size, hinit->name);
+
+found:
+
+    for (i = 0; i < size; i++) {
+        test[i] = sizeof(void *);
+    }
+
+    for (n = 0; n < nelts; n++) {
+        if (names[n].key.data == NULL) {
+            continue;
+        }
+
+        key = names[n].key_hash % size;
+        test[key] = (u_short) (test[key] + NGX_HASH_ELT_SIZE(&names[n]));
+    }
+
+    len = 0;
+
+    for (i = 0; i < size; i++) {
+        if (test[i] == sizeof(void *)) {
+            continue;
+        }
+
+        test[i] = (u_short) (ngx_align(test[i], ngx_cacheline_size));
+
+        len += test[i];
+    }
+
+    if (hinit->hash == NULL) {
+        hinit->hash = ngx_pcalloc(hinit->pool, sizeof(ngx_hash_wildcard_t)
+                                             + size * sizeof(ngx_hash_elt_t *));
+        if (hinit->hash == NULL) {
+            ngx_free(test);
+            return NGX_ERROR;
+        }
+
+        buckets = (ngx_hash_elt_t **)
+                      ((u_char *) hinit->hash + sizeof(ngx_hash_wildcard_t));
+
+    } else {
+        buckets = ngx_pcalloc(hinit->pool, size * sizeof(ngx_hash_elt_t *));
+        if (buckets == NULL) {
+            ngx_free(test);
+            return NGX_ERROR;
+        }
+    }
+
+    elts = ngx_palloc(hinit->pool, len + ngx_cacheline_size);
+    if (elts == NULL) {
+        ngx_free(test);
+        return NGX_ERROR;
+    }
+
+    elts = ngx_align_ptr(elts, ngx_cacheline_size);
+
+    for (i = 0; i < size; i++) {
+        if (test[i] == sizeof(void *)) {
+            continue;
+        }
+
+        buckets[i] = (ngx_hash_elt_t *) elts;
+        elts += test[i];
+
+    }
+
+    for (i = 0; i < size; i++) {
+        test[i] = 0;
+    }
+
+    for (n = 0; n < nelts; n++) {
+        if (names[n].key.data == NULL) {
+            continue;
+        }
+
+        key = names[n].key_hash % size;
+        elt = (ngx_hash_elt_t *) ((u_char *) buckets[key] + test[key]);
+
+        elt->value = names[n].value;
+        elt->len = (u_short) names[n].key.len;
+
+        ngx_strlow(elt->name, names[n].key.data, names[n].key.len);
+
+        test[key] = (u_short) (test[key] + NGX_HASH_ELT_SIZE(&names[n]));
+    }
+
+    for (i = 0; i < size; i++) {
+        if (buckets[i] == NULL) {
+            continue;
+        }
+
+        elt = (ngx_hash_elt_t *) ((u_char *) buckets[i] + test[i]);
+
+        elt->value = NULL;
+    }
+
+    ngx_free(test);
+
+    hinit->hash->buckets = buckets;
+    hinit->hash->size = size;
+
+#if 0
+
+    for (i = 0; i < size; i++) {
+        ngx_str_t   val;
+        ngx_uint_t  key;
+
+        elt = buckets[i];
+
+        if (elt == NULL) {
+            ngx_log_error(NGX_LOG_ALERT, hinit->pool->log, 0,
+                          "%ui: NULL", i);
+            continue;
+        }
+
+        while (elt->value) {
+            val.len = elt->len;
+            val.data = &elt->name[0];
+
+            key = hinit->key(val.data, val.len);
+
+            ngx_log_error(NGX_LOG_ALERT, hinit->pool->log, 0,
+                          "%ui: %p \"%V\" %ui", i, elt, &val, key);
+
+            elt = (ngx_hash_elt_t *) ngx_align_ptr(&elt->name[0] + elt->len,
+                                                   sizeof(void *));
+        }
+    }
+
+#endif
+
+    return NGX_OK;
+}
+{% endhighlight %}
+本函数根据```hint```及```name```数组完成精准匹配hash表初始化。下面我们分成几个部分来进行讲解：
+
+1) 检查```max_size```及```bucket_size```是否合法
+
+```max_size```用于指定整个hash表中桶的数目；而bucket_size用于指定每个桶的大小，它的大小必须要保证每个桶至少能存放一个```<key,value>```键值对。
+
+{% highlight string %}
+ngx_int_t
+ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
+{
+    if (hinit->max_size == 0) {
+        ngx_log_error(NGX_LOG_EMERG, hinit->pool->log, 0,
+                      "could not build %s, you should "
+                      "increase %s_max_size: %i",
+                      hinit->name, hinit->name, hinit->max_size);
+        return NGX_ERROR;
+    }
+
+    for (n = 0; n < nelts; n++) {
+        if (hinit->bucket_size < NGX_HASH_ELT_SIZE(&names[n]) + sizeof(void *))
+        {
+            ngx_log_error(NGX_LOG_EMERG, hinit->pool->log, 0,
+                          "could not build %s, you should "
+                          "increase %s_bucket_size: %i",
+                          hinit->name, hinit->name, hinit->bucket_size);
+            return NGX_ERROR;
+        }
+    }
+}
+{% endhighlight %}
+上面for循环保证hash的桶至少能装一个```<key,value>```键值对。宏```NGX_HASH_ELT_SIZE```用于计算一个实际的键值对所占用的空间。之所以后面还要再加上```sizeof(void *)```,是因为每个桶都用一个值```NULL```的void *指针来标记结束。
+
+2) 计算Hash中桶的个数
+
+
 
 <br />
 <br />

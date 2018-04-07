@@ -139,7 +139,7 @@ typedef struct {
 
 * ```key```: 散列方法
 
-* ```max_size```: 用于设置hash->size的值，即设置hash表的最大桶数
+* ```max_size```: hash表中桶的最大值,实际桶的个数存放在前面ngx_hash_t中的size字段中
 
 * ```bucket_size```: 每个bucket的空间，即ngx_hash_elt_t的空间大小
 
