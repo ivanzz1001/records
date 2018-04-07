@@ -60,6 +60,9 @@ typedef struct {
 
 * ```size```: hash桶个数
 
+![ngx-hash-buckets](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_hash_buckets.jpg)
+
+
 ## 2. ngx_hash_wildcard_t数据结构
 {% highlight string %}
 typedef struct {
@@ -186,18 +189,19 @@ typedef struct {
 
 * ```temp_pool```： 临时内存池，下面的临时动态数组是由临时内存池分配的
 
-* ```keys```: 存放所有非通配符key的数组
+* ```keys```: 存放所有非通配符key的数组。数据类型为```ngx_hash_key_t```
 
 * ```key_hash```: 这是个二维数组，第一个维度代表的是bucket编号，那么keys_hash[i]中存放的是所有key求Hash后对hsize取模值为i的key列表。假设有3个key, 分别是key1、key2和key3，假设hash算出来以后对hsize去模的值都是i，那么这三个key就顺序存放在keys_hash[i][0]、keys_hash[i][1]、keys_hash[i][2]。该值在调用的过程中用来保存和检测是否有冲突的key值，也就是是否有重复
 
 
-* ```dns_wc_head```: 存放前向通配符key被处理完成以后的值。比如```*.abc.com```被处理完成以后，变成```com.abc.```被存放在此数组中
+* ```dns_wc_head```: 存放前向通配符key被处理完成以后的值。比如```*.abc.com```被处理完成以后，变成```com.abc.```被存放在此数组中。数据类型为```ngx_hash_key_t```
 
 * ```dns_wc_head_hash```: 这是一个二维数组。该值在调用的过程中用来保存和检测是否有冲突的key值，也就是是否有重复
 
-* ```dns_wc_tail```: 存放后向通配符key被处理完成以后的值。比如：```mail.xxx.*```被处理完成以后，变成```mail.xxx.```被存放在此数组中
+* ```dns_wc_tail```: 存放后向通配符key被处理完成以后的值。比如：```mail.xxx.*```被处理完成以后，变成```mail.xxx.```被存放在此数组中。数据类型为```ngx_hash_key_t```
 
 * ```dns_wc_tail_hash```: 这是一个二维数组。该值在调用的过程中用来保存和检测是否有冲突的key值，也就是是否有重复
+
 
 
 ## 7. ngx_table_elt_t数据结构
@@ -218,24 +222,44 @@ ngx_table_elt_t是为HTTP头部量身定制的，其中key存储头部名称，v
 
 ## 8. 相关函数声明
 {% highlight string %}
+//用于从hash表中查找指定key和name的元素
 void *ngx_hash_find(ngx_hash_t *hash, ngx_uint_t key, u_char *name, size_t len);
+
+//查找带前向通配符的元素
 void *ngx_hash_find_wc_head(ngx_hash_wildcard_t *hwc, u_char *name, size_t len);
+
+//查找带后向通配符的元素
 void *ngx_hash_find_wc_tail(ngx_hash_wildcard_t *hwc, u_char *name, size_t len);
+
+//从combined中查找指定key和name的元素
 void *ngx_hash_find_combined(ngx_hash_combined_t *hash, ngx_uint_t key,
     u_char *name, size_t len);
 
+
+//hash表初始化
 ngx_int_t ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names,
     ngx_uint_t nelts);
+
+//wildcard哈希表初始化
 ngx_int_t ngx_hash_wildcard_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names,
     ngx_uint_t nelts);
 
+//单个字符的哈希算法
 #define ngx_hash(key, c)   ((ngx_uint_t) key * 31 + c)
+
+//求data的hash算法
 ngx_uint_t ngx_hash_key(u_char *data, size_t len);
+
+//首先将data转换成小写，再求hash
 ngx_uint_t ngx_hash_key_lc(u_char *data, size_t len);
+
+//首先将src转换成小写(转换后的结果存放在dst中)，再求hash
 ngx_uint_t ngx_hash_strlow(u_char *dst, u_char *src, size_t n);
 
-
+// 基于数组的hash keys初始化
 ngx_int_t ngx_hash_keys_array_init(ngx_hash_keys_arrays_t *ha, ngx_uint_t type);
+
+//向基于数组的hash keys中添加元素
 ngx_int_t ngx_hash_add_key(ngx_hash_keys_arrays_t *ha, ngx_str_t *key,
     void *value, ngx_uint_t flags);
 {% endhighlight %}
