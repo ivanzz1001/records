@@ -76,6 +76,17 @@ ngx_hash_find(ngx_hash_t *hash, ngx_uint_t key, u_char *name, size_t len)
 }
 {% endhighlight %}
 
+这里函数实现较为简单，我们主要看一下ngx_align_ptr宏，该宏的core/ngx_config.h头文件中：
+<pre>
+#define ngx_align_ptr(p, a)                                                   \
+    (u_char *) (((uintptr_t) (p) + ((uintptr_t) a - 1)) & ~((uintptr_t) a - 1))
+</pre>
+主要是实现```a```字节对齐，这里是进行```sizeof(void *)```字节对齐。
+
+
+
+
+
 <br />
 <br />
 
