@@ -164,7 +164,22 @@ harbor-offline-installer-v1.4.0.tgz
 </pre>
 
 #### 2.3.2 配置Harbor
+Harbor配置参数处于```harbor.cfg```文件中。在harbor.cfg配置文件中，有两大类参数： ```必填参数```和```可选参数```
 
+* ```required parameters```: 这些参数在配置文件中必须填写。在更新harbor.cfg配置文件后，调用install.sh重新安装Harbor，这些参数就会起作用
+
+* ```optional parameters```: 这些参数在更新时是可选的。例如， 用户可以先让这些参数取默认值，然后在Harbor启动后在Web UI上来进行修改。假如这些参数在harbor.cfg中也进行了配置，那么只在第一次启动harbor有效。后续再对harbor.cfg进行更新将会被忽略。
+
+<pre>
+Note: 假如你选择通过Web UI的方式来更改这些参数，确保在Harbor启动之后马上进行更改。通常，你必须在注册或创建新的用户之前设置auth_mode。
+当Harbor系统中有用户之后（出admin管理用户外)，auth_mode是不能被修改的
+</pre>
+
+如下所描述的参数，你至少需要更改```hostname```属性：
+
+**Required parameters**:
+
+* ```hostname```: 
 
 
 <br />
