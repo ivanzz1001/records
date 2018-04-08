@@ -71,7 +71,24 @@ docker 1.10.0+ and docker-compose 1.6.0+
 
 Harbor部署完后会运行多个Docker containers，因此可以部署在任何支持docker的Linux发布版本上。部署的目标主机需要安装```Python```, ```Docker```和```Docker Compose```。
 
-硬件环境：
+**硬件环境：**
+
+|        Resource        |         Capacity           |     Description      |
+|:----------------------:|:--------------------------:|:--------------------:|
+|        CPU             |         minimal 2 CPU      |  4 CPU is prefered   |
+|        Mem             |         minimal 4GB        |  8GB is preffered    |
+|        Disk            |         minimal 40GB       |  160GB is preffered  |
+
+
+**软件环境**
+
+|      Software      |         Version           |     Description                                                             |
+|:------------------:|:-------------------------:|:---------------------------------------------------------------------------:|
+|    Python          | version 2.7 or higher     | 注意： 在有一些Linux发布版本(Gentoo、Arch)默认没有安装Python，此时你必须手动安装   |
+|    Docker Engine   | version 1.10 or higher    | 具体安装手册，请参看相关文档:https://docs.docker.com/engine/installation/       |
+|    Docker Compose  | version 1.6.0 or higher   | 具体安装手册，请参看相关文档:https://docs.docker.com/compose/install/           |
+|    Openssl         | latest is preffered       | 用于为Harbor产生证书和秘钥                                                     |
+
 
 
 
