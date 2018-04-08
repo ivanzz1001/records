@@ -169,10 +169,10 @@ Harbor配置参数处于```harbor.cfg```文件中。在harbor.cfg配置文件中
 
 * ```optional parameters```: 这些参数在更新时是可选的。例如， 用户可以先让这些参数取默认值，然后在Harbor启动后在Web UI上来进行修改。假如这些参数在harbor.cfg中也进行了配置，那么只在第一次启动harbor有效。后续再对harbor.cfg进行更新将会被忽略。
 
-<pre>
+{% highlight string %}
 Note: 假如你选择通过Web UI的方式来更改这些参数，确保在Harbor启动之后马上进行更改。通常，你必须在注册或创建新的用户之前设置auth_mode。
 当Harbor系统中有用户之后（出admin管理用户外)，auth_mode是不能被修改的
-</pre>
+{% endhighlight %}
 
 如下所描述的参数，你至少需要更改```hostname```属性：
 
@@ -205,9 +205,9 @@ Note: 假如你选择通过Web UI的方式来更改这些参数，确保在Harbo
 * ```harbor_admin_password```: 用于设置管理员初始密码。该密码只在Harbor第一次启动时有效。启动之后该密码将会被忽略，Administrator的密码应该在UI中进行设置。注意，默认的用户名/密码为```admin/Harbor12345```。
 
 * ```auth_mode```: 用户认证的类型，默认情况下为```db_auth```，这种情况下用户名密码被存放在数据库中。如果要使用```LDAP```认证的话，请将此字段设置为```ldap_auth```。
-<pre>
+{% highlight string %}
 IMPORTANT: 当要从一个已存在的Harbor实例升级的时候，你必须确保在harbor.cfg中配置的auth_mode是相同的，否则在更新后可能会造成用户不能正常登录
-</pre>
+{% endhighlight %}
 
 * ```ldap_url```: LDAP端点的URL(例如：ldaps://ldap.mydomain.com)。只在auth_mode被设置为```ldap_auth```时使用
 
@@ -217,7 +217,7 @@ IMPORTANT: 当要从一个已存在的Harbor实例升级的时候，你必须确
 
 * ```token_expiration```: token创建多长时间之后会过期，默认是30min
 
-* ```project_creation_restriction```: 本flag用于控制哪些用于有权限来创建projects。默认情况下，任何用户都可以创建project，假如设置为```adminonly```，则只有admin用户可以创建project。
+* ```project_creation_restriction```: 本flag用于控制哪些用户有权限来创建projects。默认情况下，任何用户都可以创建project，假如设置为```adminonly```，则只有admin用户可以创建project。
 
 #### 2.3.3 配置存储后端(可选）
 默认情况下，Harbor存储镜像到本地文件系统。在实际的生产环境下，你可以采用其他的存储后端来代替本地文件系统，例如可以采用S3、OpenStack Swift、Ceph等。而这你需要修改的文件是```common/templates/registry/config.yml```的```storage```字段。例如，假如你需要配置存储后端为Openstack swift，则storage段类似如下：
@@ -255,6 +255,8 @@ Harbor已经集成了Notary/Clair(用于vulnerability scanning）。然而，默
 
 ```IMPORTANT```: 默认情况下安装Harbor，使用的是http协议。这样你必须为docker daemon添加```--insecure-registry```，并重启docker daemon服务
 
+<br />
+
 **2) Installation with Notary**
 
 要安装带```Notary```服务的Harbor，你可以在运行```install.sh```脚本时添加一个参数：
@@ -266,10 +268,14 @@ Harbor已经集成了Notary/Clair(用于vulnerability scanning）。然而，默
 
 要了解更多关于```Notary```及```Docker Content Trust```相关信息，请参看docker相关文档：[Docker Content Trust](https://docs.docker.com/engine/security/trust/content_trust/)
 
+<br />
+
 **3) Installation with Clair**
 
 要安装带```Clair```服务的Harbor，你可以在运行```install.sh```脚本时添加一个参数：
+<pre>
 
+</pre>
 
 
 
