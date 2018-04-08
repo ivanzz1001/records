@@ -91,12 +91,11 @@ Harbor部署完后会运行多个Docker containers，因此可以部署在任何
 
 **网络端口**
 
-|      Port      |     Protocol       |     Description                                                             |
-|:--------------:|:------------------:|-----------------------------------------------------------------------------|
-|    443         |    Https           | 注意： 在有一些Linux发布版本(Gentoo、Arch)默认没有安装Python，此时你必须手动安装   |
-|    4443        |    Https           | 具体安装手册，请参看相关文档:https://docs.docker.com/engine/installation/       |
-|    80          |    Http            | 具体安装手册，请参看相关文档:https://docs.docker.com/compose/install/           |
-|    Openssl     |latest is preffered | 用于为Harbor产生证书和秘钥                                                     |
+|      Port      |     Protocol       |     Description                                                              |
+|:--------------:|:------------------:|------------------------------------------------------------------------------|
+|    443         |    HTTPS           | 在https协议下，Harbor UI与API将会在本端口上接收请求                              |
+|    4443        |    HTTPS           | Harbor的Docker Content Trust service将会连接到本端口，只在Notary启用时使用       |
+|    80          |    HTTP            | 在http协议下，Harbor UI与API将会在本端口上接收请求                               |
 
 
 我们当前的硬件环境：
@@ -179,7 +178,100 @@ Note: 假如你选择通过Web UI的方式来更改这些参数，确保在Harbo
 
 **Required parameters**:
 
-* ```hostname```: 
+* ```hostname```: 目标主机的hostname名称，被用于访问WebUI和registry服务。其可以被设置为IP地址，或者你目标机器的全限定域名。例如: ```192.168.1.10```或者```reg.yourdomain.com```。注意不要将hostname设置为```localhost```或者```127.0.0.1```, registry服务需要能够被外网访问的到。
+
+* ```ui_url_protocol```: 可以设置为http或者https，默认值为http。该协议被用于访问Web UI和```token/notification```服务。假如```Notary```被使能的话，则必须设置为https。默认情况下采用http协议，要想设置为https,请参看[Configuring Harbor with HTTPS Access](Configuring Harbor with HTTPS Access)
+
+* ```db_password```: 当auth采用db_auth方式时，用于设置MySQL数据库的密码。请在任何实际生产环境中，修改此密码
+
+* ```max_job_workers```: 用于设置job service中```replication```worker的最大数（默认为3）。对于每一个image replication任务，一个worker会同步repository中所有tags到远程目标地址。增大本字段的值，允许在一个系统中有更多的并发复制进程。然而，每个replication worker都会消耗一定数量的network/CPU/IO资源，请基于你当前的硬件环境选择一个合适的值。
+
+* ```customize_crt```: 可以被设置为on或者off，默认值为on。当本属性设置为on时，prepare脚本会创建一个```private key```及```root certificate```,以用于registry token的验证。假如本属性被设置为off的话，你可以自己手动来产生```private key```及```root certificate```。请参看:[Customize Key and Certificate of Harbor Token Service](https://github.com/vmware/harbor/blob/master/docs/customize_token_service.md)
+
+* ```ssl_cert```: SSL certificate路径，当协议被设置为https时使用
+
+* ```ssl_cert_key```: SSL key路径，当协议被设置为https时使用
+
+* ```secretkey_path```: 用于加密和机密远程registry密码的key路径
+
+* ```log_rotate_count```: 用于设置日志在回滚多少次之后被删除。假如被设置为0，则日志不会被回滚，而是会被直接删除
+
+* ```log_rotate_size```: 用于设置日志在多大时会进行回滚，单位可以是K/M/G，分别表示KB/MB/GB。
+
+**Optional parameters**:
+
+* ```Email settings```: 这些信息主要是为了重置Harbor密码时使用，通常情况下我们并不需要。 
+
+* ```harbor_admin_password```: 用于设置管理员初始密码。该密码只在Harbor第一次启动时有效。启动之后该密码将会被忽略，Administrator的密码应该在UI中进行设置。注意，默认的用户名/密码为```admin/Harbor12345```。
+
+* ```auth_mode```: 用户认证的类型，默认情况下为```db_auth```，这种情况下用户名密码被存放在数据库中。如果要使用```LDAP```认证的话，请将此字段设置为```ldap_auth```。
+<pre>
+IMPORTANT: 当要从一个已存在的Harbor实例升级的时候，你必须确保在harbor.cfg中配置的auth_mode是相同的，否则在更新后可能会造成用户不能正常登录
+</pre>
+
+* ```ldap_url```: LDAP端点的URL(例如：ldaps://ldap.mydomain.com)。只在auth_mode被设置为```ldap_auth```时使用
+
+* ```ldap_searchdn```、```ldap_search_pwd```、```ldap_basedn```、```ldap_filter```、```ldap_uid```、```ldap_scope```
+
+* ```self_registration```: 可选值为on/off，默认为on。本选项用于使能或禁止注册成为本系统的账户。当被禁止时，新用户只能由admin用户来创建，在Harbor中只有admin用户可以创建新用户。注意： 当auth_mode被设置为```ldap_auth```时，self-registration功能总是会被禁止，并且此选项会被忽略。
+
+* ```token_expiration```: token创建多长时间之后会过期，默认是30min
+
+* ```project_creation_restriction```: 本flag用于控制哪些用于有权限来创建projects。默认情况下，任何用户都可以创建project，假如设置为```adminonly```，则只有admin用户可以创建project。
+
+#### 2.3.3 配置存储后端(可选）
+默认情况下，Harbor存储镜像到本地文件系统。在实际的生产环境下，你可以采用其他的存储后端来代替本地文件系统，例如可以采用S3、OpenStack Swift、Ceph等。而这你需要修改的文件是```common/templates/registry/config.yml```的```storage```字段。例如，假如你需要配置存储后端为Openstack swift，则storage段类似如下：
+<pre>
+storage:
+  swift:
+    username: admin
+    password: ADMIN_PASS
+    authurl: http://keystone_addr:35357/v3/auth
+    tenant: admin
+    domain: default
+    region: regionOne
+    container: docker_images
+</pre>
+
+想要了解详细的后端存储配置，请参看[Registry Configuration Reference ](https://docs.docker.com/registry/configuration/)
+
+#### 2.3.4 完成安装并启动Harbor
+一旦harbor.cfg及存储后端(可选）完成配置，使用```install.sh```脚本完成安装并启动Harbor。
+
+**1) 默认安装(without Notary/Clair)**
+
+Harbor已经集成了Notary/Clair(用于vulnerability scanning）。然而，默认的安装并不包含Notary/Clair:
+<pre>
+# sudo ./install.sh
+</pre>
+
+假如一切工作正常的话，你可以打开一个用户界面，然后访问后台管理页面```http://reg.yourdomain.com/```(注意这里请将reg.yourdomain.com替换为你在harbor.cfg中配置的hostname字段的值），默认的后台管理username/password为admin/Harbor12345
+
+登录admin管理页面，然后创建一个新的工程，例如```myproject```，你可以使用docker命令来登录并push镜像(默认情况下，registry server监听在80端口上）:
+<pre>
+# docker login reg.yourdomain.com
+# docker push reg.yourdomain.com/myproject/myrepo:mytag
+</pre>
+
+```IMPORTANT```: 默认情况下安装Harbor，使用的是http协议。这样你必须为docker daemon添加```--insecure-registry```，并重启docker daemon服务
+
+**2) Installation with Notary**
+
+要安装带```Notary```服务的Harbor，你可以在运行```install.sh```脚本时添加一个参数：
+<pre>
+# sudo ./install.sh --with-notary
+</pre>
+
+```NOTE```: 要让Harbor支持Notary服务的话，```ui_url_protocol```必须配置为```https```。要配置https,请参考另外的章节
+
+要了解更多关于```Notary```及```Docker Content Trust```相关信息，请参看docker相关文档：[Docker Content Trust](https://docs.docker.com/engine/security/trust/content_trust/)
+
+**3) Installation with Clair**
+
+要安装带```Clair```服务的Harbor，你可以在运行```install.sh```脚本时添加一个参数：
+
+
+
 
 
 <br />
