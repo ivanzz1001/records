@@ -241,6 +241,8 @@ storage:
 
 想要了解详细的后端存储配置，请参看[Registry Configuration Reference ](https://docs.docker.com/registry/configuration/)
 
+<br />
+
 ### 2.4 完成安装并启动Harbor
 一旦harbor.cfg及存储后端(可选）完成配置，使用```install.sh```脚本完成安装并启动Harbor。
 
@@ -261,7 +263,6 @@ Harbor已经集成了Notary/Clair(用于vulnerability scanning）。然而，默
 
 ```IMPORTANT```: 默认情况下安装Harbor，使用的是http协议。这样你必须为docker daemon添加```--insecure-registry```，并重启docker daemon服务
 
-<br />
 
 **2) Installation with Notary**
 
@@ -274,7 +275,6 @@ Harbor已经集成了Notary/Clair(用于vulnerability scanning）。然而，默
 
 要了解更多关于```Notary```及```Docker Content Trust```相关信息，请参看docker相关文档：[Docker Content Trust](https://docs.docker.com/engine/security/trust/content_trust/)
 
-<br />
 
 **3) Installation with Clair**
 
