@@ -136,9 +136,8 @@ Docker version 17.12.1-ce, build 7390fc6
 # docker-compose --version
 docker-compose version 1.20.1, build 5d8c71b
 
-# openssl version -a
+# openssl version -v
 OpenSSL 1.0.2k-fips  26 Jan 2017
-built on: reproducible build, date unspecified
 </pre>
 
 ### 2.3 安装步骤
