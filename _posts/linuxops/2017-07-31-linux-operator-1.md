@@ -185,8 +185,35 @@ int main(int argc,char *argv[])
 ngx_ncpu:40
 </pre>
 
+## 2. Linux下查看内存大小
+<pre>
+# free
+              total        used        free      shared  buff/cache   available
+Mem:       10058704      474400     8964360        9264      619944     9187956
+Swap:       5112828           0     5112828
 
-## 2. windows系统如何查看物理cpu核数(补充)
+# cat /proc/meminfo | grep MemTotal
+MemTotal:       10058704 kB
+</pre>
+
+## 3. Linux下查看硬盘大小
+<pre>
+# fdisk -l
+
+Disk /dev/sda: 85.9 GB, 85899345920 bytes, 167772160 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disk label type: dos
+Disk identifier: 0x000c3eb0
+
+   Device Boot      Start         End      Blocks   Id  System
+/dev/sda1   *        2048      616447      307200   83  Linux
+/dev/sda2          616448    10842111     5112832   82  Linux swap / Solaris
+/dev/sda3        10842112   167772159    78465024   83  Linux	
+</pre>
+
+## 4. windows系统如何查看物理cpu核数(补充)
 
 参看：https://jingyan.baidu.com/article/59703552e83cf98fc0074005.html
 
