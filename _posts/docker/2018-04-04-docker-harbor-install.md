@@ -344,6 +344,47 @@ Starting proxy ... done
 {% endhighlight %}
 
 
+### 4.1 Harbor with Notary生命周期管理
+当Harbor被安装支持Notary服务时，需要给docker-compose提供一个额外的模板文件```docker-compose.notary.yml```。docker-compose管理Harbor生命周期的命令：
+<pre>
+# sudo docker-compose -f ./docker-compose.yml -f ./docker-compose.notary.yml [ up|down|ps|stop|start ]
+</pre>
+例如，假如你想要改变```harbor.cfg```配置文件，并重新部署带Notary服务的Harbor，那么你可以用如下的命令：
+<pre>
+# sudo docker-compose -f ./docker-compose.yml -f ./docker-compose.notary.yml down -v
+# vim harbor.cfg
+# sudo prepare --with-notary
+# sudo docker-compose -f ./docker-compose.yml -f ./docker-compose.notary.yml up -d
+</pre>
+
+### 4.2 Harbor with Clair生命周期管理
+当Harbor被安装支持Clair服务时，需要给docker-compose提供一个额外的模板文件```docker-compose.clair.yml```。docker-compose管理Clair生命周期的命令：
+<pre>
+#  sudo docker-compose -f ./docker-compose.yml -f ./docker-compose.clair.yml [ up|down|ps|stop|start ]
+</pre>
+
+例如，假如你想要改变```harbor.cfg```配置文件，并重新部署带Clair服务的Harbor，那么你可以用如下的命令：
+<pre>
+# sudo docker-compose -f ./docker-compose.yml -f ./docker-compose.clair.yml down -v
+# vim harbor.cfg
+# sudo prepare --with-clair
+# sudo docker-compose -f ./docker-compose.yml -f ./docker-compose.clair.yml up -d
+</pre>
+
+### 4.3 Harbor with Notary and Clair生命周期管理
+假如你安装了同时支持Notary及Clair服务的Harbor，你应该在docker-compose命令中包含两个组件：
+<pre>
+# sudo docker-compose -f ./docker-compose.yml -f ./docker-compose.notary.yml -f ./docker-compose.clair.yml down -v
+# vim harbor.cfg
+# sudo prepare --with-notary --with-clair
+# sudo docker-compose -f ./docker-compose.yml -f ./docker-compose.notary.yml -f ./docker-compose.clair.yml up -d
+</pre>
+请参看[Docker Compose command-line reference](https://docs.docker.com/compose/reference/)以了解更多docker-compose的用法。
+
+## 5. 持久化数据及日志文件
+
+
+
 
 
 
