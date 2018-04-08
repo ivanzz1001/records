@@ -235,7 +235,7 @@ storage:
 
 想要了解详细的后端存储配置，请参看[Registry Configuration Reference ](https://docs.docker.com/registry/configuration/)
 
-#### 2.3.4 完成安装并启动Harbor
+### 2.4 完成安装并启动Harbor
 一旦harbor.cfg及存储后端(可选）完成配置，使用```install.sh```脚本完成安装并启动Harbor。
 
 **1) 默认安装(without Notary/Clair)**
@@ -274,8 +274,69 @@ Harbor已经集成了Notary/Clair(用于vulnerability scanning）。然而，默
 
 要安装带```Clair```服务的Harbor，你可以在运行```install.sh```脚本时添加一个参数：
 <pre>
-
+# sudo ./install.sh --with-clair
 </pre>
+
+要想了解更多```Clair```相关信息，请参看[Clair文档](https://coreos.com/clair/docs/2.0.1/)
+
+```注意```： 假如要同时支持Notary与Clair，你必须在同一个命令中同时指定这两个参数：
+<pre>
+# sudo ./install.sh --with-notary --with-clair
+</pre>
+
+欲了解更多Harbor的使用，请参看[User Guide of Harbor](https://github.com/vmware/harbor/blob/master/docs/user_guide.md)
+
+<br />
+
+## 3. 配置Harbor以支持https访问
+Harbor本身在发布时并不提供任何证书，默认情况下，其使用http来提供相应服务。这使得Harbor可以相对容易来建立及运行，特别是在开发及测试环境中，这很重要。然而在实际的生产环境中，并不建议采用http。要使能https，请参看[Configuring Harbor with HTTPS Access](https://github.com/vmware/harbor/blob/master/docs/configure_https.md)
+
+
+## 4. Harbor生命周期管理
+你可以使用docker-compose来管理Harbor的生命周期，下面列出一些常用的命令（说明必须在docker-compose.yml文件所在目录运行)：
+
+**1) 停止Harbor**
+{% highlight string %}
+# sudo docker-compose stop
+Stopping nginx ... done
+Stopping harbor-jobservice ... done
+Stopping harbor-ui ... done
+Stopping harbor-db ... done
+Stopping registry ... done
+Stopping harbor-log ... done
+{% endhighlight %} 
+ 
+
+**2) 在Harbor停止后，重启Harbor**
+{% highlight string %}
+# sudo docker-compose start
+Starting log ... done
+Starting ui ... done
+Starting mysql ... done
+Starting jobservice ... done
+Starting registry ... done
+Starting proxy ... done
+{% endhighlight %}
+
+**3) 如果要改变Harbor的配置，首先要停止当前已存在的Harbor实例，然后更新harbor.cfg。然后再运行```prepare```脚本更新配置文件，最后再重新创建并启动Harbor实例**
+{% highlight string %}
+# sudo docker-compose down -v
+# vim harbor.cfg
+# sudo prepare
+# sudo docker-compose up -d
+{% endhighlight %}
+
+**4) 移除Harbor容器，但保留文件系统上的image data及Harbor数据库**
+{% highlight string %}
+# sudo docker-compose down -v
+{% endhighlight %}
+
+**5) 移除Harbor数据库及image data(用于干净环境下Harbor重装)**
+{% highlight string %}
+# rm -r /data/database
+# rm -r /data/registry
+{% endhighlight %}
+
 
 
 
