@@ -148,6 +148,8 @@ OpenSSL 1.0.2k-fips  26 Jan 2017
 
 * 运行```install.sh```脚本进行安装并启动harbor
 
+<br />
+
 #### 2.3.1 解压harbor安装包
 
 我们在上面下载了harbor安装包，这里解压：
@@ -161,6 +163,8 @@ harbor-offline-installer-v1.4.0.tgz
 # tar -zxvf harbor-offline-installer-v1.4.0.tgz 
 # cd harbor
 </pre>
+
+<br />
 
 #### 2.3.2 配置Harbor
 Harbor配置参数处于```harbor.cfg```文件中。在harbor.cfg配置文件中，有两大类参数： ```必填参数```和```可选参数```
@@ -218,6 +222,8 @@ IMPORTANT: 当要从一个已存在的Harbor实例升级的时候，你必须确
 * ```token_expiration```: token创建多长时间之后会过期，默认是30min
 
 * ```project_creation_restriction```: 本flag用于控制哪些用户有权限来创建projects。默认情况下，任何用户都可以创建project，假如设置为```adminonly```，则只有admin用户可以创建project。
+
+<br />
 
 #### 2.3.3 配置存储后端(可选）
 默认情况下，Harbor存储镜像到本地文件系统。在实际的生产环境下，你可以采用其他的存储后端来代替本地文件系统，例如可以采用S3、OpenStack Swift、Ceph等。而这你需要修改的文件是```common/templates/registry/config.yml```的```storage```字段。例如，假如你需要配置存储后端为Openstack swift，则storage段类似如下：
@@ -286,7 +292,7 @@ Harbor已经集成了Notary/Clair(用于vulnerability scanning）。然而，默
 
 欲了解更多Harbor的使用，请参看[User Guide of Harbor](https://github.com/vmware/harbor/blob/master/docs/user_guide.md)
 
-<br />
+
 
 ## 3. 配置Harbor以支持https访问
 Harbor本身在发布时并不提供任何证书，默认情况下，其使用http来提供相应服务。这使得Harbor可以相对容易来建立及运行，特别是在开发及测试环境中，这很重要。然而在实际的生产环境中，并不建议采用http。要使能https，请参看[Configuring Harbor with HTTPS Access](https://github.com/vmware/harbor/blob/master/docs/configure_https.md)
