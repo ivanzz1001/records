@@ -809,6 +809,9 @@ MAC verified OK
     40) rc2-ofb
     41) rc4
     42) rc4-40
+	  
+# openssl version -v   (查看openssl版本)
+OpenSSL 1.0.2k-fips  26 Jan 2017
 {% endhighlight %}
 
 <br />
