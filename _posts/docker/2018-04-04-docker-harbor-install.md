@@ -83,7 +83,7 @@ Harbor部署完后会运行多个Docker containers，因此可以部署在任何
 **软件环境**
 
 |      Software      |         Version           |     Description                                                             |
-|:------------------:|:-------------------------:|:---------------------------------------------------------------------------:|
+|:------------------:|:-------------------------:|-----------------------------------------------------------------------------|
 |    Python          | version 2.7 or higher     | 注意： 在有一些Linux发布版本(Gentoo、Arch)默认没有安装Python，此时你必须手动安装   |
 |    Docker Engine   | version 1.10 or higher    | 具体安装手册，请参看相关文档:https://docs.docker.com/engine/installation/       |
 |    Docker Compose  | version 1.6.0 or higher   | 具体安装手册，请参看相关文档:https://docs.docker.com/compose/install/           |
@@ -91,12 +91,12 @@ Harbor部署完后会运行多个Docker containers，因此可以部署在任何
 
 **网络端口**
 
-|      Port      |     Protocol     |     Description                                                             |
-|:--------------:|:----------------:|:---------------------------------------------------------------------------:|
-|    443         |    Https         | 注意： 在有一些Linux发布版本(Gentoo、Arch)默认没有安装Python，此时你必须手动安装   |
-|    4443        |    Https         | 具体安装手册，请参看相关文档:https://docs.docker.com/engine/installation/       |
-|    80          |    Http          | 具体安装手册，请参看相关文档:https://docs.docker.com/compose/install/           |
-|    Openssl         | latest is preffered       | 用于为Harbor产生证书和秘钥                                                     |
+|      Port      |     Protocol       |     Description                                                             |
+|:--------------:|:------------------:|-----------------------------------------------------------------------------|
+|    443         |    Https           | 注意： 在有一些Linux发布版本(Gentoo、Arch)默认没有安装Python，此时你必须手动安装   |
+|    4443        |    Https           | 具体安装手册，请参看相关文档:https://docs.docker.com/engine/installation/       |
+|    80          |    Http            | 具体安装手册，请参看相关文档:https://docs.docker.com/compose/install/           |
+|    Openssl     |latest is preffered | 用于为Harbor产生证书和秘钥                                                     |
 
 
 我们当前的硬件环境：
