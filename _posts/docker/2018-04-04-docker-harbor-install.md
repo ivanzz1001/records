@@ -89,6 +89,82 @@ Harbor部署完后会运行多个Docker containers，因此可以部署在任何
 |    Docker Compose  | version 1.6.0 or higher   | 具体安装手册，请参看相关文档:https://docs.docker.com/compose/install/           |
 |    Openssl         | latest is preffered       | 用于为Harbor产生证书和秘钥                                                     |
 
+**网络端口**
+
+|      Port      |     Protocol     |     Description                                                             |
+|:--------------:|:----------------:|:---------------------------------------------------------------------------:|
+|    443         |    Https         | 注意： 在有一些Linux发布版本(Gentoo、Arch)默认没有安装Python，此时你必须手动安装   |
+|    4443        |    Https         | 具体安装手册，请参看相关文档:https://docs.docker.com/engine/installation/       |
+|    80          |    Http          | 具体安装手册，请参看相关文档:https://docs.docker.com/compose/install/           |
+|    Openssl         | latest is preffered       | 用于为Harbor产生证书和秘钥                                                     |
+
+
+我们当前的硬件环境：
+<pre>
+//物理CPU个数
+# cat /proc/cpuinfo| grep "physical id"| sort| uniq| wc -l
+1
+
+//每个CPU核数
+# cat /proc/cpuinfo| grep "cpu cores"| uniq
+cpu cores       : 4
+
+//逻辑CPU个数
+# cat /proc/cpuinfo  | grep processor
+processor       : 0
+processor       : 1
+processor       : 2
+processor       : 3
+
+# cat /proc/meminfo | grep MemTotal
+MemTotal:       10058704 kB
+
+#  fdisk -l | grep Disk
+Disk /dev/sda: 85.9 GB, 85899345920 bytes, 167772160 sectors
+Disk label type: dos
+Disk identifier: 0x000c3eb0
+</pre>
+
+我们当前软件环境：
+<pre>
+# python --version
+Python 2.7.5
+
+# docker --version
+Docker version 17.12.1-ce, build 7390fc6
+
+# docker-compose --version
+docker-compose version 1.20.1, build 5d8c71b
+
+# openssl version -a
+OpenSSL 1.0.2k-fips  26 Jan 2017
+built on: reproducible build, date unspecified
+</pre>
+
+### 2.3 安装步骤
+安装Harbor一般遵循如下步骤：
+
+* 下载Harbor installer
+
+* 配置harbor.cfg
+
+* 运行```install.sh```脚本进行安装并启动harbor
+
+#### 2.3.1 解压harbor安装包
+
+我们在上面下载了harbor安装包，这里解压：
+<pre>
+# pwd
+/opt/harbor-inst
+
+# ls
+harbor-offline-installer-v1.4.0.tgz
+
+# tar -zxvf harbor-offline-installer-v1.4.0.tgz 
+# cd harbor
+</pre>
+
+#### 2.3.2 配置Harbor
 
 
 
