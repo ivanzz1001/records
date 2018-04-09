@@ -662,7 +662,67 @@ ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
 上面for循环保证hash的桶至少能装一个```<key,value>```键值对。宏```NGX_HASH_ELT_SIZE```用于计算一个实际的键值对所占用的空间。之所以后面还要再加上```sizeof(void *)```,是因为每个桶都用一个值```NULL```的void *指针来标记结束。
 
 2) 计算Hash中桶的个数
+{% highlight string %}
+ngx_int_t
+ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
+{
+	    test = ngx_alloc(hinit->max_size * sizeof(u_short), hinit->pool->log);
+    if (test == NULL) {
+        return NGX_ERROR;
+    }
 
+    bucket_size = hinit->bucket_size - sizeof(void *);
+
+    start = nelts / (bucket_size / (2 * sizeof(void *)));
+    start = start ? start : 1;
+
+    if (hinit->max_size > 10000 && nelts && hinit->max_size / nelts < 100) {
+        start = hinit->max_size - 1000;
+    }
+
+    for (size = start; size <= hinit->max_size; size++) {
+
+        ngx_memzero(test, size * sizeof(u_short));
+
+        for (n = 0; n < nelts; n++) {
+            if (names[n].key.data == NULL) {
+                continue;
+            }
+
+            key = names[n].key_hash % size;
+            test[key] = (u_short) (test[key] + NGX_HASH_ELT_SIZE(&names[n]));
+
+#if 0
+            ngx_log_error(NGX_LOG_ALERT, hinit->pool->log, 0,
+                          "%ui: %ui %ui \"%V\"",
+                          size, key, test[key], &names[n].key);
+#endif
+
+            if (test[key] > (u_short) bucket_size) {
+                goto next;
+            }
+        }
+
+        goto found;
+
+    next:
+
+        continue;
+    }
+
+    size = hinit->max_size;
+
+    ngx_log_error(NGX_LOG_WARN, hinit->pool->log, 0,
+                  "could not build optimal %s, you should increase "
+                  "either %s_max_size: %i or %s_bucket_size: %i; "
+                  "ignoring %s_bucket_size",
+                  hinit->name, hinit->name, hinit->max_size,
+                  hinit->name, hinit->bucket_size, hinit->name);
+}
+{% endhighlight %}
+这里我们先给出一个示意图：
+
+![ngx-hash-buckets-count](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_hash_buckets_count.jpg)
 
 
 <br />
