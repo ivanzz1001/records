@@ -289,7 +289,7 @@ Set-Cookie: beegosessionID=0bcee40b8b46feaffa29d024e32f8d5c; Path=/; HttpOnly
    ]
 }
 </pre>
-上面我们获取到了```library/redis:alpine```镜像的manifests(注意上面```Bearer```后面为完整的token值，这里进行了适当裁剪)
+上面我们获取到了```library/redis:alpine```镜像的manifests。(注意上面```Bearer```后面为完整的token值，这里进行了适当裁剪)
 
 
 <br />
