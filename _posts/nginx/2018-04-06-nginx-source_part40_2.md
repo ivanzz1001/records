@@ -666,7 +666,7 @@ ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
 ngx_int_t
 ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
 {
-	    test = ngx_alloc(hinit->max_size * sizeof(u_short), hinit->pool->log);
+	test = ngx_alloc(hinit->max_size * sizeof(u_short), hinit->pool->log);
     if (test == NULL) {
         return NGX_ERROR;
     }
@@ -723,6 +723,87 @@ ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
 这里我们先给出一个示意图：
 
 ![ngx-hash-buckets-count](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_hash_buckets_count.jpg)
+
+这里nginx首先会分配一个最大的桶```hinit->max_size```，但是一般情况下我们并不需要那么大空间，这里我们会进行相应的运算，从而选出一个适合当前环境的桶大小。这里首先评估每一个```ngx_hash_elt_t```元素的大小为```2*sizeof(void *)```,则bucket[0]、bucket[1]...中每一个子桶能够容纳的元素个数约为```bucket_size/2*sizeof(void *)```,这样就评估出大概的start值。然后我们遍历```names```，分别将其hash进桶中，如果当前bucket_size能够容纳这些元素，则我们就可以采用该```size```大小作为桶数。
+
+注意上面函数中有：
+<pre>
+bucket_size = hinit->bucket_size - sizeof(void *);
+</pre>
+这里减去```sizeof(void *)```是为了减去最后一个以```NULL```结尾的指针空间
+
+
+
+3） 计算新创建Hash所占用的空间
+{% highlight string %}
+ngx_int_t
+ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
+{
+found:
+
+    for (i = 0; i < size; i++) {
+        test[i] = sizeof(void *);
+    }
+
+    for (n = 0; n < nelts; n++) {
+        if (names[n].key.data == NULL) {
+            continue;
+        }
+
+        key = names[n].key_hash % size;
+        test[key] = (u_short) (test[key] + NGX_HASH_ELT_SIZE(&names[n]));
+    }
+
+    len = 0;
+
+    for (i = 0; i < size; i++) {
+        if (test[i] == sizeof(void *)) {
+            continue;
+        }
+
+        test[i] = (u_short) (ngx_align(test[i], ngx_cacheline_size));
+
+        len += test[i];
+    }
+
+}
+{% endhighlight %}
+这里首先将test[i]的值都初始化为```sizeof(void *)```,即一个```NULL```结尾指针的大小。再接着将```names```所有元素hash进桶中，然后计算出每个子桶占用的空间大小； 最后在求出所有这些子桶总共占用的空间大小。
+
+上面根据实际的<key,value>键值对来实际计算每个桶的大小，而不是所有桶的大小的设置成一样的，这样能很有效的节约内存空间，当然由于每个桶的大小是不固定的，所有每个桶的末尾需要一个额外空间（大小为sizeof(void*)）来标记桶的结束。并且每个桶大小满足cache行对齐，这样能加快访问速度，从这里也可以看出nginx无处不在优化程序的性能和资源的使用效率。
+
+4) 分配一级桶空间
+{% highlight string %}
+ngx_int_t
+ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
+{
+
+    if (hinit->hash == NULL) {
+        hinit->hash = ngx_pcalloc(hinit->pool, sizeof(ngx_hash_wildcard_t)
+                                             + size * sizeof(ngx_hash_elt_t *));
+        if (hinit->hash == NULL) {
+            ngx_free(test);
+            return NGX_ERROR;
+        }
+
+        buckets = (ngx_hash_elt_t **)
+                      ((u_char *) hinit->hash + sizeof(ngx_hash_wildcard_t));
+
+    } else {
+        buckets = ngx_pcalloc(hinit->pool, size * sizeof(ngx_hash_elt_t *));
+        if (buckets == NULL) {
+            ngx_free(test);
+            return NGX_ERROR;
+        }
+    }
+
+}
+{% endhighlight %}
+这里如果```hinit->hash```为NULL时，则首先应该为```hash```(ngx_hash_t)本身分配空间，并且需要为hash所指向的桶分配空间。这里为hash本身分配空间时，使用的是```sizeof(ngx_hash_wildcard_t)```,多分配了一小点空间。分配后如下所示：
+
+![ngx-hash-buckets-alloc](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_hash_buckets_alloc.jpg)
+
+
 
 
 <br />
