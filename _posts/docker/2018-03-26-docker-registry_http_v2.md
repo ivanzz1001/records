@@ -215,8 +215,31 @@ Content-Length: 78
 Accept: application/vnd.docker.distribution.manifest.v2+json
 </pre>
 
+## 3. 附录
+下面给出Basic认证条件下，求授权信息信息的方法实现：
+{% highlight string %}
+package main
 
+import (
+	"encoding/base64"
+	"fmt"
+)
 
+func main(){
+
+	username := "admin"
+	password := "Harbor12345"
+
+	auth := username + ":" + password
+
+	str := base64.StdEncoding.EncodeToString([]byte(auth))
+
+	fmt.Println(str)
+
+}
+{% endhighlight %}
+
+运行输出```YWRtaW46SGFyYm9yMTIzNDU=```。
 <br />
 <br />
 

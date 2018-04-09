@@ -382,9 +382,388 @@ Starting proxy ... done
 请参看[Docker Compose command-line reference](https://docs.docker.com/compose/reference/)以了解更多docker-compose的用法。
 
 ## 5. 持久化数据及日志文件
+默认情况下，registry的数据会被持久化到主机的```/data/```目录。即使在容器被移除或者重新创建的情况下，这些数据都会维持不变。
+
+另外，Harbor使用```rsyslog```来收集每一个容器的日志。默认情况下，这些日志文件都被存储在```/var/log/harbor```目录下，我们可以使用这些日志来处理一些相关问题。
+
+## 6. 定制化Harbor监听端口
+
+默认情况下，Harbor会监听80端口(http)和443端口(假如配置了https)，以此来处理Harbor的后台管理操作及支持docker的相关命令。你也可以对这些端口进行相应的定制。
+
+### 6.1 定制http协议端口
+
+**1) 修改docker-compose.yml文件**
+
+替换第一个```80```端口为一个定制化指定端口，例如```8888:80```: 
+<pre>
+proxy:
+    image: library/nginx:1.11.5
+    restart: always
+    volumes:
+      - ./config/nginx:/etc/nginx
+    ports:
+      - 8888:80
+      - 443:443
+    depends_on:
+      - mysql
+      - registry
+      - ui
+      - log
+    logging:
+      driver: "syslog"
+      options:  
+        syslog-address: "tcp://127.0.0.1:1514"
+        tag: "proxy"
+</pre>
+
+**2) 修改harbor.cfg文件，添加端口到```hostname```参数**
+<pre>
+hostname = 192.168.0.2:8888
+</pre>
+
+**3) 重新部署Harbor**
+
+请参看前面"Harbor生命周期管理"相关章节。
+
+### 6.2 定制https协议端口
+
+**1) 在Harbor中使能HTTPS**
+
+请参看相关章节。
+
+**2) 修改docker-compose.yml文件**
+
+将第一个```443```端口替换为一个定制化指定端口，例如```8888:80```:
+<pre>
+proxy:
+    image: library/nginx:1.11.5
+    restart: always
+    volumes:
+      - ./config/nginx:/etc/nginx
+    ports:
+      - 80:80
+      - 8888:443
+    depends_on:
+      - mysql
+      - registry
+      - ui
+      - log
+    logging:
+      driver: "syslog"
+      options:  
+        syslog-address: "tcp://127.0.0.1:1514"
+        tag: "proxy"
+</pre>
+
+**3) 修改harbor.cfg文件，添加端口到```hostname```参数**
+<pre>
+hostname = 192.168.0.2:8888
+</pre>
+
+**4) 重新部署Harbor**
+
+请参看前面"Harbor生命周期管理"相关章节。 
 
 
 
+## 7. 性能调优
+默认情况下，Harbor会限制Clair容器的的CPU使用率为15000来避免其占用所有的CPU资源。这是在```docker-compose.clair.yml```文件中进行配置的。你可以根据你的硬件配置进行相应的修改。
+
+## 8. Troubleshooting
+
+1） 当Harbor不能正常工作时，通过运行如下的命令来找出是否所有的容器都处于```UP```状态
+<pre>
+# sudo docker-compose ps
+        Name                     Command               State                    Ports                   
+  -----------------------------------------------------------------------------------------------------
+  harbor-db           docker-entrypoint.sh mysqld      Up      3306/tcp                                 
+  harbor-jobservice   /harbor/harbor_jobservice        Up                                               
+  harbor-log          /bin/sh -c crond && rsyslo ...   Up      127.0.0.1:1514->514/tcp                    
+  harbor-ui           /harbor/harbor_ui                Up                                               
+  nginx               nginx -g daemon off;             Up      0.0.0.0:443->443/tcp, 0.0.0.0:80->80/tcp 
+  registry            /entrypoint.sh serve /etc/ ...   Up      5000/tcp 
+</pre>
+假如有一个container不是处于```UP```状态，请检查```/var/log/harbor```目录下该容器的日志。例如，假如```harbor-ui```没有运行的话，你可以查询```ui.log```日志文件。
+
+2) 当在一个Nginx代代理或ELB(elastic load balancing)后端建立Harbor时，请在```common/templates/nginx/nginx.http.conf```文件中查询如下行：
+<pre>
+proxy_set_header X-Forwarded-Proto $scheme;
+</pre>
+假如代理中已经有类似于```location /, location /v2/ 与 location /service/```的设置，请将其从所在section移除，然后根据上面```Harbor生命周期管理```相关章节重新部署Harbor。
+
+
+## 9. 部署示例
+前面我们已经下载并解压好了harbor，这里我们进入解压好的根目录：
+<pre>
+# cd /opt/harbor-inst/harbor
+# ls
+common  docker-compose.clair.yml  docker-compose.notary.yml  docker-compose.yml  ha  harbor.cfg  harbor.v1.4.0.tar.gz  install.sh  LICENSE  NOTICE  prepare
+</pre>
+
+我们当前ip地址为```192.168.69.128```, 用netstat查看```80```、```443```等端口也没有被占用。
+
+**1) 修改harbor.cfg的```hostname```字段**
+<pre>
+hostname = 192.168.69.128
+</pre>
+
+**2) 执行install.sh脚本**
+<pre>
+# ./install.sh 
+
+[Step 0]: checking installation environment ...
+
+Note: docker version: 17.12.1
+
+Note: docker-compose version: 1.20.1
+
+[Step 1]: loading Harbor images ...
+651f69aef02c: Loading layer [==================================================>]  135.8MB/135.8MB
+40a1aad64343: Loading layer [==================================================>]  23.24MB/23.24MB
+3fe2713e4072: Loading layer [==================================================>]  12.16MB/12.16MB
+ba3a1eb0e375: Loading layer [==================================================>]   17.3MB/17.3MB
+447427ec5e1a: Loading layer [==================================================>]  15.87kB/15.87kB
+4ccb4026663c: Loading layer [==================================================>]  3.072kB/3.072kB
+16faa95946a1: Loading layer [==================================================>]  29.46MB/29.46MB
+Loaded image: vmware/notary-server-photon:v0.5.1-v1.4.0
+fa7ba9fd42c9: Loading layer [==================================================>]  10.95MB/10.95MB
+4e400f9ae23e: Loading layer [==================================================>]   17.3MB/17.3MB
+2802fb27c88b: Loading layer [==================================================>]  15.87kB/15.87kB
+e6367a4e1e1e: Loading layer [==================================================>]  3.072kB/3.072kB
+8ece8dfcdd98: Loading layer [==================================================>]  28.24MB/28.24MB
+Loaded image: vmware/notary-signer-photon:v0.5.1-v1.4.0
+a7dd1a8afcaf: Loading layer [==================================================>]  396.7MB/396.7MB
+05adebbe496f: Loading layer [==================================================>]  9.216kB/9.216kB
+86eb534949fa: Loading layer [==================================================>]  9.216kB/9.216kB
+d7f127c69380: Loading layer [==================================================>]   7.68kB/7.68kB
+5ac1c4dc5ee9: Loading layer [==================================================>]  1.536kB/1.536kB
+d0bec56b5b1a: Loading layer [==================================================>]  9.728kB/9.728kB
+4bbe83860556: Loading layer [==================================================>]   2.56kB/2.56kB
+e526f9e6769f: Loading layer [==================================================>]  3.072kB/3.072kB
+Loaded image: vmware/harbor-db:v1.4.0
+1cff102bbda2: Loading layer [==================================================>]  154.1MB/154.1MB
+04c9f3e07de1: Loading layer [==================================================>]  10.75MB/10.75MB
+7b6c7bf54f5c: Loading layer [==================================================>]  2.048kB/2.048kB
+42f8acdb7fe3: Loading layer [==================================================>]  48.13kB/48.13kB
+5b6299d0a1df: Loading layer [==================================================>]   10.8MB/10.8MB
+Loaded image: vmware/clair-photon:v2.0.1-v1.4.0
+6534131f457c: Loading layer [==================================================>]  94.76MB/94.76MB
+73f582101e4b: Loading layer [==================================================>]  6.656kB/6.656kB
+86d847823c48: Loading layer [==================================================>]  6.656kB/6.656kB
+Loaded image: vmware/postgresql-photon:v1.4.0
+5cd250d5a352: Loading layer [==================================================>]  23.24MB/23.24MB
+ad3fd52b54f3: Loading layer [==================================================>]  14.99MB/14.99MB
+13b1e24cc368: Loading layer [==================================================>]  14.99MB/14.99MB
+Loaded image: vmware/harbor-adminserver:v1.4.0
+c26c69706710: Loading layer [==================================================>]  23.24MB/23.24MB
+223f6fe02cc8: Loading layer [==================================================>]  23.45MB/23.45MB
+1fc843c8698a: Loading layer [==================================================>]  7.168kB/7.168kB
+e09293610ee7: Loading layer [==================================================>]  10.39MB/10.39MB
+d59f9780b1d8: Loading layer [==================================================>]  23.44MB/23.44MB
+Loaded image: vmware/harbor-ui:v1.4.0
+dd4753242e59: Loading layer [==================================================>]  73.07MB/73.07MB
+95aed61ca251: Loading layer [==================================================>]  3.584kB/3.584kB
+1864f9818562: Loading layer [==================================================>]  3.072kB/3.072kB
+da2a19f80b81: Loading layer [==================================================>]  4.096kB/4.096kB
+058531639e75: Loading layer [==================================================>]  3.584kB/3.584kB
+a84e69fb619b: Loading layer [==================================================>]  10.24kB/10.24kB
+Loaded image: vmware/harbor-log:v1.4.0
+b1056051f246: Loading layer [==================================================>]  23.24MB/23.24MB
+07678065e08b: Loading layer [==================================================>]  19.19MB/19.19MB
+a2d9bdb8f5fb: Loading layer [==================================================>]  19.19MB/19.19MB
+Loaded image: vmware/harbor-jobservice:v1.4.0
+7f58ce57cd5e: Loading layer [==================================================>]  4.805MB/4.805MB
+Loaded image: vmware/nginx-photon:v1.4.0
+4c8965978b77: Loading layer [==================================================>]  23.24MB/23.24MB
+1466c942edde: Loading layer [==================================================>]  2.048kB/2.048kB
+ac5c17331735: Loading layer [==================================================>]  2.048kB/2.048kB
+86824c7c466a: Loading layer [==================================================>]  2.048kB/2.048kB
+fd3bd0e70d67: Loading layer [==================================================>]   22.8MB/22.8MB
+b02195d77636: Loading layer [==================================================>]   22.8MB/22.8MB
+Loaded image: vmware/registry-photon:v2.6.2-v1.4.0
+Loaded image: vmware/photon:1.0
+Loaded image: vmware/mariadb-photon:v1.4.0
+454c81edbd3b: Loading layer [==================================================>]  135.2MB/135.2MB
+e99db1275091: Loading layer [==================================================>]  395.4MB/395.4MB
+051e4ee23882: Loading layer [==================================================>]  9.216kB/9.216kB
+6cca4437b6f6: Loading layer [==================================================>]  9.216kB/9.216kB
+1d48fc08c8bc: Loading layer [==================================================>]   7.68kB/7.68kB
+0419724fd942: Loading layer [==================================================>]  1.536kB/1.536kB
+526b2156bd7a: Loading layer [==================================================>]  637.8MB/637.8MB
+9ebf6900ecbd: Loading layer [==================================================>]  78.34kB/78.34kB
+Loaded image: vmware/harbor-db-migrator:1.4
+
+
+[Step 2]: preparing environment ...
+Generated and saved secret to file: /data/secretkey
+Generated configuration file: ./common/config/nginx/nginx.conf
+Generated configuration file: ./common/config/adminserver/env
+Generated configuration file: ./common/config/ui/env
+Generated configuration file: ./common/config/registry/config.yml
+Generated configuration file: ./common/config/db/env
+Generated configuration file: ./common/config/jobservice/env
+Generated configuration file: ./common/config/log/logrotate.conf
+Generated configuration file: ./common/config/jobservice/app.conf
+Generated configuration file: ./common/config/ui/app.conf
+Generated certificate, key file: ./common/config/ui/private_key.pem, cert file: ./common/config/registry/root.crt
+The configuration files are ready, please use docker-compose to start the service.
+
+
+[Step 3]: checking existing instance of Harbor ...
+
+
+[Step 4]: starting Harbor ...
+Creating network "harbor_harbor" with the default driver
+Creating harbor-log ... done
+Creating harbor-adminserver ... done
+Creating harbor-db          ... done
+Creating registry           ... done
+Creating harbor-ui          ... done
+Creating harbor-jobservice  ... done
+Creating nginx              ... done
+
+✔ ----Harbor has been installed and started successfully.----
+
+Now you should be able to visit the admin portal at http://192.168.69.128. 
+For more details, please visit https://github.com/vmware/harbor .
+
+</pre>
+
+**3) 查询Harbor运行状态**
+{% highlight string %}
+# docker ps
+CONTAINER ID        IMAGE                                  COMMAND                  CREATED             STATUS                            PORTS                                                              NAMES
+10b95448f80f        vmware/nginx-photon:v1.4.0             "nginx -g 'daemon of…"   5 seconds ago       Up 4 seconds                      0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp, 0.0.0.0:4443->4443/tcp   nginx
+64893e6ba9d3        vmware/harbor-jobservice:v1.4.0        "/harbor/start.sh"       5 seconds ago       Up 4 seconds (health: starting)                                                                      harbor-jobservice
+62220b07e57f        vmware/harbor-ui:v1.4.0                "/harbor/start.sh"       5 seconds ago       Up 5 seconds (health: starting)                                                                      harbor-ui
+ce166d26724e        vmware/harbor-db:v1.4.0                "/usr/local/bin/dock…"   7 seconds ago       Up 6 seconds (health: starting)   3306/tcp                                                           harbor-db
+a62d8f460c35        vmware/registry-photon:v2.6.2-v1.4.0   "/entrypoint.sh serv…"   7 seconds ago       Up 5 seconds (health: starting)   5000/tcp                                                           registry
+5e5e4bcee123        vmware/harbor-adminserver:v1.4.0       "/harbor/start.sh"       7 seconds ago       Up 6 seconds (health: starting)                                                                      harbor-adminserver
+cb6dbc564382        vmware/harbor-log:v1.4.0               "/bin/sh -c /usr/loc…"   7 seconds ago       Up 6 seconds (health: starting)   127.0.0.1:1514->10514/tcp                                          harbor-log
+{% endhighlight %}
+
+**4) 访问**
+
+首先我们用curl命令访问一下：
+<pre>
+# curl -X GET http://192.168.69.128 -k -IL
+HTTP/1.1 200 OK
+Server: nginx
+Date: Mon, 09 Apr 2018 02:43:20 GMT
+Content-Type: text/html; charset=utf-8
+Content-Length: 810
+Connection: keep-alive
+Set-Cookie: beegosessionID=1720767232a3cdcb58a54cd13eead058; Path=/; HttpOnly
+</pre>
+
+然后我们再用浏览器访问。
+
+**5） 向Harbor push/pull镜像**
+
+* 停止Harbor
+<pre>
+# docker-compose stop
+Stopping nginx              ... done
+Stopping harbor-jobservice  ... done
+Stopping harbor-ui          ... done
+Stopping harbor-db          ... done
+Stopping registry           ... 
+Stopping registry           ... done
+Stopping harbor-adminserver ... done
+Stopping harbor-log         ... done
+</pre>
+
+* 修改dockerd启动脚本
+
+这里修改```/lib/systemd/system/docker.service```文件，将```ExecStart```修改为：
+<pre>
+ExecStart=/usr/bin/dockerd \
+        --insecure-registry=192.168.69.128 \
+        -H tcp://0.0.0.0:2375 \
+        -H unix://var/run/docker.sock \
+        -H tcp://0.0.0.0:7654
+</pre>
+上面添加了```--insecure-registry```选项。然后执行再执行如下命令重启dockerd:
+<pre>
+# systemctl daemon-reload
+
+# systemctl restart docker
+</pre>
+
+**6） 重启Harbor**
+{% highlight string %}
+# docker-compose start
+Starting log         ... done
+Starting registry    ... done
+Starting mysql       ... done
+Starting adminserver ... done
+Starting ui          ... done
+Starting jobservice  ... done
+Starting proxy       ... done
+# docker ps
+CONTAINER ID        IMAGE                                  COMMAND                  CREATED             STATUS                            PORTS                                                              NAMES
+10b95448f80f        vmware/nginx-photon:v1.4.0             "nginx -g 'daemon of…"   21 minutes ago      Up Less than a second             0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp, 0.0.0.0:4443->4443/tcp   nginx
+64893e6ba9d3        vmware/harbor-jobservice:v1.4.0        "/harbor/start.sh"       21 minutes ago      Up 4 seconds (health: starting)                                                                      harbor-jobservice
+62220b07e57f        vmware/harbor-ui:v1.4.0                "/harbor/start.sh"       21 minutes ago      Up 4 seconds (health: starting)                                                                      harbor-ui
+ce166d26724e        vmware/harbor-db:v1.4.0                "/usr/local/bin/dock…"   21 minutes ago      Up 57 seconds (healthy)           3306/tcp                                                           harbor-db
+a62d8f460c35        vmware/registry-photon:v2.6.2-v1.4.0   "/entrypoint.sh serv…"   21 minutes ago      Up 57 seconds (healthy)           5000/tcp                                                           registry
+5e5e4bcee123        vmware/harbor-adminserver:v1.4.0       "/harbor/start.sh"       21 minutes ago      Up 4 seconds (health: starting)                                                                      harbor-adminserver
+cb6dbc564382        vmware/harbor-log:v1.4.0               "/bin/sh -c /usr/loc…"   21 minutes ago      Up 57 seconds (healthy)           127.0.0.1:1514->10514/tcp                                          harbor-log
+{% endhighlight %}
+
+**7) 往Harbor中push/pull镜像**
+
+* 登录
+<pre>
+# docker login 192.168.69.128
+Username: admin
+Password: 
+Login Succeeded
+</pre>
+
+* 重新为镜像打tag
+<pre>
+# docker images
+REPOSITORY                    TAG                 IMAGE ID            CREATED             SIZE
+test-image                    latest              fe9c46d12863        7 days ago          195MB
+friendlyhello                 latest              f2ae8dec6267        9 days ago          150MB
+redis                         alpine              c27f56585938        3 weeks ago         27.7MB
+
+//这里我们用Harbor中的默认库
+# docker tag redis:alpine 192.168.69.128/library/redis:alpine
+# docker images | grep redis
+192.168.69.128/library/redis          alpine              c27f56585938        3 weeks ago         27.7MB
+redis                         alpine              c27f56585938        3 weeks ago         27.7MB
+</pre>
+
+
+
+* 上传镜像到Harbor
+<pre>
+# docker push 192.168.69.128/library/redis:alpine
+The push refers to repository [192.168.69.128/library/redis]
+f6b9463783dc: Pushed 
+222a85888a99: Pushed 
+1925395eabdd: Pushed 
+c3d278563734: Pushed 
+ad9247fe8c63: Pushed 
+cd7100a72410: Pushed 
+alpine: digest: sha256:9d017f829df3d0800f2a2582c710143767f6dda4df584b708260e73b1a1b6db3 size: 1568
+</pre>
+
+然后我们登录网站，可以看到镜像上传成功。（注： 这里Harbor默认采用```Www-Authenticate: Bearer```认证）
+
+* 下载镜像
+<pre>
+//这里我们先把原来本地的镜像删除
+# docker rmi 192.168.69.128/library/redis:alpine
+
+//从Harbor镜像库拉取镜像
+# docker pull 192.168.69.128/library/redis:alpine
+alpine: Pulling from library/redis
+Digest: sha256:9d017f829df3d0800f2a2582c710143767f6dda4df584b708260e73b1a1b6db3
+Status: Downloaded newer image for 192.168.69.128/library/redis:alpine
+</pre>
 
 
 
