@@ -1,6 +1,6 @@
 ---
 layout: post
-title: core/ngx_hash.c源文件分析
+title: core/ngx_hash.c源文件分析(1)
 tags:
 - nginx
 categories: nginx
