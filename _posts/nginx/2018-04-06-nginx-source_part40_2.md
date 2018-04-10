@@ -412,7 +412,7 @@ ngx_hash_find_combined(ngx_hash_combined_t *hash, ngx_uint_t key, u_char *name,
 #define NGX_HASH_ELT_SIZE(name)                                               \
     (sizeof(void *) + ngx_align((name)->key.len + 2, sizeof(void *)))
 {% endhighlight %}
-这里求```ngx_hash_elt_t```结构体的大小。
+这里求```ngx_hash_elt_t```结构体的大小。注意会进行```sizeof(void *)```字节对齐。
 
 ## 6. 函数ngx_hash_init()
 {% highlight string %}
@@ -804,6 +804,86 @@ ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
 ![ngx-hash-buckets-alloc](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_hash_buckets_alloc.jpg)
 
 
+5) 分配二级子桶空间
+{% highlight string %}
+ngx_int_t
+ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
+{
+	elts = ngx_palloc(hinit->pool, len + ngx_cacheline_size);
+    if (elts == NULL) {
+        ngx_free(test);
+        return NGX_ERROR;
+    }
+
+    elts = ngx_align_ptr(elts, ngx_cacheline_size);
+}
+{% endhighlight %}
+这里分配的空间为```len+ngx_cacheline_size```，这是因为我们下面需要进行```ngx_cacheline_size```大小对齐。
+
+6） 初始化一级桶相关指针
+{% highlight string %}
+ngx_int_t
+ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
+{
+	   for (i = 0; i < size; i++) {
+        if (test[i] == sizeof(void *)) {
+            continue;
+        }
+
+        buckets[i] = (ngx_hash_elt_t *) elts;
+        elts += test[i];
+
+    }
+}
+{% endhighlight %}
+因为这里二级桶分配的是一块连续的内存空间，因此这里需要对一级桶指针做一个初始化。
+
+7) 初始化hash表
+{% highlight string %}
+ngx_int_t
+ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
+{
+	    for (i = 0; i < size; i++) {
+        test[i] = 0;
+    }
+
+    for (n = 0; n < nelts; n++) {
+        if (names[n].key.data == NULL) {
+            continue;
+        }
+
+        key = names[n].key_hash % size;
+        elt = (ngx_hash_elt_t *) ((u_char *) buckets[key] + test[key]);
+
+        elt->value = names[n].value;
+        elt->len = (u_short) names[n].key.len;
+
+        ngx_strlow(elt->name, names[n].key.data, names[n].key.len);
+
+        test[key] = (u_short) (test[key] + NGX_HASH_ELT_SIZE(&names[n]));
+    }
+
+    for (i = 0; i < size; i++) {
+        if (buckets[i] == NULL) {
+            continue;
+        }
+
+        elt = (ngx_hash_elt_t *) ((u_char *) buckets[i] + test[i]);
+
+        elt->value = NULL;
+    }
+
+    ngx_free(test);
+
+    hinit->hash->buckets = buckets;
+    hinit->hash->size = size;
+}
+{% endhighlight %}
+这里对```names```数组中的每一个元素，将其映射到hash表中。第二个for循环用于将每个子桶中的最末尾位置置为NULL，以做结尾使用。
+
+到此位置，就完成了Hash表的初始化，下面给出一幅Hash的大概图景：
+
+![ngx-hash-init](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_hash_init.jpg)
 
 
 <br />
