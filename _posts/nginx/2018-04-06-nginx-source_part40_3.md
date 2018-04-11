@@ -174,7 +174,31 @@ ngx_hash_wildcard_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names,
 
 ![ngx-wildcard-hash](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_wildcard_hash.jpg)
 
-上图只显示了二级Hash，实际上可能会出现多级Hash的情况。接下来我们分成好几个部分来讲解一下ngx_hash_wildcard_init()函数：
+上图只显示了二级Hash，实际上可能会出现多级Hash的情况。这里我们再举一个例子来加深理解，假设有下面的键值对<key,value>:
+{% highlight string %}
+<*.com, "220.181.111.147">,<*.baidu.com, "220.181.111.147">,<*.baidu.com.cn, "220.181.111.147">,<*.google.com，"58.63.236.35">
+{% endhighlight %}
+
+再调用后面的```ngx_hash_add_key()```函数添加到```dns_wc_head```数组中时，该数组值最后会被处理成如下所示：
+<pre>
+{key = ("com.", 4 ), key_hash = 0, value = "220.181.111.147"}
+{key = ("cn.com.baidu.", 13), key_hash = 0, value = "220.181.111.147"}
+{key = ("com.baidu.", 10), key_hash = 0, value = "220.181.111.147"}
+{key = ("com.google.", 11), key_hash = 0, value = "58.63.236.35"}
+</pre>
+
+然后将```dns_wc_head```数组中的值添加到hash表中之前，一般都会先调用```qsort()```函数进行排序，处理成为：
+<pre>
+{key = ("cn.com.baidu.", 13), key_hash = 0, value = "220.181.111.147"}
+{key = ("com.", 4 ), key_hash = 0, value = "220.181.111.147"}
+{key = ("com.baidu.", 10), key_hash = 0, value = "220.181.111.147"}
+{key = ("com.google.", 11), key_hash = 0, value = "58.63.236.35"}
+</pre>
+这样处理完成后，所有相同前缀的元素都会排在一起。
+
+
+
+接下来我们分成好几个部分来讲解一下ngx_hash_wildcard_init()函数：
 
 1) 初始化两个数组
 {% highlight string %}
@@ -197,8 +221,64 @@ ngx_hash_wildcard_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names,
     }
 }
 {% endhighlight %}
+其中第一个数组```curr_names```用于处理上图中的```一级Hash元素```; 而```next_names```用于处理```子级Hash元素```(二级以上）。
+
+2） 构建Hash表
+{% highlight string %}
+ngx_int_t
+ngx_hash_wildcard_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names,
+    ngx_uint_t nelts)
+{
+    // 这里for循环时，n可能不是每次+1， 这是因为在处理到有相同前缀的元素时，会构造子hash，后面这些元素都交由子Hash来处理
+	for (n = 0; n < nelts; n = i) {
+      
+         //1) 寻找到names[n]中的第一个'.'字符（例如上面cn.com.baidu.)
+   
+         //2) 将寻找到的元素放入curr_names数组中(这里查找的元素为cn)
+
+         //3) 假如查找到的元素长度不等于names[n]的总长度, 则初始化next_names数组(例如，上面len(cn) != len(cn.com.baidu))
+      
+        //4) 从names[n+1]开始，判断后续是否有与上面查找到的元素同前缀的names， 如果有则加到next_names数组中
+
+        //5） 假如next_names数组长度不为0，则递归调用ngx_hash_wildcard_init()函数，构建子级Hash
+         if (next_names.nelts) {
+
+            h = *hinit;
+            h.hash = NULL;
+
+            if (ngx_hash_wildcard_init(&h, (ngx_hash_key_t *) next_names.elts,
+                                       next_names.nelts)
+                != NGX_OK)
+            {
+                return NGX_ERROR;
+            }
+
+            wdc = (ngx_hash_wildcard_t *) h.hash;
+
+            //全匹配的Hash值在wdc->value处
+            if (names[n].key.len == len) {
+                wdc->value = names[n].value;
+            }
+
+            //这里dot来区分该元素是否匹配到了最末尾
+            name->value = (void *) ((uintptr_t) wdc | (dot ? 3 : 2));
+
+        } else if (dot) {
+
+            //并没有子级Hash的情况
+            name->value = (void *) ((uintptr_t) name->value | 1);
+        }
+    }
+
+    //6) 初始化一级Hash表
+
+}
+{% endhighlight %}
 
 
+下面给出上面所举例子的一个Hash图：
+
+![ngx-wildcard-hash-eg](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_wildcard_hash._eg.jpg)
 
 
 
