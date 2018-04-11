@@ -280,8 +280,123 @@ ngx_hash_wildcard_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names,
 
 ![ngx-wildcard-hash-eg](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_wildcard_hash._eg.jpg)
 
+## 2. 函数ngx_hash_key() 
+{% highlight string %}
+ngx_uint_t
+ngx_hash_key(u_char *data, size_t len)
+{
+    ngx_uint_t  i, key;
 
+    key = 0;
 
+    for (i = 0; i < len; i++) {
+        key = ngx_hash(key, data[i]);
+    }
+
+    return key;
+}
+{% endhighlight %}
+本函数用于对一个字符串求Hash：
+<pre>
+key = (ngx_uint_t) key * 31 + data[i];
+</pre>
+
+## 3. 函数ngx_hash_key_lc()
+{% highlight string %}
+ngx_uint_t
+ngx_hash_key_lc(u_char *data, size_t len)
+{
+    ngx_uint_t  i, key;
+
+    key = 0;
+
+    for (i = 0; i < len; i++) {
+        key = ngx_hash(key, ngx_tolower(data[i]));
+    }
+
+    return key;
+}
+{% endhighlight %}
+
+这里将data字符串转换为小写来求Hash
+
+## 4. 函数ngx_hash_strlow()
+{% highlight string %}
+ngx_uint_t
+ngx_hash_strlow(u_char *dst, u_char *src, size_t n)
+{
+    ngx_uint_t  key;
+
+    key = 0;
+
+    while (n--) {
+        *dst = ngx_tolower(*src);
+        key = ngx_hash(key, *dst);
+        dst++;
+        src++;
+    }
+
+    return key;
+}
+{% endhighlight %}
+这里在求Hash的同时，将src转化成小写.
+
+## 5. 函数ngx_hash_keys_array_init()
+{% highlight string %}
+ngx_int_t
+ngx_hash_keys_array_init(ngx_hash_keys_arrays_t *ha, ngx_uint_t type)
+{
+    ngx_uint_t  asize;
+
+    if (type == NGX_HASH_SMALL) {
+        asize = 4;
+        ha->hsize = 107;
+
+    } else {
+        asize = NGX_HASH_LARGE_ASIZE;
+        ha->hsize = NGX_HASH_LARGE_HSIZE;
+    }
+
+    if (ngx_array_init(&ha->keys, ha->temp_pool, asize, sizeof(ngx_hash_key_t))
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    if (ngx_array_init(&ha->dns_wc_head, ha->temp_pool, asize,
+                       sizeof(ngx_hash_key_t))
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    if (ngx_array_init(&ha->dns_wc_tail, ha->temp_pool, asize,
+                       sizeof(ngx_hash_key_t))
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    ha->keys_hash = ngx_pcalloc(ha->temp_pool, sizeof(ngx_array_t) * ha->hsize);
+    if (ha->keys_hash == NULL) {
+        return NGX_ERROR;
+    }
+
+    ha->dns_wc_head_hash = ngx_pcalloc(ha->temp_pool,
+                                       sizeof(ngx_array_t) * ha->hsize);
+    if (ha->dns_wc_head_hash == NULL) {
+        return NGX_ERROR;
+    }
+
+    ha->dns_wc_tail_hash = ngx_pcalloc(ha->temp_pool,
+                                       sizeof(ngx_array_t) * ha->hsize);
+    if (ha->dns_wc_tail_hash == NULL) {
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+{% endhighlight %}
 
 
 
