@@ -123,7 +123,7 @@ Date: Mon, 26 Mar 2018 11:56:38 GMT
 {"repositories":["busybox","centos-sshd"]}
 </pre>
 
-**3) /v2/<name>/tags/list获得镜像标签**
+**3) ```/v2/<name>/tags/list```获得镜像标签**
 <pre>
 # curl -X GET -H "Authorization: Basic YWRtaW46TWlkZWFAMTIz" -H "Accept: */*" http://10.17.153.196:5000/v2/busybox/tags/list
 {"name":"busybox","tags":["latest"]}
