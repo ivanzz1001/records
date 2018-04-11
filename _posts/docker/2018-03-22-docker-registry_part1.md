@@ -523,6 +523,15 @@ X-Content-Type-Options: nosniff
 {% endhighlight %}
 
 
+停止：
+<pre>
+# docker-compose down -v
+Stopping nginxconf_nginx_1    ... done
+Stopping nginxconf_registry_1 ... done
+Removing nginxconf_nginx_1    ... done
+Removing nginxconf_registry_1 ... done
+</pre>
+
 <br />
 <br />
 
