@@ -170,7 +170,9 @@ ngx_hash_wildcard_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names,
 }
 {% endhighlight %}
 
-本函数用于初始化带通配符的hash表。下面我们会分成几个部分来进行讲解：
+本函数用于初始化带通配符的hash表。在具体介绍本函数之前，我们先给出一副整体的示意图：
+
+![ngx-wildcard-hash](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_wildcard_hash.jpg)
 
 1) 初始化两个数组
 {% highlight string %}
