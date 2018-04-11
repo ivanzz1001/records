@@ -500,6 +500,7 @@ CONTAINER ID        IMAGE                          COMMAND                  CREA
 {% endhighlight %}
 
 用如下命令测试：
+{% highlight string %}
 # curl -X GET -iL -H "Authorization: Basic dGVzdHVzZXI6dGVzdHBhc3N3b3Jk" https://192.168.69.128/v2 --cacert /opt/cert/ca.crt
 HTTP/1.1 301 Moved Permanently
 Server: nginx/1.13.12
