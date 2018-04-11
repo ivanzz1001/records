@@ -174,6 +174,8 @@ ngx_hash_wildcard_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names,
 
 ![ngx-wildcard-hash](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_wildcard_hash.jpg)
 
+上图只显示了二级Hash，实际上可能会出现多级Hash的情况。接下来我们分成好几个部分来讲解一下ngx_hash_wildcard_init()函数：
+
 1) 初始化两个数组
 {% highlight string %}
 ngx_int_t
