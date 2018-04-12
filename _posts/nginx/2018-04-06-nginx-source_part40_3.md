@@ -261,7 +261,7 @@ ngx_hash_wildcard_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names,
             }
 
             //这里dot来区分该元素是否匹配到了最末尾
-            //这里2表示当前已经到了一个匹配的结尾，不用再往后匹配了（注： 这可能不是最优匹配）
+            //这里2表示当前已经到了一个匹配的结尾，即已经获得了一个全量匹配，不需要再匹配下去了
             name->value = (void *) ((uintptr_t) wdc | (dot ? 3 : 2));
 
         } else if (dot) {
@@ -844,8 +844,64 @@ ngx_hash_add_key(ngx_hash_keys_arrays_t *ha, ngx_str_t *key, void *value,
 
 * 如果没有重复，则将当前元素```<key,value>```插入到无通配符的hash表中
 
+**3） 检查```.example.com```类型通配是否在exact hash中**
+{% highlight string %}
+ngx_int_t
+ngx_hash_add_key(ngx_hash_keys_arrays_t *ha, ngx_str_t *key, void *value,
+    ngx_uint_t flags)
+{
+wildcard:
 
+    /* wildcard hash */
 
+    k = ngx_hash_strlow(&key->data[skip], &key->data[skip], last - skip);
+
+    k %= ha->hsize;
+
+    if (skip == 1) {
+
+        /* check conflicts in exact hash for ".example.com" */
+
+        name = ha->keys_hash[k].elts;
+
+        if (name) {
+            len = last - skip;
+
+            for (i = 0; i < ha->keys_hash[k].nelts; i++) {
+                if (len != name[i].len) {
+                    continue;
+                }
+
+                if (ngx_strncmp(&key->data[1], name[i].data, len) == 0) {
+                    return NGX_BUSY;
+                }
+            }
+
+        } else {
+            if (ngx_array_init(&ha->keys_hash[k], ha->temp_pool, 4,
+                               sizeof(ngx_str_t))
+                != NGX_OK)
+            {
+                return NGX_ERROR;
+            }
+        }
+
+        name = ngx_array_push(&ha->keys_hash[k]);
+        if (name == NULL) {
+            return NGX_ERROR;
+        }
+
+        name->len = last - 1;
+        name->data = ngx_pnalloc(ha->temp_pool, name->len);
+        if (name->data == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_memcpy(name->data, &key->data[1], name->len);
+    }
+
+}
+{% endhighlight %}
 
 
 
