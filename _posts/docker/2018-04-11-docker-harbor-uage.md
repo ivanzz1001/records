@@ -56,6 +56,29 @@ Harbor通过工程（projects)的方式来管理镜像(images)。在添加用户
 视频示例: [Tencent Video](https://v.qq.com/x/page/l0553yw19ek.html)
 
 
+## 2. 用户账户(User Account)
+Harbor支持两种身份验证方式：
+
+* **Database(db_auth)**： 这种情况下，所有用户被存放在一个本地数据库
+
+在这种模式下，一个用户可以在Harbor系统中进行注册。如果要禁止```自行注册```功能，在初始化配置时请参看[installation guide](https://github.com/vmware/harbor/blob/master/docs/installation_guide.md)； 或者是在```Administraor Options```中禁止该特性。当self-registration被禁止后，系统管理员可以添加用户到Harbor中。
+
+当注册或添加一个新的用户到Harbor中时，Harbor系统中的用户名、email必须是唯一的。密码至少要有8个字符长度，并且至少要包含一个大写字母(uppercase letter)、一个小写字母(lowercase letter)以及一个数字(numeric character)
+
+当你忘记密码的时候，你可以按如下的步骤来重设密码:
+<pre>
+1) 在注册页面点击"Forgot Password" 链接
+
+2) 输入你注册时所用的邮箱地址， 然后Harbor系统会发送一封邮件给你来进行密码重设
+
+3) 在收到邮件之后，单击邮件中给出的链接地址，然后会跳转到一个密码重设的Web页面
+
+4) 输入新的密码并单击"Save"按钮
+</pre>
+
+* **LDAP/Active Directory(ldap_auth)**: 
+
+
 
 <br />
 <br />
