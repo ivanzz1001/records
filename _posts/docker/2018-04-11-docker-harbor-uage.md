@@ -118,6 +118,20 @@ Harbor中的一个工程包含了一个应用程序所需要的所有repositorie
 ![harbor-project-config](https://ivanzz1001.github.io/records/assets/img/docker/harbor_project_config.png)
 
 
+## 4. 管理工程中的用户成员
+
+**1） 添加成员**
+
+你可以向一个已存在的工程添加项目成员，并为其指定相应的角色。在LDAP/AD认证模式下，你也可以添加一个LDAP/AD用户使其成为工程中的一员：
+
+![new-add-member](https://ivanzz1001.github.io/records/assets/img/docker/new_add_member.png)
+
+**2) 更新及移除成员**
+
+可以批量选中工程中的成员，然后修改他们的角色； 也可以删除某些成员：
+
+![harbor-update-member](https://ivanzz1001.github.io/records/assets/img/docker/harbor_update_member.png)
+
 
 
 <br />
