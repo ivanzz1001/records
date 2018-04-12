@@ -101,6 +101,23 @@ Harbor中的一个工程包含了一个应用程序所需要的所有repositorie
 
 ![harbor-browse-project](https://ivanzz1001.github.io/records/assets/img/docker/harbor_browse_project.png)
 
+你可以通过单击```Logs```选项卡来查看所有的日志。你也可以使用```username```, ```operations```以及```Advanced Search```中的日期来过滤日志信息：
+
+![log-search-advanced](https://ivanzz1001.github.io/records/assets/img/docker/log_search_advanced.png)
+
+可以通过单击```Configuration```选项卡设置工程相关属性：
+
+* 选中```Public```复选框，你就可以将该工程下的所有repositories设置为公有访问权限
+
+* 通过使能```Enable content trust```复选框来阻止从工程拉取未被登记的镜像
+
+* 通过选择```Prevent vulnerable images from running```复选框和改变vulnerabilities的安全级别，以阻止vulnerable镜像被拉取。假如一个镜像的安全级别高于大于等于当前所设置的级别的话，Image将不能够被拉取。
+
+* 为了激活对push到工程中的新镜像进行vulnerability扫描，可以选中```Automatically scan images```复选框
+
+![harbor-project-config](https://ivanzz1001.github.io/records/assets/img/docker/harbor_project_config.png)
+
+
 
 
 <br />
