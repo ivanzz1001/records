@@ -132,6 +132,23 @@ Harbor中的一个工程包含了一个应用程序所需要的所有repositorie
 
 ![harbor-update-member](https://ivanzz1001.github.io/records/assets/img/docker/harbor_update_member.png)
 
+## 5. 复制镜像
+
+镜像复制被用于从一个Harbor实例向另一个Harbor实例复制repositories。
+
+该功能是面向工程的(project-oriented), 而一旦系统管理员为该工程设置了相应的规则，当[触发条件](https://github.com/vmware/harbor/blob/master/docs/user_guide.md#trigger-mode)被触发的话该工程下所有匹配相应规则的repositories都会被复制到远程仓库中。
+每一个repository都会启动一个```job```来进行复制。假如该工程在远程镜像仓库中并不存在，则会自动的创建出一个新的工程。但是假如该工程已经存在并且被用户配置为没有写权限的话，则这个同步过程会失败。这里注意：```项目成员信息将不会被复制```
+
+根据不同的网络状况，这个复制过程可能会有一定的延迟。假若是因为网络的原因导致镜像同步失败，则在几分钟之后Harbor会尝试再进行同步（该同步过程会一直进行，直到网络恢复，同步成功）
+
+注意： Harbor 0.35版本之前和之后的不同实例不能进行相互同步。
+
+
+### 5.1 创建复制规则
+可以通过创建规则来配置复制策略。
+
+
+
 
 
 <br />
