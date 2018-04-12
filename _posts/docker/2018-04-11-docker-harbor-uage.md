@@ -14,17 +14,28 @@ description: Harbor使用手册
 
 * project中成员(members)的管理
 
-* 复制工程到远程仓库
+* 复制工程到远程仓库(remote registry)
 
-* 查询工程(projects)及查询镜像仓库(repositories)
+* 查询工程(projects)及repositories
 
-* 系统管理员对Harbor系统的管理
+* 系统管理员身份对Harbor系统的管理
 
 * 使用docker client拉取及推送镜像
 
+* 为repositories添加描述
+
+* 删除repositories及镜像
+
+* Content Trust
 
 
 <!-- more -->
+
+## 1. 基于角色的访问控制
+
+Harbor提供了基于角色的访问控制（Role Based Access Control, RBAC):
+
+![docker-harbor-rbac](https://ivanzz1001.github.io/records/assets/img/docker/docker_harbor_rbac.png)
 
 
 
