@@ -261,6 +261,7 @@ ngx_hash_wildcard_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names,
             }
 
             //这里dot来区分该元素是否匹配到了最末尾
+            //这里2表示当前已经到了一个匹配的结尾，不用再往后匹配了（注： 这可能不是最优匹配）
             name->value = (void *) ((uintptr_t) wdc | (dot ? 3 : 2));
 
         } else if (dot) {
