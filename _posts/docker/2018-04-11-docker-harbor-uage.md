@@ -97,6 +97,9 @@ Harbor中的一个工程包含了一个应用程序所需要的所有repositorie
 ![harbor-create-project](https://ivanzz1001.github.io/records/assets/img/docker/harbor_create_project.png)
 
 
+在工程被创建完成之后，你可以通过导航标签浏览```repositories```，```members```, ```logs```,```replication```以及```configuration```:
+
+![harbor-browse-project](https://ivanzz1001.github.io/records/assets/img/docker/harbor_browse_project.png)
 
 
 
