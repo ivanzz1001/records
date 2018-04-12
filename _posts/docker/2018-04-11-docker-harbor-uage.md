@@ -76,7 +76,13 @@ Harbor支持两种身份验证方式：
 4) 输入新的密码并单击"Save"按钮
 </pre>
 
-* **LDAP/Active Directory(ldap_auth)**: 
+* **LDAP/Active Directory(ldap_auth)**: 在这种认证模式下，用户的credentials都被存放在外部的LDAP或AD服务器中，用户在那边完成认证后可以直接登录到Harbor系统。
+
+当一个LDAP/AD用户通过```username```和```password```的方式登录进系统时，Harbor会用```LDAP Search DN```及```LDAP Search Password```绑定LDAP/AD服务器（请参看[installation guide](https://github.com/vmware/harbor/blob/master/docs/installation_guide.md))。假如成功的话，Harbor会在LDAP的```LDAP Base DN```目录及其子目录来查询该用户。通过```LDAP UID```指定的一些属性(比如: uid、cn)会与```username```一起共同来匹配一个用户。假如被成功匹配，用户的密码会通过一个发送到LDAP/AD服务器的bind request所验证。假如LDAP/AD服务器使用自签名证书(self-signed certificate)或者不受信任的证书的话，请不要检查```LDAP Verify Cert```。
+
+在LDAP/AD认证模式下，不支持```self-registration```、删除用户、修改密码、重设密码等功能，这是因为用户是由LDAP/AD系统所管理.
+
+
 
 
 
