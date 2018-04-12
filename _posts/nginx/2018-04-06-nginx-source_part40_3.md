@@ -399,6 +399,456 @@ ngx_hash_keys_array_init(ngx_hash_keys_arrays_t *ha, ngx_uint_t type)
 }
 {% endhighlight %}
 
+本函数用于初始化```ngx_hash_keys_arrays_t```数据结构， 分别初始化如下数据：
+
+* ```ha->keys```: 不带通配符的```ngx_hash_key_t```数组
+
+* ```ha->dns_wc_head```: 带前向通配符的```ngx_hash_key_t```数组
+
+* ```ha->dns_wc_tail```: 带后向通配符的```ngx_hash_key_t```数组
+
+* ```ha->keys_hash```:  这是一个二维数组。该值在调用的过程中用来保存和检测是否有冲突的key值，也就是是否有重复
+
+* ```ha->dns_wc_head_hash```: 这是一个二维数组。该值在调用的过程中用来保存和检测是否有冲突的key值，也就是是否有重复
+
+* ```ha->dns_wc_tail_hash```: 这是一个二维数组。该值在调用的过程中用来保存和检测是否有冲突的key值，也就是是否有重复
+
+
+## 6. 函数ngx_hash_add_key()
+{% highlight string %}
+ngx_int_t
+ngx_hash_add_key(ngx_hash_keys_arrays_t *ha, ngx_str_t *key, void *value,
+    ngx_uint_t flags)
+{
+    size_t           len;
+    u_char          *p;
+    ngx_str_t       *name;
+    ngx_uint_t       i, k, n, skip, last;
+    ngx_array_t     *keys, *hwc;
+    ngx_hash_key_t  *hk;
+
+    last = key->len;
+
+    if (flags & NGX_HASH_WILDCARD_KEY) {
+
+        /*
+         * supported wildcards:
+         *     "*.example.com", ".example.com", and "www.example.*"
+         */
+
+        n = 0;
+
+        for (i = 0; i < key->len; i++) {
+
+            if (key->data[i] == '*') {
+                if (++n > 1) {
+                    return NGX_DECLINED;
+                }
+            }
+
+            if (key->data[i] == '.' && key->data[i + 1] == '.') {
+                return NGX_DECLINED;
+            }
+
+            if (key->data[i] == '\0') {
+                return NGX_DECLINED;
+            }
+        }
+
+        if (key->len > 1 && key->data[0] == '.') {
+            skip = 1;
+            goto wildcard;
+        }
+
+        if (key->len > 2) {
+
+            if (key->data[0] == '*' && key->data[1] == '.') {
+                skip = 2;
+                goto wildcard;
+            }
+
+            if (key->data[i - 2] == '.' && key->data[i - 1] == '*') {
+                skip = 0;
+                last -= 2;
+                goto wildcard;
+            }
+        }
+
+        if (n) {
+            return NGX_DECLINED;
+        }
+    }
+
+    /* exact hash */
+
+    k = 0;
+
+    for (i = 0; i < last; i++) {
+        if (!(flags & NGX_HASH_READONLY_KEY)) {
+            key->data[i] = ngx_tolower(key->data[i]);
+        }
+        k = ngx_hash(k, key->data[i]);
+    }
+
+    k %= ha->hsize;
+
+    /* check conflicts in exact hash */
+
+    name = ha->keys_hash[k].elts;
+
+    if (name) {
+        for (i = 0; i < ha->keys_hash[k].nelts; i++) {
+            if (last != name[i].len) {
+                continue;
+            }
+
+            if (ngx_strncmp(key->data, name[i].data, last) == 0) {
+                return NGX_BUSY;
+            }
+        }
+
+    } else {
+        if (ngx_array_init(&ha->keys_hash[k], ha->temp_pool, 4,
+                           sizeof(ngx_str_t))
+            != NGX_OK)
+        {
+            return NGX_ERROR;
+        }
+    }
+
+    name = ngx_array_push(&ha->keys_hash[k]);
+    if (name == NULL) {
+        return NGX_ERROR;
+    }
+
+    *name = *key;
+
+    hk = ngx_array_push(&ha->keys);
+    if (hk == NULL) {
+        return NGX_ERROR;
+    }
+
+    hk->key = *key;
+    hk->key_hash = ngx_hash_key(key->data, last);
+    hk->value = value;
+
+    return NGX_OK;
+
+
+wildcard:
+
+    /* wildcard hash */
+
+    k = ngx_hash_strlow(&key->data[skip], &key->data[skip], last - skip);
+
+    k %= ha->hsize;
+
+    if (skip == 1) {
+
+        /* check conflicts in exact hash for ".example.com" */
+
+        name = ha->keys_hash[k].elts;
+
+        if (name) {
+            len = last - skip;
+
+            for (i = 0; i < ha->keys_hash[k].nelts; i++) {
+                if (len != name[i].len) {
+                    continue;
+                }
+
+                if (ngx_strncmp(&key->data[1], name[i].data, len) == 0) {
+                    return NGX_BUSY;
+                }
+            }
+
+        } else {
+            if (ngx_array_init(&ha->keys_hash[k], ha->temp_pool, 4,
+                               sizeof(ngx_str_t))
+                != NGX_OK)
+            {
+                return NGX_ERROR;
+            }
+        }
+
+        name = ngx_array_push(&ha->keys_hash[k]);
+        if (name == NULL) {
+            return NGX_ERROR;
+        }
+
+        name->len = last - 1;
+        name->data = ngx_pnalloc(ha->temp_pool, name->len);
+        if (name->data == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_memcpy(name->data, &key->data[1], name->len);
+    }
+
+
+    if (skip) {
+
+        /*
+         * convert "*.example.com" to "com.example.\0"
+         *      and ".example.com" to "com.example\0"
+         */
+
+        p = ngx_pnalloc(ha->temp_pool, last);
+        if (p == NULL) {
+            return NGX_ERROR;
+        }
+
+        len = 0;
+        n = 0;
+
+        for (i = last - 1; i; i--) {
+            if (key->data[i] == '.') {
+                ngx_memcpy(&p[n], &key->data[i + 1], len);
+                n += len;
+                p[n++] = '.';
+                len = 0;
+                continue;
+            }
+
+            len++;
+        }
+
+        if (len) {
+            ngx_memcpy(&p[n], &key->data[1], len);
+            n += len;
+        }
+
+        p[n] = '\0';
+
+        hwc = &ha->dns_wc_head;
+        keys = &ha->dns_wc_head_hash[k];
+
+    } else {
+
+        /* convert "www.example.*" to "www.example\0" */
+
+        last++;
+
+        p = ngx_pnalloc(ha->temp_pool, last);
+        if (p == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_cpystrn(p, key->data, last);
+
+        hwc = &ha->dns_wc_tail;
+        keys = &ha->dns_wc_tail_hash[k];
+    }
+
+
+    /* check conflicts in wildcard hash */
+
+    name = keys->elts;
+
+    if (name) {
+        len = last - skip;
+
+        for (i = 0; i < keys->nelts; i++) {
+            if (len != name[i].len) {
+                continue;
+            }
+
+            if (ngx_strncmp(key->data + skip, name[i].data, len) == 0) {
+                return NGX_BUSY;
+            }
+        }
+
+    } else {
+        if (ngx_array_init(keys, ha->temp_pool, 4, sizeof(ngx_str_t)) != NGX_OK)
+        {
+            return NGX_ERROR;
+        }
+    }
+
+    name = ngx_array_push(keys);
+    if (name == NULL) {
+        return NGX_ERROR;
+    }
+
+    name->len = last - skip;
+    name->data = ngx_pnalloc(ha->temp_pool, name->len);
+    if (name->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(name->data, key->data + skip, name->len);
+
+
+    /* add to wildcard hash */
+
+    hk = ngx_array_push(hwc);
+    if (hk == NULL) {
+        return NGX_ERROR;
+    }
+
+    hk->key.len = last - 1;
+    hk->key.data = p;
+    hk->key_hash = 0;
+    hk->value = value;
+
+    return NGX_OK;
+}
+{% endhighlight %}
+
+本函数用于添加元素到```ngx_hash_keys_arrays_t```数据结构中。下面我们分几个部分来说明一下该函数：
+
+**1) 判断元素添加到哪一种类的Hash表中**
+{% highlight string %}
+ngx_int_t
+ngx_hash_add_key(ngx_hash_keys_arrays_t *ha, ngx_str_t *key, void *value,
+    ngx_uint_t flags)
+{
+	last = key->len;
+
+    if (flags & NGX_HASH_WILDCARD_KEY) {
+
+        /*
+         * supported wildcards:
+         *     "*.example.com", ".example.com", and "www.example.*"
+         */
+
+        n = 0;
+
+        for (i = 0; i < key->len; i++) {
+
+            if (key->data[i] == '*') {
+                if (++n > 1) {
+                    return NGX_DECLINED;
+                }
+            }
+
+            if (key->data[i] == '.' && key->data[i + 1] == '.') {
+                return NGX_DECLINED;
+            }
+
+            if (key->data[i] == '\0') {
+                return NGX_DECLINED;
+            }
+        }
+
+        if (key->len > 1 && key->data[0] == '.') {
+            skip = 1;
+            goto wildcard;
+        }
+
+        if (key->len > 2) {
+
+            if (key->data[0] == '*' && key->data[1] == '.') {
+                skip = 2;
+                goto wildcard;
+            }
+
+            if (key->data[i - 2] == '.' && key->data[i - 1] == '*') {
+                skip = 0;
+                last -= 2;
+                goto wildcard;
+            }
+        }
+
+        if (n) {
+            return NGX_DECLINED;
+        }
+    }
+}
+{% endhighlight %}
+这里首先根据```flags```提示当前是否要添加的```key```元素是否含有通配。如果有的话，则执行if条件的相关操作。这里支持的通配含如下三种形式：
+<pre>
+/*
+* supported wildcards:
+*     "*.example.com", ".example.com", and "www.example.*"
+*/
+</pre>
+
+然后判断所传入的带通配的```key```元素是否合法，如果合法是属于上述三种的哪一种通配：
+
+* ```skip=1```: 表示```.example.com```这种通配类型
+
+* ```skip=2```: 表示```*.example.com```这种通配类型
+
+* ```skip=0```: 表示```www.example.*```这种通配类型，此时将```last```值进行调整```last-=2```，即减去后面```.*```两个字符的长度。
+
+**2) 插入元素到exact hash中**
+{% highlight string %}
+ngx_int_t
+ngx_hash_add_key(ngx_hash_keys_arrays_t *ha, ngx_str_t *key, void *value,
+    ngx_uint_t flags)
+{
+	 /* exact hash */
+
+    k = 0;
+
+    for (i = 0; i < last; i++) {
+        if (!(flags & NGX_HASH_READONLY_KEY)) {
+            key->data[i] = ngx_tolower(key->data[i]);
+        }
+        k = ngx_hash(k, key->data[i]);
+    }
+
+    k %= ha->hsize;
+
+    /* check conflicts in exact hash */
+
+    name = ha->keys_hash[k].elts;
+
+    if (name) {
+        for (i = 0; i < ha->keys_hash[k].nelts; i++) {
+            if (last != name[i].len) {
+                continue;
+            }
+
+            if (ngx_strncmp(key->data, name[i].data, last) == 0) {
+                return NGX_BUSY;
+            }
+        }
+
+    } else {
+        if (ngx_array_init(&ha->keys_hash[k], ha->temp_pool, 4,
+                           sizeof(ngx_str_t))
+            != NGX_OK)
+        {
+            return NGX_ERROR;
+        }
+    }
+
+    name = ngx_array_push(&ha->keys_hash[k]);
+    if (name == NULL) {
+        return NGX_ERROR;
+    }
+
+    *name = *key;
+
+    hk = ngx_array_push(&ha->keys);
+    if (hk == NULL) {
+        return NGX_ERROR;
+    }
+
+    hk->key = *key;
+    hk->key_hash = ngx_hash_key(key->data, last);
+    hk->value = value;
+
+    return NGX_OK;
+
+}
+{% endhighlight %}
+
+这里插入步骤如下：
+
+* 求可以的hash值。 这里如果```flags```标明的该key不是```NGX_HASH_READONLY_KEY```不是readonly类型的话，会先将该key转换成小写，然后再求hash值。
+
+* 判断该```key```在```ha->keys```数组当中是否有重复。 这里可以看到```ha->hash_keys```哈希表的用处了，就是用于快速判断是否有重复。
+
+* 如果没有重复，则将当前元素```<key,value>```插入到无通配符的hash表中
+
+
+
+
+
+
 
 
 <br />
