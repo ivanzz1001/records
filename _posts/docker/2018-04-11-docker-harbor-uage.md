@@ -83,6 +83,20 @@ Harbor支持两种身份验证方式：
 在LDAP/AD认证模式下，不支持```self-registration```、删除用户、修改密码、重设密码等功能，这是因为用户是由LDAP/AD系统所管理.
 
 
+## 3. Harbor工程管理
+
+Harbor中的一个工程包含了一个应用程序所需要的所有repositories。在工程创建之前，并不允许推送镜像到Harbor中。Harbor对于project采用基于角色的访问控制。在Harbor中projects有两种类型：
+
+* ```Public```: 所有的用户都具有读取public project的权限， 其主要是为了方便你分享一些repositories
+
+* ```Private```: 一个私有project只能被特定用户以适当的权限进行访问
+
+
+在登录之后，你就可以创建一个工程(project)。默认情况下，创建的工程都是私有的，你可以通过在创建时选中```Access Level```复选框来使创建的工程变为public的：
+
+![harbor-create-project](https://ivanzz1001.github.io/records/assets/img/docker/harbor_create_project.png)
+
+
 
 
 
