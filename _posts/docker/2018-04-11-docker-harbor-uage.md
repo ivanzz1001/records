@@ -239,6 +239,9 @@ Harbor中的一个工程包含了一个应用程序所需要的所有repositorie
 ![new-self-reg](https://ivanzz1001.github.io/records/assets/img/docker/new_self_reg.png)
 
 
+### 6.7 邮箱设置管理
+
+
 
 <br />
 <br />
