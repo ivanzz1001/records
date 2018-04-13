@@ -224,6 +224,10 @@ Harbor中的一个工程包含了一个应用程序所需要的所有repositorie
 
 ![harbor-new-auth](https://ivanzz1001.github.io/records/assets/img/docker/harbor_new_auth.png)
 
+当使用LDAP模式的时候，用户的自注册功能会被禁止。LDAP服务器的相关参数必须要被填写。更多信息，请参看[User account](https://github.com/vmware/harbor/blob/master/docs/user_guide.md#user-account).
+
+![harbor-ldap-auth](https://ivanzz1001.github.io/records/assets/img/docker/harbor_ldap_auth.png)
+
 
 
 <br />
