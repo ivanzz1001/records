@@ -145,7 +145,33 @@ Harbor中的一个工程包含了一个应用程序所需要的所有repositorie
 
 
 ### 5.1 创建复制规则
-可以通过创建规则来配置复制策略。
+可以通过创建规则来配置复制策略。点击```Administration->Replications```页面的```NEW REPLICATION RULE```按钮，然后填写一些必须的字段。你可以根据不同的需要选择不同的Image filters和trigger mode。假如当前并没有可用的远程registry，则你需要创建一个远程registry。然后单击```SAVE```按钮为指定的工程创建复制规则。假如勾选了```Replicate existing images immediately```复选框，则该工程下已存在的镜像将会马上复制到远程镜像仓库。
+
+**Image filter**
+
+对镜像我们支持两种不同的image filter:
+
+* ```Repository```: 复制时会根据镜像名称的repository部分来进行
+
+* ```Tag```: 复制时会根据镜像名称的标签(tag)部分来进行
+
+在过滤器中支持两种不同的过滤匹配模式：
+
+* ```*```: 匹配除```/```之外的任何字符
+
+* ```?```: 匹配除```/```之外的任何单个字符
+
+**Trigger mode**
+
+* ```Manual```: 当需要的时候，通过手工方式来触发repositories的复制。 Note： 对镜像的删除操作并不会被复制
+
+* ```Immediate```: 当有一个新的repository被push到工程中时，其就会被马上复制到远程registry。假如还勾选了```Delete remote images when locally deleted```复选框，则在本地镜像被删除时也会马上复制到远程registry。
+
+* ```Scheduled```: 每天或者每周复制repositories。Note： 对镜像的删除操作并不会被复制。
+
+![harbor-create-rule](https://ivanzz1001.github.io/records/assets/img/docker/harbor_create_rule.png)
+
+
 
 
 
