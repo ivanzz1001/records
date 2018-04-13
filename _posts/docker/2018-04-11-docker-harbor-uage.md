@@ -171,6 +171,11 @@ Harbor中的一个工程包含了一个应用程序所需要的所有repositorie
 
 ![harbor-create-rule](https://ivanzz1001.github.io/records/assets/img/docker/harbor_create_rule.png)
 
+### 5.2 列出和停止replication jobs
+
+选中一个```rule```，则属于该规则的所有jobs都会被列出。一个job代表复制repository到远程registry的一个工作进程。可以单击```STOP JOBS```，则这个rule规则下的所有处于```pending and retrying job```将会被马上停止， 而处于```running```工作状态的job会在下一个checkpoint被取消。
+
+![list-stop-jobs](https://ivanzz1001.github.io/records/assets/img/docker/list_stop_jobs.png)
 
 
 
