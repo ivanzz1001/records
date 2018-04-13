@@ -228,6 +228,16 @@ Harbor中的一个工程包含了一个应用程序所需要的所有repositorie
 
 ![harbor-ldap-auth](https://ivanzz1001.github.io/records/assets/img/docker/harbor_ldap_auth.png)
 
+### 6.5 工程创建管理(Managing project creation)
+可以使用```Project Creation```下拉菜单来设置哪些用户可以创建工程。选择```Everyone```的话，则允许所有的用户来创建工程。如果选择```Admin Only```，则只允许拥有```Administrator```角色的用户创建工程：
+
+![new-proj-create](https://ivanzz1001.github.io/records/assets/img/docker/new_proj_create.png)
+
+### 6.6 用户自注册管理(Managing self-registration)
+你可以管理是否允许用户自己注册一个新的账户。该选项在使用LDAP认证的方式下将不可用。
+
+![new-self-reg](https://ivanzz1001.github.io/records/assets/img/docker/new_self_reg.png)
+
 
 
 <br />
