@@ -219,6 +219,10 @@ Harbor中的一个工程包含了一个应用程序所需要的所有repositorie
 
 ![harbor-manage-replication](https://ivanzz1001.github.io/records/assets/img/docker/harbor_manage_replication.png)
 
+### 6.4 认证管理(Managing authentication)
+在没有添加任何用户之前，你可以修改认证模式（Database模式或者LDAP模式）, 当Harbor系统中已经有至少一个用户之后（出admin用户外），将不能够修改认证模式：
+
+![harbor-new-auth](https://ivanzz1001.github.io/records/assets/img/docker/harbor_new_auth.png)
 
 
 
