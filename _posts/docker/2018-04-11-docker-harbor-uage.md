@@ -183,6 +183,29 @@ Harbor中的一个工程包含了一个应用程序所需要的所有repositorie
 ![harbor-start-replicate](https://ivanzz1001.github.io/records/assets/img/docker/harbor_start_replicate.png)
 
 
+### 5.4 删除replication rule
+选中一个replication rule，然后单击```DELETE```按钮来将其删除。只有那些没有工作任务的rule会被删除（如果一个rule下有处于pending/running/retrying状态的job,则该rule不能被删除）
+
+![harbor-delete-rule](https://ivanzz1001.github.io/records/assets/img/docker/harbor_delete_rule.png)
+
+
+系统管理员也可以在```Projects```视图下，选中```Replication```标签来为来为指定的project设置复制规则。而工程管理员(Project Manager，请参看上面的RBAC)只有只读访问权限：
+
+![rule-under-project-view](https://ivanzz1001.github.io/records/assets/img/docker/rule_under_project_view.png)
+
+### 5.5 查询工程及repositories
+在页面顶部输入搜索关键字，然后点击搜索就可以查询出所有匹配的```projects```以及```repositories```。这些搜索结果包含你有权限访问的public及private repositories。
+
+![harbor-new-search](https://ivanzz1001.github.io/records/assets/img/docker/harbor_new_search.png)
+
+
+
+## 6. Administrator Options
+
+### 6.1 用户管理
+```Administrator```可以将一个或多个普通的用户设置为```administrator```角色。也可以进行用户的删除（注意： 只有在数据库认证模式下，才支持删除用户）:
+
+![harbor-remove-user](https://ivanzz1001.github.io/records/assets/img/docker/new_set_admin_remove_user.png)
 
 
 
