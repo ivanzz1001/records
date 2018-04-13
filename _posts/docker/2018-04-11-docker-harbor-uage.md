@@ -177,6 +177,11 @@ Harbor中的一个工程包含了一个应用程序所需要的所有repositorie
 
 ![list-stop-jobs](https://ivanzz1001.github.io/records/assets/img/docker/list_stop_jobs.png)
 
+### 5.3 手动启动replication进程
+选中一个复制规则，然后点击```REPLICATE```按钮， 则该工程下匹配相应规则的镜像将会被马上复制到远程registry。假设当前已经有匹配该规则的处于pending/running状态的job，则新的复制将不会被启动。
+
+![harbor-start-replicate](https://ivanzz1001.github.io/records/assets/img/docker/harbor_start_replicate.png)
+
 
 
 
