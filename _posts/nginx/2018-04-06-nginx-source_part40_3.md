@@ -903,7 +903,157 @@ wildcard:
 }
 {% endhighlight %}
 
+这里首先求出所要通配的key的hash值，然后看其映射到哪一个桶。如果```skip=1```,即key是属于```.example.com```这种通配类型的时候，需要判断是否该key也存在于```exact hash```中。 如果在```exact hash```中也存在，直接返回```NGX_BUSY```； 否则将其在```ha->keys_hash```中做一个标记，后续禁止往```ha->keys```中插入该key(注意这里并没有插入```ha->keys```)。
 
+**4) 对通配字符串进行相应的格式转换**
+{% highlight string %}
+ngx_int_t
+ngx_hash_add_key(ngx_hash_keys_arrays_t *ha, ngx_str_t *key, void *value,
+    ngx_uint_t flags)
+{
+	 if (skip) {
+
+        /*
+         * convert "*.example.com" to "com.example.\0"
+         *      and ".example.com" to "com.example\0"
+         */
+
+        p = ngx_pnalloc(ha->temp_pool, last);
+        if (p == NULL) {
+            return NGX_ERROR;
+        }
+
+        len = 0;
+        n = 0;
+
+        for (i = last - 1; i; i--) {
+            if (key->data[i] == '.') {
+                ngx_memcpy(&p[n], &key->data[i + 1], len);
+                n += len;
+                p[n++] = '.';
+                len = 0;
+                continue;
+            }
+
+            len++;
+        }
+
+        if (len) {
+            ngx_memcpy(&p[n], &key->data[1], len);
+            n += len;
+        }
+
+        p[n] = '\0';
+
+        hwc = &ha->dns_wc_head;
+        keys = &ha->dns_wc_head_hash[k];
+
+    } else {
+
+        /* convert "www.example.*" to "www.example\0" */
+
+        last++;
+
+        p = ngx_pnalloc(ha->temp_pool, last);
+        if (p == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_cpystrn(p, key->data, last);
+
+        hwc = &ha->dns_wc_tail;
+        keys = &ha->dns_wc_tail_hash[k];
+    }
+
+}
+{% endhighlight %}
+这里对通配字符串进行格式转换：
+
+* ```skip>0```: 表示前置通配字符串。此时```*.example.com```会被转换成```com.example.\0```; ```.example.com```会被转换成 ```com.example\0```。
+* 
+* ```skip=0```: 表示后置通配符。此时```www.example.*```会被转换成```www.example\0```。
+
+**5） 在wildcard hash中检查是否有冲突**
+{% highlight string %}
+ngx_int_t
+ngx_hash_add_key(ngx_hash_keys_arrays_t *ha, ngx_str_t *key, void *value,
+    ngx_uint_t flags)
+{
+	 /* check conflicts in wildcard hash */
+
+    name = keys->elts;
+
+    if (name) {
+        len = last - skip;
+
+        for (i = 0; i < keys->nelts; i++) {
+            if (len != name[i].len) {
+                continue;
+            }
+
+            if (ngx_strncmp(key->data + skip, name[i].data, len) == 0) {
+                return NGX_BUSY;
+            }
+        }
+
+    } else {
+        if (ngx_array_init(keys, ha->temp_pool, 4, sizeof(ngx_str_t)) != NGX_OK)
+        {
+            return NGX_ERROR;
+        }
+    }
+
+    name = ngx_array_push(keys);
+    if (name == NULL) {
+        return NGX_ERROR;
+    }
+
+    name->len = last - skip;
+    name->data = ngx_pnalloc(ha->temp_pool, name->len);
+    if (name->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(name->data, key->data + skip, name->len);
+}
+{% endhighlight %}
+
+注意在```ha->dns_wc_head_hash```或```ha->dns_wc_head_hash```中存放的是没有经过上述```4)步骤```所转换的key。例如对于：
+
+* ```*.example.com```: 存放的在```ha->dns_wc_head_hash```中的值为```example.com```
+
+* ```.example.com```: 存放在```ha->dns_wc_head_hash```中的值也为```example.com```
+
+* ```www.example.*```: 存放在```ha->dns_wc_tail_hash```中的值为```www.example```
+
+**6) 添加转换后的通配字符串到数组中**
+{% highlight string %}
+ngx_int_t
+ngx_hash_add_key(ngx_hash_keys_arrays_t *ha, ngx_str_t *key, void *value,
+    ngx_uint_t flags)
+{
+    /* add to wildcard hash */
+
+    hk = ngx_array_push(hwc);
+    if (hk == NULL) {
+        return NGX_ERROR;
+    }
+
+    hk->key.len = last - 1;
+    hk->key.data = p;
+    hk->key_hash = 0;
+    hk->value = value;
+
+    return NGX_OK;
+}
+{% endhighlight %}
+这里添加到```hk```中的是经过```步骤4)```所转换过的字符串。例如对于：
+
+* ```*.example.com```: 添加到```hk```中为```com.example.```
+
+* ```.example.com```: 添加到```hk```中为```com.example```
+
+* ```www.example.*```: 添加到```hk```中为```www.example```
 
 
 
