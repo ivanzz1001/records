@@ -208,6 +208,14 @@ Harbor中的一个工程包含了一个应用程序所需要的所有repositorie
 ![harbor-remove-user](https://ivanzz1001.github.io/records/assets/img/docker/new_set_admin_remove_user.png)
 
 
+### 6.2 仓库管理(Manager endpoint)
+在```Administration->Registries```项下，你可以列出、添加、修改或者删除远程的endpoint。只有那些没有被任何rules所引用的endpoint才能被删除：
+
+![harbor-manage-endpoint](https://ivanzz1001.github.io/records/assets/img/docker/harbor_manage_endpoint.png)
+
+
+
+
 
 
 <br />
