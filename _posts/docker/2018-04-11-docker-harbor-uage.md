@@ -240,6 +240,9 @@ Harbor中的一个工程包含了一个应用程序所需要的所有repositorie
 
 
 ### 6.7 邮箱设置管理
+你可以改变Harbor的邮箱设置，该邮箱服务器被用于发送响应给重置密码的用户。
+
+![new-config-email](https://ivanzz1001.github.io/records/assets/img/docker/new_config_email.png)
 
 
 
