@@ -100,6 +100,44 @@ typedef struct {
 } ngx_addr_t;
 {% endhighlight %}
 
+* ```ngx_in_cidr_t```: 是ipv4无类域间ip地址
+
+* ```ngx_in6_cidr_t```: 是ipv6无类域间ip地址。当前我们并不支持```NGX_HAVE_INET6```
+
+* ```ngx_cidr_t```: 无类域间ip地址
+
+* ```ngx_addr_t```: socket ip地址封装 
+
+
+## 3. ngx_url_t数据结构
+{% highlight string %}
+typedef struct {
+    ngx_str_t                 url;
+    ngx_str_t                 host;
+    ngx_str_t                 port_text;
+    ngx_str_t                 uri;
+
+    in_port_t                 port;
+    in_port_t                 default_port;
+    int                       family;
+
+    unsigned                  listen:1;
+    unsigned                  uri_part:1;
+    unsigned                  no_resolve:1;
+    unsigned                  one_addr:1;  /* compatibility */
+
+    unsigned                  no_port:1;
+    unsigned                  wildcard:1;
+
+    socklen_t                 socklen;
+    u_char                    sockaddr[NGX_SOCKADDRLEN];
+
+    ngx_addr_t               *addrs;
+    ngx_uint_t                naddrs;
+
+    char                     *err;
+} ngx_url_t;
+{% endhighlight %}
 
 
 <br />
