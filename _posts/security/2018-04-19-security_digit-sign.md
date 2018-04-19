@@ -224,8 +224,8 @@ int main(void)
 		RSA_free(pRsaPriv);
 		return -1;
 	}
-    RSA_free(pRsaPriv);
-    printf("sign success\n\n");
+	RSA_free(pRsaPriv);
+	printf("sign success\n\n");
 
 
 
