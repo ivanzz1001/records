@@ -517,7 +517,9 @@ log_rotate_config = os.path.join(config_dir, "log", "logrotate.conf")
 
 * ```日志配置```: 存放路径为common/config/log/logrotate.conf
 
-## 7. 生成nginx配置文件
+## 7. 生成相应配置文件
+
+**1) 生成nginx配置文件**
 {% highlight string %}
 if protocol == "https":
     target_cert_path = os.path.join(cert_dir, os.path.basename(cert_path))
@@ -536,7 +538,7 @@ else:
 {% endhighlight %}
 这里如果配置为https模式，则会将harbor.cfg配置文件中指定的证书、秘钥拷贝到common/config/nginx/cert目录中，然后再以nginx.https.conf为模板生成nginx配置文件； 否则以nginx.http.conf为模板生成nginx配置文件。
 
-## 8. 生成admin server环境变量配置
+**2) 生成admin server环境变量配置**
 {% highlight string %}
 render(os.path.join(templates_dir, "adminserver", "env"),
         adminserver_conf_env,
