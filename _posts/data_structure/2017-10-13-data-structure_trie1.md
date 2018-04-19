@@ -47,6 +47,8 @@ presentation of prefix tree, see compact prefix tree.
 
 2. [ Trie实践：一种比哈希表更快的数据结构](http://blog.csdn.net/stevenkylelee/article/details/38343985)
 
+
+3. [AVL树](https://baike.baidu.com/item/AVL%E6%A0%91/10986648?fr=aladdin)
 <br />
 <br />
 <br />
