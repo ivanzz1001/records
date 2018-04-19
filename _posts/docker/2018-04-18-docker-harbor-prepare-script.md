@@ -646,6 +646,164 @@ shutil.copyfile(os.path.join(templates_dir, "ui", "app.conf"), ui_conf)
 {% endhighlight %}
 
 
+## 8. 产生证书、秘钥文件
+{% highlight string %}
+if auth_mode == "uaa_auth":
+    if os.path.isfile(uaa_ca_cert):
+        if not os.path.isdir(ui_cert_dir):
+            os.makedirs(ui_cert_dir, mode=0o600)
+        ui_uaa_ca = os.path.join(ui_cert_dir, "uaa_ca.pem")
+        print("Copying UAA CA cert to %s" % ui_uaa_ca)
+        shutil.copyfile(uaa_ca_cert, ui_uaa_ca)
+    else:
+        print("Can not find UAA CA cert: %s, skip" % uaa_ca_cert)
+
+
+def validate_crt_subj(dirty_subj):
+    subj_list = [item for item in dirty_subj.strip().split("/") \
+        if len(item.split("=")) == 2 and len(item.split("=")[1]) > 0]
+    return "/" + "/".join(subj_list)
+
+FNULL = open(os.devnull, 'w')
+
+from functools import wraps
+def stat_decorator(func):
+    @wraps(func)
+    def check_wrapper(*args, **kw):
+        stat = func(*args, **kw)
+        message = "Generated certificate, key file: %s, cert file: %s" % (kw['key_path'], kw['cert_path']) \
+                if stat == 0 else "Fail to generate key file: %s, cert file: %s" % (kw['key_path'], kw['cert_path'])
+        print(message)
+        if stat != 0:
+            sys.exit(1)
+    return check_wrapper
+
+@stat_decorator
+def create_root_cert(subj, key_path="./k.key", cert_path="./cert.crt"):
+   rc = subprocess.call(["openssl", "genrsa", "-out", key_path, "4096"], stdout=FNULL, stderr=subprocess.STDOUT)
+   if rc != 0:
+        return rc
+   return subprocess.call(["openssl", "req", "-new", "-x509", "-key", key_path,\
+        "-out", cert_path, "-days", "3650", "-subj", subj], stdout=FNULL, stderr=subprocess.STDOUT)
+
+@stat_decorator
+def create_cert(subj, ca_key, ca_cert, key_path="./k.key", cert_path="./cert.crt"):
+    cert_dir = os.path.dirname(cert_path)
+    csr_path = os.path.join(cert_dir, "tmp.csr")
+    rc = subprocess.call(["openssl", "req", "-newkey", "rsa:4096", "-nodes","-sha256","-keyout", key_path,\
+        "-out", csr_path, "-subj", subj], stdout=FNULL, stderr=subprocess.STDOUT)
+    if rc != 0:
+        return rc
+    return subprocess.call(["openssl", "x509", "-req", "-days", "3650", "-in", csr_path, "-CA", \
+        ca_cert, "-CAkey", ca_key, "-CAcreateserial", "-out", cert_path], stdout=FNULL, stderr=subprocess.STDOUT)
+
+def openssl_installed():
+    shell_stat = subprocess.check_call(["which", "openssl"], stdout=FNULL, stderr=subprocess.STDOUT)
+    if shell_stat != 0:
+        print("Cannot find openssl installed in this computer\nUse default SSL certificate file")
+        return False
+    return True
+        
+
+if customize_crt == 'on' and openssl_installed():
+    shell_stat = subprocess.check_call(["which", "openssl"], stdout=FNULL, stderr=subprocess.STDOUT)
+    empty_subj = "/C=/ST=/L=/O=/CN=/"
+    private_key_pem = os.path.join(config_dir, "ui", "private_key.pem")
+    root_crt = os.path.join(config_dir, "registry", "root.crt")
+    create_root_cert(empty_subj, key_path=private_key_pem, cert_path=root_crt)
+    os.chmod(private_key_pem, 0o600)
+    os.chmod(root_crt, 0o600)
+else:
+    print("Copied configuration file: %s" % ui_config_dir + "private_key.pem")
+    shutil.copyfile(os.path.join(templates_dir, "ui", "private_key.pem"), os.path.join(ui_config_dir, "private_key.pem"))
+    print("Copied configuration file: %s" % registry_config_dir + "root.crt")
+    shutil.copyfile(os.path.join(templates_dir, "registry", "root.crt"), os.path.join(registry_config_dir, "root.crt"))
+
+if args.notary_mode:
+    notary_config_dir = prep_conf_dir(config_dir, "notary")
+    notary_temp_dir = os.path.join(templates_dir, "notary") 
+    print("Copying sql file for notary DB")
+    if os.path.exists(os.path.join(notary_config_dir, "mysql-initdb.d")):
+        shutil.rmtree(os.path.join(notary_config_dir, "mysql-initdb.d"))
+    shutil.copytree(os.path.join(notary_temp_dir, "mysql-initdb.d"), os.path.join(notary_config_dir, "mysql-initdb.d")) 
+    if customize_crt == 'on' and openssl_installed():
+        try:
+            temp_cert_dir = os.path.join(base_dir, "cert_tmp")
+            if not os.path.exists(temp_cert_dir):
+                os.makedirs(temp_cert_dir)
+            ca_subj = "/C=US/ST=California/L=Palo Alto/O=VMware, Inc./OU=Harbor/CN=Self-signed by VMware, Inc."
+            cert_subj = "/C=US/ST=California/L=Palo Alto/O=VMware, Inc./OU=Harbor/CN=notarysigner"
+            signer_ca_cert = os.path.join(temp_cert_dir, "notary-signer-ca.crt")
+            signer_ca_key = os.path.join(temp_cert_dir, "notary-signer-ca.key")
+            signer_cert_path = os.path.join(temp_cert_dir, "notary-signer.crt")
+            signer_key_path = os.path.join(temp_cert_dir, "notary-signer.key")
+            create_root_cert(ca_subj, key_path=signer_ca_key, cert_path=signer_ca_cert)
+            create_cert(cert_subj, signer_ca_key, signer_ca_cert, key_path=signer_key_path, cert_path=signer_cert_path)
+            print("Copying certs for notary signer")
+            os.chmod(signer_cert_path, 0o600)
+            os.chmod(signer_key_path, 0o600)
+            os.chmod(signer_ca_cert, 0o600)
+            shutil.copy2(signer_cert_path, notary_config_dir)
+            shutil.copy2(signer_key_path, notary_config_dir)
+            shutil.copy2(signer_ca_cert, notary_config_dir)
+        finally:
+            srl_tmp = os.path.join(os.getcwd(), ".srl")
+            if os.path.isfile(srl_tmp):
+                os.remove(srl_tmp)
+            if os.path.isdir(temp_cert_dir):
+                shutil.rmtree(temp_cert_dir, True)
+    else:
+        print("Copying certs for notary signer")
+        shutil.copy2(os.path.join(notary_temp_dir, "notary-signer.crt"), notary_config_dir)
+        shutil.copy2(os.path.join(notary_temp_dir, "notary-signer.key"), notary_config_dir)
+        shutil.copy2(os.path.join(notary_temp_dir, "notary-signer-ca.crt"), notary_config_dir)
+    shutil.copy2(os.path.join(registry_config_dir, "root.crt"), notary_config_dir)
+    print("Copying notary signer configuration file")
+    shutil.copy2(os.path.join(notary_temp_dir, "signer-config.json"), notary_config_dir)
+    render(os.path.join(notary_temp_dir, "server-config.json"),
+        os.path.join(notary_config_dir, "server-config.json"),
+        token_endpoint=ui_url)
+
+    print("Copying nginx configuration file for notary")
+    shutil.copy2(os.path.join(templates_dir, "nginx", "notary.upstream.conf"), nginx_conf_d)
+    render(os.path.join(templates_dir, "nginx", "notary.server.conf"), 
+            os.path.join(nginx_conf_d, "notary.server.conf"), 
+            ssl_cert = os.path.join("/etc/nginx/cert", os.path.basename(target_cert_path)),
+            ssl_cert_key = os.path.join("/etc/nginx/cert", os.path.basename(target_cert_key_path)))
+
+    default_alias = get_alias(secretkey_path)
+    render(os.path.join(notary_temp_dir, "signer_env"), os.path.join(notary_config_dir, "signer_env"), alias = default_alias)
+
+if args.clair_mode:
+    clair_temp_dir = os.path.join(templates_dir, "clair")
+    clair_config_dir = prep_conf_dir(config_dir, "clair")
+    if os.path.exists(os.path.join(clair_config_dir, "postgresql-init.d")):
+        print("Copying offline data file for clair DB")
+        shutil.rmtree(os.path.join(clair_config_dir, "postgresql-init.d"))
+    shutil.copytree(os.path.join(clair_temp_dir, "postgresql-init.d"), os.path.join(clair_config_dir, "postgresql-init.d"))
+    postgres_env = os.path.join(clair_config_dir, "postgres_env") 
+    render(os.path.join(clair_temp_dir, "postgres_env"), postgres_env, password = clair_db_password)
+    clair_conf = os.path.join(clair_config_dir, "config.yaml")
+    render(os.path.join(clair_temp_dir, "config.yaml"),
+            clair_conf,
+            password = clair_db_password,
+            username = clair_db_username,
+            host = clair_db_host,
+            port = clair_db_port)
+
+if args.ha_mode:
+    prepare_ha(rcp, args)
+
+FNULL.close()
+print("The configuration files are ready, please use docker-compose to start the service.")
+{% endhighlight %}
+
+如果认证模式为```uaa_auth```,则会将harbor.cfg中的```uaa_ca_cert```配置指定的cert文件拷贝到common/config/ui/certificates目录下。
+
+另外，如果harbor.cfg中```customize_crt```被配置为on，且当前系统安装了openssl，则会自动产生一对cert/key； 否则会采用模板中的cert/key。在Registry所连接的Auth token服务中，其用private_key来对所产生的token进行数字签名，然后Registry接收到Token后用root.crt来进行校验。
+
+
+
 
 <br />
 <br />
@@ -653,6 +811,8 @@ shutil.copyfile(os.path.join(templates_dir, "ui", "app.conf"), ui_conf)
 **[参考]**
 
 1. [LDAP目录服务折腾之后的总结](https://www.cnblogs.com/wadeyu/p/ldap-search-summary.html)
+
+2. [Docker Registry V2 Auth Server](https://hui.lu/docker-registry-v2-auth-server-with-python/)
 
 
 <br />
