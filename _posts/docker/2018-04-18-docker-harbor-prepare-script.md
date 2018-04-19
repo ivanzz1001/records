@@ -256,7 +256,6 @@ validate(rcp, args)
 
 ## 5. 处理相关选项
 
-选项比较多，我们分几根部分来讲解：
 {% highlight string %}
 reload_config = rcp.get("configuration", "reload_config") if rcp.has_option(
     "configuration", "reload_config") else "false"
@@ -273,13 +272,332 @@ email_ssl = rcp.get("configuration", "email_ssl")
 email_insecure = rcp.get("configuration", "email_insecure")
 harbor_admin_password = rcp.get("configuration", "harbor_admin_password")
 auth_mode = rcp.get("configuration", "auth_mode")
+ldap_url = rcp.get("configuration", "ldap_url")
+# this two options are either both set or unset
+if rcp.has_option("configuration", "ldap_searchdn"):
+    ldap_searchdn = rcp.get("configuration", "ldap_searchdn")
+    ldap_search_pwd = rcp.get("configuration", "ldap_search_pwd")
+else:
+    ldap_searchdn = ""
+    ldap_search_pwd = ""
+ldap_basedn = rcp.get("configuration", "ldap_basedn")
+# ldap_filter is null by default
+if rcp.has_option("configuration", "ldap_filter"):
+    ldap_filter = rcp.get("configuration", "ldap_filter")
+else:
+    ldap_filter = ""
+ldap_uid = rcp.get("configuration", "ldap_uid")
+ldap_scope = rcp.get("configuration", "ldap_scope")
+ldap_timeout = rcp.get("configuration", "ldap_timeout")
+ldap_verify_cert = rcp.get("configuration", "ldap_verify_cert")
+db_password = rcp.get("configuration", "db_password")
+db_host = rcp.get("configuration", "db_host")
+db_user = rcp.get("configuration", "db_user")
+db_port = rcp.get("configuration", "db_port")
+self_registration = rcp.get("configuration", "self_registration")
+if protocol == "https":
+    cert_path = rcp.get("configuration", "ssl_cert")
+    cert_key_path = rcp.get("configuration", "ssl_cert_key")
+customize_crt = rcp.get("configuration", "customize_crt")
+max_job_workers = rcp.get("configuration", "max_job_workers")
+token_expiration = rcp.get("configuration", "token_expiration")
+proj_cre_restriction = rcp.get("configuration", "project_creation_restriction")
+secretkey_path = rcp.get("configuration", "secretkey_path")
+if rcp.has_option("configuration", "admiral_url"):
+    admiral_url = rcp.get("configuration", "admiral_url")
+else:
+    admiral_url = ""
+clair_db_password = rcp.get("configuration", "clair_db_password")
+clair_db_host = rcp.get("configuration", "clair_db_host")
+clair_db_port = rcp.get("configuration", "clair_db_port")
+clair_db_username = rcp.get("configuration", "clair_db_username")
+clair_db = rcp.get("configuration", "clair_db")
+
+uaa_endpoint = rcp.get("configuration", "uaa_endpoint")
+uaa_clientid = rcp.get("configuration", "uaa_clientid")
+uaa_clientsecret = rcp.get("configuration", "uaa_clientsecret")
+uaa_verify_cert = rcp.get("configuration", "uaa_verify_cert")
+uaa_ca_cert = rcp.get("configuration", "uaa_ca_cert")
+
+secret_key = get_secret_key(secretkey_path)
+log_rotate_count = rcp.get("configuration", "log_rotate_count")
+log_rotate_size = rcp.get("configuration", "log_rotate_size")
+
+if rcp.has_option("configuration", "redis_url"):
+    redis_url = rcp.get("configuration", "redis_url")
+else:
+    redis_url = ""
+
+storage_provider_name = rcp.get("configuration", "registry_storage_provider_name").strip()
+storage_provider_config = rcp.get("configuration", "registry_storage_provider_config").strip()
+# yaml requires 1 or more spaces between the key and value
+storage_provider_config = storage_provider_config.replace(":", ": ", 1)
+
+ui_secret = ''.join(random.choice(string.ascii_letters+string.digits) for i in range(16))  
+jobservice_secret = ''.join(random.choice(string.ascii_letters+string.digits) for i in range(16))  
 {% endhighlight %}
-在harbor.cfg配置文件中，reload_config默认是没有定义的，因此取值为```false```， 表示adminserver不会重新加载配置。
+上面基本都是从harbor.cfg中读取配置文件。harbor.cfg配置文件可以分为几个部分，下面我们分别进行讲解（不一定按照上面的排列顺序）：
+
+### 5.1 全局通用配置
+
+全局通用配置主要有：
+
+* ```hostname```:  用于设置访问admin UI以及registry service的IP地址或hostname。不要配置为localhost或者127.0.0.1，因为Harbor需要被外部clients所访问。
+
+* ```ui_url_protocol```: 该协议用于访问UI、token/notification服务，默认情况下是http
+
+* ```max_job_workers```: 在job service中最大的job worker数
+
+* ```customize_crt```: 用于决定是否为registry的token产生证书。假如该字段被设置为```on```，则prepare脚本会产生新的```root cert```以及```private key```，其会被用于在访问registry的token时使用。假如设置为```off```，则会使用默认的key/cert。本选项也会控制notary signer的cert的产生。
+
+* ```ssl_cert```、```ssl_cert_key```: 用于为nginx设置cert以及key的路径。只在protocol被设置为https时使用
+
+* ```secretkey_path```: 秘钥的存放路径
+
+* ```admiral_url```: 管理员URL, 一般不需要进行设置（直接注释掉或设置为NA）
+
+* ```log_rotate_size```: 用于指定日志文件在被删除之前会被rotate的次数。假如本字段设置为0，则老版本的日志会被移除，而不是被rotate
+
+* ```log_rotate_size```: 日志文件只有在达到log_rotate_size时，才会进行rotate。单位可以设置为K/M/G。
+
+上面代码中我们还定义了一个reload_config字段， 该字段在harbor.cfg配置文件中并没有进行定义。因此取值为```false```， 表示adminserver不会重新加载配置(进行复位）
+
+
+### 5.2 初始化属性配置
+
+如下的一些属性配置只会在第一次启动的时候产生效果，而后续对这些属性的更改需要通过WebUI来完成.
+
+**1） 邮箱设置**
+
+这里邮箱用于发送密码重置的邮件。邮箱服务器通过与客户端主机建立TLS连接，使用给定的username、password来进行认证。
+
+* ```email_identity```: 邮件标识。假如为空的话，则默认为username
+
+* ```email_server```: 邮件服务器地址
+
+* ```email_server_port```: 邮件服务器端口
+
+* ```email_username```: 用户名
+
+* ```email_password```: 密码
+
+* ```email_from```: 显示邮件从什么地址发出
+
+* ```email_ssl```: 是否使用ssl
+
+* ```email_insecure```: 是否insecure
+
+**2) harbor管理员密码**
+
+* ```harbor_admin_password```: 用于设置Harbor admin用户的初始密码，只在Harbor第一次启动时有效。在Harbor第一次启动之后，修改本字段是无效的。如果第一次启动后，要修改Harbor admin密码，请通过WebUI来进行修改。
+
+**3)  用户认证**
+
+* ```auth_mode```: 默认的认证模式是db_auth，此时用户的credentials会存放在本地数据库中；如果要通过LDAP服务器来验证用户的credential, 可以配置为ldap_auth模式。
+
+* ```ldap_url```: ldap endpoint 的URL
+
+* ```ldap_searchdn```: 
+
+* ```ldap_search_pwd```:
+
+* ```ldap_basedn```:
+
+* ```ldap_filter```:
+
+* ```ldap_uid```:
+
+* ```ldap_scope```:
+
+* ```ldap_timeout```:
+
+* ```ldap_verify_cert```:
+
+* ```self_registration```: 是否允许用户自注册功能
+
+* ```token_expiration```: token的过期时间，默认是30分钟
+
+* ```project_creation_restriction```: 该字段用于控制哪些用户具有创建projects的权限。默认值为```everyone```，表示允许所有人创建工程，如果设置为```adminonly```的话，则只有admin用户可以创建工程。
+
+### 5.3 Harbor数据库配置
+
+* ```db_host```: 用于配置Harbor数据的地址，只在需要使用外部数据库的时候才要更改此字段
+
+* ```db_password```: 用于设置Harbor DB的root账户密码， 在实际生产环境中请更改本值
+
+* ```db_port```: 用于设置Harbor DB的端口
+
+* ```db_user```: 用于设置Harbor数据库的用户名
+
+
+
+### 5.4 Harbor HA模式Redis配置
+
+* ```redis_url```: 在Harbor HA模式下，需要配置redis服务器的地址
+
+### 5.5 Clair DB配置
+
+* ```clair_db_host```: 用于配置Clair DB主机地址。只在当需要使用外部数据库时，才需要更改此字段
+
+* ```clair_db_password```: Clair的 postgres数据库密码。只在Harbor启用Clair功能时有效。请在部署之前修改此密码，若部署后再进行修改可能会导致Clair API server与Habor无法访问Clair数据库
+
+* ```clair_db_port```: Clair数据库端口
+
+* ```clair_db_username```: Clair数据库用户名
+
+* ```clair_db```: 采用的Clair数据类型
+
+### 5.6 uaa_auth认证模式配置
+
+当认证模式被配置为uaa_auth时，需要配置如下字段：```uaa_endpoint```、```uaa_clientid```、```uaa_clientsecret```、```uaa_verify_cert``` 、```uaa_ca_cert```
+
+
+### 5.7 docker registry配置
+如下是Docker Registry的相关配置：
+
+* ```registry_storage_provider_name```: 本字段的可选值有```filesystem```、```s3```、```gcs```、```azure```等
+
+* ```registry_storage_provider_config```: 本字段是一个以逗号分割的```key: value```对。例如：```key1: value1, key2: value2```。更多可用的配置请参看[https://docs.docker.com/registry/configuration/#storage](https://docs.docker.com/registry/configuration/#storage)
+
+### 5.8 其他
+<pre>
+ui_secret = ''.join(random.choice(string.ascii_letters+string.digits) for i in range(16))  
+jobservice_secret = ''.join(random.choice(string.ascii_letters+string.digits) for i in range(16))  
+</pre>
+这里还会产生相关秘钥，用于不同服务之间的通信
+
+## 6. 产生配置文件存放目录
+{% highlight string %}
+adminserver_config_dir = os.path.join(config_dir,"adminserver")
+if not os.path.exists(adminserver_config_dir):
+    os.makedirs(os.path.join(config_dir, "adminserver"))
+
+ui_config_dir = prep_conf_dir(config_dir,"ui")
+ui_certificates_dir =  prep_conf_dir(ui_config_dir,"certificates")
+db_config_dir = prep_conf_dir(config_dir, "db")
+job_config_dir = prep_conf_dir(config_dir, "jobservice")
+registry_config_dir = prep_conf_dir(config_dir, "registry")
+nginx_config_dir = prep_conf_dir (config_dir, "nginx")
+nginx_conf_d = prep_conf_dir(nginx_config_dir, "conf.d")
+log_config_dir = prep_conf_dir (config_dir, "log")
+
+adminserver_conf_env = os.path.join(config_dir, "adminserver", "env")
+ui_conf_env = os.path.join(config_dir, "ui", "env")
+ui_conf = os.path.join(config_dir, "ui", "app.conf")
+ui_cert_dir = os.path.join(config_dir, "ui", "certificates")
+jobservice_conf = os.path.join(config_dir, "jobservice", "app.conf")
+registry_conf = os.path.join(config_dir, "registry", "config.yml")
+db_conf_env = os.path.join(config_dir, "db", "env")
+job_conf_env = os.path.join(config_dir, "jobservice", "env")
+nginx_conf = os.path.join(config_dir, "nginx", "nginx.conf")
+cert_dir = os.path.join(config_dir, "nginx", "cert")
+log_rotate_config = os.path.join(config_dir, "log", "logrotate.conf") 
+{% endhighlight %}
+这里默认的```config_dir```为common/config， 默认的templates_dir为common/templates。因此:
+
+* ```adminserver配置```: 存放路径为common/config/adminserver/env
+
+* ```ui env配置```: 存放路径为common/config/ui/env
+
+* ```ui配置```: 存放路径为common/config/ui/app.conf
+
+* ```ui_cert_dir```: 用于存放UI证书的路径，为common/config/ui/certificates
+
+* ```jobservice配置```: 存放路径为common/config/jobservice/app.conf
+
+* ```registry配置```: 存放路径为common/config/registry/config.yml
+
+* ```db env配置```: 存放路径为common/config/db/env 
+
+* ```job env配置```: 存放路径为common/config/jobservice/env
+
+* ```nginx配置```: 存放路径为common/config/nginx/nginx.conf
+
+* ```cert存放目录```: 路径为common/config/nginx/cert
+
+* ```日志配置```: 存放路径为common/config/log/logrotate.conf
+
+## 7. 生成nginx配置文件
+{% highlight string %}
+if protocol == "https":
+    target_cert_path = os.path.join(cert_dir, os.path.basename(cert_path))
+    if not os.path.exists(cert_dir):
+        os.makedirs(cert_dir)
+    shutil.copy2(cert_path,target_cert_path)
+    target_cert_key_path = os.path.join(cert_dir, os.path.basename(cert_key_path))
+    shutil.copy2(cert_key_path,target_cert_key_path)
+    render(os.path.join(templates_dir, "nginx", "nginx.https.conf"),
+            nginx_conf,
+            ssl_cert = os.path.join("/etc/nginx/cert", os.path.basename(target_cert_path)),
+            ssl_cert_key = os.path.join("/etc/nginx/cert", os.path.basename(target_cert_key_path)))
+else:
+    render(os.path.join(templates_dir, "nginx", "nginx.http.conf"),
+        nginx_conf)
+{% endhighlight %}
+这里如果配置为https模式，则会将harbor.cfg配置文件中指定的证书、秘钥拷贝到common/config/nginx/cert目录中，然后再以nginx.https.conf为模板生成nginx配置文件； 否则以nginx.http.conf为模板生成nginx配置文件。
+
+## 8. 生成admin server环境变量配置
+{% highlight string %}
+render(os.path.join(templates_dir, "adminserver", "env"),
+        adminserver_conf_env,
+        reload_config=reload_config,
+        ui_url=ui_url,
+        auth_mode=auth_mode,
+        self_registration=self_registration,
+        ldap_url=ldap_url,
+        ldap_searchdn =ldap_searchdn, 
+        ldap_search_pwd =ldap_search_pwd,
+        ldap_basedn=ldap_basedn,
+        ldap_filter=ldap_filter,
+        ldap_uid=ldap_uid,
+        ldap_scope=ldap_scope,
+        ldap_verify_cert=ldap_verify_cert,
+        ldap_timeout=ldap_timeout,
+        db_password=db_password,
+        db_host=db_host,
+        db_user=db_user,
+        db_port=db_port,
+        email_host=email_host,
+        email_port=email_port,
+        email_usr=email_usr,
+        email_pwd=email_pwd,
+        email_ssl=email_ssl,
+        email_insecure=email_insecure,
+        email_from=email_from,
+        email_identity=email_identity,
+        harbor_admin_password=harbor_admin_password,
+        project_creation_restriction=proj_cre_restriction,
+        max_job_workers=max_job_workers,
+        ui_secret=ui_secret,
+        jobservice_secret=jobservice_secret,
+        token_expiration=token_expiration,
+        admiral_url=admiral_url,
+        with_notary=args.notary_mode,
+        with_clair=args.clair_mode,
+        clair_db_password=clair_db_password,
+        clair_db_host=clair_db_host,
+        clair_db_port=clair_db_port,
+        clair_db_username=clair_db_username,
+        clair_db=clair_db,
+        uaa_endpoint=uaa_endpoint,
+        uaa_clientid=uaa_clientid,
+        uaa_clientsecret=uaa_clientsecret,
+        uaa_verify_cert=uaa_verify_cert,
+        storage_provider_name=storage_provider_name
+	)
+
+{% endhighlight %}
+这是作为整个Harbor管理后台的相关配置。
 
 
 
 
+<br />
+<br />
 
+**[参考]**
+
+1. [LDAP目录服务折腾之后的总结](https://www.cnblogs.com/wadeyu/p/ldap-search-summary.html)
 
 
 <br />
