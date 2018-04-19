@@ -176,11 +176,9 @@ RSA* getPublicKey(char* in_szKeyPath)
 		return NULL;
     }
 
-
-
     rsa = EVP_PKEY_get1_RSA(pubk);
 
-    BIO_free(bio);
+	BIO_free(bio);
 	X509_free(x509);
 
 	return rsa;
@@ -192,8 +190,8 @@ RSA* getPublicKey(char* in_szKeyPath)
 int main(void)
 {
 	char	szEncData[]="orderId=01010500201502000004reqTime=20150205012727ext=20151120ext2=1";
-    int strlen, iRet;
-
+	int strlen, iRet;
+	
 	RSA		*pRsaPriv = NULL, *pRSAPub = NULL;
 	char sign_digest_buf[BUFFSIZE], sign_buf[BUFFSIZE];
 	char verify_digest_buf[BUFFSIZE], verify_buf[BUFFSIZE];
@@ -210,7 +208,7 @@ int main(void)
 	//RSA_print_fp(stdout, prsa, 11);
 
 	strlen = sizeof(szEncData) -1;
-    printf("szEnData:[%s]\n", szEncData);
+	printf("szEnData:[%s]\n", szEncData);
 
 
 	//1) Get the message digest
@@ -259,7 +257,7 @@ int main(void)
 	memset(verify_digest_buf, 0, BUFFSIZE);
 	SHA1(szEncData, strlen, verify_digest_buf);
 
-    //5) verify
+	//5) verify
 	iRet = RSA_verify(NID_sha1, (unsigned char *)verify_digest_buf, 20, (unsigned char*)sign_buf, siglen, pRSAPub);
 	if(iRet != 1 )
 	{
