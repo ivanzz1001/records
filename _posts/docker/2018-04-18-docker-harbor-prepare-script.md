@@ -591,6 +591,59 @@ render(os.path.join(templates_dir, "adminserver", "env"),
 {% endhighlight %}
 这是作为整个Harbor管理后台的相关配置。
 
+**3) registry配置**
+{% highlight string %}
+registry_config_file = "config_ha.yml" if args.ha_mode else "config.yml"
+if storage_provider_name == "filesystem":
+    if not storage_provider_config:
+        storage_provider_config = "rootdirectory: /storage"
+    elif "rootdirectory:" not in storage_provider_config:
+        storage_provider_config = "rootdirectory: /storage" + "," + storage_provider_config
+# generate storage configuration section in yaml format
+storage_provider_info = ('\n' + ' ' * 4).join(
+    [storage_provider_name + ':'] + map(string.strip, storage_provider_config.split(",")))
+render(os.path.join(templates_dir, "registry", registry_config_file),
+    registry_conf,
+    storage_provider_info=storage_provider_info,
+    ui_url=ui_url,
+    redis_url=redis_url)
+{% endhighlight %}
+这里用于产生Docker Registry的配置文件
+
+**4) 产生DB配置文件**
+{% highlight string %}
+render(os.path.join(templates_dir, "db", "env"),
+        db_conf_env,
+        db_password=db_password)
+{% endhighlight %}
+
+**5) 产生jobservice env配置**
+{% highlight string %}
+render(os.path.join(templates_dir, "jobservice", "env"),
+        job_conf_env,
+        ui_secret=ui_secret,
+        jobservice_secret=jobservice_secret)
+{% endhighlight %}
+
+**6) 产生日志服务配置**
+{% highlight string %}
+render(os.path.join(templates_dir, "log", "logrotate.conf"),
+        log_rotate_config,
+        log_rotate_count=log_rotate_count,
+		log_rotate_size=log_rotate_size)
+{% endhighlight %}
+
+**7) 产生jobservice配置文件**
+{% highlight string %}
+print("Generated configuration file: %s" % jobservice_conf)
+shutil.copyfile(os.path.join(templates_dir, "jobservice", "app.conf"), jobservice_conf)
+{% endhighlight %}
+
+**8) 产生ui配置文件**
+{% highlight string %}
+print("Generated configuration file: %s" % ui_conf)
+shutil.copyfile(os.path.join(templates_dir, "ui", "app.conf"), ui_conf)
+{% endhighlight %}
 
 
 
