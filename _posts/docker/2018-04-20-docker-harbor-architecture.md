@@ -167,8 +167,6 @@ networks:
 
 2. [vmware harbor](http://vmware.github.io/harbor/)
 
-3. [habor documents](https://github.com/vmware/harbor/tree/master/docs)
-
 <br />
 <br />
 <br />

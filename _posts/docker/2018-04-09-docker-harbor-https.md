@@ -202,7 +202,7 @@ ssl_cert_key = /opt/cert/harbor-registry.key
 </pre>
 
 4) 关闭harbor
-</pre>
+<pre>
 # docker-compose down 
 </pre>
 
