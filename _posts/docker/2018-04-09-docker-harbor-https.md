@@ -20,8 +20,8 @@ description: 配置Harbor以支持https
 <pre>
 # docker-compose down -v
 # ls /data/*
-# rm -r /data/database
-# rm -r /data/registry
+# rm -rf /data/database
+# rm -rf /data/registry
 # rm -rf /data/*
 # rm -rf /var/log/harbor*
 # 

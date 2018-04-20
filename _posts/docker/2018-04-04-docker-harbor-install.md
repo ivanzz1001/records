@@ -339,8 +339,8 @@ Starting proxy ... done
 
 **5) 移除Harbor数据库及image data(用于干净环境下Harbor重装)**
 {% highlight string %}
-# rm -r /data/database
-# rm -r /data/registry
+# rm -rf /data/database
+# rm -rf /data/registry
 {% endhighlight %}
 
 
