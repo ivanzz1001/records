@@ -1,10 +1,10 @@
 ---
 layout: post
-title: Harbor docker-compose文件分析
+title: Harbor整体架构
 tags:
 - docker
 categories: docker
-description: Harbor docker-compose文件分析
+description: Harbor整体架构
 ---
 
 
@@ -14,147 +14,21 @@ description: Harbor docker-compose文件分析
 
 <!-- more -->
 
-## 1. docker-compose.yml文件
+## 1. Harbor整体架构
+默认情况下，Harbor运行起来后有如下容器：
 {% highlight string %}
-version: '2'
-services:
-  log:
-    image: vmware/harbor-log:v1.4.0
-    container_name: harbor-log 
-    restart: always
-    volumes:
-      - /var/log/harbor/:/var/log/docker/:z
-      - ./common/config/log/:/etc/logrotate.d/:z
-    ports:
-      - 127.0.0.1:1514:10514
-    networks:
-      - harbor
-  registry:
-    image: vmware/registry-photon:v2.6.2-v1.4.0
-    container_name: registry
-    restart: always
-    volumes:
-      - /data/registry:/storage:z
-      - ./common/config/registry/:/etc/registry/:z
-    networks:
-      - harbor
-    environment:
-      - GODEBUG=netdns=cgo
-    command:
-      ["serve", "/etc/registry/config.yml"]
-    depends_on:
-      - log
-    logging:
-      driver: "syslog"
-      options:  
-        syslog-address: "tcp://127.0.0.1:1514"
-        tag: "registry"
-  mysql:
-    image: vmware/harbor-db:v1.4.0
-    container_name: harbor-db
-    restart: always
-    volumes:
-      - /data/database:/var/lib/mysql:z
-    networks:
-      - harbor
-    env_file:
-      - ./common/config/db/env
-    depends_on:
-      - log
-    logging:
-      driver: "syslog"
-      options:  
-        syslog-address: "tcp://127.0.0.1:1514"
-        tag: "mysql"
-  adminserver:
-    image: vmware/harbor-adminserver:v1.4.0
-    container_name: harbor-adminserver
-    env_file:
-      - ./common/config/adminserver/env
-    restart: always
-    volumes:
-      - /data/config/:/etc/adminserver/config/:z
-      - /data/secretkey:/etc/adminserver/key:z
-      - /data/:/data/:z
-    networks:
-      - harbor
-    depends_on:
-      - log
-    logging:
-      driver: "syslog"
-      options:  
-        syslog-address: "tcp://127.0.0.1:1514"
-        tag: "adminserver"
-  ui:
-    image: vmware/harbor-ui:v1.4.0
-    container_name: harbor-ui
-    env_file:
-      - ./common/config/ui/env
-    restart: always
-    volumes:
-      - ./common/config/ui/app.conf:/etc/ui/app.conf:z
-      - ./common/config/ui/private_key.pem:/etc/ui/private_key.pem:z
-      - ./common/config/ui/certificates/:/etc/ui/certificates/:z
-      - /data/secretkey:/etc/ui/key:z
-      - /data/ca_download/:/etc/ui/ca/:z
-      - /data/psc/:/etc/ui/token/:z
-    networks:
-      - harbor
-    depends_on:
-      - log
-      - adminserver
-      - registry
-    logging:
-      driver: "syslog"
-      options:  
-        syslog-address: "tcp://127.0.0.1:1514"
-        tag: "ui"
-  jobservice:
-    image: vmware/harbor-jobservice:v1.4.0
-    container_name: harbor-jobservice
-    env_file:
-      - ./common/config/jobservice/env
-    restart: always
-    volumes:
-      - /data/job_logs:/var/log/jobs:z
-      - ./common/config/jobservice/app.conf:/etc/jobservice/app.conf:z
-      - /data/secretkey:/etc/jobservice/key:z
-    networks:
-      - harbor
-    depends_on:
-      - ui
-      - adminserver
-    logging:
-      driver: "syslog"
-      options:  
-        syslog-address: "tcp://127.0.0.1:1514"
-        tag: "jobservice"
-  proxy:
-    image: vmware/nginx-photon:v1.4.0
-    container_name: nginx
-    restart: always
-    volumes:
-      - ./common/config/nginx:/etc/nginx:z
-    networks:
-      - harbor
-    ports:
-      - 80:80
-      - 443:443
-      - 4443:4443
-    depends_on:
-      - mysql
-      - registry
-      - ui
-      - log
-    logging:
-      driver: "syslog"
-      options:  
-        syslog-address: "tcp://127.0.0.1:1514"
-        tag: "proxy"
-networks:
-  harbor:
-    external: false
+# docker ps
+CONTAINER ID        IMAGE                                  COMMAND                  CREATED             STATUS                            PORTS                                                              NAMES
+248ae75cf72b        vmware/nginx-photon:v1.4.0             "nginx -g 'daemon of…"   4 seconds ago       Up 3 seconds                      0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp, 0.0.0.0:4443->4443/tcp   nginx
+2f4278759096        vmware/harbor-jobservice:v1.4.0        "/harbor/start.sh"       4 seconds ago       Up 4 seconds (health: starting)                                                                      harbor-jobservice
+5977ecfd082b        vmware/harbor-ui:v1.4.0                "/harbor/start.sh"       5 seconds ago       Up 4 seconds (health: starting)                                                                      harbor-ui
+ff6fc31844a9        vmware/harbor-db:v1.4.0                "/usr/local/bin/dock…"   5 seconds ago       Up 3 seconds (health: starting)   3306/tcp                                                           harbor-db
+2ed6ff381ab9        vmware/harbor-adminserver:v1.4.0       "/harbor/start.sh"       5 seconds ago       Up 4 seconds (health: starting)                                                                      harbor-adminserver
+d3e1e93bce1b        vmware/registry-photon:v2.6.2-v1.4.0   "/entrypoint.sh serv…"   5 seconds ago       Up 4 seconds (health: starting)   5000/tcp                                                           registry
+096310feb030        vmware/harbor-log:v1.4.0               "/bin/sh -c /usr/loc…"   6 seconds ago       Up 5 seconds (health: starting)   127.0.0.1:1514->10514/tcp                                          harbor-log
 {% endhighlight %}
+名称分别为：```nginx```、```harbor-jobservice```、```harbor-ui```、```harbor-db```、```harbor-adminserver```、```registry```以及```harbor-log```。
+
 
 
 
@@ -163,9 +37,7 @@ networks:
 
 **[参考]**
 
-1. [harbor官网](https://github.com/vmware/harbor)
-
-2. [vmware harbor](http://vmware.github.io/harbor/)
+1. [Architecture Overview of Harbor](https://github.com/vmware/harbor/wiki/Architecture-Overview-of-Harbor)
 
 <br />
 <br />
