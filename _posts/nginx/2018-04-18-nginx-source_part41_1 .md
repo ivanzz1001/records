@@ -139,6 +139,8 @@ typedef struct {
 } ngx_url_t;
 {% endhighlight %}
 
+注意这里```ngx_url_t```是并不包含```http```、```https```这样的前缀的（参看:ngx_http_proxy_eval()函数)
+
 
 <br />
 <br />
@@ -149,6 +151,19 @@ typedef struct {
 
 2. [无类域间路由](https://baike.baidu.com/item/%E6%97%A0%E7%B1%BB%E5%9F%9F%E9%97%B4%E8%B7%AF%E7%94%B1/240168?fr=aladdin&fromid=3695195&fromtitle=CIDR)
 
+3. [Nginx中发送udp请求](http://blog.aka-cool.net/blog/2014/02/24/udp-in-nginx/)
+
+4. [nginx源码初读](https://blog.csdn.net/wuchunlai_2012/article/category/6098793)
+
+5. [Module ngx_http_core_module - listen](http://nginx.org/en/docs/http/ngx_http_core_module.html#listen)
+
+6. [Module ngx_http_core_module - debug_connection](http://nginx.org/en/docs/ngx_core_module.html#debug_connection)
+
+7. [memcached_pass](http://nginx.org/en/docs/http/ngx_http_memcached_module.html#memcached_pass)
+
+8. [resolver](http://nginx.org/en/docs/http/ngx_http_core_module.html#resolver)
+
+9. [stream module - listen](http://nginx.org/en/docs/stream/ngx_stream_core_module.html#listen)
 
 <br />
 <br />
