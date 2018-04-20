@@ -800,7 +800,7 @@ print("The configuration files are ready, please use docker-compose to start the
 
 如果认证模式为```uaa_auth```,则会将harbor.cfg中的```uaa_ca_cert```配置指定的cert文件拷贝到common/config/ui/certificates目录下。
 
-另外，如果harbor.cfg中```customize_crt```被配置为on，且当前系统安装了openssl，则会自动产生一对cert/key； 否则会采用模板中的cert/key。在Registry所连接的Auth token服务中，其用private_key来对所产生的token进行数字签名，然后Registry接收到Token后用root.crt来进行校验。
+另外，如果harbor.cfg中```customize_crt```被配置为on，且当前系统安装了openssl，则会自动产生一对cert/key(自签名证书）； 否则会采用模板中的cert/key。在Registry所连接的Auth token服务中，其用private_key来对所产生的token进行数字签名，然后Registry接收到Token后用root.crt来进行校验。
 
 
 
