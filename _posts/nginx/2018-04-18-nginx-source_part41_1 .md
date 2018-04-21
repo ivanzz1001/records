@@ -139,7 +139,9 @@ typedef struct {
 } ngx_url_t;
 {% endhighlight %}
 
-注意这里```ngx_url_t```是并不包含```http```、```https```这样的前缀的（参看:ngx_http_proxy_eval()函数)
+在介绍```ngx_url_t```数据结构之前，我们先来了解一下nginx中所配置url大体是什么样式。搜索```ngx_parse_url()```函数，并找到所使用```ngx_url_t```的一些位置。
+
+
 
 
 <br />
@@ -164,6 +166,8 @@ typedef struct {
 8. [resolver](http://nginx.org/en/docs/http/ngx_http_core_module.html#resolver)
 
 9. [stream module - listen](http://nginx.org/en/docs/stream/ngx_stream_core_module.html#listen)
+
+10. [error_log - syslog](http://nginx.org/en/docs/ngx_core_module.html#error_log)
 
 <br />
 <br />
