@@ -256,8 +256,42 @@ server backend.example.com service=_http._tcp resolve;
 
 * ```uri_part```: 是否具有uri部分
 
+* ```no_resolve```: 需不需要进行DNS解析
 
+* ```one_addr```: 本字段暂时未使用
 
+* ```no_port```: 表明当前url中是否配置了端口（如果没有配置，且需要端口的话，则会采用默认端口）
+
+* ```wildcard```: 是否为一个通配地址
+
+* ```socklen```: 所对应的socket长度
+
+* ```sockaddr```: 存放socket地址的内存空间（此地址存放的一般是选作为默认的socket地址，请参看如下字段）
+
+* ```addrs```: 存放所有socket的地址的数组空间（有时配置是一个通配地址，或者是一个域名地址，在完成DNS解析后可能会解析出多个地址）
+
+* ```naddrs```: 上面addrs数组元素的个数
+
+* ```err```: 用于存放对应的错误信息字符串
+
+## 4. 相关函数声明
+{% highlight string %}
+in_addr_t ngx_inet_addr(u_char *text, size_t len);
+#if (NGX_HAVE_INET6)
+ngx_int_t ngx_inet6_addr(u_char *p, size_t len, u_char *addr);
+size_t ngx_inet6_ntop(u_char *p, u_char *text, size_t len);
+#endif
+size_t ngx_sock_ntop(struct sockaddr *sa, socklen_t socklen, u_char *text,
+    size_t len, ngx_uint_t port);
+size_t ngx_inet_ntop(int family, void *addr, u_char *text, size_t len);
+ngx_int_t ngx_ptocidr(ngx_str_t *text, ngx_cidr_t *cidr);
+ngx_int_t ngx_parse_addr(ngx_pool_t *pool, ngx_addr_t *addr, u_char *text,
+    size_t len);
+ngx_int_t ngx_parse_url(ngx_pool_t *pool, ngx_url_t *u);
+ngx_int_t ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u);
+ngx_int_t ngx_cmp_sockaddr(struct sockaddr *sa1, socklen_t slen1,
+    struct sockaddr *sa2, socklen_t slen2, ngx_uint_t cmp_port);
+{% endhighlight %}
 
 
 <br />
