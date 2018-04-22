@@ -294,6 +294,26 @@ ngx_int_t ngx_cmp_sockaddr(struct sockaddr *sa1, socklen_t slen1,
 {% endhighlight %}
 
 
+* ```ngx_inet_addr()```: 用于将字符串表示的IPv4地址转换成in_addr_t类型表示
+
+* ```ngx_inet6_addr()```: 用于将字符串表示的IPv6地址转换成ipv6相应结构，存放在addr所指向的内存中。当前我们并不支持```NGX_HAVE_INET6```宏定义。
+
+* ```ngx_inet6_ntop()```: 用于将ipv6相应内存结构转换成字符串表示形式
+
+* ```ngx_sock_ntop()```: 用于将ipv4、ipv6、unix域socket地址转换成字符串表示形式，存放在text中
+
+* ```ngx_inet_ntop()```: 用于将ipv4、ipv6表示的相应结构转换成字符串表示形式，存放在text中
+
+* ```ngx_ptocidr()```: 将字符串表示形式的ip地址(ipv4/ipv6)转换成cidr表示形式
+
+* ```ngx_parse_addr()```: 将```text```表示形式的IP地址转换成ngx_addr_t结构
+
+* ```ngx_parse_url()```: 解析```ngx_url_t```数据结构
+
+* ```ngx_inet_resolve()```: 将主机名转换成socket地址结构
+
+* ```ngx_cmp_sockaddr()```: 比较两个IP地址
+
 <br />
 <br />
 
