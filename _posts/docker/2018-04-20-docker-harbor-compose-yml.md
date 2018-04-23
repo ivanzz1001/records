@@ -161,6 +161,25 @@ networks:
 ![docker-harbor-arch](https://ivanzz1001.github.io/records/assets/img/docker/docker_harbor_arch.png)
 
 
+上面各组件之间构建了一个内部网络```harbor```, 相互之间通过harbor网络进行通信。各组件之间的依赖关系如下：
+
+
+![harbor-components-reply](https://ivanzz1001.github.io/records/assets/img/docker/harbor_components_reply.jpg)
+
+上面如果admin server要将相应的配置存放到数据库，其也需要依赖于mysql。
+
+另外还有两个地方需要注意：
+
+1） admin server、ui、job service之间交互会共用一个公共的secretkey, 其存放在/data/secretkey文件中
+
+2) ui与registry之间，采用数字签名的方式来进行认证。ui采用private_key.pem对token进行数字签名，在registry后续接收到token后采用root.crt来进行校验。
+
+
+
+## 2. 手动启动Harbor个组件
+
+
+
 
 
 
