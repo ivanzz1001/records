@@ -72,8 +72,49 @@ Harbor的每一个组件都被包装成一个docker容器。自然，Harbor是�
 如下两个Docker命令行的例子显示了Harbor各组件之间的交互。
 
 ## 3. docker login处理流程
+假设Harbor被部署在```192.168.1.10```宿主机上。用户通过如下命令行发送一个登录Harbor的请求：
+<pre>
+docker login 192.168.1.10
+</pre>
+
+在用户输入所需要的```Credentials```之后，Docker Client会发送一个HTTP GET请求到```192.168.1.10/v2/```地址处，Harbor的不同容器组件将会按照如下步骤进行处理：
+
+![harbor-doker-login](https://ivanzz1001.github.io/records/assets/img/docker/harbor_docker_login.png)
+
+(a) 首先，该请求将会被监听在80端口上的代理容器所接收到。容器中的Nginx将会把该请求转发给后端的Registry容器
+
+(b) 由于registry容器已经被配置为基于```token```的认证，因此其会返回一个401错误码，用于通知docker客户端从一个指定的URL处获得一个有效的token。在Harbor中，该URL会指向Core service中的token service。
+
+(c) 当Docker Client接收到这个错误码，其就会发送一个请求到token service URL，会根据HTTP基本认证协议在请求头中内嵌username和password相关信息
+
+(d) 在该请求被发送到代理的80端口上后，Nginx会根据预先所配置的规则将请求转发到UI容器上。UI容器中的token service接收到该请求之后，其就会对该请求进行解码然后获得相应的用户名及密码
+
+(e) 在成功获得用户名及密码之后，token Service就会检查mysql数据库以完成用户的认证。当token service被配置为LDAP/AD认证的时候，其就会通过外部的LDAP/AD服务来完成认证。在成功认证之后，token Service就会返回一个认证成功的http code， Http body部分会返回一个通过private key所产生的token
+
+
+到这里为止，Docker login就处理完成。Docker client会将步骤(c)所产生的username及password编码后保存到一个隐藏的文件中
 
 ## 4. docker push处理流程
+
+![harbor-doker-push](https://ivanzz1001.github.io/records/assets/img/docker/harbor_docker_push.png)
+
+
+(注： 上述我们已经省略了Nginx代理转发的步骤。上图展示了docker push过程中不同组件之间的交互流程）
+
+在用户成功登录之后，就会通过Docker push命令向Harbor发送一个Docker Image:
+<pre>
+# docker push 192.168.1.10/library/hello-world
+</pre>
+
+(a) 首先，docker client执行类似登录时的流程发送一个请求到registry，然后返回一个token service的URL
+
+(b) 然后，docker client通过提供一些额外的信息与ui/token交互以获得push镜像library/hello-world的token
+
+(c) 在成功获得来自Nginx转发的请求之后，Token Service查询数据库以寻找用户推送镜像的```角色```及```权限```。假如用户有相应的权限，token service就会编码相应的push操作信息，并用一个private key进行签名。然后返回一个token给Docker client
+
+(d) 在docker client获得token之后，其就会发送一个push请求到registry，在该push请求的头中包含有上面返回的token信息。一旦registry收到了该请求，其就会使用public key来解码该token，然后再校验其内容。该public key对应于token service处的private key。假如registry发现该token有效，则会开启镜像的传输流程。
+
+
 
 
 
