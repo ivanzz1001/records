@@ -156,6 +156,14 @@ networks:
     external: false
 {% endhighlight %}
 
+这里我们再给出Harbor的整个架构图：
+
+![docker-harbor-arch](https://ivanzz1001.github.io/records/assets/img/docker/docker_harbor_arch.png)
+
+
+
+
+
 
 
 <br />
