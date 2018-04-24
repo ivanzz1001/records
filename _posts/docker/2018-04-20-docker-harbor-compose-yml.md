@@ -177,6 +177,21 @@ networks:
 
 
 ## 2. 手动启动Harbor个组件
+这里先首先停止Harbor所有组件，删除所有已有数据：
+<pre>
+# docker-compose down -v
+# ls /data/*
+# rm -rf /data/database
+# rm -rf /data/registry
+# rm -rf /data/*
+# rm -rf /var/log/harbor*
+</pre>
+
+下面根据上图的各依赖关系，分别启动各个组件：
+
+### 2.1 启动log组件
+
+
 
 
 
