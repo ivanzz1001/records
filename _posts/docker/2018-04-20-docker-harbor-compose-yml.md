@@ -290,7 +290,7 @@ lo        Link encap:Local Loopback
 # docker run -itd --name harbor-db \
  -v /data/database:/var/lib/mysql:z \
  --env-file /opt/harbor-inst/harbor/common/config/db/env \
- --log-driver syslog --log-opt syslog-address=tcp://127.0.0.1:1514 --log-opt tag=mysql\
+ --log-driver syslog --log-opt syslog-address=tcp://127.0.0.1:1514 --log-opt tag=mysql \
  vmware/harbor-db:v1.4.0
 a28716bfb7a547222c2f7918ed87a23bf51d9a155c973357548a72d9165772a3
 
@@ -313,7 +313,7 @@ fe15b507a2f6        vmware/harbor-db:v1.4.0        "/usr/local/bin/dock…"   Ab
  -v /data/secretkey:/etc/adminserver/key:z \
  -v /data/:/data/:z \
  --env-file /opt/harbor-inst/harbor/common/config/adminserver/env \
- --log-driver syslog --log-opt syslog-address=tcp://127.0.0.1:1514 --log-opt tag=adminserver\
+ --log-driver syslog --log-opt syslog-address=tcp://127.0.0.1:1514 --log-opt tag=adminserver \
  --add-host mysql:172.17.0.3 \
  vmware/harbor-adminserver:v1.4.0
 
@@ -330,17 +330,51 @@ a28716bfb7a5        vmware/harbor-db:v1.4.0            "/usr/local/bin/dock…" 
 {% endhighlight %}
 注意上面需要添加```--add-host```选项来设置mysql的地址。
 
-##  2.4 启动Registry
+
+## 2.4 启动job service
 {% highlight string %}
+# docker run -itd --name harbor-jobservice \
+ -v /data/job_logs:/var/log/jobs:z \
+ -v /opt/harbor-inst/harbor/common/config/jobservice/app.conf:/etc/jobservice/app.conf:z \
+ -v /data/secretkey:/etc/jobservice/key:z \
+ --env-file /opt/harbor-inst/harbor/common/config/jobservice/env \
+ --log-driver syslog --log-opt syslog-address=tcp://127.0.0.1:1514 --log-opt tag=jobservice \
+ --add-host mysql:172.17.0.3 \
+ --add-host adminserver:172.17.0.4 \
+ vmware/harbor-jobservice:v1.4.0
+
+# docker ps
+CONTAINER ID        IMAGE                              COMMAND                  CREATED             STATUS                    PORTS                     NAMES
+fe1ae649fe7e        vmware/harbor-jobservice:v1.4.0    "/harbor/start.sh"       45 seconds ago      Up 45 seconds (healthy)                             harbor-jobservice
+08dca12b8cb4        vmware/harbor-adminserver:v1.4.0   "/harbor/start.sh"       3 minutes ago       Up 3 minutes (healthy)                              harbor-adminserver
+ad69caeb1bf6        vmware/harbor-db:v1.4.0            "/usr/local/bin/dock…"   3 minutes ago       Up 3 minutes (healthy)    3306/tcp                  harbor-db
+0ee562d91870        vmware/harbor-log:v1.4.0           "/bin/sh -c /usr/loc…"   3 minutes ago       Up 3 minutes (healthy)    0.0.0.0:1514->10514/tcp   harbor-log
+
+# docker inspect harbor-jobservice | grep IPAddress
+docker inspect harbor-jobservice | grep IPAddress
+            "SecondaryIPAddresses": null,
+            "IPAddress": "172.17.0.5",
+                    "IPAddress": "172.17.0.5",
+{% endhighlight %}
+
+## 2.5 启动registry、ui
+这里registry与ui之间相互依赖： 启动registry时需要UI的地址，而启动UI时又需要registry的地址。因此这里我们采用一种取巧的办法： 一般用docker连续创建两个容器时，容器对应的ip地址一般也是连续且相邻的。接着上面```harbor-jobservice```，我们下面先创建registry容器，然后再创建ui容器，这两个容器对应的IP根据经验应该分别为：
+
+* **registry IP**: 172.17.0.6
+
+* **ui IP**: 172.17.0.7
+
+下面我们就采用```--add-host```参数预先添加相应的主机名到创建容器命令中(注意这两者之间启动间隔必须控制在几秒中之内，否则可能导致失败）：
+
+{% highligh string %}
+
 # docker run -itd --name harbor-registry \
  -v /data/registry:/storage:z -v /opt/harbor-inst/harbor/common/config/registry/:/etc/registry/:z \
  -e "GODEBUG=netdns=cgo" \
- --log-driver syslog --log-opt syslog-address=tcp://127.0.0.1:1514 --log-opt tag=registry\
+ --add-host ui:172.17.0.7 \
+ --log-driver syslog --log-opt syslog-address=tcp://127.0.0.1:1514 --log-opt tag=registry \
  vmware/registry-photon:v2.6.2-v1.4.0 /bin/registry serve /etc/registry/config.yml
-{% endhighlight %}
 
-### 2.5 启动ui
-{% highlight string %}
 # docker run -itd --name harbor-ui \
  -v /opt/harbor-inst/harbor/common/config/ui/app.conf:/etc/ui/app.conf:z \
  -v /opt/harbor-inst/harbor/common/config/ui/private_key.pem:/etc/ui/private_key.pem:z \
@@ -350,17 +384,79 @@ a28716bfb7a5        vmware/harbor-db:v1.4.0            "/usr/local/bin/dock…" 
  -v /data/psc/:/etc/ui/token/:z \
  --add-host mysql:172.17.0.3 \
  --add-host adminserver:172.17.0.4 \
+ --add-host jobservice:172.17.0.5 \
+ --add-host registry:172.17.0.6 \
  --env-file /opt/harbor-inst/harbor/common/config/ui/env \
- --log-driver syslog --log-opt syslog-address=tcp://127.0.0.1:1514 --log-opt tag=ui\
+ --log-driver syslog --log-opt syslog-address=tcp://127.0.0.1:1514 --log-opt tag=ui \
  vmware/harbor-ui:v1.4.0
 
+
+//这里启动之后，等待一段时间变为health
 # docker ps
-CONTAINER ID        IMAGE                              COMMAND                  CREATED              STATUS                                 PORTS                     NAMES
-839d48d6c389        vmware/harbor-ui:v1.4.0            "/harbor/start.sh"       About a minute ago   Up About a minute (health: starting)                             harbor-ui
-9e4044e9d73f        vmware/harbor-adminserver:v1.4.0   "/harbor/start.sh"       27 minutes ago       Up 27 minutes (healthy)                                          harbor-adminserver
-a28716bfb7a5        vmware/harbor-db:v1.4.0            "/usr/local/bin/dock…"   39 minutes ago       Up 39 minutes (healthy)                3306/tcp                  harbor-db
-7c9ad816e6ab        vmware/harbor-log:v1.4.0           "/bin/sh -c /usr/loc…"   39 minutes ago       Up 39 minutes (healthy)                0.0.0.0:1514->10514/tcp   harbor-log
+CONTAINER ID        IMAGE                                  COMMAND                  CREATED              STATUS                        PORTS                     NAMES
+249e8a888841        vmware/harbor-ui:v1.4.0                "/harbor/start.sh"       57 seconds ago       Up 56 seconds (healthy)                                 harbor-ui
+70c011d6308d        vmware/registry-photon:v2.6.2-v1.4.0   "/entrypoint.sh /bin…"   About a minute ago   Up About a minute (healthy)   5000/tcp                  harbor-registry
+fe1ae649fe7e        vmware/harbor-jobservice:v1.4.0        "/harbor/start.sh"       11 minutes ago       Up 11 minutes (healthy)                                 harbor-jobservice
+08dca12b8cb4        vmware/harbor-adminserver:v1.4.0       "/harbor/start.sh"       14 minutes ago       Up 14 minutes (healthy)                                 harbor-adminserver
+ad69caeb1bf6        vmware/harbor-db:v1.4.0                "/usr/local/bin/dock…"   14 minutes ago       Up 14 minutes (healthy)       3306/tcp                  harbor-db
+0ee562d91870        vmware/harbor-log:v1.4.0               "/bin/sh -c /usr/loc…"   14 minutes ago       Up 14 minutes (healthy)       0.0.0.0:1514->10514/tcp   harbor-log
+
+# docker inspect harbor-registry | grep IPAddress
+            "SecondaryIPAddresses": null,
+            "IPAddress": "172.17.0.6",
+                    "IPAddress": "172.17.0.6",
+# docker inspect harbor-ui | grep IPAddress
+            "SecondaryIPAddresses": null,
+            "IPAddress": "172.17.0.7",
+                    "IPAddress": "172.17.0.7",
 {% endhighlight %}
+
+
+## 2.6 启动nginx代理
+{% highlight string %}
+# docker run -itd --name nginx \
+ -v /opt/harbor-inst/harbor/common/config/nginx:/etc/nginx:z \
+ -p 80:80 -p 443:443 -p 4443:4443 \
+ --log-driver syslog --log-opt syslog-address=tcp://127.0.0.1:1514 --log-opt tag=proxy \
+ --add-host ui:172.17.0.7 \
+ --add-host registry:172.17.0.6 \
+ vmware/nginx-photon:v1.4.0
+
+# docker ps
+CONTAINER ID        IMAGE                                  COMMAND                  CREATED             STATUS                 PORTS                                                              NAMES
+aa59816f391b        vmware/nginx-photon:v1.4.0             "nginx -g 'daemon of…"   2 seconds ago       Up 1 second            0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp, 0.0.0.0:4443->4443/tcp   nginx
+249e8a888841        vmware/harbor-ui:v1.4.0                "/harbor/start.sh"       2 hours ago         Up 2 hours (healthy)                                                                      harbor-ui
+70c011d6308d        vmware/registry-photon:v2.6.2-v1.4.0   "/entrypoint.sh /bin…"   2 hours ago         Up 2 hours (healthy)   5000/tcp                                                           harbor-registry
+fe1ae649fe7e        vmware/harbor-jobservice:v1.4.0        "/harbor/start.sh"       2 hours ago         Up 2 hours (healthy)                                                                      harbor-jobservice
+08dca12b8cb4        vmware/harbor-adminserver:v1.4.0       "/harbor/start.sh"       2 hours ago         Up 2 hours (healthy)                                                                      harbor-adminserver
+ad69caeb1bf6        vmware/harbor-db:v1.4.0                "/usr/local/bin/dock…"   2 hours ago         Up 2 hours (healthy)   3306/tcp                                                           harbor-db
+0ee562d91870        vmware/harbor-log:v1.4.0               "/bin/sh -c /usr/loc…"   2 hours ago         Up 2 hours (healthy)   0.0.0.0:1514->10514/tcp
+
+# docker inspect nginx | grep IPAddress
+            "SecondaryIPAddresses": null,
+            "IPAddress": "172.17.0.8",
+                    "IPAddress": "172.17.0.8",
+{% endhighlight %}
+到此为止，我们把整个harbor系统给部署完成了。我们先用docker 命令推送一个镜像到Harbor:
+{% highlight string %}
+# docker pull nginx
+# docker tag nginx 192.168.69.128/library/nginx
+# docker login 192.168.69.128
+Username: admin
+Password: 
+Login Succeeded
+
+# docker push 192.168.69.128/library/nginx
+The push refers to repository [192.168.69.128/library/nginx]
+77e23640b533: Pushed 
+757d7bb101da: Pushed 
+3358360aedad: Pushed 
+latest: digest: sha256:d903fe3076f89ad76afe1cbd0e476d9692d79b3835895b5b3541654c85422bf1 size: 948
+{% endhighlight %}
+通过网页，我们可以看到镜像已经成功推送到了Harbor上。至此为止，我们基本完成了harbor系统的手动部署。
+
+
+
 
 
 
