@@ -77,7 +77,7 @@ description: 计算机中数据信息的表示
 
 因此，(116.8125)10 = (1110100.1101)2
 
-![cb-binary-transform](https://ivanzz1001.github.io/records/assets/img/docker/cb_binary_transform.jpg)
+![cb-binary-transform](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_binary_transform.jpg)
 
 
 
