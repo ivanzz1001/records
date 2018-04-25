@@ -366,7 +366,7 @@ docker inspect harbor-jobservice | grep IPAddress
 
 下面我们就采用```--add-host```参数预先添加相应的主机名到创建容器命令中(注意这两者之间启动间隔必须控制在几秒中之内，否则可能导致失败）：
 
-{% highligh string %}
+{% highlight string %}
 
 # docker run -itd --name harbor-registry \
  -v /data/registry:/storage:z -v /opt/harbor-inst/harbor/common/config/registry/:/etc/registry/:z \
