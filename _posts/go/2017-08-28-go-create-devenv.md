@@ -32,17 +32,83 @@ IDE工具：**JetBrains Gogland**
 
 画图工具: EDraw
 
+## 2. Centos上安装Go开发环境
+
+### 2.1 安装Go开发环境
+我们当前的操作系统环境为：
+<pre>
+# cat /etc/centos-release
+CentOS Linux release 7.3.1611 (Core) 
+
+# uname -a
+Linux bogon 3.10.0-514.el7.x86_64 #1 SMP Tue Nov 22 16:42:41 UTC 2016 x86_64 x86_64 x86_64 GNU/Linux
+</pre>
+
+这里yum源上的go版本符合我们的要求，因此这里直接采用yum来安装：
+<pre>
+# yum install golang
+# which go
+/usr/bin/go 
+
+//最终我们找到go的安装目录为
+# ls /usr/lib/golang/
+api  bin  favicon.ico  lib  pkg  robots.txt  src  test  VERSION
+</pre>
+
+在/etc/profile文件中添加如下：
+<pre>
+export GOROOT=/usr/lib/golang
+export GOBIN=/usr/lib/golang/bin
+export GOPATH=/opt/gowork
+export GOOS=linux
+export GOARCH=amd64
+export PATH=$PATH:$GOROOT:$GOBIN
+</pre>
+
+上面我们将/opt/gowork/目录作为我们的根工作目录， 然后我们执行如下命令：
+<pre>
+# source /etc/profile
+# go version
+# go version
+go version go1.8.3 linux/amd64
+</pre>
+
+### 2.2 测试
+我们在```GOPATH```指定的根目录下创建```test```工程:
+<pre>
+# mkdir -p /opt/gowork/test && cd /opt/gowork/test
+</pre>
+编写```hello.go```源代码文件：
+{% highlight string %}
+package main
+import "fmt"
+func main() {
+    fmt.Println("Hello, 世界")
+}
+{% endhighlight %}
+
+编译运行：
+<pre>
+# go run hello.go 
+Hello, 世界
+</pre>
+
+
 
 
 <br />
 <br />
 **[参看]：**
 
-http://www.cnblogs.com/caiyezi/p/5641363.html
+1. [go——搭建Win7下的Go开发环境](http://www.cnblogs.com/caiyezi/p/5641363.html)
 
 2. [GoLand软件的免激活使用](http://blog.csdn.net/benben_2015/article/details/78725467)
 
 3. [goland的激活码](https://www.cnblogs.com/aomi/p/8288137.html)
+
+4. [go官网](https://golang.org/dl/)
+
+5. [centos 7搭建go环境](https://www.cnblogs.com/ylqs/p/7541806.html)
 
 <br />
 <br />
