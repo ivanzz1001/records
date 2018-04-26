@@ -310,13 +310,92 @@ e4cdabfee168        golang:1.9.2                        "bash"                  
 </pre>
 
 
+### 4.7 查看编译结果
+进入harbor目录下的```make/dev```目录，查看：
+<pre>
+# cd make/dev
+# tree
+.
+├── adminserver
+│   ├── Dockerfile
+│   └── harbor_adminserver
+├── docker-compose.yml
+├── jobservice
+│   ├── Dockerfile
+│   └── harbor_jobservice
+├── nodeclarity
+│   ├── angular-cli.json
+│   ├── Dockerfile
+│   ├── entrypoint.sh
+│   └── index.html
+└── ui
+    ├── Dockerfile
+    └── harbor_ui
+
+4 directories, 11 files
+</pre>
+我们看到这里编译出了```adminserver```、```jobservice```、```nodeclarity```、```ui```四个目录。其中```nodeclarity```我们暂时不会用到。后续我们需要进行扩展开发也主要是针对：
+
+* harbor_adminserver
+
+* harbor_jobservice
+
+* harbor_ui
+
+
+## 5. 附录
+
+### 5.1 Harbor Makefile的使用
+
+根目录下的Makefile文件包括如下的一些配置参数：
+
+|        Variable        |                     Description                                    | 
+|:----------------------:|:------------------------------------------------------------------:|
+|      BASEIMAGE         |            容器的基础镜像，默认为：photon                             | 
+|    CLARITYIMAGE        |  Clarity UI(抗脆弱性)构建镜像，默认为:harbor-clarity-ui-builder       | 
+|     DEVFLAG            |  构建模型标签，默认为:dev(实际发布时，我们可以修改为对应的版本号)         |  
+|     COMPILETAG         |  编译模型标签，默认为: compile_normal(使用本地golang来构建)            |
+|     NOTARYFLAG         |  Notary模型标签，默认为： false                                      |
+|     CLAIRFLAG          |  Clair模型标签，默认为： false                                       |
+|     HTTPPROXY          |  针对Clarity UI builder的NPM http代理                               | 
+|    REGISTRYSERVER      |  远程Registry服务的地址                                              | 
+|    REGISTRYUSER        |  远程Registry服务的用户名                                            |  
+|  REGISTRYPASSWORD      |  远程Registry服务的密码                                              |
+| REGISTRYPROJECTNAME    |  远程Registry服务上的一个工程的名称(Project Name)                      |
+|     VERSIONTAG         |  Harbor镜像的版本标志，默认为:dev(实际发布时，我们可以修改为对应的版本号)  |
+|     PKGVERSIONTAG      |  Harbor online与offline版本标志                                      |
 
 
 
+### 5.2 Makefile中预先定义的target
+
+根目录下的Makefile文件中预先定义了大量的target:
+
+|        Target          |                     Description                                                      | 
+|:----------------------:|:------------------------------------------------------------------------------------:|
+|          all           |     用于准备env, 编译Harbor各组件相应二进制文件，构建镜像，然后运行镜像                     | 
+|       prepare          |     用于准备env                                                                       | 
+|     compile            |     编译ui及jobservice源代码                                                           |  
+|     compile_ui         |     编译ui二进制文件                                                                   |
+|  compile_jobservice    |     编译jobservice二进制文件                                                           |
+|     compile_clarity    |     编译clarity二进制文件                                                              |
+|         build          |     构建Harbor docker镜像（默认：使用build_photon)                                     | 
+|      build_photon      |     以Photon OS base image作为基础镜像来构建Harbor镜像                                  | 
+|         install        | 编译二进制文件，构建镜像，准备特定版本的compose文件并且启动Harbor示例                       |  
+|         start          | 启动Harbor实例（当要启动Notary时，请设置NOTARYFLAG=true                                  |
+|          down          | 停止Harbor实例（当Harbor实例是以Notary方式启动时，停止时也应加上NOTARYFLAG=true            |
+|     package_online     | 构建Harbor在线安装包                                                                   |
+|     package_offline    | 构建Harbor离线安装包                                                                   |
+|      pushimage         | 推送harbor镜像到一个指定的镜像仓库                                                       |
+|      clean all         | 移除二进制文件，Harbor镜像，特定版本的docker-compose文件，特定版本tag以及online/offline安装包|
+|     cleanbinary        | 移除ui及jobservice二进制文件                                                            |
+|        cleanimage      | 移除Harbor镜像文 件                                                                     |
+| cleandockercomposefile | 移除指定版本的doc ker-compose文件                                                       |
+|     cleanversiontag    | 移除指定版本的tag                                                                      |
+|     cleanpackage       | 移除online/offline安装包                                                               |
 
 
-
-
+### 5.3 示例
 
 
 
