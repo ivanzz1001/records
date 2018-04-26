@@ -57,100 +57,22 @@ go version go1.8.3 linux/amd64
 </pre>
 上面git版本低于所要求版本，应该不存在问题。
 
-## 2. 获得Harbor源代码
-
-这里我们的```GOPATH```路径为：
+## 2. 获取Harbor源代码
 <pre>
-# echo $GOPATH
-/opt/gowork
-<pre>
-因此我们在```/opt/gowork```目录下创建harbor目录，然后将源代码git clone到那里：
-<pre>
-# cd /opt/gowork/
-# mkdir -p src/github.com/vmware/ && src/github.com/vmware/
 # git clone https://github.com/vmware/harbor
-# ls && cd harbor
-harbor  tes
 </pre>
 
 ## 3. 构建并安装Harbor
-这里我们原来的Harbor环境全部清除掉：
-<pre>
-# cd /opt/harbor-inst/harbor
-# docker-compose down -v
-# ls /data/*
-# rm -rf /data/database
-# rm -rf /data/registry
-# rm -rf /data/*
-# rm -rf /var/log/harbor*
-# rm -rf common/config/
-
-# docker ps
-CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
-
-
-//把原来的harbor相关镜像删除
-# docker images | grep vmware | awk '{print $1":"$2}'
-vmware/clair-photon:v2.0.1-v1.4.0
-vmware/notary-server-photon:v0.5.1-v1.4.0
-vmware/notary-signer-photon:v0.5.1-v1.4.0
-vmware/registry-photon:v2.6.2-v1.4.0
-vmware/nginx-photon:v1.4.0
-vmware/harbor-log:v1.4.0
-vmware/harbor-jobservice:v1.4.0
-vmware/harbor-ui:v1.4.0
-vmware/harbor-adminserver:v1.4.0
-vmware/harbor-db:v1.4.0
-vmware/mariadb-photon:v1.4.0
-vmware/postgresql-photon:v1.4.0
-vmware/harbor-db-migrator:1.4
-vmware/photon:1.0
-# docker images | grep vmware | awk '{print $1":"$2}' | xargs docker rmi
-# 
-</pre>
 
 ### 3.1 配置
 修改```make/harbor.cfg```配置文件，对其中的一些必要配置进行修改。请参看其他相关章节：
 <pre>
-# cd /opt/workdir/harbor
+# cd harbor
 # vi make/harbor.cfg
 </pre>
 
-这里，我们修改如下几个字段：
-<pre>
-hostname = 192.168.69.128
-ui_url_protocol = https
-max_job_workers = 1
-ssl_cert = /opt/cert/harbor-registry.crt
-ssl_cert_key = /opt/cert/harbor-registry.key
-
-#http_proxy =
-#https_proxy =
-#no_proxy = 127.0.0.1,localhost,ui
-</pre>
-将```http_proxy```，```https_proxy```，```no_proxy```这三行注释掉.
-
-### 3.2 编译、运行
-
-修改Makefile:
-<pre>
-CLARITYIMAGE=vmware/harbor-clarity-ui-builder[:tag]
-</pre>
-这里将```[:tag]```修改为```:1.4.0```， 再拉取```vmware/harbor-clarity-ui-builder:1.4.0```镜像
-<pre>
-# docker pull vmware/harbor-clarity-ui-builder：1.4.0
-# docker images | grep clarity
-vmware/harbor-clarity-ui-builder   1.4.0               937eb5e24878        7 days ago          1.54GB
-</pre>
-
-修改Makefile:
-<pre>
-GOBUILDIMAGE=reg.mydomain.com/library/harborgo[:tag]
-</pre>
-改为```GOBUILDIMAGE=vmware/harborgo:1.6.2```。
-
-
-你可以采用如下三种方式中的一种来对源代码进行编译：
+### 3.2 编译运行
+你可以采用如下两种方式中的一种来对源代码进行编译：
 
 **方式1： 使用官方Golang镜像来编译**
 
@@ -200,6 +122,201 @@ golang                         1.9.2               138bd936fa29        4 months 
 # cd $GOPATH/src/github.com/vmware/harbor
 # make install -e NOTARYFLAG=true CLAIRFLAG=true
 </pre>
+
+### 3.3 验证
+假如一切进展顺利的话，你将会得到如下的打印消息：
+<pre>
+...
+Start complete. You can visit harbor now.
+</pre>
+这时Harbor会启动，你可以根据[ Installation and Configuration Guide](https://github.com/vmware/harbor/blob/master/docs/installation_guide.md#managing-harbors-lifecycle)来对Harbor进行验证。
+
+
+## 4. Harbor编译示例
+
+下面我们以一个实际的例子来讲述一下Harbor源代码的编译过程
+
+### 4.1 安装Go编译环境
+这里我们安装Go编译环境：
+<pre>
+# cd /opt
+# wget https://storage.googleapis.com/golang/go1.9.linux-amd64.tar.gz
+# tar -zxvf go1.9.linux-amd64.tar.gz -C /usr/local/
+</pre>
+在```/etc/profile```文件中导出如下变量：
+<pre>
+export GOROOT=/usr/local/go/
+export GOBIN=/usr/local/go/bin/
+export GOPATH=/opt/gowork/
+export GOOS=linux
+export GOARCH=amd64
+export PATH=$PATH:$GOROOT:$GOBIN
+</pre>
+使相应变量生效，并创建go工作目录,然后再检查是否安装成功：
+<pre>
+# source /etc/profile
+
+# mkdir -p /opt/gowork/src
+
+# which go
+/usr/local/go/bin/go
+# go version
+go version go1.9 linux/amd64
+
+# echo $GOROOT $GOPATH
+/usr/local/go/ /opt/gowork/
+</pre>
+
+### 4.2 清理Harbor环境
+这里我们把原来的Harbor环境全部清除掉：
+<pre>
+# cd /opt/harbor-inst/harbor
+# docker-compose down -v
+# rm -rf /data/*
+# rm -rf /var/log/harbor*
+# rm -rf common/config
+
+# docker ps
+CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
+</pre>
+
+然后再清除掉原来下载下来的Harbor相关镜像：
+<pre>
+# docker images | grep vmware | awk '{print $1":"$2}'
+vmware/clair-photon:v2.0.1-v1.4.0
+vmware/notary-server-photon:v0.5.1-v1.4.0
+vmware/notary-signer-photon:v0.5.1-v1.4.0
+vmware/registry-photon:v2.6.2-v1.4.0
+vmware/nginx-photon:v1.4.0
+vmware/harbor-log:v1.4.0
+vmware/harbor-jobservice:v1.4.0
+vmware/harbor-ui:v1.4.0
+vmware/harbor-adminserver:v1.4.0
+vmware/harbor-db:v1.4.0
+vmware/mariadb-photon:v1.4.0
+vmware/postgresql-photon:v1.4.0
+vmware/harbor-db-migrator:1.4
+vmware/photon:1.0
+# docker images | grep vmware | awk '{print $1":"$2}' | xargs docker rmi
+</pre>
+
+### 4.3 下载Harbor源代码
+这里我们在实际使用过程中，并不会采用最新的Harbor源代码，而是采用相对较新的稳定版本。我们下载```v1.4.0```版本到```$GOPATH/src```目录下：
+<pre>
+# echo $GOPATH
+/opt/gowork/
+
+# cd /opt/gowork/src
+# wget https://github.com/vmware/harbor/archive/v1.4.0.tar.gz
+# tar -zxvf v1.4.0.tar.gz
+# ls
+harbor-1.4.0  v1.4.0.tar.gz
+</pre>
+
+### 4.4 下载相关依赖镜像
+这里我们会依赖到两个镜像： ```harbor-clarity-ui-builder```与```golang```。
+
+* 这里我们首先拉取harbor-clarity-ui-build镜像，当前所用版本为```1.4.0```
+<pre>
+# docker pull vmware/harbor-clarity-ui-builder:1.4.0
+# docker images | grep clarity
+vmware/harbor-clarity-ui-builder   1.4.0               937eb5e24878        7 days ago          1.54GB
+</pre>
+
+* 然后再拉取golang镜像，当前使用版本为```1.9.2```
+<pre>
+# docker pull golang:1.9.2
+# docker tag golang:1.9.2 vmware/harborgo:1.9.2
+# docker images | grep harborgo
+vmware/harborgo                    1.9.2               138bd936fa29        4 months ago        733MB
+</pre>
+
+
+### 4.5 编译并运行Harbor1.4
+
+* **将上面下载的Harbor源代码移动到```$GOPATH```目录下的相应位置**
+<pre>
+# pwd
+/opt/gowork/src
+
+# mv harbor-1.4.0 $GOPATH/src/github.com/vmware/.
+# cd $GOPATH/src/github.com/vmware/. && mv harbor-1.4.0 harbor
+</pre>
+注意，上面必须把名字```harbor-1.4.0```改为harbor，否则后面编译时可能导致相应的错误。
+
+
+* **修改相关配置文件**
+
+进入harbor源代码目录：
+<pre>
+# cd cd $GOPATH/src/github.com/vmware/harbor
+</pre>
+
+1) 修改```make/harbor.cfg```文件
+<pre>
+hostname = 192.168.69.128
+ui_url_protocol = https
+max_job_workers = 1
+ssl_cert = /opt/cert/harbor-registry.crt
+ssl_cert_key = /opt/cert/harbor-registry.key
+</pre>
+
+2) 修改harbor目录下的Makefile文件
+
+首先将如下行：
+<pre>
+CLARITYIMAGE=vmware/harbor-clarity-ui-builder[:tag]
+</pre>
+修改为
+{% highlight string %}
+CLARITYIMAGE=vmware/harbor-clarity-ui-builder:1.4.0
+{% endhighlight %}
+
+再将如下行：
+<pre>
+GOBUILDIMAGE=reg.mydomain.com/library/harborgo[:tag]
+</pre>
+修改为：
+<pre>
+GOBUILDIMAGE=vmware/harborgo:1.9.2
+</pre>
+
+
+
+* **编译Harbor源代码，并运行**
+<pre>
+# make install
+</pre>
+上面Harbor源代码编译会耗费一段时间，编译完成之后就会自动运行Harbor:
+<pre>
+# docker ps
+CONTAINER ID        IMAGE                               COMMAND                  CREATED             STATUS                 PORTS                                                              NAMES
+98bf7bff91db        vmware/harbor-jobservice:dev        "/harbor/start.sh"       3 hours ago         Up 3 hours (healthy)                                                                      harbor-jobservice
+feb4c66b8e75        vmware/nginx-photon:dev             "nginx -g 'daemon of…"   3 hours ago         Up 3 hours             0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp, 0.0.0.0:4443->4443/tcp   nginx
+6c1d9e8f3e80        vmware/harbor-ui:dev                "/harbor/start.sh"       3 hours ago         Up 3 hours (healthy)                                                                      harbor-ui
+fff4eab5c159        vmware/harbor-db:dev                "/usr/local/bin/dock…"   3 hours ago         Up 3 hours (healthy)   3306/tcp                                                           harbor-db
+8d598f0a2d6e        vmware/harbor-adminserver:dev       "/harbor/start.sh"       3 hours ago         Up 3 hours (healthy)                                                                      harbor-adminserver
+557b2b17f928        vmware/registry-photon:v2.6.2-dev   "/entrypoint.sh serv…"   3 hours ago         Up 3 hours (healthy)   5000/tcp                                                           registry
+c02ab8aa35cd        vmware/harbor-log:dev               "/bin/sh -c /usr/loc…"   3 hours ago         Up 3 hours (healthy)   127.0.0.1:1514->10514/tcp                                          harbor-log
+e4cdabfee168        golang:1.9.2                        "bash"                   4 hours ago         Up 4 hours                                                                                harborgo
+</pre>
+
+
+### 4.6 测试
+在上述编译完成后，我们可以进行简单的测试，看Harbor是否工作正常:
+<pre>
+# docker login 192.168.69.128
+# docker push 192.168.69.128/library/nginx
+</pre>
+
+
+
+
+
+
+
+
+
 
 
 
