@@ -350,7 +350,7 @@ e4cdabfee168        golang:1.9.2                        "bash"                  
 根目录下的Makefile文件包括如下的一些配置参数：
 
 |        Variable        |                     Description                                    | 
-|:----------------------:|:------------------------------------------------------------------:|
+|------------------------|--------------------------------------------------------------------|
 |      BASEIMAGE         |            容器的基础镜像，默认为：photon                             | 
 |    CLARITYIMAGE        |  Clarity UI(抗脆弱性)构建镜像，默认为:harbor-clarity-ui-builder       | 
 |     DEVFLAG            |  构建模型标签，默认为:dev(实际发布时，我们可以修改为对应的版本号)         |  
@@ -372,7 +372,7 @@ e4cdabfee168        golang:1.9.2                        "bash"                  
 根目录下的Makefile文件中预先定义了大量的target:
 
 |        Target          |                     Description                                                      | 
-|:----------------------:|:------------------------------------------------------------------------------------:|
+|------------------------|--------------------------------------------------------------------------------------|
 |          all           |     用于准备env, 编译Harbor各组件相应二进制文件，构建镜像，然后运行镜像                     | 
 |       prepare          |     用于准备env                                                                       | 
 |     compile            |     编译ui及jobservice源代码                                                           |  
@@ -397,6 +397,30 @@ e4cdabfee168        golang:1.9.2                        "bash"                  
 
 ### 5.3 示例
 
+**1) 推送harbor镜像到指定的registry服务器**
+<pre>
+make pushimage -e DEVFLAG=false REGISTRYSERVER=[$SERVERADDRESS] REGISTRYUSER=[$USERNAME] \
+ REGISTRYPASSWORD=[$PASSWORD] REGISTRYPROJECTNAME=[$PROJECTNAME]
+</pre> 
+
+注意：需要添加一个```/```到```REGISTRYSERVER```后。假如```REGISTRYSERVER```并未设置的话，镜像将会被直接push到Docker Hub上
+<pre>
+# make pushimage -e DEVFLAG=false REGISTRYUSER=[$USERNAME] \
+ REGISTRYPASSWORD=[$PASSWORD] REGISTRYPROJECTNAME=[$PROJECTNAME]
+</pre>
+
+
+**2) 清除指定版本的二进制文件及镜像**
+<pre>
+# make clean -e VERSIONTAG=[TAG]
+</pre>
+
+注意： 假如有新的代码传递到Github上，则```TAG```可能会发生改变。使用此命令一般是清除以前版本的TAG镜像及文件
+
+默认情况下，Make进程会创建一个```development build```。假如要构建一个发布版本的```Harbor```，可以设置```DEVFLAG```为false:
+<pre>
+# make XXXX -e DEVFLAG=false
+</pre>
 
 
 <br />
