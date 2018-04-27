@@ -117,6 +117,13 @@ description: 计算机中数据信息的表示
 
 ![cb-signed-char](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_signed_char.jpg)
 
+## 3. 原码表示
+
+原码表示是一种简单、直观的机器数表示方法，其表示形式与真值的形式最为接近。原码表示规定：机器数的最高位为符号位，0表示正数，1表示负数，数值部分在符号位后面，并以绝对值形式给出。
+
+![cb-yuanma-definition](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_yuanma_definition.jpg)
+
+
 
 <br />
 <br />
