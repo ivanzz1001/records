@@ -160,7 +160,11 @@ description: 计算机中数据信息的表示
 
 ![cb-buma-mod](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_buma_mod.jpg)
 
+### 4.2 补码的定义
 
+在计算机中，由于硬件的运算部件与寄存器都有一定的字长限制，即计算机硬件能够一次处理的二进制数据的长度是有限的，因此计算机中的运算也是有模运算。例如一个位数为8的二进制计数器，计数范围为```00000000~11111111```，当计数满到11111111时，再加1，计数值将达到100000000，产生溢出，最高位的1被丢掉，使得计数器又从00000000开始计数。对于这个8位二进制计数器而言，产生溢出的量100000000就是计数器的模，相当于前述钟表列中的12。
+
+![cb-buma-definition](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_buma_definition.jpg)
 
 
 
