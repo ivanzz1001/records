@@ -86,9 +86,11 @@ description: 计算机中数据信息的表示
 机器数可以分为无符号数和有符号数两种。无符号数是指计算机字长的所有二进制位均表示数值；而有符号数是指机器数分为符号和数值两部分，且均用二进制代码表示。
 
 **例如** 设某机器的字长为8位，无符号整数在机器中的表示形式为：
+
 ![cb-unsigned-number](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_unsigned_number.jpg)
 
 带符号整数在机器中的表示形式为：
+
 ![cb-signed-number](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_signed_number.jpg)
 
 分别写出机器数```10011001```作为无符号整数和带符号整数对应的真值。
@@ -112,6 +114,7 @@ description: 计算机中数据信息的表示
 
 
 因为机器数的长度是由机器硬件规模规定的，所以机器数表示的数值是不连续的。例如8位二进制无符号数可以表示256个整数： 00000000 ~ 11111111可表示0~255； 8位二进制有符号数中： 00000000~01111111可表示0~127, 11111111~10000000可表示-127~0共256个数，其中00000000表示```+0```, 10000000表示```-0```。
+
 ![cb-signed-char](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_signed_char.jpg)
 
 
