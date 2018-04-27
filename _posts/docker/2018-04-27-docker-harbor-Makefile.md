@@ -132,7 +132,10 @@ compile_clarity:
 	fi
 	@echo "Done."
 </pre>
-因为当前我们并未设置```HTTPPROXY```，因此这里执行```else```分支。这里主要是运行起```vmware/harbor-clarity-ui-builder:1.4.0```这个镜像，然后执行其中的```entrypoint.sh```脚本。 
+因为当前我们并未设置```HTTPPROXY```，因此这里执行```else```分支。这里主要是运行起```vmware/harbor-clarity-ui-builder:1.4.0```这个镜像，然后执行其中的```/entrypoint.sh```脚本。 
+
+
+
 
 
 <br />
