@@ -1149,6 +1149,105 @@ unix  2      [ ACC ]     STREAM     LISTENING     326358   15626/radosgw        
 
 
 最后，到此为止整个集群已经部署完毕.
+
+
+## 5. 添加新的mon(附录）
+
+有时候，我们在ceph运行了一段时间之后，需要添加新的mon。假设我们这里要在```10.133.134.214```这台主机上添加新的mon节点，此时我们可以参照如下步骤：
+
+
+### 5.1 初始化主机
+
+这里参照上面，将```10.133.134.214```这台主机的主机名设置为```ceph001-node4```，同时关闭相应的防火墙。请参考上文。
+
+
+### 5.2 准备文件
+
+我们需要从原来mon集群中获得```monmap```、```mon.keyring```以及```admin.keyring```文件，然后分发到```ceph001-node4```节点上。
+
+
+**1) 导出monmap**
+
+我们可以从原来老的mon集群中导出monmap:
+<pre>
+# ceph mon getmap -o ./new_monmap.bin
+got monmap epoch 43286
+
+# monmaptool --print ./new_monmap.bin
+</pre>
+
+**2) 导出mon.keying**
+
+我们可以从原来老的mon集群中导出keying:
+<pre>
+# ceph auth get mon. -o ./new_keyfile
+# cat ./new_keyfile 
+</pre>
+
+
+**3) 导出admin.keyring**
+
+```admin.keyring```即为原来集群的```/etc/ceph/ceph.client.admin.keyring```，此处直接获取即可。
+
+
+获取完上面三个文件之后，直接分发到```ceph001-node4```节点即可。
+
+### 5.3 初始化mon节点
+
+**1) 创建新的monmap**
+
+首先在原来```new_monmap.bin```的基础上创建新的monmap:
+
+<pre>
+# monmaptool --create --add ceph001-node4 10.133.134.214 --fsid ba47fcbc-b2f7-4071-9c37-be859d8c7e6e --clobber ./new_monmap.bin
+
+# monmaptool --print ./new_monmap.bin
+</pre>
+
+**2) 修改ceph.conf文件**
+
+修改配置文件```/etc/ceph/ceph.conf```:
+{% highlight string %}
+[global]
+fsid = ba47fcbc-b2f7-4071-9c37-be859d8c7e6e
+mon_initial_members = ceph001-node1,ceph001-node2,ceph001-node3,ceph001-node4
+mon_host = 10.133.134.211,10.133.134.212,10.133.134.213,10.133.134.214 
+auth_supported = cephx
+auth_cluster_required = cephx
+auth_client_required = cephx
+auth_service_required = cephx
+osd_pool_default_crush_rule = 2
+osd_pool_default_size = 2
+osd_pool_default_pg_num = 8
+osd_pool_default_pgp_num = 8
+osd_crush_chooseleaf_type = 0
+[mon.node7-2]
+host = node7-2
+mon_data = /var/lib/ceph/mon/ceph-ceph001-node4
+mon_addr = 10.133.134.214:6789
+{% endhighlight %}
+
+**3) 创建新的monitor fs**
+<pre>
+# ceph-mon -i ceph001-node4 --mkfs --monmap ./new_monmap.bin --keyring  ./new_keyfile
+ceph-mon: set fsid to ba47fcbc-b2f7-4071-9c37-be859d8c7e6e
+ceph-mon: created monfs at /var/lib/ceph/mon/ceph-ceph001-node4 for mon.ceph001-node4
+</pre>
+
+**4) 注入monmap**
+
+这里我们将上面生成的```new_monmap.bin```注入到monitor fs中：
+<pre>
+# ceph-mon --inject-monmap ./new_monmap.bin --mon-data  /var/lib/ceph/mon/ceph-ceph001-node4/
+</pre>
+
+**5) 启动monitor**
+<pre>
+# sudo /etc/init.d/ceph start mon.ceph001-node4
+</pre>
+这里注意需要将上面的```admin.keyring```也拷贝到```/etc/ceph/ceph.client.admin.keyring```。
+
+
 <br />
 <br />
 <br />
