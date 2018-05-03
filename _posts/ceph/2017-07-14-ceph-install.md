@@ -1221,8 +1221,8 @@ osd_pool_default_size = 2
 osd_pool_default_pg_num = 8
 osd_pool_default_pgp_num = 8
 osd_crush_chooseleaf_type = 0
-[mon.node7-2]
-host = node7-2
+[mon.ceph001-node4]
+host = ceph001-node4
 mon_data = /var/lib/ceph/mon/ceph-ceph001-node4
 mon_addr = 10.133.134.214:6789
 {% endhighlight %}
