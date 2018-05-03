@@ -166,6 +166,59 @@ description: 计算机中数据信息的表示
 
 ![cb-buma-definition](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_buma_definition.jpg)
 
+![cb-buma-example1](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_buma_example1.jpg)
+
+![cb-buma-represent](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_buma_represent.jpg)
+
+
+
+### 4.3 补码的简便求法
+
+给定一个二进制数```x```，如果需要求其补码，可以直接根据定义求得。但当```x<0```时，根据定义需要做减法运算，不太方便，因此可以采用以下简便方法：
+
+1） 若 ```x>=0```, 则```[x]补 = x```，并使符号位为0
+
+2） 若 ```x<0```， 则将```x```的各位取反，然后在最低位加 1，并使得符号位为 1，即得到```[x]补```
+
+
+
+## 5. 反码表示
+
+反码表示也是一种机器数，它实质上是一种特殊的补码，其特殊之处在于反码的模比补码的模小一个最低位上的1。
+
+### 5.1 反码的定义
+
+![cb-fanma-definition](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_fanma_definition.jpg)
+
+
+### 5.2 反码的特点
+
+1) 在反码表示中，用符号位```x0```表示数值的正负，形式与源码表示相同，即0为正；1为负
+
+2） 在反码表示中，数值0有两种表示方法：
+
+![cb-fanma-feature](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_fanma_feature.jpg)
+
+
+## 6. 移码表示
+
+从上面补码的几何性质中可以看到，如果将补码的符号部分与数值部分统一起来看成数值，则负数补码的值大于正数补码的值，这样在比较补码所对应的真值大小时，就不是很直观和方便，为此提出了移码表示。
+
+### 6.1 移码的定义
+
+![cb-yima-definition](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_yima_definition.jpg)
+
+
+### 6.2 移码的特点
+
+
+![cb-yima-feature](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_yima_feature.jpg)
+
+
+
+<br />
+<br />
+
 
 
 <br />
