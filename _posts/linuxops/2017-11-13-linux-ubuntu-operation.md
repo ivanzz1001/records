@@ -420,7 +420,29 @@ APT::Periodic::AutocleanInterval "0";
 # for files in `ls *.txt`; do filename=`echo $files | sed 's/.jpg/.png/'`; mv $files $filename; done
 {% endhighlight %}
 
+**23) tee命令**
 
+tee命令用于从标准输入读取数据，然后写到标准输出及文件中去。基本语法如下：
+{% highlight string %}
+SYNOPSIS
+       tee [OPTION]... [FILE]...
+
+DESCRIPTION
+       Copy standard input to each FILE, and also to standard output.
+
+       -a, --append
+              append to the given FILEs, do not overwrite
+{% endhighlight %}
+
+例如：
+<pre>
+# tee test.txt <<- 'EOF'
+> hello,world 0
+> hello,world 1
+> EOF
+hello,world 0
+hello,world 1
+</pre>
 
 
 <br />
