@@ -974,7 +974,343 @@ radosgw-admin zone create --rgw-zonegroup=cn --rgw-zone=cn-oss \
                             --master --default 
 </pre>
 
+4) 删除默认的zone-group,zone,realm
+<pre>
+# radosgw-admin zonegroup remove --rgw-zonegroup=default --rgw-zone=default
+# radosgw-admin period update --commit
+# radosgw-admin zone delete --rgw-zone=default
+# radosgw-admin period update --commit
+# radosgw-admin zonegroup delete --rgw-zonegroup=default
+# radosgw-admin period update --commit
 
+# radosgw-admin realm remove --rgw-realm=default --rgw-zonegroup=default
+# radosgw-admin period update --commit
+# radosgw-admin realm delete --rgw-realm=default
+# radosgw-admin period update --commit
+</pre>
+
+
+
+5) 删除默认的pool
+
+我们首先来看一下默认的pool:
+<pre>
+# rados lspools
+.rgw.root
+default.rgw.control
+default.rgw.data.root
+default.rgw.gc
+default.rgw.log
+default.rgw.users.uid
+default.rgw.users.keys
+default.rgw.buckets.index
+default.rgw.usage
+default.rgw.buckets.data
+default.rgw.buckets.non-ec
+</pre>
+下面删除这些默认的pool(注意不要删除```.rgw.root```):
+
+<pre>
+# rados rmpool default.rgw.control default.rgw.control --yes-i-really-really-mean-it
+# rados rmpool default.rgw.data.root default.rgw.data.root --yes-i-really-really-mean-it
+# rados rmpool default.rgw.gc default.rgw.gc --yes-i-really-really-mean-it
+# rados rmpool default.rgw.log default.rgw.log --yes-i-really-really-mean-it
+# rados rmpool default.rgw.users.uid default.rgw.users.uid --yes-i-really-really-mean-it
+# rados rmpool default.rgw.users.keys default.rgw.users.keys --yes-i-really-really-mean-it
+# rados rmpool default.rgw.buckets.index default.rgw.buckets.index --yes-i-really-really-mean-it
+# rados rmpool default.rgw.usage default.rgw.usage --yes-i-really-really-mean-it
+# rados rmpool default.rgw.buckets.data default.rgw.buckets.data --yes-i-really-really-mean-it
+# rados rmpool default.rgw.buckets.non-ec default.rgw.buckets.non-ec --yes-i-really-really-mean-it
+</pre>
+
+6） 配置zonegroup
+
+首先通过命令获取到当前的zonegroup:
+{% highlight string %}
+# radosgw-admin zonegroup get --rgw-zonegroup=cn > zonegroup.json
+{% endhighlight %}
+接着修改```zonegroup.json```,将```bucket_index_max_shards```设置为8，然后在导入到rgw中：
+<pre>
+# radosgw-admin zonegroup set --rgw-zonegroup=cn --infile=zonegroup.json
+</pre>
+
+
+7) 创建一个用于跨zone同步的系统用户
+<pre>
+# radosgw-admin user create --uid="synchronization-user" --display-name="Synchronization User" --system
+{
+    "user_id": "synchronization-user",
+    "display_name": "Synchronization User",
+    "email": "",
+    "suspended": 0,
+    "max_buckets": 1000,
+    "auid": 0,
+    "subusers": [],
+    "keys": [
+        {
+            "user": "synchronization-user",
+            "access_key": "V9O1G3E80KBF2P280YDS",
+            "secret_key": "LzmQ7y0sBvPjuQA23EQLqy8R4sgBbNz4FOfNUzDN"
+        }
+    ],
+    "swift_keys": [],
+    "caps": [],
+    "op_mask": "read, write, delete",
+    "system": "true",
+    "default_placement": "",
+    "placement_tags": [],
+    "bucket_quota": {
+        "enabled": false,
+        "max_size_kb": -1,
+        "max_objects": -1
+    },
+    "user_quota": {
+        "enabled": false,
+        "max_size_kb": -1,
+        "max_objects": -1
+    },
+    "temp_url_keys": []
+}
+</pre>
+这里说明一下，当secondary zones需要和master zone完成认证时，需要access_key与secret_key。
+
+然后将系统用户添加到master zone中：
+<pre>
+# radosgw-admin zone modify --rgw-zone=cn-oss --access-key=V9O1G3E80KBF2P280YDS --secret=LzmQ7y0sBvPjuQA23EQLqy8R4sgBbNz4FOfNUzDN
+# radosgw-admin period update --commit
+</pre>
+
+
+8) 更新period
+
+在更新完master zone配置之后，需要更新period:
+<pre>
+# radosgw-admin period update --commit
+</pre>
+注意： 执行上述更新命令时，会更新epoch，然后确保其他的zone也会收到该配置。
+
+
+### 4.2 在ceph001-node1上部署RGW
+
+1) 创建存储池
+
+在创建存储池之前，执行如下命令确保当前集群处于正常工作状态：
+<pre>
+# ceph -s
+</pre>
+
+创建新的pool:
+<pre>
+ceph osd pool create .rgw.root 8 8
+ceph osd pool create default.rgw.control 8 8
+ceph osd pool create default.rgw.data.root 16 16
+ceph osd pool create default.rgw.gc 8 8
+ceph osd pool create default.rgw.log 8 8
+ceph osd pool create default.rgw.intent-log 8 8
+ceph osd pool create default.rgw.usage 8 8
+ceph osd pool create default.rgw.users.keys 8 8
+ceph osd pool create default.rgw.users.email 8 8
+ceph osd pool create default.rgw.users.swift 8 8
+ceph osd pool create default.rgw.users.uid 8 8
+ceph osd pool create default.rgw.buckets.index 256 256
+ceph osd pool create default.rgw.buckets.data 256 256
+ceph osd pool create default.rgw.meta 8 8
+ceph osd pool create default.rgw.buckets.non-ec 8 8
+</pre>
+
+然后更改pool所用的crush 规则：
+<pre>
+ceph osd pool set .rgw.root crush_ruleset 5
+ceph osd pool set default.rgw.control crush_ruleset 5
+ceph osd pool set default.rgw.data.root crush_ruleset 5
+ceph osd pool set default.rgw.gc crush_ruleset 5
+ceph osd pool set default.rgw.log  crush_ruleset 5
+ceph osd pool set default.rgw.intent-log crush_ruleset 5
+ceph osd pool set default.rgw.usage crush_ruleset 5
+ceph osd pool set default.rgw.users.keys crush_ruleset 5
+ceph osd pool set default.rgw.users.email crush_ruleset 5
+ceph osd pool set default.rgw.users.swift crush_ruleset 5
+ceph osd pool set default.rgw.users.uid crush_ruleset 5
+ceph osd pool set default.rgw.buckets.index crush_ruleset 5
+ceph osd pool set default.rgw.buckets.data crush_ruleset 5
+ceph osd pool set default.rgw.meta crush_ruleset 5
+ceph osd pool set default.rgw.buckets.non-ec crush_ruleset 5
+</pre>
+
+2) 为当前节点RGW创建用户
+<pre>
+# ceph-authtool --create-keyring /etc/ceph/ceph.client.radosgw.keyring --gen-key -n client.radosgw.ceph001-node1 --cap mon 'allow rwx' --cap osd 'allow rwx'
+
+# ceph -k /etc/ceph/ceph.client.admin.keyring auth add client.radosgw.ceph001-node1 -i /etc/ceph/ceph.client.radosgw.keyring
+
+# ceph auth list
+</pre>
+
+3) 修改当前节点RGW配置
+
+当前节点配置文件为```/etc/ceph/ceph.conf```,添加rgw配置：
+<pre>
+[client.radosgw.ceph001-node1]
+host = ceph001-node1
+log_file = /var/log/ceph/radosgw-ceph001-node1.log
+rgw_s3_auth_use_keystone = False
+rgw_frontends = civetweb port=7480
+rgw_socket_path = /var/run/ceph/ceph.radosgw.ceph001-node1.sock
+user = root
+keyring = /etc/ceph/ceph.client.radosgw.keyring
+rgw_override_bucket_index_max_shards = 0
+rgw_swift_token_expiration = 86400
+rgw_enable_usage_log = True
+rgw_cache_lru_size = 10000
+rgw_print_continue = False
+rgw_cache_enabled = True
+admin_socket = /var/run/ceph/radosgw-node7-1.asok
+rgw_thread_pool_size=512
+rgw_num_rados_handles=512
+</pre>
+
+4) 启动RGW
+{% highlight string %}
+radosgw -c /etc/ceph/ceph.conf -n client.radosgw.ceph001-node1
+{% endhighlight %}
+
+查看是否启动成功：
+<pre>
+[root@ceph001-node1 build]# netstat -lpn | grep radosgw
+tcp        0      0 0.0.0.0:7480            0.0.0.0:*               LISTEN      21229/radosgw       
+unix  2      [ ACC ]     STREAM     LISTENING     403819   21229/radosgw        /var/run/ceph/radosgw-ceph001-node1.asok
+</pre>
+
+
+
+5) 创建一个用于管理rgw的超级用户
+
+这里我们为RGW创建一个管理员用户，用于后台管理。
+{% highlight string %}
+radosgw-admin user create --uid=admin --display-name="admin"
+
+radosgw-admin caps add --uid=admin --caps="buckets=*"
+radosgw-admin caps add --uid=admin --caps="data=*"
+radosgw-admin caps add --uid=admin --caps="metadata=*"
+radosgw-admin caps add --uid=admin --caps="usage=*"
+radosgw-admin caps add --uid=admin --caps="users=*"
+radosgw-admin caps add --uid=admin --caps="zone=*"
+{% endhighlight %}
+
+上面我们看到，该管理员用户具有十分大的权限。
+
+至此，ceph001-node1节点的radosgw已经部署完成。
+
+
+### 4.3 在ceph001-node2上部署RGW
+
+此处只需要创建相应的rgw用户并加入集群，然后配置ceph.conf文件，再启动rgw即可。下面是详细步骤：
+
+1） 创建RGW秘钥并加入集群
+{% highlight string %}
+ceph-authtool --create-keyring /etc/ceph/ceph.client.radosgw.keyring --gen-key -n client.radosgw.ceph001-node2 --cap mon 'allow rwx' --cap osd 'allow rwx'
+
+ceph -k /etc/ceph/ceph.client.admin.keyring auth add client.radosgw.ceph001-node2 -i /etc/ceph/ceph.client.radosgw.keyring
+
+ceph auth list
+{% endhighlight %}
+
+2) 修改ceph配置文件
+
+修改/etc/ceph/ceph.conf配置文件，在其中添加：
+<pre>
+[client.radosgw.ceph001-node2]
+host = ceph001-node2
+log_file = /var/log/ceph/radosgw-ceph001-node2.log
+rgw_s3_auth_use_keystone = False
+rgw_frontends = civetweb port=7480
+rgw_socket_path = /var/run/ceph/ceph.radosgw.ceph001-node2.sock
+user = root
+keyring = /etc/ceph/ceph.client.radosgw.keyring
+rgw_override_bucket_index_max_shards = 0
+rgw_swift_token_expiration = 86400
+rgw_enable_usage_log = True
+rgw_cache_lru_size = 10000
+rgw_print_continue = False
+rgw_cache_enabled = True
+admin_socket = /var/run/ceph/radosgw-ceph001-node2.asok
+rgw_thread_pool_size=512
+rgw_num_rados_handles=512
+</pre>
+
+3) 启动RGW
+{% highlight string %}
+radosgw -c /etc/ceph/ceph.conf -n client.radosgw.ceph001-node2
+{% endhighlight %}
+
+查看是否启动成功：
+<pre>
+[root@ceph001-node2 build]# netstat -lpn | grep radosgw
+tcp        0      0 0.0.0.0:7480            0.0.0.0:*               LISTEN      9756/radosgw        
+unix  2      [ ACC ]     STREAM     LISTENING     312548   9756/radosgw         /var/run/ceph/radosgw-ceph001-node2.asok
+</pre>
+
+因为节点ceph001-node1已经创建好了admin账号以及初始化权限，所以之后的节点都不需要再进行创建了。
+
+至此，节点ceph001-node2部署rgw完毕。
+
+
+### 4.4 在ceph001-node3上部署RGW
+
+此处只需要创建相应的rgw用户并加入集群，然后配置ceph.conf文件，再启动rgw即可。下面是详细步骤：
+
+1） 创建RGW秘钥并加入集群
+{% highlight string %}
+ceph-authtool --create-keyring /etc/ceph/ceph.client.radosgw.keyring --gen-key -n client.radosgw.ceph001-node3 --cap mon 'allow rwx' --cap osd 'allow rwx'
+
+ceph -k /etc/ceph/ceph.client.admin.keyring auth add client.radosgw.ceph001-node3 -i /etc/ceph/ceph.client.radosgw.keyring
+
+ceph auth list
+{% endhighlight %}
+
+2) 修改ceph配置文件
+
+修改/etc/ceph/ceph.conf配置文件，在其中添加：
+<pre>
+[client.radosgw.ceph001-node3]
+host = ceph001-node3
+log_file = /var/log/ceph/radosgw-ceph001-node3.log
+rgw_s3_auth_use_keystone = False
+rgw_frontends = civetweb port=7480
+rgw_socket_path = /var/run/ceph/ceph.radosgw.ceph001-node3.sock
+user = root
+keyring = /etc/ceph/ceph.client.radosgw.keyring
+rgw_override_bucket_index_max_shards = 0
+rgw_swift_token_expiration = 86400
+rgw_enable_usage_log = True
+rgw_cache_lru_size = 10000
+rgw_print_continue = False
+rgw_cache_enabled = True
+admin_socket = /var/run/ceph/radosgw-ceph001-node3.asok
+rgw_thread_pool_size=512
+rgw_num_rados_handles=512
+</pre>
+
+3) 启动RGW
+{% highlight string %}
+radosgw -c /etc/ceph/ceph.conf -n client.radosgw.ceph001-node3
+{% endhighlight %}
+
+查看是否启动成功：
+<pre>
+[root@ceph001-node3 build]# netstat -lpn | grep radosgw
+tcp        0      0 0.0.0.0:7480            0.0.0.0:*               LISTEN      15626/radosgw       
+unix  2      [ ACC ]     STREAM     LISTENING     326358   15626/radosgw        /var/run/ceph/radosgw-ceph001-node3.asok
+</pre>
+
+因为节点ceph001-node1已经创建好了admin账号以及初始化权限，所以之后的节点都不需要再进行创建了。
+
+至此，节点ceph001-node3部署rgw完毕。
+<br />
+<br />
+
+
+最后，到此为止整个集群已经部署完毕.
 <br />
 <br />
 

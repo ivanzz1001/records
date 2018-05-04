@@ -101,7 +101,7 @@ RGW是建立在librados上的一个对象存储接口，支持两种类型的接
 # radosgw-admin zonegroup delete --rgw-zonegroup=default
 # radosgw-admin period update --commit
 </pre>
-最后，删除ceph存储集群中的```default``` pools(**说明:** 下面的操作步骤是假设你要配置的multi-site当前未存储任何数据，如果当前default zone group)：
+最后，删除ceph存储集群中的```default``` pools(**说明:** 下面的操作步骤是假设你要配置的multi-site当前未存储任何数据，如果当前default zone group存储有数据，删除将会导致数据丢失)：
 <pre>
 # rados rmpool default.rgw.control default.rgw.control --yes-i-really-really-mean-it
 # rados rmpool default.rgw.data.root default.rgw.data.root --yes-i-really-really-mean-it
