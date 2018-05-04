@@ -983,11 +983,11 @@ max_osd 9
 
 2） 创建RGW秘钥并加入集群
 {% highlight string %}
-ceph-authtool --create-keyring /etc/ceph/ceph.client.radosgw.keyring --gen-key -n client.radosgw.ceph001-node1 --cap mon 'allow rwx' --cap osd 'allow rwx'
+# ceph-authtool --create-keyring /etc/ceph/ceph.client.radosgw.keyring --gen-key -n client.radosgw.ceph001-node1 --cap mon 'allow rwx' --cap osd 'allow rwx'
 
-ceph -k /etc/ceph/ceph.client.admin.keyring auth add client.radosgw.ceph001-node1 -i /etc/ceph/ceph.client.radosgw.keyring
+# ceph -k /etc/ceph/ceph.client.admin.keyring auth add client.radosgw.ceph001-node1 -i /etc/ceph/ceph.client.radosgw.keyring
 
-ceph auth list
+# ceph auth list
 {% endhighlight %}
 
 3) 修改ceph配置文件
@@ -1093,7 +1093,7 @@ unix  2      [ ACC ]     STREAM     LISTENING     312548   9756/radosgw         
 至此，节点ceph001-node2部署rgw完毕。
 
 
-### 4.3 在ceph001-node2上部署RGW
+### 4.3 在ceph001-node3上部署RGW
 
 此处只需要创建相应的rgw用户并加入集群，然后配置ceph.conf文件，再启动rgw即可。下面是详细步骤：
 
