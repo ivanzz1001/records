@@ -584,15 +584,356 @@ mon_addr = 10.133.134.213:6789
 
 我们目前会在每一个节点上部署3个OSD，总共3个节点则一共会部署9个OSD。首先查看我们当前的硬盘信息：
 <pre>
-[root@ceph001-node1 build]# lsblk -a
-NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
-sr0     11:0    1  436K  0 rom  
-vda    253:0    0   20G  0 disk 
-└─vda1 253:1    0   20G  0 part /
-vdb    253:16   0  100G  0 disk 
-vdc    253:32   0  100G  0 disk 
-vdd    253:48   0   15G  0 disk 
+[root@ceph001-node1 build]#  lsblk -l
+NAME MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sr0   11:0    1  422K  0 rom
+vda  253:0    0   20G  0 disk
+vda1 253:1    0   20G  0 part /
+vdb  253:16   0   200G  0 disk
+vdc  253:32   0  200G  0 disk
+vdd  253:48   0  200G  0 disk
+vde  253:64   0  15G  0 disk
 </pre>
+
+因为需要部署3副本，所以在部署osd之前要先确认是否有相应的磁盘来装载数据和日志。一般来说，虚拟机会配置4个磁盘，其中3个用来装数据，另外一个磁盘用来装3个osd对应的日志。因此，这里我们首先对ceph001-node1,ceph001-node2,ceph001-node3三个节点进行分区并格式化磁盘：
+{% highlight string %}
+# mkfs -t xfs -f -i size=2048 /dev/vdb
+# mkfs -t xfs -f -i size=2048 /dev/vdc
+# mkfs -t xfs -f -i size=2048 /dev/vdd
+# parted -s /dev/vde mklabel gpt
+# parted -s /dev/vde mkpart primary 0% 33%
+# parted -s /dev/vde mkpart primary 33% 67%
+# parted -s /dev/vde mkpart primary 67% 100%
+{% endhighlight %}
+
+查看分区后的状态：
+<pre>
+[root@ceph001-node1 build]# lsblk -a 
+NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sr0   11:0    1  422K  0 rom
+vda  253:0    0   20G  0 disk
+vda1 253:1    0   20G  0 part /
+vdb  253:16   0   200G  0 disk
+vdc  253:32   0  200G  0 disk
+vdd  253:48   0  200G  0 disk
+vde    253:48   0   15G  0 disk 
+├─vde1 253:49   0  5G  0 part 
+├─vde2 253:50   0  5G  0 part 
+├─vde3 253:51   0  5G  0 part 
+</pre>
+
+**在ceph001-node1上建立3个OSD节点**
+
+
+1) 在ceph001-node1上建立3个OSD
+
+使用脚本在ceph001-node1上建立OSD(请分步执行如下命令，减少可能的出错机会）：
+{% highlight string %}
+# chmod 777 ./script/ -R
+# ./script/init_osd.sh vdb vde1
+# ./script/init_osd.sh vdc vde2
+# ./script/init_osd.sh vdd vd33
+{% endhighlight %}
+
+2) 启动对应的OSD
+
+我们首先需要知道通过上述脚本建立了哪些OSD。这里有几种方法可以查看：
+
+* 到```/tmp/```目录下查看当前主机所部署的OSD：
+<pre>
+# ls /tmp/init_osd-*
+/tmp/init_osd-0.log  /tmp/init_osd-1.log  /tmp/init_osd-2.log
+</pre>
+
+* 到```/var/lib/ceph/osd```目录下查看当前主机部署的OSD
+<pre>
+# ls /var/lib/ceph/osd/
+ceph-0  ceph-1  ceph-2
+</pre>
+
+下面我们就启动这几个OSD,分成如下几个步骤：
+
+* 修改osd启动用户
+
+这里我们将osd的启动用户改为了root：
+<pre>
+# sed -i 's/--setuser ceph --setgroup ceph/--setuser root --setgroup root/g' /usr/lib/systemd/system/ceph-osd@.service
+</pre>
+
+* 设置为开机启动
+<pre>
+# systemctl enable ceph-osd@0
+# systemctl enable ceph-osd@1
+# systemctl enable ceph-osd@2
+</pre>
+
+* 启动osd
+<pre>
+# systemctl daemon-reload
+# systemctl start ceph-osd@0
+# systemctl status ceph-osd@0
+
+
+# systemctl start ceph-osd@1
+# systemctl status ceph-osd@1
+
+# systemctl start ceph-osd@2
+# systemctl status ceph-osd@2
+</pre>
+
+
+3） 查看OSD的启动状况
+{% highlight string %}
+ps -ef | grep osd
+ceph -s
+{% endhighlight %}
+查看信息如下：
+<pre>
+[root@ceph001-node1 build]# ceph -s
+    cluster ba47fcbc-b2f7-4071-9c37-be859d8c7e6e
+     health HEALTH_WARN
+            too few PGs per OSD (0 < min 30)
+     monmap e1: 3 mons at {ceph001-node1=10.133.134.211:6789/0,ceph001-node2=10.133.134.212:6789/0,ceph001-node3=10.133.134.213:6789/0}
+            election epoch 4, quorum 0,1,2 ceph001-node1,ceph001-node2,ceph001-node3
+     osdmap e10: 3 osds: 3 up, 3 in
+      pgmap v14: 0 pgs, 0 pools, 0 bytes data, 0 objects
+            101136 kB used, 149 GB / 149 GB avail
+[root@ceph001-node1 build]# ps -ef | grep osd
+root     17392     1  0 15:52 ?        00:00:00 /bin/bash -c ulimit -n 32768;  /usr/bin/ceph-osd -i 0 --pid-file /var/run/ceph/osd.0.pid -c /etc/ceph/ceph.conf --cluster ceph -f
+root     17393 17392  0 15:52 ?        00:00:00 /usr/bin/ceph-osd -i 0 --pid-file /var/run/ceph/osd.0.pid -c /etc/ceph/ceph.conf --cluster ceph -f
+root     17809     1  0 15:52 ?        00:00:00 /bin/bash -c ulimit -n 32768;  /usr/bin/ceph-osd -i 1 --pid-file /var/run/ceph/osd.1.pid -c /etc/ceph/ceph.conf --cluster ceph -f
+root     17810 17809  0 15:52 ?        00:00:00 /usr/bin/ceph-osd -i 1 --pid-file /var/run/ceph/osd.1.pid -c /etc/ceph/ceph.conf --cluster ceph -f
+root     18213     1  0 15:53 ?        00:00:00 /bin/bash -c ulimit -n 32768;  /usr/bin/ceph-osd -i 2 --pid-file /var/run/ceph/osd.2.pid -c /etc/ceph/ceph.conf --cluster ceph -f
+root     18215 18213  0 15:53 ?        00:00:00 /usr/bin/ceph-osd -i 2 --pid-file /var/run/ceph/osd.2.pid -c /etc/ceph/ceph.conf --cluster ceph -f
+root     18370 16930  0 15:53 pts/0    00:00:00 grep --color=auto osd
+[root@ceph001-node1 build]# ceph -s
+    cluster ba47fcbc-b2f7-4071-9c37-be859d8c7e6e
+     health HEALTH_WARN
+            too few PGs per OSD (0 < min 30)
+     monmap e1: 3 mons at {ceph001-node1=10.133.134.211:6789/0,ceph001-node2=10.133.134.212:6789/0,ceph001-node3=10.133.134.213:6789/0}
+            election epoch 4, quorum 0,1,2 ceph001-node1,ceph001-node2,ceph001-node3
+     osdmap e10: 3 osds: 3 up, 3 in
+      pgmap v14: 0 pgs, 0 pools, 0 bytes data, 0 objects
+            101136 kB used, 149 GB / 149 GB avail
+</pre>
+
+**在ceph001-node2上建立3个OSD节点**
+
+与ceph001-node1类似，只需要注意少许参数的修改，这里不在赘述。
+
+**在ceph001-node3上建立3个OSD节点**
+
+与ceph001-node1类似，只需要注意少许参数的修改，这里不再赘述。
+
+### 3.2 构建crush map
+
+在上面3.1节建立好OSD之后，默认的crush map如下图所示：
+<pre>
+[root@ceph001-node1 build]# ceph osd tree
+ID WEIGHT  TYPE NAME              UP/DOWN REWEIGHT PRIMARY-AFFINITY 
+-1 0.44989 root default                                             
+-2 0.14996     host ceph001-node1                                   
+ 0 0.04999         osd.0               up  1.00000          1.00000 
+ 1 0.04999         osd.1               up  1.00000          1.00000 
+ 2 0.04999         osd.2               up  1.00000          1.00000 
+-3 0.14996     host ceph001-node2                                   
+ 3 0.04999         osd.3               up  1.00000          1.00000 
+ 4 0.04999         osd.4               up  1.00000          1.00000 
+ 5 0.04999         osd.5               up  1.00000          1.00000 
+-4 0.14996     host ceph001-node3                                   
+ 6 0.04999         osd.6               up  1.00000          1.00000 
+ 7 0.04999         osd.7               up  1.00000          1.00000 
+ 8 0.04999         osd.8               up  1.00000          1.00000
+</pre>
+
+这不适用与我们的生产环境。下面我们就来构建我们自己的crush map.
+
+1) 删除默认的crush map结构
+{% highlight string %}
+for i in {0..8}; do ceph osd crush rm osd.$i; done
+for i in {1..3}; do ceph osd crush rm ceph001-node$i; done
+ceph osd tree
+{% endhighlight %}
+
+执行完后，当前的ceph集群视图如下：
+<pre>
+[root@ceph001-node1 build]# ceph osd tree
+ID WEIGHT TYPE NAME    UP/DOWN REWEIGHT PRIMARY-AFFINITY 
+-1      0 root default                                   
+ 0      0 osd.0             up  1.00000          1.00000 
+ 1      0 osd.1             up  1.00000          1.00000 
+ 2      0 osd.2             up  1.00000          1.00000 
+ 3      0 osd.3             up  1.00000          1.00000 
+ 4      0 osd.4             up  1.00000          1.00000 
+ 5      0 osd.5             up  1.00000          1.00000 
+ 6      0 osd.6             up  1.00000          1.00000 
+ 7      0 osd.7             up  1.00000          1.00000 
+ 8      0 osd.8             up  1.00000          1.00000 
+</pre>
+
+2) 修改crush rule规则内容
+{% highlight string %}
+ceph osd getcrushmap -o ./old_crushmap.bin
+crushtool -d ./old_crushmap.bin -o ./old_crushmap.txt
+cp old_crushmap.txt new_crushmap.txt
+{% endhighlight %}
+
+下面修改new_crushmap.txt:
+<pre>
+# 在type 10 root下面添加逻辑拓扑中的bucket类型, 其中数值越大, 表示在crush map中的层级越大
+type 11 osd-domain
+type 12 host-domain
+type 13 replica-domain
+type 14 failure-domain
+# 将crush map中所有的 alg straw2 修改为 alg starw
+</pre>
+
+修改后重新设置到ceph集群中：
+{% highlight string %}
+crushtool -c new_crushmap.txt -o new_crushmap.bin
+ceph osd setcrushmap -i new_crushmap.bin
+ceph osd crush dump 
+{% endhighlight %}
+
+3) 重新构建crush map中的物理拓扑
+
+请分步执行如下命令：
+{% highlight string %}
+for i in {0..2}; do ceph osd crush create-or-move osd.$i 0.15 host=ceph001-node1  rack=rack-01 root=default; done
+
+for i in {3..5}; do ceph osd crush create-or-move osd.$i 0.15 host=ceph001-node2  rack=rack-02 root=default; done
+
+for i in {6..8}; do ceph osd crush create-or-move osd.$i 0.15 host=ceph001-node3  rack=rack-03 root=default; done
+
+ceph osd tree
+{% endhighlight %}
+
+构建完成后，查看对应的物理拓扑结构：
+<pre>
+[root@ceph001-node1 build]# ceph osd tree
+ID WEIGHT  TYPE NAME                  UP/DOWN REWEIGHT PRIMARY-AFFINITY 
+-1 1.34995 root default                                                 
+-3 0.44998     rack rack-02                                             
+-2 0.44998         host ceph001-node2                                   
+ 3 0.14999             osd.3               up  1.00000          1.00000 
+ 4 0.14999             osd.4               up  1.00000          1.00000 
+ 5 0.14999             osd.5               up  1.00000          1.00000 
+-5 0.44998     rack rack-03                                             
+-4 0.44998         host ceph001-node3                                   
+ 6 0.14999             osd.6               up  1.00000          1.00000 
+ 7 0.14999             osd.7               up  1.00000          1.00000 
+ 8 0.14999             osd.8               up  1.00000          1.00000 
+-7 0.44998     rack rack-01                                             
+-6 0.44998         host ceph001-node1                                   
+ 0 0.14999             osd.0               up  1.00000          1.00000 
+ 1 0.14999             osd.1               up  1.00000          1.00000 
+ 2 0.14999             osd.2               up  1.00000          1.00000 
+</pre>
+
+4） 重新构建crush map中的逻辑拓扑
+
+请分步执行如下命令：
+{% highlight string %}
+ceph osd crush link ceph001-node1 host-domain=host-group-0-rack-01  replica-domain=replica-0 failure-domain=sata-00
+
+ceph osd crush link ceph001-node2 host-domain=host-group-0-rack-02  replica-domain=replica-0 failure-domain=sata-00
+
+ceph osd crush link ceph001-node3 host-domain=host-group-0-rack-03  replica-domain=replica-0 failure-domain=sata-00
+
+ceph osd tree
+{% endhighlight %}
+
+构建完成后，查看对应的逻辑拓扑结构：
+<pre>
+[root@ceph001-node1 build]# ceph osd tree
+ID  WEIGHT  TYPE NAME                                UP/DOWN REWEIGHT PRIMARY-AFFINITY 
+-10 1.34995 failure-domain sata-00                                                     
+ -9 1.34995     replica-domain replica-0                                               
+ -8 0.44998         host-domain host-group-0-rack-01                                   
+ -6 0.44998             host ceph001-node1                                             
+  0 0.14999                 osd.0                         up  1.00000          1.00000 
+  1 0.14999                 osd.1                         up  1.00000          1.00000 
+  2 0.14999                 osd.2                         up  1.00000          1.00000 
+-11 0.44998         host-domain host-group-0-rack-02                                   
+ -2 0.44998             host ceph001-node2                                             
+  3 0.14999                 osd.3                         up  1.00000          1.00000 
+  4 0.14999                 osd.4                         up  1.00000          1.00000 
+  5 0.14999                 osd.5                         up  1.00000          1.00000 
+-12 0.44998         host-domain host-group-0-rack-03                                   
+ -4 0.44998             host ceph001-node3                                             
+  6 0.14999                 osd.6                         up  1.00000          1.00000 
+  7 0.14999                 osd.7                         up  1.00000          1.00000 
+  8 0.14999                 osd.8                         up  1.00000          1.00000 
+ -1 1.34995 root default                                                               
+ -3 0.44998     rack rack-02                                                           
+ -2 0.44998         host ceph001-node2                                                 
+  3 0.14999             osd.3                             up  1.00000          1.00000 
+  4 0.14999             osd.4                             up  1.00000          1.00000 
+  5 0.14999             osd.5                             up  1.00000          1.00000 
+ -5 0.44998     rack rack-03                                                           
+ -4 0.44998         host ceph001-node3                                                 
+  6 0.14999             osd.6                             up  1.00000          1.00000 
+  7 0.14999             osd.7                             up  1.00000          1.00000 
+  8 0.14999             osd.8                             up  1.00000          1.00000 
+ -7 0.44998     rack rack-01                                                           
+ -6 0.44998         host ceph001-node1                                                 
+  0 0.14999             osd.0                             up  1.00000          1.00000 
+  1 0.14999             osd.1                             up  1.00000          1.00000 
+  2 0.14999             osd.2                             up  1.00000          1.00000 
+</pre>
+
+5） 构建crush rule规则
+{% highlight string %}
+ceph osd getcrushmap -o origin_crushmap.bin
+crushtool -d origin_crushmap.bin -o origin_crushmap.txt
+cp origin_crushmap.txt tobuild_crushmap.txt
+{% endhighlight %}
+
+修改tobuild_crushmap.txt文件,手动添加如下内容：
+<pre>
+rule replicated_rule-5 {
+     ruleset 5
+     type replicated
+     min_size 1
+     max_size 10
+     step take sata-00
+     step choose firstn 1 type replica-domain
+     step chooseleaf firstn 0 type host-domain 
+     step emit
+}
+</pre>
+对上面```step chooseleaf firstn 0 type host-domain```说明一下： 由于当前crush map中的逻辑拓扑的层级结构为: failure-domain --> replica-domain --> host-domain, 此处就要使用host-domain而不是osd-domain。
+
+修改完成后，重新设置到ceph集群中。
+{% highlight string %}
+crushtool -c tobuild_crushmap.txt -o tobuild_crushmap.bin
+
+ceph osd setcrushmap -i tobuild_crushmap.bin
+
+ceph osd crush dump 
+{% endhighlight %}
+
+6) 创建pool, 并将pool绑定之指定crush_ruleset
+{% highlight string %}
+ceph osd pool delete rbd rbd --yes-i-really-really-mean-it 
+
+ceph osd pool create rbd-01 128 128
+
+ceph osd pool set rbd-01 size 3
+
+ceph osd pool set rbd-01 crush_ruleset 5
+{% endhighlight %}
+
+7) 使用rbd命令简单测试创建的pool是否能够正常使用
+{% highlight string %}
+rbd create rbd-01/test-image --size 4096
+
+rbd info rbd-01/test-image
+
+rbd rm rbd-01/test-image
+{% endhighlight %}
+
+到此为止，crush map就已经构建完毕。
 
 
 
