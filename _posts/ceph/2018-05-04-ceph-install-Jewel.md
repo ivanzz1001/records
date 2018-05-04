@@ -11,7 +11,7 @@ description: Jewel版本ceph安装
 
 <!-- more -->
 
-
+<pre>
 [root@ceph001-node1 /]# lsb_release -a
 LSB Version:    :core-4.1-amd64:core-4.1-noarch
 Distributor ID: CentOS
@@ -725,7 +725,7 @@ root     18370 16930  0 15:53 pts/0    00:00:00 grep --color=auto osd
 
 与ceph001-node1类似，只需要注意少许参数的修改，这里不再赘述。
 
-### 3.2 构建crush map
+### 3.3 构建crush map
 
 在上面3.1节建立好OSD之后，默认的crush map如下图所示：
 <pre>
@@ -935,8 +935,44 @@ rbd rm rbd-01/test-image
 
 到此为止，crush map就已经构建完毕。
 
+## 4. 构建RGW
 
+这里我们构建一个```multi-site```类型RGW。下面我们以realm为```oss```, master zone group为```cn```，  master zone为```cn-oss```的例子来说明：
 
+### 4.1 配置一个master zone
+1) 创建REALM
+<pre>
+# radosgw-admin realm create --rgw-realm=oss --default
+{
+    "id": "78e7a255-d6cb-440e-bd82-124d34116f95",
+    "name": "oss",
+    "current_period": "b376eed3-ddc5-4ea8-8c03-391013d5c021",
+    "epoch": 1
+}
+</pre>
+
+创建之后，可以通过如下命令获取realm信息：
+<pre>
+2. 获取 realm 的信息
+# radosgw-admin realm get --rgw-realm=oss
+{
+    "id": "78e7a255-d6cb-440e-bd82-124d34116f95",
+    "name": "oss",
+    "current_period": "b376eed3-ddc5-4ea8-8c03-391013d5c021",
+    "epoch": 1
+}
+</pre>
+
+2) 创建master zone group
+<pre>
+# radosgw-admin zonegroup create --rgw-zonegroup=cn --rgw-realm=oss --master --default
+</pre>
+
+3) 创建master zone
+<pre>
+radosgw-admin zone create --rgw-zonegroup=cn --rgw-zone=cn-oss \
+                            --master --default 
+</pre>
 
 
 <br />

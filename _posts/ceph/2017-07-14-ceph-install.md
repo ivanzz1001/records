@@ -730,7 +730,7 @@ root     18370 16930  0 15:53 pts/0    00:00:00 grep --color=auto osd
 
 
 
-### 3.2 构建crush map
+### 3.3 构建crush map
 
 在上面3.1节建立好OSD之后，默认的crush map如下图所示：
 <pre>

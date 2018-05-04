@@ -108,7 +108,7 @@ RGW是建立在librados上的一个对象存储接口，支持两种类型的接
 # rados rmpool default.rgw.gc default.rgw.gc --yes-i-really-really-mean-it
 # rados rmpool default.rgw.log default.rgw.log --yes-i-really-really-mean-it
 # rados rmpool default.rgw.users.uid default.rgw.users.uid --yes-i-really-really-mean-it
-<pre>
+</pre>
 
 **5） 创建一个系统用户**
 
