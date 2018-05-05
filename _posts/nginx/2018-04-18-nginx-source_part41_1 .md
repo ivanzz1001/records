@@ -143,7 +143,7 @@ typedef struct {
 
 **1） core模块中的listen指令**
 
-可以在```listen```指令后为IP设置```address```以及```port```，或者指定一个unix域socket。服务器将会在这些地址上接收外部请求。可以同时指定```address```以及```port```，也可只指定```address```或```port``。而对于```address```也可以用主机名代替。例如：
+可以在```listen```指令后为IP设置```address```以及```port```，或者指定一个unix域socket。服务器将会在这些地址上接收外部请求。可以同时指定```address```以及```port```，也可只指定```address```或```port```。而对于```address```也可以用主机名代替。例如：
 <pre>
 listen 127.0.0.1:8000;
 listen 127.0.0.1;
