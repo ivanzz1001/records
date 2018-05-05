@@ -473,7 +473,17 @@ ngx_inet6_ntop(u_char *p, u_char *text, size_t len)
 #endif
 {% endhighlight %}
 
-这里对128bit的IPv6地址转换成IPv6字符串表示形式。
+这里对128bit的IPv6地址转换成IPv6字符串表示形式。下面详细介绍一下该函数：
+{% highlight string %}
+size_t
+ngx_inet6_ntop(u_char *p, u_char *text, size_t len)
+{
+   //1) IPv6地址总共16个字节，每2个字节一组，找出最长连续为0的组，
+   // 用zero变量记录该组的起始位置，用max记录连续为0的组数目
+
+   //2) 处理
+}
+{% endhighlight %}
 
 
 
