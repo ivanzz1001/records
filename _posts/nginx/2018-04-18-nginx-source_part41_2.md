@@ -796,7 +796,212 @@ ngx_parse_unix_domain_url(ngx_pool_t *pool, ngx_url_t *u)
 }
 {% endhighlight %}
 
+本函数用于解析```ngx_url_t.url```，主要会解析成以下几个部分：
 
+* ```ngx_url_t.uri```: 如果url中uri部分存在的话，解析后存放于此
+
+* ```ngx_url_t.host```: 解析后的主机名存放于此
+
+* ```ngx_url_t.sockaddr```: 解析后的字符串表示形式
+
+* ```ngx_url_t.addrs```: 解析后的地址
+
+## 9. 函数ngx_parse_inet_url()
+{% highlight string %}
+static ngx_int_t
+ngx_parse_inet_url(ngx_pool_t *pool, ngx_url_t *u)
+{
+    u_char               *p, *host, *port, *last, *uri, *args;
+    size_t                len;
+    ngx_int_t             n;
+    struct sockaddr_in   *sin;
+#if (NGX_HAVE_INET6)
+    struct sockaddr_in6  *sin6;
+#endif
+
+    u->socklen = sizeof(struct sockaddr_in);
+    sin = (struct sockaddr_in *) &u->sockaddr;
+    sin->sin_family = AF_INET;
+
+    u->family = AF_INET;
+
+    host = u->url.data;
+
+    last = host + u->url.len;
+
+    port = ngx_strlchr(host, last, ':');
+
+    uri = ngx_strlchr(host, last, '/');
+
+    args = ngx_strlchr(host, last, '?');
+
+    if (args) {
+        if (uri == NULL || args < uri) {
+            uri = args;
+        }
+    }
+
+    if (uri) {
+        if (u->listen || !u->uri_part) {
+            u->err = "invalid host";
+            return NGX_ERROR;
+        }
+
+        u->uri.len = last - uri;
+        u->uri.data = uri;
+
+        last = uri;
+
+        if (uri < port) {
+            port = NULL;
+        }
+    }
+
+    if (port) {
+        port++;
+
+        len = last - port;
+
+        n = ngx_atoi(port, len);
+
+        if (n < 1 || n > 65535) {
+            u->err = "invalid port";
+            return NGX_ERROR;
+        }
+
+        u->port = (in_port_t) n;
+        sin->sin_port = htons((in_port_t) n);
+
+        u->port_text.len = len;
+        u->port_text.data = port;
+
+        last = port - 1;
+
+    } else {
+        if (uri == NULL) {
+
+            if (u->listen) {
+
+                /* test value as port only */
+
+                n = ngx_atoi(host, last - host);
+
+                if (n != NGX_ERROR) {
+
+                    if (n < 1 || n > 65535) {
+                        u->err = "invalid port";
+                        return NGX_ERROR;
+                    }
+
+                    u->port = (in_port_t) n;
+                    sin->sin_port = htons((in_port_t) n);
+
+                    u->port_text.len = last - host;
+                    u->port_text.data = host;
+
+                    u->wildcard = 1;
+
+                    return NGX_OK;
+                }
+            }
+        }
+
+        u->no_port = 1;
+        u->port = u->default_port;
+        sin->sin_port = htons(u->default_port);
+    }
+
+    len = last - host;
+
+    if (len == 0) {
+        u->err = "no host";
+        return NGX_ERROR;
+    }
+
+    u->host.len = len;
+    u->host.data = host;
+
+    if (u->listen && len == 1 && *host == '*') {
+        sin->sin_addr.s_addr = INADDR_ANY;
+        u->wildcard = 1;
+        return NGX_OK;
+    }
+
+    sin->sin_addr.s_addr = ngx_inet_addr(host, len);
+
+    if (sin->sin_addr.s_addr != INADDR_NONE) {
+
+        if (sin->sin_addr.s_addr == INADDR_ANY) {
+            u->wildcard = 1;
+        }
+
+        u->naddrs = 1;
+
+        u->addrs = ngx_pcalloc(pool, sizeof(ngx_addr_t));
+        if (u->addrs == NULL) {
+            return NGX_ERROR;
+        }
+
+        sin = ngx_pcalloc(pool, sizeof(struct sockaddr_in));
+        if (sin == NULL) {
+            return NGX_ERROR;
+        }
+
+        ngx_memcpy(sin, u->sockaddr, sizeof(struct sockaddr_in));
+
+        u->addrs[0].sockaddr = (struct sockaddr *) sin;
+        u->addrs[0].socklen = sizeof(struct sockaddr_in);
+
+        p = ngx_pnalloc(pool, u->host.len + sizeof(":65535") - 1);
+        if (p == NULL) {
+            return NGX_ERROR;
+        }
+
+        u->addrs[0].name.len = ngx_sprintf(p, "%V:%d",
+                                           &u->host, u->port) - p;
+        u->addrs[0].name.data = p;
+
+        return NGX_OK;
+    }
+
+    if (u->no_resolve) {
+        return NGX_OK;
+    }
+
+    if (ngx_inet_resolve_host(pool, u) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    u->family = u->addrs[0].sockaddr->sa_family;
+    u->socklen = u->addrs[0].socklen;
+    ngx_memcpy(u->sockaddr, u->addrs[0].sockaddr, u->addrs[0].socklen);
+
+    switch (u->family) {
+
+#if (NGX_HAVE_INET6)
+    case AF_INET6:
+        sin6 = (struct sockaddr_in6 *) &u->sockaddr;
+
+        if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
+            u->wildcard = 1;
+        }
+
+        break;
+#endif
+
+    default: /* AF_INET */
+        sin = (struct sockaddr_in *) &u->sockaddr;
+
+        if (sin->sin_addr.s_addr == INADDR_ANY) {
+            u->wildcard = 1;
+        }
+
+        break;
+    }
+
+    return NGX_OK;
+}
+{% endhighlight %}
 
 
 
