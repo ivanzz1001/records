@@ -1154,7 +1154,411 @@ ngx_parse_inet6_url(ngx_pool_t *pool, ngx_url_t *u)
 #endif
 }
 {% endhighlight %}
+本函数用于解析IPv6形式的Url。首先我们给出一个IPv6形式的url的例子：
+<pre>
+listen [::1]:12345
+</pre>
+下面我们再来简要分析一下本函数：
+{% highlight string %}
+static ngx_int_t
+ngx_parse_inet6_url(ngx_pool_t *pool, ngx_url_t *u)
+{
+   //1) IPv6形式的url以“["开始，首先分析出其中的uri, port
 
+   //2) 转换IPv6的host部分
+}
+{% endhighlight %}
+
+
+
+## 11. 函数ngx_inet_resolve_host()
+{% highlight string %}
+#if (NGX_HAVE_GETADDRINFO && NGX_HAVE_INET6)
+
+ngx_int_t
+ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u)
+{
+    u_char               *p, *host;
+    size_t                len;
+    in_port_t             port;
+    ngx_uint_t            i;
+    struct addrinfo       hints, *res, *rp;
+    struct sockaddr_in   *sin;
+    struct sockaddr_in6  *sin6;
+
+    port = htons(u->port);
+
+    host = ngx_alloc(u->host.len + 1, pool->log);
+    if (host == NULL) {
+        return NGX_ERROR;
+    }
+
+    (void) ngx_cpystrn(host, u->host.data, u->host.len + 1);
+
+    ngx_memzero(&hints, sizeof(struct addrinfo));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+#ifdef AI_ADDRCONFIG
+    hints.ai_flags = AI_ADDRCONFIG;
+#endif
+
+    if (getaddrinfo((char *) host, NULL, &hints, &res) != 0) {
+        u->err = "host not found";
+        ngx_free(host);
+        return NGX_ERROR;
+    }
+
+    ngx_free(host);
+
+    for (i = 0, rp = res; rp != NULL; rp = rp->ai_next) {
+
+        switch (rp->ai_family) {
+
+        case AF_INET:
+        case AF_INET6:
+            break;
+
+        default:
+            continue;
+        }
+
+        i++;
+    }
+
+    if (i == 0) {
+        u->err = "host not found";
+        goto failed;
+    }
+
+    /* MP: ngx_shared_palloc() */
+
+    u->addrs = ngx_pcalloc(pool, i * sizeof(ngx_addr_t));
+    if (u->addrs == NULL) {
+        goto failed;
+    }
+
+    u->naddrs = i;
+
+    i = 0;
+
+    /* AF_INET addresses first */
+
+    for (rp = res; rp != NULL; rp = rp->ai_next) {
+
+        if (rp->ai_family != AF_INET) {
+            continue;
+        }
+
+        sin = ngx_pcalloc(pool, rp->ai_addrlen);
+        if (sin == NULL) {
+            goto failed;
+        }
+
+        ngx_memcpy(sin, rp->ai_addr, rp->ai_addrlen);
+
+        sin->sin_port = port;
+
+        u->addrs[i].sockaddr = (struct sockaddr *) sin;
+        u->addrs[i].socklen = rp->ai_addrlen;
+
+        len = NGX_INET_ADDRSTRLEN + sizeof(":65535") - 1;
+
+        p = ngx_pnalloc(pool, len);
+        if (p == NULL) {
+            goto failed;
+        }
+
+        len = ngx_sock_ntop((struct sockaddr *) sin, rp->ai_addrlen, p, len, 1);
+
+        u->addrs[i].name.len = len;
+        u->addrs[i].name.data = p;
+
+        i++;
+    }
+
+    for (rp = res; rp != NULL; rp = rp->ai_next) {
+
+        if (rp->ai_family != AF_INET6) {
+            continue;
+        }
+
+        sin6 = ngx_pcalloc(pool, rp->ai_addrlen);
+        if (sin6 == NULL) {
+            goto failed;
+        }
+
+        ngx_memcpy(sin6, rp->ai_addr, rp->ai_addrlen);
+
+        sin6->sin6_port = port;
+
+        u->addrs[i].sockaddr = (struct sockaddr *) sin6;
+        u->addrs[i].socklen = rp->ai_addrlen;
+
+        len = NGX_INET6_ADDRSTRLEN + sizeof("[]:65535") - 1;
+
+        p = ngx_pnalloc(pool, len);
+        if (p == NULL) {
+            goto failed;
+        }
+
+        len = ngx_sock_ntop((struct sockaddr *) sin6, rp->ai_addrlen, p,
+                            len, 1);
+
+        u->addrs[i].name.len = len;
+        u->addrs[i].name.data = p;
+
+        i++;
+    }
+
+    freeaddrinfo(res);
+    return NGX_OK;
+
+failed:
+
+    freeaddrinfo(res);
+    return NGX_ERROR;
+}
+
+#else /* !NGX_HAVE_GETADDRINFO || !NGX_HAVE_INET6 */
+
+ngx_int_t
+ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u)
+{
+    u_char              *p, *host;
+    size_t               len;
+    in_port_t            port;
+    in_addr_t            in_addr;
+    ngx_uint_t           i;
+    struct hostent      *h;
+    struct sockaddr_in  *sin;
+
+    /* AF_INET only */
+
+    port = htons(u->port);
+
+    in_addr = ngx_inet_addr(u->host.data, u->host.len);
+
+    if (in_addr == INADDR_NONE) {
+        host = ngx_alloc(u->host.len + 1, pool->log);
+        if (host == NULL) {
+            return NGX_ERROR;
+        }
+
+        (void) ngx_cpystrn(host, u->host.data, u->host.len + 1);
+
+        h = gethostbyname((char *) host);
+
+        ngx_free(host);
+
+        if (h == NULL || h->h_addr_list[0] == NULL) {
+            u->err = "host not found";
+            return NGX_ERROR;
+        }
+
+        for (i = 0; h->h_addr_list[i] != NULL; i++) { /* void */ }
+
+        /* MP: ngx_shared_palloc() */
+
+        u->addrs = ngx_pcalloc(pool, i * sizeof(ngx_addr_t));
+        if (u->addrs == NULL) {
+            return NGX_ERROR;
+        }
+
+        u->naddrs = i;
+
+        for (i = 0; i < u->naddrs; i++) {
+
+            sin = ngx_pcalloc(pool, sizeof(struct sockaddr_in));
+            if (sin == NULL) {
+                return NGX_ERROR;
+            }
+
+            sin->sin_family = AF_INET;
+            sin->sin_port = port;
+            sin->sin_addr.s_addr = *(in_addr_t *) (h->h_addr_list[i]);
+
+            u->addrs[i].sockaddr = (struct sockaddr *) sin;
+            u->addrs[i].socklen = sizeof(struct sockaddr_in);
+
+            len = NGX_INET_ADDRSTRLEN + sizeof(":65535") - 1;
+
+            p = ngx_pnalloc(pool, len);
+            if (p == NULL) {
+                return NGX_ERROR;
+            }
+
+            len = ngx_sock_ntop((struct sockaddr *) sin,
+                                sizeof(struct sockaddr_in), p, len, 1);
+
+            u->addrs[i].name.len = len;
+            u->addrs[i].name.data = p;
+        }
+
+    } else {
+
+        /* MP: ngx_shared_palloc() */
+
+        u->addrs = ngx_pcalloc(pool, sizeof(ngx_addr_t));
+        if (u->addrs == NULL) {
+            return NGX_ERROR;
+        }
+
+        sin = ngx_pcalloc(pool, sizeof(struct sockaddr_in));
+        if (sin == NULL) {
+            return NGX_ERROR;
+        }
+
+        u->naddrs = 1;
+
+        sin->sin_family = AF_INET;
+        sin->sin_port = port;
+        sin->sin_addr.s_addr = in_addr;
+
+        u->addrs[0].sockaddr = (struct sockaddr *) sin;
+        u->addrs[0].socklen = sizeof(struct sockaddr_in);
+
+        p = ngx_pnalloc(pool, u->host.len + sizeof(":65535") - 1);
+        if (p == NULL) {
+            return NGX_ERROR;
+        }
+
+        u->addrs[0].name.len = ngx_sprintf(p, "%V:%d",
+                                           &u->host, ntohs(port)) - p;
+        u->addrs[0].name.data = p;
+    }
+
+    return NGX_OK;
+}
+
+#endif /* NGX_HAVE_GETADDRINFO && NGX_HAVE_INET6 */
+
+{% endhighlight %}
+
+本函数用于将主机名解析成url的IP地址。在objs/ngx_auto_config.h头文件中我们有如下定义：
+<pre>
+#ifndef NGX_HAVE_GETADDRINFO
+#define NGX_HAVE_GETADDRINFO  1
+#endif
+</pre>
+但是当前并不支持```NGX_HAVE_INET6```。下面我们对该函数进行简要说明：
+{% highlight string %}
+#if (NGX_HAVE_GETADDRINFO && NGX_HAVE_INET6)
+
+ngx_int_t
+ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u)
+{
+    //1) 调用getaddrinfo()解析主机名
+
+    //2) 对IPv4及IPv6形式的IP地址保存到ngx_url_t.addrs中
+}
+#else
+ngx_int_t
+ngx_inet_resolve_host(ngx_pool_t *pool, ngx_url_t *u)
+{
+   // 1) 调用ngx_inet_addr()转换url中的Host主机
+
+   //2) 如果转换结果为INADDR_NONE，表明不知直接IPv4表示形式的主机，此时调用
+   // gethostbyname()函数来获得主机地址； 否则直接保存对应的ip即可
+}
+#endif
+{% endhighlight %}
+
+
+## 12. 函数ngx_cmp_sockaddr()
+{% highlight string %}
+ngx_int_t
+ngx_cmp_sockaddr(struct sockaddr *sa1, socklen_t slen1,
+    struct sockaddr *sa2, socklen_t slen2, ngx_uint_t cmp_port)
+{
+    struct sockaddr_in   *sin1, *sin2;
+#if (NGX_HAVE_INET6)
+    struct sockaddr_in6  *sin61, *sin62;
+#endif
+#if (NGX_HAVE_UNIX_DOMAIN)
+    size_t                len;
+    struct sockaddr_un   *saun1, *saun2;
+#endif
+
+    if (sa1->sa_family != sa2->sa_family) {
+        return NGX_DECLINED;
+    }
+
+    switch (sa1->sa_family) {
+
+#if (NGX_HAVE_INET6)
+    case AF_INET6:
+
+        sin61 = (struct sockaddr_in6 *) sa1;
+        sin62 = (struct sockaddr_in6 *) sa2;
+
+        if (cmp_port && sin61->sin6_port != sin62->sin6_port) {
+            return NGX_DECLINED;
+        }
+
+        if (ngx_memcmp(&sin61->sin6_addr, &sin62->sin6_addr, 16) != 0) {
+            return NGX_DECLINED;
+        }
+
+        break;
+#endif
+
+#if (NGX_HAVE_UNIX_DOMAIN)
+    case AF_UNIX:
+
+        saun1 = (struct sockaddr_un *) sa1;
+        saun2 = (struct sockaddr_un *) sa2;
+
+        if (slen1 < slen2) {
+            len = slen1 - offsetof(struct sockaddr_un, sun_path);
+
+        } else {
+            len = slen2 - offsetof(struct sockaddr_un, sun_path);
+        }
+
+        if (len > sizeof(saun1->sun_path)) {
+            len = sizeof(saun1->sun_path);
+        }
+
+        if (ngx_memcmp(&saun1->sun_path, &saun2->sun_path, len) != 0) {
+            return NGX_DECLINED;
+        }
+
+        break;
+#endif
+
+    default: /* AF_INET */
+
+        sin1 = (struct sockaddr_in *) sa1;
+        sin2 = (struct sockaddr_in *) sa2;
+
+        if (cmp_port && sin1->sin_port != sin2->sin_port) {
+            return NGX_DECLINED;
+        }
+
+        if (sin1->sin_addr.s_addr != sin2->sin_addr.s_addr) {
+            return NGX_DECLINED;
+        }
+
+        break;
+    }
+
+    return NGX_OK;
+}
+
+{% endhighlight %}
+此函数用于比较两个socket地址是否相同。函数较为简单，这里不再进行细讲。
+
+
+<pre>
+//IPv4形式的socket 地址
+struct sockaddr_in   *sin1, *sin2;
+
+//IPv6形式的socket 地址
+struct sockaddr_in6  *sin61, *sin62;
+
+//unix域socket地址
+struct sockaddr_un   *saun1, *saun2;
+</pre>
 
 
 <br />
