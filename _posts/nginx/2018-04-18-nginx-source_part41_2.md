@@ -1002,7 +1002,158 @@ ngx_parse_inet_url(ngx_pool_t *pool, ngx_url_t *u)
     return NGX_OK;
 }
 {% endhighlight %}
+本函数用于解析IPv4类型的URL。例如：
+<pre>
+localhost:8088/query?id=1001
+listen 8000;
+</pre>
 
+下面我们就来简要分析一下该函数：
+{% highlight string %}
+static ngx_int_t
+ngx_parse_inet_url(ngx_pool_t *pool, ngx_url_t *u)
+{
+   //1) 找出port, uri以及args字段的起始位置
+
+   //2) 解析uri
+
+   //3) 解析port: 这里如果url中本身携带有port，则直接转换； 否则进行如下解析：
+   //   若uri为NULL并且u->listen为1(即类似于listen 8000)，调用ngx_atoi()进行转换；
+   //   否则设置u->no_port=1， 然后采用默认的端口
+
+   
+   //4) 转换u->host部分： 如果host直接是ip地址表示形式，可以直接转换；否则
+   //调用ngx_inet_resolve_host()进行域名解析
+}
+{% endhighlight %}
+
+
+## 10. 函数ngx_parse_inet6_url()
+{% highlight string %}
+static ngx_int_t
+ngx_parse_inet6_url(ngx_pool_t *pool, ngx_url_t *u)
+{
+#if (NGX_HAVE_INET6)
+    u_char               *p, *host, *port, *last, *uri;
+    size_t                len;
+    ngx_int_t             n;
+    struct sockaddr_in6  *sin6;
+
+    u->socklen = sizeof(struct sockaddr_in6);
+    sin6 = (struct sockaddr_in6 *) &u->sockaddr;
+    sin6->sin6_family = AF_INET6;
+
+    host = u->url.data + 1;
+
+    last = u->url.data + u->url.len;
+
+    p = ngx_strlchr(host, last, ']');
+
+    if (p == NULL) {
+        u->err = "invalid host";
+        return NGX_ERROR;
+    }
+
+    if (last - p) {
+
+        port = p + 1;
+
+        uri = ngx_strlchr(port, last, '/');
+
+        if (uri) {
+            if (u->listen || !u->uri_part) {
+                u->err = "invalid host";
+                return NGX_ERROR;
+            }
+
+            u->uri.len = last - uri;
+            u->uri.data = uri;
+
+            last = uri;
+        }
+
+        if (*port == ':') {
+            port++;
+
+            len = last - port;
+
+            n = ngx_atoi(port, len);
+
+            if (n < 1 || n > 65535) {
+                u->err = "invalid port";
+                return NGX_ERROR;
+            }
+
+            u->port = (in_port_t) n;
+            sin6->sin6_port = htons((in_port_t) n);
+
+            u->port_text.len = len;
+            u->port_text.data = port;
+
+        } else {
+            u->no_port = 1;
+            u->port = u->default_port;
+            sin6->sin6_port = htons(u->default_port);
+        }
+    }
+
+    len = p - host;
+
+    if (len == 0) {
+        u->err = "no host";
+        return NGX_ERROR;
+    }
+
+    u->host.len = len + 2;
+    u->host.data = host - 1;
+
+    if (ngx_inet6_addr(host, len, sin6->sin6_addr.s6_addr) != NGX_OK) {
+        u->err = "invalid IPv6 address";
+        return NGX_ERROR;
+    }
+
+    if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
+        u->wildcard = 1;
+    }
+
+    u->family = AF_INET6;
+    u->naddrs = 1;
+
+    u->addrs = ngx_pcalloc(pool, sizeof(ngx_addr_t));
+    if (u->addrs == NULL) {
+        return NGX_ERROR;
+    }
+
+    sin6 = ngx_pcalloc(pool, sizeof(struct sockaddr_in6));
+    if (sin6 == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(sin6, u->sockaddr, sizeof(struct sockaddr_in6));
+
+    u->addrs[0].sockaddr = (struct sockaddr *) sin6;
+    u->addrs[0].socklen = sizeof(struct sockaddr_in6);
+
+    p = ngx_pnalloc(pool, u->host.len + sizeof(":65535") - 1);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    u->addrs[0].name.len = ngx_sprintf(p, "%V:%d",
+                                       &u->host, u->port) - p;
+    u->addrs[0].name.data = p;
+
+    return NGX_OK;
+
+#else
+
+    u->err = "the INET6 sockets are not supported on this platform";
+
+    return NGX_ERROR;
+
+#endif
+}
+{% endhighlight %}
 
 
 
