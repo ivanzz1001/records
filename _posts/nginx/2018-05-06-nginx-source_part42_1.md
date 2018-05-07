@@ -130,6 +130,10 @@ void *ngx_list_push(ngx_list_t *list);
 
 * ```pool```: 该链表结构对应的内存池
 
+下面给出```ngx_list_t```的一个整体结构图：
+
+![ngx-list](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_list.jpg)
+
 ### 1.2 相关函数声明
 
 {% highlight string %}
