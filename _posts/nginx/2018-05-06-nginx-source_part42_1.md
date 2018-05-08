@@ -169,6 +169,83 @@ ngx_list_init(ngx_list_t *list, ngx_pool_t *pool, ngx_uint_t n, size_t size)
 本函数较为简单，就是对一个链表结构进行简单的初始化。
 
 ## 2. core/ngx_list.c源文件
+{% highlight string %}
+
+/*
+ * Copyright (C) Igor Sysoev
+ * Copyright (C) Nginx, Inc.
+ */
+
+
+#include <ngx_config.h>
+#include <ngx_core.h>
+
+
+ngx_list_t *
+ngx_list_create(ngx_pool_t *pool, ngx_uint_t n, size_t size)
+{
+    ngx_list_t  *list;
+
+    list = ngx_palloc(pool, sizeof(ngx_list_t));
+    if (list == NULL) {
+        return NULL;
+    }
+
+    if (ngx_list_init(list, pool, n, size) != NGX_OK) {
+        return NULL;
+    }
+
+    return list;
+}
+
+
+void *
+ngx_list_push(ngx_list_t *l)
+{
+    void             *elt;
+    ngx_list_part_t  *last;
+
+    last = l->last;
+
+    if (last->nelts == l->nalloc) {
+
+        /* the last part is full, allocate a new list part */
+
+        last = ngx_palloc(l->pool, sizeof(ngx_list_part_t));
+        if (last == NULL) {
+            return NULL;
+        }
+
+        last->elts = ngx_palloc(l->pool, l->nalloc * l->size);
+        if (last->elts == NULL) {
+            return NULL;
+        }
+
+        last->nelts = 0;
+        last->next = NULL;
+
+        l->last->next = last;
+        l->last = last;
+    }
+
+    elt = (char *) last->elts + l->size * last->nelts;
+    last->nelts++;
+
+    return elt;
+}
+
+{% endhighlight %}
+
+
+下面我们简单介绍一下这两个函数：
+
+**1） 函数ngx_list_create()**
+
+本函数主要是创建一个```ngx_list_t```结构，然后调用ngx_list_init()进行链表的初始化。
+
+**2) 函数ngx_list_push()**
+
+本函数用于从链表尾部找出一个可用于插入的位置。
 
 
 <br />
