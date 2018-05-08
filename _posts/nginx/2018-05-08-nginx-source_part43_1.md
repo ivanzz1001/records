@@ -129,6 +129,17 @@ struct ngx_log_s {
 };
 {% endhighlight %}
 
+
+
+
+<br />
+<br />
+
+**[参考]**
+
+1. [git的使用](https://www.yiibai.com/git/git-quick-start.html)
+
+2. [bit book](https://git-scm.com/book/zh/v2)
 <br />
 <br />
 <br />
