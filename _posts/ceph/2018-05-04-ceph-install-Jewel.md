@@ -1311,6 +1311,240 @@ unix  2      [ ACC ]     STREAM     LISTENING     326358   15626/radosgw        
 
 
 最后，到此为止整个集群已经部署完毕.
+
+
+## 5. ceph的卸载
+
+在有些时候，由于ceph安装失败或其他原因，我们希望把ceph整个环境卸载，以回到一个干净的操作系统环境。
+
+
+### 5.1 kill掉ceph相关的所有进程
+<pre>
+# ps -aux | grep ceph | grep -v grep | awk '{print $2}' | xargs kill -9
+# ps -aux | grep ceph | grep -v grep | awk '{print $2}' | xargs kill -9   //执行多次
+# ps -ef | grep ceph
+</pre>
+
+### 5.2 删除ceph相关所有数据
+<pre>
+# ls /var/lib/ceph/
+bootstrap-mds  bootstrap-osd  bootstrap-rgw  mon  osd
+# rm -rf /var/lib/ceph/*
+# rm -rf /var/lib/ceph/*
+
+#  ls /etc/ceph/
+ceph.client.openstack.keyring  ceph.conf      ceph.conf.rgw  rbdmap
+ceph.client.admin.keyring    ceph.client.radosgw.keyring      ceph.conf.cluster  keyfile
+# rm -rf /etc/ceph/*
+# rm -rf /etc/ceph/*
+
+# ls /var/run/ceph/
+# rm -rf /var/run/ceph/
+</pre>
+
+### 5.3 卸载已挂载硬盘
+1) 首先通过如下命令查看当前挂载了哪些硬盘:
+<pre>
+# lsblk -l
+NAME                 MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+sda                    8:0    0   1.8T  0 disk 
+└─sda1                 8:1    0   1.8T  0 part /var/lib/ceph/osd/ceph-0
+sdb                    8:16   0   1.8T  0 disk 
+└─sdb1                 8:17   0   1.8T  0 part /var/lib/ceph/osd/ceph-1
+sdc                    8:32   0   1.8T  0 disk 
+└─sdc1                 8:33   0   1.8T  0 part /var/lib/ceph/osd/ceph-2
+sdd                    8:48   0   1.8T  0 disk 
+└─sdd1                 8:49   0   1.8T  0 part /var/lib/ceph/osd/ceph-3
+sde                    8:64   0   1.8T  0 disk 
+└─sde1                 8:65   0   1.8T  0 part /var/lib/ceph/osd/ceph-12
+sdf                    8:80   0   1.8T  0 disk 
+└─sdf1                 8:81   0   1.8T  0 part /var/lib/ceph/osd/ceph-13
+sdg                    8:96   0 447.1G  0 disk 
+├─sdg1                 8:97   0    14G  0 part 
+├─sdg2                 8:98   0    14G  0 part 
+├─sdg3                 8:99   0    14G  0 part 
+├─sdg4                 8:100  0    14G  0 part 
+├─sdg5                 8:101  0    14G  0 part 
+├─sdg6                 8:102  0    14G  0 part 
+├─sdg7                 8:103  0    14G  0 part 
+├─sdg8                 8:104  0    14G  0 part 
+└─sdg9                 8:105  0    14G  0 part 
+sdh                    8:112  0   1.8T  0 disk 
+└─sdh1                 8:113  0   1.8T  0 part /var/lib/ceph/osd/ceph-14
+sdi                    8:128  0   1.8T  0 disk 
+└─sdi1                 8:129  0   1.8T  0 part /var/lib/ceph/osd/ceph-15
+sdj                    8:144  0   1.8T  0 disk 
+└─sdj1                 8:145  0   1.8T  0 part /var/lib/ceph/osd/ceph-16
+sdk                    8:160  0   1.8T  0 disk 
+├─sdk1                 8:161  0  1000M  0 part /boot
+├─sdk2                 8:162  0   3.9G  0 part [SWAP]
+└─sdk3                 8:163  0   1.8T  0 part 
+  ├─company_pv-rootvol 253:0    0  19.5G  0 lvm  /
+  └─company_pv-varvol  253:1    0   1.8T  0 lvm  /var
+</pre>
+上面我们看到，有sda~sdk共11个硬盘， 这里除了sdk硬盘几个分区作为系统分区使用，其他都作为一般分区使用。
+
+2) 这里卸载挂载的硬盘：
+<pre>
+# umount /var/lib/ceph/osd/ceph-0
+# umount /var/lib/ceph/osd/ceph-1
+# umount /var/lib/ceph/osd/ceph-2
+# umount /var/lib/ceph/osd/ceph-3
+# umount /var/lib/ceph/osd/ceph-12
+# umount /var/lib/ceph/osd/ceph-13
+# umount /var/lib/ceph/osd/ceph-14
+# umount /var/lib/ceph/osd/ceph-15
+# umount /var/lib/ceph/osd/ceph-16
+
+或直接如下命令：
+# umount /var/lib/ceph/osd/*
+</pre>
+
+3) 卸载完成后，我们看当前硬盘挂载情况：
+<pre>
+# lsblk 
+NAME                 MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+sda                    8:0    0   1.8T  0 disk 
+└─sda1                 8:1    0   1.8T  0 part 
+sdb                    8:16   0   1.8T  0 disk 
+└─sdb1                 8:17   0   1.8T  0 part 
+sdc                    8:32   0   1.8T  0 disk 
+└─sdc1                 8:33   0   1.8T  0 part 
+sdd                    8:48   0   1.8T  0 disk 
+└─sdd1                 8:49   0   1.8T  0 part 
+sde                    8:64   0   1.8T  0 disk 
+└─sde1                 8:65   0   1.8T  0 part 
+sdf                    8:80   0   1.8T  0 disk 
+└─sdf1                 8:81   0   1.8T  0 part 
+sdg                    8:96   0 447.1G  0 disk 
+├─sdg1                 8:97   0    14G  0 part 
+├─sdg2                 8:98   0    14G  0 part 
+├─sdg3                 8:99   0    14G  0 part 
+├─sdg4                 8:100  0    14G  0 part 
+├─sdg5                 8:101  0    14G  0 part 
+├─sdg6                 8:102  0    14G  0 part 
+├─sdg7                 8:103  0    14G  0 part 
+├─sdg8                 8:104  0    14G  0 part 
+└─sdg9                 8:105  0    14G  0 part 
+sdh                    8:112  0   1.8T  0 disk 
+└─sdh1                 8:113  0   1.8T  0 part 
+sdi                    8:128  0   1.8T  0 disk 
+└─sdi1                 8:129  0   1.8T  0 part 
+sdj                    8:144  0   1.8T  0 disk 
+└─sdj1                 8:145  0   1.8T  0 part 
+sdk                    8:160  0   1.8T  0 disk 
+├─sdk1                 8:161  0  1000M  0 part /boot
+├─sdk2                 8:162  0   3.9G  0 part [SWAP]
+└─sdk3                 8:163  0   1.8T  0 part 
+  ├─company_pv-rootvol 253:0    0  19.5G  0 lvm  /
+  └─company_pv-varvol  253:1    0   1.8T  0 lvm  /var
+</pre>
+
+4) 删除分区
+
+这里我们删除```除sdk1、sdk2、sdk3```之外的所有分区：
+<pre>
+# parted /dev/sda rm 1
+Information: You may need to update /etc/fstab.
+
+# parted /dev/sdb rm 1
+# parted /dev/sdc rm 1
+# parted /dev/sdd rm 1
+# parted /dev/sde rm 1
+# parted /dev/sdf rm 1
+
+# parted /dev/sdg rm 1
+# parted /dev/sdg rm 2
+# parted /dev/sdg rm 3
+# parted /dev/sdg rm 4
+# parted /dev/sdg rm 5
+# parted /dev/sdg rm 6
+# parted /dev/sdg rm 7
+# parted /dev/sdg rm 8
+# parted /dev/sdg rm 9
+
+
+# parted /dev/sdh rm 1
+# parted /dev/sdi rm 1
+# parted /dev/sdj rm 1
+</pre>
+
+删除后查看当前分区情况：
+<pre>
+# lsblk                                                 
+NAME                 MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+sda                    8:0    0   1.8T  0 disk 
+sdb                    8:16   0   1.8T  0 disk 
+sdc                    8:32   0   1.8T  0 disk 
+sdd                    8:48   0   1.8T  0 disk 
+sde                    8:64   0   1.8T  0 disk 
+sdf                    8:80   0   1.8T  0 disk 
+sdg                    8:96   0 447.1G  0 disk 
+sdh                    8:112  0   1.8T  0 disk 
+sdi                    8:128  0   1.8T  0 disk 
+sdj                    8:144  0   1.8T  0 disk 
+sdk                    8:160  0   1.8T  0 disk 
+├─sdk1                 8:161  0  1000M  0 part /boot
+├─sdk2                 8:162  0   3.9G  0 part [SWAP]
+└─sdk3                 8:163  0   1.8T  0 part 
+  ├─company_pv-rootvol 253:0    0  19.5G  0 lvm  /
+  └─company_pv-varvol  253:1    0   1.8T  0 lvm  /var
+</pre>
+
+5) 修改/etc/fstab文件
+
+这里把上面删除的分区的相关挂载信息删除。
+
+
+## 6. 卸载ceph
+
+首先用如下命令查看当前安装的与ceph相关的软件包：
+<pre>
+# rpm -qa|grep ceph
+libcephfs1-10.2.3-0.el7.x86_64
+ceph-common-10.2.3-0.el7.x86_64
+ceph-selinux-10.2.3-0.el7.x86_64
+ceph-osd-10.2.3-0.el7.x86_64
+ceph-mds-10.2.3-0.el7.x86_64
+ceph-radosgw-10.2.3-0.el7.x86_64
+python-cephfs-10.2.3-0.el7.x86_64
+ceph-base-10.2.3-0.el7.x86_64
+ceph-mon-10.2.3-0.el7.x86_64
+ceph-10.2.3-0.el7.x86_64
+</pre>
+
+然后调用如下命令进行卸载：
+<pre>
+# yum remove ceph
+</pre>
+
+卸载完成后再调用：
+<pre>
+# rpm -qa | grep ceph
+</pre>
+如果仍残留有```ceph```相关包，则调用如下命令卸载：
+{% highlight string %}
+# yum remove <ceph-package-name>
+{% endhighlight %}
+
+## 7. 删除与ceph相关的定时任务
+
+首先通过如下命令查看：
+<pre>
+# crontab -l
+#* * * * * /usr/sbin/ntpdate ntp.ustack.in 1 >/dev/null 2>&1
+* * * * * /apps/zabbix/ceph/ceph_check.py > /apps/zabbix/ceph/ceph_check_tmp.a;mv /apps/zabbix//ceph/ceph_check_tmp.a /apps/zabbix/ceph/ceph_check_tmp &
+* * * * * /apps/zabbix/ceph/ceph_usage.py > /apps/zabbix/ceph/ceph_usage_tmp.a 2>/dev/null;mv /apps/zabbix/ceph/ceph_usage_tmp.a /apps/zabbix/ceph/ceph_usage_tmp &
+</pre>
+
+然后删除相关任务：
+<pre>
+# crontab -e
+# service crond restart 
+</pre>
+
+
+
 <br />
 <br />
 
@@ -1319,6 +1553,9 @@ unix  2      [ ACC ]     STREAM     LISTENING     326358   15626/radosgw        
 1. [MULTI-SITE](http://docs.ceph.com/docs/master/radosgw/multisite/)
 
 
+2. [ceph的卸载](https://www.cnblogs.com/nulige/articles/8475907.html)
+
+3. [Linux下进行硬盘挂载、分区、删除分区，格式化，卸载方法](https://www.cnblogs.com/zishengY/p/7137671.html)
 <br />
 <br />
 <br />
