@@ -246,7 +246,7 @@ gcc可变参数宏定义类似于如下：
 * ngx_log_debug_core(): 打印debug级别日志的函数
 
 
-## 4. 
+## 4. ngx_log_debug辅助函数
 {% highlight string %}
 #if (NGX_DEBUG)
 
@@ -348,7 +348,7 @@ gcc可变参数宏定义类似于如下：
 #endif
 {% endhighlight %}
 
-
+如上这些函数只是为了使用方便，针对ngx_log_debug()可变参数函数的特定参数个数时，进行定制。
 
 
 
