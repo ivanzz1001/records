@@ -214,6 +214,140 @@ void ngx_cdecl ngx_log_debug_core(ngx_log_t *log, ngx_err_t err,
 
 这里首先定义了```NGX_MAX_ERROR_STR```为2048，即单条日志的最大长度为2048。
 
+当前在objs/ngx_auto_config.h头文件中，我们有如下宏定义：
+<pre>
+#ifndef NGX_HAVE_C99_VARIADIC_MACROS
+#define NGX_HAVE_C99_VARIADIC_MACROS  1
+#endif
+
+
+#ifndef NGX_HAVE_GCC_VARIADIC_MACROS
+#define NGX_HAVE_GCC_VARIADIC_MACROS  1
+#endif
+</pre>
+
+我们当前同时支持```C99可变参数宏定义```与```gcc可变参数宏定义```。其中c99可变参数宏定义类似于如下：
+<pre>
+#define var(dummy, ...)  sprintf(__VA_ARGS__)
+</pre>
+
+gcc可变参数宏定义类似于如下：
+<pre>
+#define var(dummy, args...)  sprintf(args)
+</pre>
+
+
+上面我们定义了三个函数：
+
+* ngx_log_error(): 打印一般的错误日志消息(只有高于对应错误日志级别，才会打印出来）
+
+* ngx_log_error_core(): 打印日志的核心函数
+
+* ngx_log_debug_core(): 打印debug级别日志的函数
+
+
+## 4. 
+{% highlight string %}
+#if (NGX_DEBUG)
+
+#if (NGX_HAVE_VARIADIC_MACROS)
+
+#define ngx_log_debug0(level, log, err, fmt)                                  \
+        ngx_log_debug(level, log, err, fmt)
+
+#define ngx_log_debug1(level, log, err, fmt, arg1)                            \
+        ngx_log_debug(level, log, err, fmt, arg1)
+
+#define ngx_log_debug2(level, log, err, fmt, arg1, arg2)                      \
+        ngx_log_debug(level, log, err, fmt, arg1, arg2)
+
+#define ngx_log_debug3(level, log, err, fmt, arg1, arg2, arg3)                \
+        ngx_log_debug(level, log, err, fmt, arg1, arg2, arg3)
+
+#define ngx_log_debug4(level, log, err, fmt, arg1, arg2, arg3, arg4)          \
+        ngx_log_debug(level, log, err, fmt, arg1, arg2, arg3, arg4)
+
+#define ngx_log_debug5(level, log, err, fmt, arg1, arg2, arg3, arg4, arg5)    \
+        ngx_log_debug(level, log, err, fmt, arg1, arg2, arg3, arg4, arg5)
+
+#define ngx_log_debug6(level, log, err, fmt,                                  \
+                       arg1, arg2, arg3, arg4, arg5, arg6)                    \
+        ngx_log_debug(level, log, err, fmt,                                   \
+                       arg1, arg2, arg3, arg4, arg5, arg6)
+
+#define ngx_log_debug7(level, log, err, fmt,                                  \
+                       arg1, arg2, arg3, arg4, arg5, arg6, arg7)              \
+        ngx_log_debug(level, log, err, fmt,                                   \
+                       arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+
+#define ngx_log_debug8(level, log, err, fmt,                                  \
+                       arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)        \
+        ngx_log_debug(level, log, err, fmt,                                   \
+                       arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
+
+
+#else /* no variadic macros */
+
+#define ngx_log_debug0(level, log, err, fmt)                                  \
+    if ((log)->log_level & level)                                             \
+        ngx_log_debug_core(log, err, fmt)
+
+#define ngx_log_debug1(level, log, err, fmt, arg1)                            \
+    if ((log)->log_level & level)                                             \
+        ngx_log_debug_core(log, err, fmt, arg1)
+
+#define ngx_log_debug2(level, log, err, fmt, arg1, arg2)                      \
+    if ((log)->log_level & level)                                             \
+        ngx_log_debug_core(log, err, fmt, arg1, arg2)
+
+#define ngx_log_debug3(level, log, err, fmt, arg1, arg2, arg3)                \
+    if ((log)->log_level & level)                                             \
+        ngx_log_debug_core(log, err, fmt, arg1, arg2, arg3)
+
+#define ngx_log_debug4(level, log, err, fmt, arg1, arg2, arg3, arg4)          \
+    if ((log)->log_level & level)                                             \
+        ngx_log_debug_core(log, err, fmt, arg1, arg2, arg3, arg4)
+
+#define ngx_log_debug5(level, log, err, fmt, arg1, arg2, arg3, arg4, arg5)    \
+    if ((log)->log_level & level)                                             \
+        ngx_log_debug_core(log, err, fmt, arg1, arg2, arg3, arg4, arg5)
+
+#define ngx_log_debug6(level, log, err, fmt,                                  \
+                       arg1, arg2, arg3, arg4, arg5, arg6)                    \
+    if ((log)->log_level & level)                                             \
+        ngx_log_debug_core(log, err, fmt, arg1, arg2, arg3, arg4, arg5, arg6)
+
+#define ngx_log_debug7(level, log, err, fmt,                                  \
+                       arg1, arg2, arg3, arg4, arg5, arg6, arg7)              \
+    if ((log)->log_level & level)                                             \
+        ngx_log_debug_core(log, err, fmt,                                     \
+                       arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+
+#define ngx_log_debug8(level, log, err, fmt,                                  \
+                       arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)        \
+    if ((log)->log_level & level)                                             \
+        ngx_log_debug_core(log, err, fmt,                                     \
+                       arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
+
+#endif
+
+#else /* !NGX_DEBUG */
+
+#define ngx_log_debug0(level, log, err, fmt)
+#define ngx_log_debug1(level, log, err, fmt, arg1)
+#define ngx_log_debug2(level, log, err, fmt, arg1, arg2)
+#define ngx_log_debug3(level, log, err, fmt, arg1, arg2, arg3)
+#define ngx_log_debug4(level, log, err, fmt, arg1, arg2, arg3, arg4)
+#define ngx_log_debug5(level, log, err, fmt, arg1, arg2, arg3, arg4, arg5)
+#define ngx_log_debug6(level, log, err, fmt, arg1, arg2, arg3, arg4, arg5, arg6)
+#define ngx_log_debug7(level, log, err, fmt, arg1, arg2, arg3, arg4, arg5,    \
+                       arg6, arg7)
+#define ngx_log_debug8(level, log, err, fmt, arg1, arg2, arg3, arg4, arg5,    \
+                       arg6, arg7, arg8)
+
+#endif
+{% endhighlight %}
+
 
 
 
