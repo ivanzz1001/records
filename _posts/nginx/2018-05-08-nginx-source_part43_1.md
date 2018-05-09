@@ -350,7 +350,69 @@ gcc可变参数宏定义类似于如下：
 
 如上这些函数只是为了使用方便，针对ngx_log_debug()可变参数函数的特定参数个数时，进行定制。
 
+当前我们并未开启```NGX_DEBUG```，要想开启```NGX_DEBUG```宏，请在编译时添加```--with-debug```选项。
 
+## 5. 相关函数声明 
+{% highlight string %}
+//1) nginx 日志初始化
+ngx_log_t *ngx_log_init(u_char *prefix);
+
+
+//2) 打印alert级别日志，表示出现严重错误
+void ngx_cdecl ngx_log_abort(ngx_err_t err, const char *fmt, ...);
+
+//3) 将相应的日志信息打印到标准输出
+void ngx_cdecl ngx_log_stderr(ngx_err_t err, const char *fmt, ...);
+
+//4) 答应相关errno的日志（注意此函数至少保证留有50个字节的空间来打印errno日志）
+u_char *ngx_log_errno(u_char *buf, u_char *last, ngx_err_t err);
+
+//5) 打开默认日志文件
+ngx_int_t ngx_log_open_default(ngx_cycle_t *cycle);
+
+//6) 重定向标准错误。即将标准错误输出重定向到某一个日志文件
+ngx_int_t ngx_log_redirect_stderr(ngx_cycle_t *cycle);
+
+//7) 获得一个文件日志对象
+ngx_log_t *ngx_log_get_file_log(ngx_log_t *head);
+
+//8) 根据ngx_conf_t设置日志对象
+char *ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head);
+{% endhighlight %}
+
+
+## 6. 相关静态函数定义
+{% highlight string %}
+/*
+ * ngx_write_stderr() cannot be implemented as macro, since
+ * MSVC does not allow to use #ifdef inside macro parameters.
+ *
+ * ngx_write_fd() is used instead of ngx_write_console(), since
+ * CharToOemBuff() inside ngx_write_console() cannot be used with
+ * read only buffer as destination and CharToOemBuff() is not needed
+ * for ngx_write_stderr() anyway.
+ */
+static ngx_inline void
+ngx_write_stderr(char *text)
+{
+    (void) ngx_write_fd(ngx_stderr, text, ngx_strlen(text));
+}
+
+
+static ngx_inline void
+ngx_write_stdout(char *text)
+{
+    (void) ngx_write_fd(ngx_stdout, text, ngx_strlen(text));
+}
+
+{% endhighlight %}
+
+
+## 7. 相关变量声明
+{% highlight string %}
+extern ngx_module_t  ngx_errlog_module;
+extern ngx_uint_t    ngx_use_stderr;
+{% endhighlight %}
 
 
 <br />
