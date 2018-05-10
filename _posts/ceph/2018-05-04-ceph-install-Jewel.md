@@ -1325,12 +1325,12 @@ unix  2      [ ACC ]     STREAM     LISTENING     326358   15626/radosgw        
 # ps -ef | grep ceph
 
 
-# ps -aux | grep nginx | grep -v nginx | awk '{print $2}' | xargs kill -9
-# ps -aux | grep nginx | grep -v nginx | awk '{print $2}' | xargs kill -9
+# ps -aux | grep nginx | grep -v grep | awk '{print $2}' | xargs kill -9
+# ps -aux | grep nginx | grep -v grep | awk '{print $2}' | xargs kill -9
 # ps -ef | grep nginx
 
-# ps -aux | grep zabbix | grep -v zabbix | awk '{print $2}' | xargs kill -9
-# ps -aux | grep zabbix | grep -v zabbix | awk '{print $2}' | xargs kill -9
+# ps -aux | grep zabbix | grep -v grep | awk '{print $2}' | xargs kill -9
+# ps -aux | grep zabbix | grep -v grep | awk '{print $2}' | xargs kill -9
 # ps -ef | grep zabbix
 </pre>
 
