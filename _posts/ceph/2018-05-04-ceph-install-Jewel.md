@@ -1556,9 +1556,11 @@ ceph-10.2.3-0.el7.x86_64
 <pre>
 # rpm -qa | grep zabbix
 # rpm -qa | grep s3cmd
+# rpm -qa | grep haproxy
 
 # yum remove zabbix
 # yum remove s3cmd
+# yum remove haproxy
 </pre>
 
 ### 5.7 查看当前开机启动相关
