@@ -7,10 +7,37 @@ categories: linuxOps
 description: Linux下systemd的用法
 ---
 
+历史上，Linux启动一直采用```init```进程。下面的命令用来启动服务：
+<pre>
+# sudo /etc/init.d/apache2 start
 
-本文主要讲解一下Linux操作系统中systemd的用法。
+//或者
+# service apache2 start
+</pre>
 
 <!-- more -->
+
+上面的启动方法有两中缺点：
+
+* 启动时间长： init进程是串行启动的，只有前一个进程启动完，才会启动下一个进程
+
+* 启动脚本复杂： init进程只是执行启动脚本，不管其他事情。脚本需要自己处理各种情况，这往往使得脚本变的很长。
+
+## 1. systemd概述
+
+Systemd是Linux系统中最新的初始化系统(init)， 它主要的设计目标是克服sysvinit固有的缺点，提高系统的启动速度，为系统的启动和管理提供一套完整的解决方案。 根据Linux惯例，字母```d```是守护进程(daemon)的缩写。Systemd这个名字的含义，就是它要守护整个系统。
+
+
+使用了Systemd，就不需要再用```init```了。Systemd取代了```initd```，成为系统的第一个进程（pid等于1)，其他进程都是它的子进程。我们可以通过如下的命令来查看Systemd的版本：
+<pre>
+# systemctl --version
+systemd 219
++PAM +AUDIT +SELINUX +IMA -APPARMOR +SMACK +SYSVINIT +UTMP +LIBCRYPTSETUP +GCRYPT +GNUTLS +ACL +XZ -LZ4 -SECCOMP +BLKID +ELFUTILS +KMOD +IDN
+</pre>
+
+Systemd的优点是功能强大，使用方便，缺点是体系庞大，非常复杂。事实上，现在还有很多人反对使用systemd，理由就是它过于复杂，与操作系统的其他部分强耦合，违反```keep simple,keep stupid```的(unix哲学)[http://www.ruanyifeng.com/blog/2009/06/unix_philosophy.html]。
+
+![lops-systemd-arch](https://ivanzz1001.github.io/records/assets/img/linuxops/lops_systemd_arch.png)
 
 
 
