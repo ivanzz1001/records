@@ -1552,10 +1552,11 @@ ceph-10.2.3-0.el7.x86_64
 
 1. [MULTI-SITE](http://docs.ceph.com/docs/master/radosgw/multisite/)
 
-
 2. [ceph的卸载](https://www.cnblogs.com/nulige/articles/8475907.html)
 
-3. [Linux下进行硬盘挂载、分区、删除分区，格式化，卸载方法](https://www.cnblogs.com/zishengY/p/7137671.html)
+3. [不卸载ceph重新获取一个干净的集群环境](https://www.cnblogs.com/sisimi/p/7693237.html)
+
+4. [Linux下进行硬盘挂载、分区、删除分区，格式化，卸载方法](https://www.cnblogs.com/zishengY/p/7137671.html)
 <br />
 <br />
 <br />
