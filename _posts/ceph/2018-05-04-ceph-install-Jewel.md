@@ -1552,6 +1552,15 @@ ceph-10.2.3-0.el7.x86_64
 # yum remove <ceph-package-name>
 {% endhighlight %}
 
+### 5.6 卸载其他相关软件
+<pre>
+# rpm -qa | grep zabbix
+# rpm -qa | grep s3cmd
+
+# yum remove zabbix
+# yum remove s3cmd
+</pre>
+
 
 
 
