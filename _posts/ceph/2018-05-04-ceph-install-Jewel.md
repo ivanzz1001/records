@@ -1325,24 +1325,9 @@ unix  2      [ ACC ]     STREAM     LISTENING     326358   15626/radosgw        
 # ps -ef | grep ceph
 </pre>
 
-### 5.2 删除ceph相关所有数据
-<pre>
-# ls /var/lib/ceph/
-bootstrap-mds  bootstrap-osd  bootstrap-rgw  mon  osd
-# rm -rf /var/lib/ceph/*
-# rm -rf /var/lib/ceph/*
 
-#  ls /etc/ceph/
-ceph.client.openstack.keyring  ceph.conf      ceph.conf.rgw  rbdmap
-ceph.client.admin.keyring    ceph.client.radosgw.keyring      ceph.conf.cluster  keyfile
-# rm -rf /etc/ceph/*
-# rm -rf /etc/ceph/*
 
-# ls /var/run/ceph/
-# rm -rf /var/run/ceph/
-</pre>
-
-### 5.3 卸载已挂载硬盘
+### 5.2 卸载已挂载硬盘
 1) 首先通过如下命令查看当前挂载了哪些硬盘:
 <pre>
 # lsblk -l
@@ -1495,8 +1480,24 @@ sdk                    8:160  0   1.8T  0 disk
 
 这里把上面删除的分区的相关挂载信息删除。
 
+### 5.3 删除ceph相关所有数据
+<pre>
+# ls /var/lib/ceph/
+bootstrap-mds  bootstrap-osd  bootstrap-rgw  mon  osd
+# rm -rf /var/lib/ceph/*
+# rm -rf /var/lib/ceph/*
 
-## 6. 卸载ceph
+#  ls /etc/ceph/
+ceph.client.openstack.keyring  ceph.conf      ceph.conf.rgw  rbdmap
+ceph.client.admin.keyring    ceph.client.radosgw.keyring      ceph.conf.cluster  keyfile
+# rm -rf /etc/ceph/*
+# rm -rf /etc/ceph/*
+
+# ls /var/run/ceph/
+# rm -rf /var/run/ceph/
+</pre>
+
+### 5.4. 卸载ceph
 
 首先用如下命令查看当前安装的与ceph相关的软件包：
 <pre>
@@ -1527,7 +1528,7 @@ ceph-10.2.3-0.el7.x86_64
 # yum remove <ceph-package-name>
 {% endhighlight %}
 
-## 7. 删除与ceph相关的定时任务
+### 5.5 删除与ceph相关的定时任务
 
 首先通过如下命令查看：
 <pre>
