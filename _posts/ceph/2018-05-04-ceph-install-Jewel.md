@@ -1323,11 +1323,35 @@ unix  2      [ ACC ]     STREAM     LISTENING     326358   15626/radosgw        
 # ps -aux | grep ceph | grep -v grep | awk '{print $2}' | xargs kill -9
 # ps -aux | grep ceph | grep -v grep | awk '{print $2}' | xargs kill -9   //执行多次
 # ps -ef | grep ceph
+
+
+# ps -aux | grep nginx | grep -v nginx | awk '{print $2}' | xargs kill -9
+# ps -aux | grep nginx | grep -v nginx | awk '{print $2}' | xargs kill -9
+# ps -ef | grep nginx
+
+# ps -aux | grep zabbix | grep -v zabbix | awk '{print $2}' | xargs kill -9
+# ps -aux | grep zabbix | grep -v zabbix | awk '{print $2}' | xargs kill -9
+# ps -ef | grep zabbix
+</pre>
+
+### 5.2 删除与ceph相关的定时任务
+
+首先通过如下命令查看：
+<pre>
+# crontab -l
+#* * * * * /usr/sbin/ntpdate ntp.ustack.in 1 >/dev/null 2>&1
+* * * * * /apps/zabbix/ceph/ceph_check.py > /apps/zabbix/ceph/ceph_check_tmp.a;mv /apps/zabbix//ceph/ceph_check_tmp.a /apps/zabbix/ceph/ceph_check_tmp &
+* * * * * /apps/zabbix/ceph/ceph_usage.py > /apps/zabbix/ceph/ceph_usage_tmp.a 2>/dev/null;mv /apps/zabbix/ceph/ceph_usage_tmp.a /apps/zabbix/ceph/ceph_usage_tmp &
+</pre>
+
+然后删除相关任务：
+<pre>
+# crontab -e
+# service crond restart 
 </pre>
 
 
-
-### 5.2 卸载已挂载硬盘
+### 5.3 卸载已挂载硬盘
 1) 首先通过如下命令查看当前挂载了哪些硬盘:
 <pre>
 # lsblk -l
@@ -1480,7 +1504,7 @@ sdk                    8:160  0   1.8T  0 disk
 
 这里把上面删除的分区的相关挂载信息删除。
 
-### 5.3 删除ceph相关所有数据
+### 5.4 删除ceph相关所有数据
 <pre>
 # ls /var/lib/ceph/
 bootstrap-mds  bootstrap-osd  bootstrap-rgw  mon  osd
@@ -1497,7 +1521,7 @@ ceph.client.admin.keyring    ceph.client.radosgw.keyring      ceph.conf.cluster 
 # rm -rf /var/run/ceph/
 </pre>
 
-### 5.4. 卸载ceph
+### 5.5 卸载ceph
 
 首先用如下命令查看当前安装的与ceph相关的软件包：
 <pre>
@@ -1528,21 +1552,7 @@ ceph-10.2.3-0.el7.x86_64
 # yum remove <ceph-package-name>
 {% endhighlight %}
 
-### 5.5 删除与ceph相关的定时任务
 
-首先通过如下命令查看：
-<pre>
-# crontab -l
-#* * * * * /usr/sbin/ntpdate ntp.ustack.in 1 >/dev/null 2>&1
-* * * * * /apps/zabbix/ceph/ceph_check.py > /apps/zabbix/ceph/ceph_check_tmp.a;mv /apps/zabbix//ceph/ceph_check_tmp.a /apps/zabbix/ceph/ceph_check_tmp &
-* * * * * /apps/zabbix/ceph/ceph_usage.py > /apps/zabbix/ceph/ceph_usage_tmp.a 2>/dev/null;mv /apps/zabbix/ceph/ceph_usage_tmp.a /apps/zabbix/ceph/ceph_usage_tmp &
-</pre>
-
-然后删除相关任务：
-<pre>
-# crontab -e
-# service crond restart 
-</pre>
 
 
 
