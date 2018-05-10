@@ -1500,9 +1500,16 @@ sdk                    8:160  0   1.8T  0 disk
   └─company_pv-varvol  253:1    0   1.8T  0 lvm  /var
 </pre>
 
-5) 修改/etc/fstab文件
 
-这里把上面删除的分区的相关挂载信息删除。
+5) 删除自动挂载相关配置
+
+这里根据如下的执行结果：
+<pre>
+# systemctl status network.service
+</pre>
+可能会把硬盘自动挂载写入到```/etc/fstab```文件或者```/etc/rc.d/rc.local```中， 因此这里需要检查这两个文件，把相应的信息删除。
+
+
 
 ### 5.4 删除ceph相关所有数据
 <pre>
