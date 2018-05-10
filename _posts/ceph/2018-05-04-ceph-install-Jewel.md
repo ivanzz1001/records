@@ -1561,6 +1561,10 @@ ceph-10.2.3-0.el7.x86_64
 # yum remove s3cmd
 </pre>
 
+### 5.7 查看当前开机启动相关
+<pre>
+# systemctl status
+</pre>
 
 
 
