@@ -299,13 +299,13 @@ sudo yum localinstall *.rpm
 </pre>
 该值太小，我们做如下设置：
 <pre>
-# ulimit -SHn 102400
+# ulimit -SHn 1024000
 </pre>
 再修改```/etc/security/limits.conf```文件：
 {% highlight string %}
-# echo "root soft nofile 65535" >> /etc/security/limits.conf
+# echo "root soft nofile 1024000" >> /etc/security/limits.conf
 
-# echo "root hard nofile 65535" >> /etc/security/limits.conf
+# echo "root hard nofile 1024000" >> /etc/security/limits.conf
 {% endhighlight %}
 
 
