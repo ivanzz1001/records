@@ -275,6 +275,38 @@ sudo yum localinstall *.rpm
 {% endhighlight %}
 
 
+10) 修改文件打开句柄数
+
+* 首先查看当前```fs-max```值
+<pre>
+# cat /proc/sys/fs/file-max
+16348794
+</pre>
+该值当前已经足够大，可以不用修改。
+
+* 再查看```nr_open```值：
+<pre>
+# cat /proc/sys/fs/nr_open
+1048576
+</pre>
+该值暂时也达到百万级别，可以不用修改。
+
+* 然后再查看```soft limit```及```hard limit```限制：
+<pre>
+# ulimit -n
+65534
+</pre>
+该值太小，我们做如下设置：
+<pre>
+# ulimit -SHn 102400
+</pre>
+再修改```/etc/security/limits.conf```文件：
+{% highlight string %}
+# echo "root soft nofile 65535" >> /etc/security/limits.conf
+
+# echo "root hard nofile 65535" >> /etc/security/limits.conf
+{% endhighlight %}
+
 
 ## 3. 建立集群
 
