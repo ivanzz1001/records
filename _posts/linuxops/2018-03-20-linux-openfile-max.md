@@ -168,6 +168,11 @@ root soft nofile 1800000
 root hard nofile 2000000
 </pre>
 
+另外可能修改在```/etc/pam.d/login```文件中添加如下行：
+<pre>
+session required pam_limits.so
+</pre>
+
 
 ### 2.2 修改系统总限制
 其实上的修改都是对一个进程打开的文件句柄数量的限制，我们还需要设置系统的总限制才可以。
@@ -222,6 +227,7 @@ fs.nr_open = 2000000
 
 5. [Documentation for /proc/sys/fs/*](https://www.kernel.org/doc/Documentation/sysctl/fs.txt)
 
+6. [ulimit -a最大打开文件数显示1024，但是/etc/security/limits.conf显示10000处理方法](http://blog.itpub.net/25462274/viewspace-2123294/)
 <br />
 <br />
 <br />
