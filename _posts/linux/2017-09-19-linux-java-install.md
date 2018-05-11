@@ -59,6 +59,8 @@ openjdk version "1.8.0_141"
 OpenJDK Runtime Environment (build 1.8.0_141-b16)
 OpenJDK 64-Bit Server VM (build 25.141-b16, mixed mode)
 </pre>
+
+注： Java历史版本可在此下载[javase archive](http://www.oracle.com/technetwork/java/javase/archive-139210.html)
  
 ## 3. 配置环境变量
 执行如下命令查看安装目录：
@@ -133,6 +135,45 @@ Hello,world
 </pre>
 
 
+## 5. open-jdk依赖
+下面给出一个手动安装open-jdk时大概的依赖包：
+<pre>
+# ls -al
+total 36984
+drwxr-xr-x 2 root root     4096 May 11 21:36 .
+drwxrwxrwx 7 root root     4096 May 11 21:40 ..
+-rw-r--r-- 1 root root   185720 May 11 20:23 chkconfig-1.7.4-1.el7.x86_64.rpm
+-rw-r--r-- 1 root root    18900 May 11 20:24 copy-jdk-configs-2.2-3.el7.noarch.rpm
+-rw-r--r-- 1 root root   234724 May 11 20:56 fontconfig-2.10.95-11.el7.x86_64.rpm
+-rw-r--r-- 1 root root    10116 May 11 20:57 fontpackages-filesystem-1.44-8.el7.noarch.rpm
+-rw-r--r-- 1 root root    40964 May 11 20:20 giflib-4.1.6-9.el7.x86_64.rpm
+-rw-r--r-- 1 root root   248404 May 11 20:10 java-1.8.0-openjdk-1.8.0.161-0.b14.el7_4.x86_64.rpm
+-rw-r--r-- 1 root root 33169084 May 11 20:12 java-1.8.0-openjdk-headless-1.8.0.161-0.b14.el7_4.x86_64.rpm
+-rw-r--r-- 1 root root    61200 May 11 20:29 jpackage-utils-1.7.5-3.16.el6.noarch.rpm
+-rw-r--r-- 1 root root    31564 May 11 21:20 libfontenc-1.1.3-3.el7.x86_64.rpm
+-rw-r--r-- 1 root root    67720 May 11 20:21 libICE-1.0.9-9.el7.x86_64.rpm
+-rw-r--r-- 1 root root    40160 May 11 20:22 libSM-1.2.2-2.el7.x86_64.rpm
+-rw-r--r-- 1 root root    22792 May 11 20:16 libXcomposite-0.4.4-4.1.el7.x86_64.rpm
+-rw-r--r-- 1 root root    39572 May 11 20:17 libXext-1.3.3-3.el7.x86_64.rpm
+-rw-r--r-- 1 root root   155992 May 11 21:02 libXfont-1.5.2-1.el7.x86_64.rpm
+-rw-r--r-- 1 root root    41088 May 11 20:18 libXi-1.7.9-1.el7.x86_64.rpm
+-rw-r--r-- 1 root root    26312 May 11 20:19 libXrender-0.9.10-1.el7.x86_64.rpm
+-rw-r--r-- 1 root root    20812 May 11 20:20 libXtst-1.2.3-1.el7.x86_64.rpm
+-rw-r--r-- 1 root root    89660 May 11 20:30 lksctp-tools-1.0.17-2.el7.x86_64.rpm
+-rw-r--r-- 1 root root   163172 May 29  2017 lyx-fonts-2.2.3-1.el7.noarch.rpm
+-rw-r--r-- 1 root root   129348 Apr 25 19:29 nspr-4.17.0-1.el7.x86_64.rpm
+-rw-r--r-- 1 root root   861612 Apr 25 19:29 nss-3.34.0-4.el7.x86_64.rpm
+-rw-r--r-- 1 root root    74644 Aug 11  2017 nss-pem-1.0.3-4.el7.x86_64.rpm
+-rw-r--r-- 1 root root   318152 Apr 25 19:30 nss-softokn-3.34.0-2.el7.x86_64.rpm
+-rw-r--r-- 1 root root   224936 Apr 25 19:30 nss-softokn-freebl-3.34.0-2.el7.x86_64.rpm
+-rw-r--r-- 1 root root    62696 Apr 25 19:30 nss-sysinit-3.34.0-4.el7.x86_64.rpm
+-rw-r--r-- 1 root root   525004 Apr 25 19:30 nss-tools-3.34.0-4.el7.x86_64.rpm
+-rw-r--r-- 1 root root    79484 Apr 25 19:30 nss-util-3.34.0-2.el7.x86_64.rpm
+-rw-r--r-- 1 root root    48676 May 11 21:35 ttmkfdir-3.0.9-42.el7.x86_64.rpm
+-rw-r--r-- 1 root root   187852 May 11 20:28 tzdata-java-2017c-1.el7.noarch.rpm
+-rw-r--r-- 1 root root   533720 May 11 20:15 xorg-x11-fonts-Type1-7.5-9.el7.noarch.rpm
+-rw-r--r-- 1 root root    89400 May 11 21:34 xorg-x11-font-utils-7.5-20.el7.x86_64.rpm
+</pre>
 
 
 <br />
