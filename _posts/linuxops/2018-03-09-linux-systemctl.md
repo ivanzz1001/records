@@ -47,15 +47,15 @@ Systemd并不是一个命令，而是一组命令，涉及到系统管理的方�
 
 ```systemctl```是Systemd的主命令，用于管理系统。从功能上来说，systemctl是将```service```及```chkconfig```这两个命令组合到一起：
 
-|        任务       |        旧指令                   |     新指令                           |
-|:------------------|:-------------------------------|:------------------------------------|
-| 使某任务自动启动    | chkconfig --level 3 httpd on   | systemctl enable httpd.service      |
-| 使某服务不自动启动  | chkconfig --level 3 httpd off  | systemctl disable httpd.service     |
-| 检查服务状态       | service httpd status           | systemctl status httpd.service(服务详细信息) systemctl is-active httpd.service(仅显示是否Active)  |
-| 显示所有已启动服务  | chkconfig --list               | systemctl list-units --type=service |
-| 启动某服务         | service httpd start            | systemctl start httpd.service       |
-| 停止某服务         | service httpd stop             | systemctl stop httpd.service        |
-| 重启某服务         | service httpd restart          | systemctl restart httpd.service     |
+|        任务       |        旧指令                         |     新指令                                 |
+|:------------------|:-------------------------------------|:------------------------------------------|
+| 使某任务自动启动    | chkconfig ```--level``` 3 httpd on   | systemctl enable httpd.service            |
+| 使某服务不自动启动  | chkconfig ```--level``` 3 httpd off  | systemctl disable httpd.service           |
+| 检查服务状态       | service httpd status                 | systemctl status httpd.service(服务详细信息) systemctl is-active httpd.service(仅显示是否Active)  |
+| 显示所有已启动服务  | chkconfig ```--list```               | systemctl list-units ```--type=service``` |
+| 启动某服务         | service httpd start                  | systemctl start httpd.service             |
+| 停止某服务         | service httpd stop                   | systemctl stop httpd.service              |
+| 重启某服务         | service httpd restart                | systemctl restart httpd.service           |
 
 
 
