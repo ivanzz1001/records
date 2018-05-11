@@ -250,6 +250,9 @@ ntpstat                 #查看当前的同步状态
 注：这个过程需要在3台虚拟机都进行一遍。
 
 
+也可以采用其他的方式进行时间同步，例如采用```chrony```。
+
+
 8) TTY
 
 在CentOS及RHEL上，当你尝试执行ceph-deploy时，你也许会收到一个错误。假如requiretty在你的Ceph节点上默认被设置了的话，可以执行``sudo visudo``然后定位到Defaults requiretty的设置部分，将其改变为Defaults:ceph !requiretty或者直接将其注释掉
@@ -1631,6 +1634,8 @@ ceph-10.2.3-0.el7.x86_64
 3. [不卸载ceph重新获取一个干净的集群环境](https://www.cnblogs.com/sisimi/p/7693237.html)
 
 4. [Linux下进行硬盘挂载、分区、删除分区，格式化，卸载方法](https://www.cnblogs.com/zishengY/p/7137671.html)
+
+5. [chrony时间同步 服务端 客户端 安装配置](https://www.cnblogs.com/elvi/p/7658021.html)
 <br />
 <br />
 <br />
