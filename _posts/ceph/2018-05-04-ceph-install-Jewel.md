@@ -242,6 +242,7 @@ ntpstat                 #查看当前的同步状态
 
 ```说明：```上面查看每台虚拟机上面的同步状态信息，显示结果中的ip表示上层服务器地址，如果三台虚拟机的上层服务器ip地址一致，说明三台虚拟机已经经过ntp时间同步了，如果需要重新搭建ntp server，请参考：[http://www.178linux.com/9320](http://www.178linux.com/9320)，一般情况下虚拟机之间的时间已经经过同步了。下一步是重新搭建ntp server之后加入crontab。在monitor节点之间通过定时任务指定ntp-server进行时钟同步:
 {% highlight string %}
+# systemctl restart ntpd
 #crontab -e
 * * * * * root /usr/sbin/ntpdate <your-ntp-server>;/sbin/hwclock -w &> /dev/null
 # service crond restart
