@@ -356,6 +356,8 @@ ceph-authtool --create-keyring /etc/ceph/ceph.client.admin.keyring --gen-key -n 
 
 
 3) 生成用于集群初始化初始化的cluster.bootstrap keyring
+
+初始化ceph monitor的时候需要用到ceph.mon.keying，还需要用到admin.keyring，这是因为ceph admin需要访问ceph monitor:
 {% highlight string %}
 cp ./ceph.mon.keyring ./cluster.bootstrap.keyring
 ceph-authtool ./cluster.bootstrap.keyring --import-keyring  /etc/ceph/ceph.client.admin.keyring
