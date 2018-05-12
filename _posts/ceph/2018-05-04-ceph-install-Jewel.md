@@ -247,7 +247,7 @@ ntpstat                 #查看当前的同步状态
 * * * * * root /usr/sbin/ntpdate <your-ntp-server>;/sbin/hwclock -w &> /dev/null
 # service crond restart
 {% endhighlight %}
-注：这个过程需要在3台虚拟机都进行一遍。
+注：这个过程需要在3台虚拟机都进行一遍。一般情况下在开机启动的时候直接调用```ntpdate```来强制进行时间同步； 而启动之后采用ntpd守护进程自动的完成时间同步。
 
 
 也可以采用其他的方式进行时间同步，例如采用```chrony```。
