@@ -340,8 +340,8 @@ lrwxrwxrwx 1 root root   9 May 12 17:39 wwn-0x50025385002a595e -> ../../sdg
 lrwxrwxrwx 1 root root   9 May 12 17:19 wwn-0x595e002a53855002 -> ../../sdg
 {% endhighlight %}
 这里我们采用如下方法找出实际的ID：
-<pre>
-# for i in sda sdb sdc sdd sde sdf sdg sdh sdi sdj sdk; do path=`udevadm info -q path -n /dev/$i`; udevadm info -q env -p $path | grep ID_WWN= | awk 'BEGIN{FS="="} {print disk,"win-"$2}' disk=$i;done
+{% highlight string %}
+# for i in sda sdb sdc sdd sde sdf sdg sdh sdi sdj sdk; do path=`udevadm info -q path -n /dev/$i`; udevadm info -q env -p $path | grep ID_WWN= | awk 'BEGIN{FS="="} {print disk,"wwn-"$2}' disk=$i;done >> ./disk-id.txt
 sda 0x50014ee0040e5e08
 sdb 0x50014ee0aeb920df
 sdc 0x50014ee0aeb92489
@@ -353,7 +353,7 @@ sdh 0x50014ee0040e5a92
 sdi 0x50014ee0040e5db2
 sdj 0x50014ee0040e5f1b
 sdk 0x6101b5442bcc7000
-</pre>
+{% endhighlight %}
 
 
 1) 生成monitor keyring
@@ -1671,6 +1671,8 @@ ceph-10.2.3-0.el7.x86_64
 5. [chrony时间同步 服务端 客户端 安装配置](https://www.cnblogs.com/elvi/p/7658021.html)
 
 6. [linux CentOS7 磁盘分区fdisk 、df 、du、parted 命令实例](http://www.bubuko.com/infodetail-2267777.html)
+
+7. [如何查找dev目录下磁盘设备的iscsi来源](https://blog.csdn.net/yuanchao99/article/details/18308987)
 <br />
 <br />
 <br />
