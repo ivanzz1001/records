@@ -326,6 +326,36 @@ sudo yum localinstall *.rpm
 
 我们会在ceph001-node1，ceph001-node2,ceph001-node3上分别部署monitor.请在/ceph-cluster/build目录下完成构建。
 
+0) 格式化存放monitor data的硬盘 (可选)
+
+在建立monitor后，相应的monitor数据一般存放在```/var/lib/ceph/mon/ceph-<host-name>```目录下，我们可以事先格式化一块硬盘然后挂载到该目录下。例如我们格式化 ```sdg```盘，然后挂载到```/var/lib/ceph/mon/ceph-ceph001-node```目录下：
+
+
+
+在实际使用过程中遇到有一个bug，就是对于一个硬盘会有多个id:
+{% highlight string %}
+# ls -al /dev/disk/by-id/ | grep sdg
+lrwxrwxrwx 1 root root   9 May 12 17:39 ata-SAMSUNG_MZ7WD480HCGM-00003_S1G1NYAG604603 -> ../../sdg
+lrwxrwxrwx 1 root root   9 May 12 17:39 wwn-0x50025385002a595e -> ../../sdg
+lrwxrwxrwx 1 root root   9 May 12 17:19 wwn-0x595e002a53855002 -> ../../sdg
+{% endhighlight %}
+这里我们采用如下方法找出实际的ID：
+<pre>
+# for i in sda sdb sdc sdd sde sdf sdg sdh sdi sdj sdk; do path=`udevadm info -q path -n /dev/$i`; udevadm info -q env -p $path | grep ID_WWN= | awk 'BEGIN{FS="="} {print disk,"win-"$2}' disk=$i;done
+sda 0x50014ee0040e5e08
+sdb 0x50014ee0aeb920df
+sdc 0x50014ee0aeb92489
+sdd 0x50014ee059637338
+sde 0x50014ee0aeb9225b
+sdf 0x50014ee0aeb9226c
+sdg 0x50025385002a595e
+sdh 0x50014ee0040e5a92
+sdi 0x50014ee0040e5db2
+sdj 0x50014ee0040e5f1b
+sdk 0x6101b5442bcc7000
+</pre>
+
+
 1) 生成monitor keyring
 {% highlight string %}
 ceph-authtool --create-keyring ./ceph.mon.keyring --gen-key -n mon. --cap mon 'allow *'
@@ -401,6 +431,7 @@ created 2017-07-19 12:27:17.374031
 
 5) 对ceph001-node1节点monitor初始化
 {% highlight string %}
+mkdir -pv /var/lib/ceph/mon/ceph-ceph001-node1
 sudo ceph-mon --mkfs -i ceph001-node1 --monmap ./bootstrap-monmap.bin --keyring ./cluster.bootstrap.keyring
 touch /var/lib/ceph/mon/ceph-ceph001-node1/{done,sysvinit}  #在数据目录建立done及sysvinit两个文件
 {% endhighlight %}
@@ -1638,6 +1669,8 @@ ceph-10.2.3-0.el7.x86_64
 4. [Linux下进行硬盘挂载、分区、删除分区，格式化，卸载方法](https://www.cnblogs.com/zishengY/p/7137671.html)
 
 5. [chrony时间同步 服务端 客户端 安装配置](https://www.cnblogs.com/elvi/p/7658021.html)
+
+6. [linux CentOS7 磁盘分区fdisk 、df 、du、parted 命令实例](http://www.bubuko.com/infodetail-2267777.html)
 <br />
 <br />
 <br />
