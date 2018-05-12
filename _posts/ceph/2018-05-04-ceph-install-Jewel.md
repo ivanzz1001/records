@@ -1561,8 +1561,8 @@ sdk                    8:160  0   1.8T  0 disk
 <pre>
 # ls /var/lib/ceph/
 bootstrap-mds  bootstrap-osd  bootstrap-rgw  mon  osd
-# rm -rf /var/lib/ceph/*
-# rm -rf /var/lib/ceph/*
+# rm -rf /var/lib/ceph
+# rm -rf /var/lib/ceph
 
 #  ls /etc/ceph/
 ceph.client.openstack.keyring  ceph.conf      ceph.conf.rgw  rbdmap
