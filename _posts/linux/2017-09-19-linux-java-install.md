@@ -65,27 +65,75 @@ OpenJDK 64-Bit Server VM (build 25.141-b16, mixed mode)
 ## 3. 配置环境变量
 执行如下命令查看安装目录：
 {% highlight string %}
-[root@localhost nginx-1.10.3]# which java
+# which java
 /usr/bin/java
-[root@localhost nginx-1.10.3]# 
-[root@localhost nginx-1.10.3]# ls -lrt /usr/bin/java
+# ls -lrt /usr/bin/java
 lrwxrwxrwx 1 root root 22 Jul 31 23:28 /usr/bin/java -> /etc/alternatives/java
-[root@localhost nginx-1.10.3]# 
-[root@localhost nginx-1.10.3]# ls -lrt /etc/alternatives/java
+# ls -lrt /etc/alternatives/java
 lrwxrwxrwx 1 root root 73 Jul 31 23:28 /etc/alternatives/java -> /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.141-1.b16.el7_3.x86_64/jre/bin/java
-[root@localhost nginx-1.10.3]# 
-[root@localhost nginx-1.10.3]# ls -lrt /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.141-1.b16.el7_3.x86_64
+# ls -lrt /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.141-1.b16.el7_3.x86_64
 total 4
 drwxr-xr-x 2 root root 4096 Jul 31 23:28 bin
 drwxr-xr-x 3 root root  132 Jul 31 23:28 include
 drwxr-xr-x 3 root root  144 Jul 31 23:28 lib
 drwxr-xr-x 2 root root  204 Jul 31 23:28 tapset
 drwxr-xr-x 4 root root   28 Jul 31 23:28 jre
+
+
+# which javac
+/usr/bin/javac
+# ls -al /usr/bin/javac
+lrwxrwxrwx 1 root root 23 May 12 09:55 /usr/bin/javac -> /etc/alternatives/javac
+# ls -al /etc/alternatives/javac 
+lrwxrwxrwx 1 root root 70 May 12 09:55 /etc/alternatives/javac -> /usr/lib/jvm/ava-1.8.0-openjdk-1.8.0.141-1.b16.el7_3.x86_64/bin/javac
+# ls -lrt /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.141-1.b16.el7_3.x86_64/bin/
+total 420
+-rwxr-xr-x 1 root root   2806 Jan 18 00:38 java-rmi.cgi
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 xjc
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 wsimport
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 wsgen
+-rwxr-xr-x 1 root root 103392 Jan 18 01:04 unpack200
+-rwxr-xr-x 1 root root   7432 Jan 18 01:04 tnameserv
+-rwxr-xr-x 1 root root   7360 Jan 18 01:04 servertool
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 serialver
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 schemagen
+-rwxr-xr-x 1 root root   7360 Jan 18 01:04 rmiregistry
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 rmid
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 rmic
+-rwxr-xr-x 1 root root   7360 Jan 18 01:04 policytool
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 pack200
+-rwxr-xr-x 1 root root   7424 Jan 18 01:04 orbd
+-rwxr-xr-x 1 root root   7360 Jan 18 01:04 native2ascii
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 keytool
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 jstatd
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 jstat
+-rwxr-xr-x 1 root root   7424 Jan 18 01:04 jstack
+-rwxr-xr-x 1 root root   7368 Jan 18 01:04 jsadebugd
+-rwxr-xr-x 1 root root   7360 Jan 18 01:04 jrunscript
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 jps
+-rwxr-xr-x 1 root root   7416 Jan 18 01:04 jmap
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 jjs
+-rwxr-xr-x 1 root root   7416 Jan 18 01:04 jinfo
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 jhat
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 jdeps
+-rwxr-xr-x 1 root root   7368 Jan 18 01:04 jdb
+-rwxr-xr-x 1 root root   7376 Jan 18 01:04 jconsole
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 jcmd
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 javap
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 javah
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 javadoc
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 javac
+-rwxr-xr-x 1 root root   7304 Jan 18 01:04 java
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 jarsigner
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 jar
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 idlj
+-rwxr-xr-x 1 root root   7352 Jan 18 01:04 extcheck
+-rwxr-xr-x 1 root root   7360 Jan 18 01:04 appletviewer
 {% endhighlight %}
 
-最后我们得出安装目录为：
+上面我们看到```java```与```javac```的安装目录有稍许不一样。javac主要是用于在编译时使用，而jre主要是用于在运行时使用。最后我们得出java安装主目录为：
 <pre>
-/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.141-1.b16.el7_3.x86_64/jre/bin/java
+/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.141-1.b16.el7_3.x86_64
 </pre>
 
 将如下环境变量配置到/etc/profile中：
@@ -136,11 +184,11 @@ Hello,world
 
 
 ## 5. open-jdk依赖
-下面给出一个手动安装open-jdk时大概的依赖包：
+下面给出一个手动安装```java-1.8.0-openjdk-1.8.0.161-0.b14```时大概的依赖包：
 <pre>
 # ls -al
-total 36984
-drwxr-xr-x 2 root root     4096 May 11 21:36 .
+total 46996
+drwxr-xr-x 2 root root     4096 May 12 09:54 .
 drwxrwxrwx 7 root root     4096 May 11 21:40 ..
 -rw-r--r-- 1 root root   185720 May 11 20:23 chkconfig-1.7.4-1.el7.x86_64.rpm
 -rw-r--r-- 1 root root    18900 May 11 20:24 copy-jdk-configs-2.2-3.el7.noarch.rpm
@@ -148,6 +196,7 @@ drwxrwxrwx 7 root root     4096 May 11 21:40 ..
 -rw-r--r-- 1 root root    10116 May 11 20:57 fontpackages-filesystem-1.44-8.el7.noarch.rpm
 -rw-r--r-- 1 root root    40964 May 11 20:20 giflib-4.1.6-9.el7.x86_64.rpm
 -rw-r--r-- 1 root root   248404 May 11 20:10 java-1.8.0-openjdk-1.8.0.161-0.b14.el7_4.x86_64.rpm
+-rw-r--r-- 1 root root 10251448 May 12 09:54 java-1.8.0-openjdk-devel-1.8.0.161-0.b14.el7_4.x86_64.rpm
 -rw-r--r-- 1 root root 33169084 May 11 20:12 java-1.8.0-openjdk-headless-1.8.0.161-0.b14.el7_4.x86_64.rpm
 -rw-r--r-- 1 root root    61200 May 11 20:29 jpackage-utils-1.7.5-3.16.el6.noarch.rpm
 -rw-r--r-- 1 root root    31564 May 11 21:20 libfontenc-1.1.3-3.el7.x86_64.rpm
