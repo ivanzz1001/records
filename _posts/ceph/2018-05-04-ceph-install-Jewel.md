@@ -382,7 +382,7 @@ ceph-authtool ./cluster.bootstrap.keyring --import-keyring  /etc/ceph/ceph.clien
 这里我们为了方便，一开始就将ceph001-node1,ceph001-node2,ceph001-node3同时作为初始化monitor。这可以减少操作步骤，但是必须要等到3个monitor同时建立完成之后monitor集群才能正常工作。
 {% highlight string %}
 UUID=`uuidgen`
-echo $UUID
+echo $UUID > ceph-uuid.txt
 monmaptool --create --add ceph001-node1 10.133.134.211 --add ceph001-node2 10.133.134.212 --add ceph001-node3 10.133.134.213 --fsid $UUID ./bootstrap-monmap.bin
 {% endhighlight %}
 
