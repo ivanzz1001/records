@@ -162,7 +162,7 @@ error_log logs/error.log error;
 
 Context: 	main, http, mail, stream, server, location
 </pre>
-上述指令用于配置日志。在同一level层级（debug/info/notice/warn/error/crit/alert/emerg)可以配置多个日志。假如在main配置层级并未显示的指定日志的存放位置，那么此时会采用默认的文件来进行存放。
+上述指令用于配置日志。在同一level层级（main/http/mail/stream/server/location)可以配置多个日志。假如在main配置层级并未显示的指定日志的存放位置，那么此时会采用默认的文件来进行存放。
 
 上述指令的第一个参数```file```用于定义log的存放位置。需要指出的是如果file被指定为特殊值```stderr```时，则日志会被输出到标准错误。如果需要将日志写到```syslog```的话，则配置的前缀为```syslog:```。而如果需要将日志写到一个```循环内存buffer```中，则使用```memory```加上一个```size```大小，将日志写到内存一般用在调试阶段。
 
@@ -293,8 +293,162 @@ ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
 
 {% endhighlight %}
 
+当前我们支持c99可变参数宏。本函数是进行错误日志打印的核心函数，下面我们简要分析一下该函数的实现：
+{% highlight string %}
+#if (NGX_HAVE_VARIADIC_MACROS)
+
+void
+ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
+    const char *fmt, ...)
+
+#else
+
+void
+ngx_log_error_core(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
+    const char *fmt, va_list args)
+
+#endif
+{
+    //1) 将缓存的日志时间存入errstr
+
+    //2) 格式化日志级别到errstr
+
+    //3) 将当前进程ID(pid)及线程ID(tid)格式化进errstr
+    
+    //4) 将当前引用该log的connection数目格式化进errstr中
+   
+    //5) 格式化函数传递进来的参数到errstr
+
+    //6) 格式化err参数
+
+    //7) 对log->data进行格式化
+
+    //8) 换行符
+
+    //9) 循环遍历log链，将日志输出到log->fd
+
+    //10) 将相应的参数日志信息输出到标准错误(stderr)
 
 
+}
+{% endhighlight %}
+
+## 5. 普通日志及debug日志输出函数
+{% highlight string %} 
+#if !(NGX_HAVE_VARIADIC_MACROS)
+
+void ngx_cdecl
+ngx_log_error(ngx_uint_t level, ngx_log_t *log, ngx_err_t err,
+    const char *fmt, ...)
+{
+    va_list  args;
+
+    if (log->log_level >= level) {
+        va_start(args, fmt);
+        ngx_log_error_core(level, log, err, fmt, args);
+        va_end(args);
+    }
+}
+
+
+void ngx_cdecl
+ngx_log_debug_core(ngx_log_t *log, ngx_err_t err, const char *fmt, ...)
+{
+    va_list  args;
+
+    va_start(args, fmt);
+    ngx_log_error_core(NGX_LOG_DEBUG, log, err, fmt, args);
+    va_end(args);
+}
+
+#endif
+{% endhighlight %}
+
+上面两个函数主要是为了处理编译器不支持可变参数宏的情况下普通日志及debug日志的输出。
+
+## 6. 函数ngx_log_abort()
+{% highlight string %}
+void ngx_cdecl
+ngx_log_abort(ngx_err_t err, const char *fmt, ...)
+{
+    u_char   *p;
+    va_list   args;
+    u_char    errstr[NGX_MAX_CONF_ERRSTR];
+
+    va_start(args, fmt);
+    p = ngx_vsnprintf(errstr, sizeof(errstr) - 1, fmt, args);
+    va_end(args);
+
+    ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, err,
+                  "%*s", p - errstr, errstr);
+}
+{% endhighlight %}
+用于输出alert级别的日志。
+
+## 7. 函数ngx_log_stderr()
+{% highlight string %}
+void ngx_cdecl
+ngx_log_stderr(ngx_err_t err, const char *fmt, ...)
+{
+    u_char   *p, *last;
+    va_list   args;
+    u_char    errstr[NGX_MAX_ERROR_STR];
+
+    last = errstr + NGX_MAX_ERROR_STR;
+
+    p = ngx_cpymem(errstr, "nginx: ", 7);
+
+    va_start(args, fmt);
+    p = ngx_vslprintf(p, last, fmt, args);
+    va_end(args);
+
+    if (err) {
+        p = ngx_log_errno(p, last, err);
+    }
+
+    if (p > last - NGX_LINEFEED_SIZE) {
+        p = last - NGX_LINEFEED_SIZE;
+    }
+
+    ngx_linefeed(p);
+
+    (void) ngx_write_console(ngx_stderr, errstr, p - errstr);
+}
+{% endhighlight %}
+将相应的日志输出到stderr
+
+## 8. 函数ngx_log_errno()
+{% highlight string %}
+u_char *
+ngx_log_errno(u_char *buf, u_char *last, ngx_err_t err)
+{
+    if (buf > last - 50) {
+
+        /* leave a space for an error code */
+
+        buf = last - 50;
+        *buf++ = '.';
+        *buf++ = '.';
+        *buf++ = '.';
+    }
+
+#if (NGX_WIN32)
+    buf = ngx_slprintf(buf, last, ((unsigned) err < 0x80000000)
+                                       ? " (%d: " : " (%Xd: ", err);
+#else
+    buf = ngx_slprintf(buf, last, " (%d: ", err);
+#endif
+
+    buf = ngx_strerror(err, buf, last - buf);
+
+    if (buf < last) {
+        *buf++ = ')';
+    }
+
+    return buf;
+}
+{% endhighlight %}
+将```ngx_err_t```类型的错误码格式化到buf中。
 
 
 <br />
