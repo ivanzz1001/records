@@ -407,12 +407,26 @@ ngx_write_stdout(char *text)
 
 {% endhighlight %}
 
+上述两个函数分别用于将```text```输出到标准错误以及标准输出中。关于为什么```ngx_write_stderr()```不能采用宏来实现，上面注释已经很清楚，不过这主要是针对MSVC上的实现，即Windows版本nginx，对于linux版本并没有此问题。
+
+而关于为什么使用```ngx_write_fd()```函数，上面的注释当前已经过于老旧。目前ngx_write_console()函数实现如下：
+<pre>
+#define ngx_write_console        ngx_write_fd
+</pre>
+
+
 
 ## 7. 相关变量声明
 {% highlight string %}
 extern ngx_module_t  ngx_errlog_module;
 extern ngx_uint_t    ngx_use_stderr;
 {% endhighlight %}
+
+上面声明了两个变量：
+
+* ```ngx_errlog_module```: errlog模块相应数据结构变量
+
+* ```ngx_use_stderr```: 该变量主要用于控制是否输出到标准错误。一般在Nginx启动的时候，会将ngx_use_stderr设置为1，这时用户可以从标准错误中看到相应的启动输出信息，启动之后就会被设置为0，这时nginx以静默方式运行。
 
 
 <br />
