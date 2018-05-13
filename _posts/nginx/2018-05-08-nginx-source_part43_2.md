@@ -57,6 +57,22 @@ typedef struct {
 
 * ```ngx_log_insert()```: 将new_log插入到log链表中，log链表是按```log->log_level```从大到小的顺序排列的。
 
+* ```ngx_log_memory_writer()```: 此函数在```NGX_DEBUG```条件下使用,主要用于在调试环境下将buf数据写到内存中。
+
+* ```ngx_log_memory_cleanup()```: 此函数在```NGX_DEBUG```条件下使用，主要用于清除内存buf
+
+* ```ngx_log_memory_buf_t```： 此数据结构在```NGX_DEBUG```条件下使用，用于在内存中保存日志的buf。这是一个循环buffer内存，下面我们详细介绍一下该数据结构中各字段的含义：
+{% highlight string %}
+#if (NGX_DEBUG)
+typedef struct {
+    u_char        *start;      //该内存Buff的开始位置
+    u_char        *end;        //该内存buff的结束位置
+    u_char        *pos;        //实际写日志的其实位置，这是因为在start后会插入一些相应的内存日志的提示信息
+    ngx_atomic_t   written;    //当前总共写了多少日志数据
+} ngx_log_memory_buf_t;
+
+#endif
+{% endhighlight %}
 
 
 
