@@ -1176,7 +1176,7 @@ default.rgw.buckets.non-ec
 # ceph -s
 </pre>
 
-创建新的pool:
+创建新的pool(一般index pool与data pool的pg_num、pgp_num设置大一些即可):
 <pre>
 ceph osd pool create .rgw.root 8 8
 ceph osd pool create default.rgw.control 8 8
