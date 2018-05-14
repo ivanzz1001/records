@@ -683,7 +683,7 @@ vde  253:64   0  15G  0 disk
 # parted -s /dev/vde mkpart primary 67% 100%
 {% endhighlight %}
 
-查看分区后的状态：
+查看分区后的状态(注：在实际挂载之前需要先进行格式化)：
 <pre>
 [root@ceph001-node1 build]# lsblk -a 
 NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
