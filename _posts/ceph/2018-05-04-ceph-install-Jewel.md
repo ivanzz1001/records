@@ -1675,6 +1675,9 @@ ceph-10.2.3-0.el7.x86_64
 7. [如何查找dev目录下磁盘设备的iscsi来源](https://blog.csdn.net/yuanchao99/article/details/18308987)
 
 8. [GNU Parted](https://wiki.archlinux.org/index.php/GNU_Parted)
+
+9. [linux下获取scsi上的磁盘设备的序列号](https://blog.csdn.net/wwyyxx26/article/details/7739070)
+
 <br />
 <br />
 <br />
