@@ -1673,6 +1673,8 @@ ceph-10.2.3-0.el7.x86_64
 6. [linux CentOS7 磁盘分区fdisk 、df 、du、parted 命令实例](http://www.bubuko.com/infodetail-2267777.html)
 
 7. [如何查找dev目录下磁盘设备的iscsi来源](https://blog.csdn.net/yuanchao99/article/details/18308987)
+
+8. [GNU Parted](https://wiki.archlinux.org/index.php/GNU_Parted)
 <br />
 <br />
 <br />
