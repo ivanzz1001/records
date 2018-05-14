@@ -1194,6 +1194,7 @@ ceph osd pool create default.rgw.buckets.data 256 256
 ceph osd pool create default.rgw.meta 8 8
 ceph osd pool create default.rgw.buckets.non-ec 8 8
 </pre>
+```注：``` 一般```.rgw.root```池为一个特殊池，名字不要更改。
 
 然后更改pool所用的crush 规则：
 <pre>
