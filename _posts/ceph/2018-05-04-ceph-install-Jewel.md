@@ -1678,7 +1678,6 @@ ceph-10.2.3-0.el7.x86_64
 
 9. [linux下获取scsi上的磁盘设备的序列号](https://blog.csdn.net/wwyyxx26/article/details/7739070)
 
-
 <br />
 <br />
 <br />
