@@ -18,6 +18,7 @@ description: Linux下curl工具的使用
 在Linux环境下安装curl工具很简单，直接通过如下的命令安装即可：
 {% highlight string %}
 // centos环境
+//一般需要安装3个包,例如：curl-7.29.0-46.el7.x86_64.rpm  libcurl-7.29.0-46.el7.x86_64.rpm  libcurl-devel-7.29.0-46.el7.x86_64.rpm
 # a=`yum list installed | grep "\<curl.x86_64\>"`
 # if [ $a -eq "" ]; then yum install curl.x86_64; fi
 
@@ -25,6 +26,8 @@ description: Linux下curl工具的使用
 //ubuntu环境
 # sudo apt-get install curl
 {% endhighlight %}
+
+
 
 
 ## 2. curl命令的基本使用
