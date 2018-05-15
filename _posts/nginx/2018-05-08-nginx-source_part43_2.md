@@ -1,6 +1,6 @@
 ---
 layout: post
-title: core/ngx_log.c源文件分析
+title: core/ngx_log.c源文件分析(1)
 tags:
 - nginx
 categories: nginx
