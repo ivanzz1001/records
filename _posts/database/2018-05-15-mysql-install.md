@@ -447,6 +447,24 @@ finish
 </pre>
 
 
+## 2. MySQL离线安装
+
+首先查看是否安装MariaDB并卸载，请参看上述方法。
+
+### 2.1 下载离线安装包
+
+在```https://dev.mysql.com/downloads/mysql/```页面点击```Looking for previous GA versions?```链接，然后针对我们当前的Centos7操作系统选择:
+
+* version: 5.7.22
+
+* os: Red Hat Enterprise Linux 7 / Oracle Linux 7
+
+* os version: all
+
+然后下载64bit版本的mysql5.7安装包mysql-5.7.22-1.el7.x86_64.rpm-bundle.tar。
+
+### 2.2 安装mysql
+
 
 
 <br />
@@ -469,6 +487,9 @@ finish
 7. [MySQL字符编码设置方法](http://www.jb51.net/article/85337.htm)
 
 8. [MySQL字符集详解](https://www.cnblogs.com/wcwen1990/p/6917109.html)
+
+
+9. [CentOS7离线安装MySQL](https://www.cnblogs.com/Orange42/p/8432185.html)
 
 
 <br />
