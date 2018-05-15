@@ -211,6 +211,8 @@ log-error=/var/log/mysqld.log
 pid-file=/var/run/mysqld/mysqld.pid
 {% endhighlight %}
 
+
+
 ### 1.4 启动mysql
 
 1) 执行如下的命令设置mysql开机启动
@@ -290,6 +292,14 @@ mysql>
 //执行如下刷新权限
 # flush privileges;
 </pre>
+
+说明：我们也可以在/etc/mysql.cnf如下行下加入```skip-grant-tables```来免密码登录
+<pre>
+# Disabling symbolic-links is recommended to prevent assorted security risks
+skip-grant-tables
+</pre>
+成功登录之后采用上面的方式来修改密码，然后再将上述语句去掉。
+
 
 
 5) 为root账户授予远程访问的权限
@@ -465,6 +475,11 @@ finish
 
 ### 2.2 安装mysql
 
+将上述安装包解压：
+<pre>
+# tar -zxvf mysql-5.7.22-1.el7.x86_64.rpm-bundle.tar
+# 
+</pre>
 
 
 <br />
