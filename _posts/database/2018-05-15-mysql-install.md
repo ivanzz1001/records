@@ -262,7 +262,7 @@ May 15 18:03:45 localhost.localdomain systemd[1]: Started MySQL Server.
 
 我们使用上述密码登录mysql，然后对密码进行重置：
 {% highlight string %}
-# mysql -uroot -p E?*RxdrDq6Ta
+# mysql -uroot -pE?*RxdrDq6Ta
 Enter password: 
 ERROR 1049 (42000): Unknown database 'E?*RxdrDq6Ta'
 [root@localhost mysql]# mysql -uroot -pE?*RxdrDq6Ta
@@ -412,7 +412,51 @@ sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
 
 上面我们安装了```mysql-devel```，我们这里用其来对刚搭建的mysql进行测试。 编写```test_mysql.c```文件如下：
 {% highlight string %}
+#include <mysql/mysql.h>
+#include <stdio.h>
+#include <stdlib.h>
 
+int main(int argc,char *argv[])
+{
+   MYSQL *conn;
+   MYSQL_RES *res;
+   MYSQL_ROW row;
+
+   const char *server = "192.168.69.128";
+   const char *user = "root";
+   const char *password = "testAa@123";
+   const char *database = "mysql";
+   const unsigned port = 3306;
+
+   conn = mysql_init(NULL);
+   
+   if(!mysql_real_connect(conn,server,user,password,database,port,NULL,0))
+   {
+      fprintf(stderr,"%s\n",mysql_error(conn));
+      exit(1);
+   }
+
+   if(mysql_query(conn,"show tables"))
+   {
+      fprintf(stderr,"%s\n",mysql_error(conn));
+      exit(1);
+   }
+
+   res = mysql_use_result(conn);
+   printf("MYSQL tables in mysql database:\n");
+
+   while((row = mysql_fetch_row(res)) != NULL)
+   {
+       printf("%s\n",row[0]);
+   }
+
+   mysql_free_result(res);
+   mysql_close(conn);
+   printf("finish\n");
+   
+   getchar();
+   return 0x0;
+}
 {% endhighlight %}
 编译运行：
 <pre>
@@ -477,9 +521,88 @@ finish
 
 将上述安装包解压：
 <pre>
-# tar -zxvf mysql-5.7.22-1.el7.x86_64.rpm-bundle.tar
-# 
+# tar -xvf ./mysql-5.7.22-1.el7.x86_64.rpm-bundle.tar 
+mysql-community-libs-5.7.22-1.el7.x86_64.rpm
+mysql-community-libs-compat-5.7.22-1.el7.x86_64.rpm
+mysql-community-embedded-5.7.22-1.el7.x86_64.rpm
+mysql-community-test-5.7.22-1.el7.x86_64.rpm
+mysql-community-server-5.7.22-1.el7.x86_64.rpm
+mysql-community-client-5.7.22-1.el7.x86_64.rpm
+mysql-community-server-minimal-5.7.22-1.el7.x86_64.rpm
+mysql-community-devel-5.7.22-1.el7.x86_64.rpm
+mysql-community-common-5.7.22-1.el7.x86_64.rpm
+mysql-community-minimal-debuginfo-5.7.22-1.el7.x86_64.rpm
+mysql-community-embedded-devel-5.7.22-1.el7.x86_64.rpm
+mysql-community-embedded-compat-5.7.22-1.el7.x86_64.rpm
 </pre>
+
+这里我们安装如下几个包：
+<pre>
+# ls -al
+total 201696
+drwxr-xr-x 2 root root      4096 May 16 09:37 .
+drwxr-xr-x 3 root root      4096 May 16 09:34 ..
+-rw-r--r-- 1 root root  25106088 May 16 09:35 mysql-community-client-5.7.22-1.el7.x86_64.rpm
+-rw-r--r-- 1 root root    280800 May 16 09:35 mysql-community-common-5.7.22-1.el7.x86_64.rpm
+-rw-r--r-- 1 root root   3781636 May 16 09:36 mysql-community-devel-5.7.22-1.el7.x86_64.rpm
+-rw-r--r-- 1 root root   2239868 May 16 09:36 mysql-community-libs-5.7.22-1.el7.x86_64.rpm
+-rw-r--r-- 1 root root   2116356 May 16 09:36 mysql-community-libs-compat-5.7.22-1.el7.x86_64.rpm
+-rw-r--r-- 1 root root 172992596 May 16 09:37 mysql-community-server-5.7.22-1.el7.x86_64.rpm
+</pre>
+
+再执行如下命令安装：
+<pre>
+# yum localinstall *.rpm
+</pre>
+
+### 2.3 配置mysql
+
+请参看上面在线安装相关章节。
+
+### 2.4 测试
+请参看上面在线安装相关章节。
+
+### 3. Ubuntu环境下安装MySQL(附录)
+
+执行如下命令安装：
+<pre>
+# sudo apt-get install mysql-server
+# sudo apt-get install mysql-client
+# sudo apt-get install libmysqlclient-dev
+</pre>
+
+通过上面安装后，查看是否安装成功：
+<pre>
+# netstat -nlp | grep mysql
+tcp6       0      0 :::3306                 :::*                    LISTEN      76868/mysqld        
+unix  2      [ ACC ]     STREAM     LISTENING     345340   76868/mysqld         /var/lib/mysql/mysql.sock
+</pre>
+
+然后修改配置文件，使MySQL支持远程登录(修改/etc/mysql/my.cnf文件)，注释掉如下语句：
+<pre>
+# bind-address     = 127.0.0.1
+</pre>
+
+以安装时默认的root用户登录mysql:
+<pre>
+# mysql -h 127.0.0.1 -uroot -p
+</pre>
+
+登录后创建一个测试用户（用户名: test_user， 密码：testAa@123)
+<pre>
+# create user 'test_user'@'%' identified by 'testAa@123';
+</pre>
+
+为创建的用户授权（目前授予最大权限，方便操作）：
+<pre>
+# grant all privileges *.* to 'test_user'@'%' identified by 'testAa@123';
+</pre>
+
+创建一个测试数据库：
+<pre>
+# create database testdb;
+</pre>
+
 
 
 <br />
