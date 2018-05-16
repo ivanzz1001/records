@@ -603,6 +603,20 @@ unix  2      [ ACC ]     STREAM     LISTENING     345340   76868/mysqld         
 # create database testdb;
 </pre>
 
+## 4. Mysql下执行sql脚本
+
+下面介绍两种方法：
+
+1) 在命令行下（未连接数据库），输入：
+<pre>
+# mysql -uroot -ptestAa@123 < /root/CreateDB_app.sql
+</pre>
+
+2) 在命令行下（已连接数据库，此时的提示符为mysql)，输入：
+{% highlight string %}
+mysql > source /root/CreateDB_app.sql
+{% endhighlight %}
+
 
 
 <br />
