@@ -252,6 +252,10 @@ Hello, World!
 </pre>
 可以看到运行成功。
 
+
+## 6. Linux下链接库的路径顺序
+
+
 <br />
 <br />
 
@@ -263,7 +267,7 @@ Hello, World!
 
 3. [PKG_CONFIG_PATH变量 与 ld.so.conf 文件](http://www.cnblogs.com/s_agapo/archive/2012/04/24/2468925.html)
 
-
+4. [Linux下运行时链接库的路径顺序](https://blog.csdn.net/npu_wy/article/details/38642191)
 <br />
 <br />
 <br />
