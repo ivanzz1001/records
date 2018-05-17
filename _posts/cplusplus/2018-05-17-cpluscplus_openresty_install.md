@@ -109,6 +109,9 @@ perl-Test-Nginx.noarch
 **4) 下载最新版openresty**
 <pre>
 # sudo yum install --downloadonly --downloaddir=./ openresty.x86_64
+# ls
+openresty-1.13.6.2-1.el7.centos.x86_64.rpm        openresty-pcre-8.42-1.el7.centos.x86_64.rpm
+openresty-openssl-1.1.0h-3.el7.centos.x86_64.rpm  openresty-zlib-1.2.11-3.el7.centos.x86_64.rpm
 </pre>
 
 
