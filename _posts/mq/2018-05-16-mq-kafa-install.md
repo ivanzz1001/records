@@ -1,16 +1,16 @@
 ---
 layout: post
-title: Centos7环境下Kafka的安装
+title: Centos7环境下Kafka的安装(单机版)
 tags:
 - mq
 categories: mq
-description: Centos7环境下Kafka的安装
+description: Centos7环境下Kafka的安装(单机版)
 ---
 
 Kafka是一种高吞吐的分布式发布订阅消息系统，能够替代传统的消息队列用于解耦数据处理，缓存未处理消息等，同时具有更高的吞吐率，支持分区、多副本、冗余，因此被广泛用于大规模消息数据处理应用。Kafka支持Java及多种其他语言客户端，可与Hadoop、Storm、Spark等其他大数据工具结合使用。
 
 
-本教程主要介绍Kafka 在Centos7上的安装和使用，下面会分别介绍Kafka的单点部署及集群部署。我们当前操作系统环境为：
+本教程主要介绍Kafka 在Centos7上的安装和使用，下面会分别介绍Kafka的单点部署。我们当前操作系统环境为：
 
 
 
@@ -26,14 +26,13 @@ Linux oss-uat-06 3.10.0-514.el7.x86_64 #1 SMP Tue Nov 22 16:42:41 UTC 2016 x86_6
 当前我们安装的kafka版本为```kafka_2.12```。
 
 
+## 1. 安装JDK
 
-## 1. kafka的单点部署
 
-### 1.1 安装JDK
 
 关于JDK的安装，请参看其他文档。
 
-## 1.2 安装zookeeper
+##2. 安装zookeeper
 
 这里安装的zookeeper采用单机模式工作，因此如下的操作配置都是采用```单机模式配置```:
 
@@ -171,11 +170,13 @@ numChildren = 0
 {% endhighlight %}
 
 
-### 1.3 安装kafka
+## 3. 安装kafka
 
 这里我们安装```kafka_2.12-0.10.2.1```版本。采用单机工作模式
 
-1) 下载kafka
+### 3.1 下载并安装kafka
+
+1) 下载kafka 
 
 到kafka官方网站```http://kafka.apache.org/```下载相应版本kafka:
 <pre>
@@ -192,7 +193,10 @@ numChildren = 0
 bin  config  libs  LICENSE  NOTICE  site-docs
 </pre>
 
-3) 启动kafka服务器
+
+### 3.2 启动kafka
+
+1) 启动kafka服务器
 
 修改kafka配置```config/server.properties```，主要修改如下字段：
 {% highlight string %}
@@ -225,9 +229,10 @@ zookeeper.connect=localhost:2181
 </pre>
 
 
-5) 简单测试kafka
+### 3.3 kafka简单测试
 
-* 创建topic
+
+**1） 创建topic**
 <pre>
 #  bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 1 --topic test
 Created topic "test".
@@ -241,7 +246,7 @@ test
 </pre>
 
 
-* 生产者发送消息
+**2） 生产者发送消息**
 
 kafka可以通过使用一个客户端将来自于```标准输入```或者```文件```的数据发送到kafka集群中。默认情况下，每一行作为一条单独的消息发送：
 <pre>
@@ -252,7 +257,7 @@ This is another message
 这里注意设定的broker-list的IP地址必须为上面kafka配置的IP地址。
 
 
-* 消费者消费消息
+**3） 消费者消费消息**
 
 我们从另外一个窗口开启一个客户端来消费消息：
 <pre>
@@ -263,16 +268,93 @@ This is another message
 这里注意设定的broker-list的IP地址必须为上面kafka配置的IP地址。
 
 
-* 查看topic某分区偏移量最大（小）值
+**4) 查看topic某分区偏移量最大（小）值**
 <pre>
 # bin/kafka-run-class.sh kafka.tools.GetOffsetShell --topic test  --time -1 --broker-list 10.17.156.73:9092 --partitions 0
 test:0:31
 </pre>
 
-* 删除topic，慎用，只会删除zookeeper中的元数据，消息文件须手动删除
-<pre>
+**5) 删除topic**
 
+这里删除kafka topic分成几个步骤：
+
+* 删除kafka存储目录
+
+通过kafka配置文件server.properties的log.dirs配置项，找到相关topic的数据存储目录(默认为/tmp/kafka-logs)，然后进行删除：
+<pre>
+# rm -rf /opt/oss_kafka/dataDir/kafka/logs/test-0/
 </pre>
+
+<br />
+
+* 删除kafka topic
+
+首先如果kafka启动时加载的配置文件中server.properties没有配置```delete.topic.enable=true```，那么此时的删除并不是真正的删除，而是把topic标记为```marked for deletion```。此时可以先修改配置，然后执行如下命令重启kafka:
+<pre>
+# bin/kafka-server-stop.sh
+# ps -ef 
+# nohup bin/kafka-server-start.sh config/server.properties >/dev/null 2>&1 &
+</pre>
+
+然后执行如下命令删除topic:
+<pre>
+# ./bin/kafka-topics.sh --delete --zookeeper localhost:2181 --topic test
+Topic test is marked for deletion.
+Note: This will have no impact if delete.topic.enable is not set to true.
+
+# ./bin/kafka-topics.sh --zookeeper localhost:2181 --list 
+__consumer_offsets
+test - marked for deletion
+</pre>
+可以看到现在将对应的topic标记为	deletion了, 后续要想彻底删除还需要到zookeeper中删除数据。
+
+<br />
+
+* 删除zookeeper中相关topic数据
+
+首先登录zookeeper客户端：
+<pre>
+# bin/zkCli.sh -server localhost:2181
+#  
+</pre>
+然后执行如下的命令找到相关topic目录：
+<pre>
+[zk: localhost:2181(CONNECTED) 0] ls /brokers/topics
+[test, __consumer_offsets]
+
+//被标记为marked for deletion的topic，可以通过如下命令查看
+[zk: localhost:2181(CONNECTED) 1] ls /admin/delete_topics 
+[test]
+</pre>
+
+再接着删除zookeeper中相关topic数据, 此时topic被彻底删除:
+<pre>
+[zk: localhost:2181(CONNECTED) 2] rmr /brokers/topics test 
+[zk: localhost:2181(CONNECTED) 3] ls /brokers/topics       
+Node does not exist: /brokers/topics
+</pre>
+
+此后再通过如下命令则看不到相关topic的数据了：
+<pre>
+# bin/kafka-topics.sh --zookeeper localhost:2181 --list
+</pre>
+
+
+* ```总结```
+ 
+如下我们针对彻底删除topic做一个总结：
+{% highlight string %}
+彻底删除topic：
+
+1： 删除kafka存储目录（server.properties文件log.dirs配置，默认为"/tmp/kafka-logs"）相关topic目录
+
+2： 如果配置了delete.topic.enable=true直接通过命令删除，如果命令删除不掉，直接通过zookeeper-client 删除掉broker下的topic即可。
+{% endhighlight %}
+
+
+
+
+
 
 <br />
 <br />
@@ -291,7 +373,8 @@ test:0:31
 
 6. [ZooKeeper Getting Started Guide](http://zookeeper.apache.org/doc/current/zookeeperStarted.html)
 
-7. [Kafka Shell基本命令（包括topic的增删改查）](https://www.cnblogs.com/xiaodf/p/6093261.html)
+7. [彻底删除Kafka中的topic](https://blog.csdn.net/fengzheku/article/details/50585972)
+
 
 <br />
 <br />
