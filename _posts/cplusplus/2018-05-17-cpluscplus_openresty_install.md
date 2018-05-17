@@ -115,7 +115,149 @@ perl-Test-Nginx.noarch
 ## 2. 源代码编译安装openresty
 
 
+### 2.1 安装
+**1) 下载源代码包**
 
+这里我们安装```openresty-1.11.2.5```版本：
+<pre>
+# https://openresty.org/download/openresty-1.11.2.5.tar.gz
+</pre>
+
+**2) 安装pcre依赖库**
+
+参看：http://www.pcre.org/
+
+执行如下命令进行安装：
+{% highlight string %}
+# yum install pcre.x86_64 pcre-devel.x86_64
+{% endhighlight %}
+或源码安装：
+{% highlight string %}
+# wget ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.40.tar.gz
+# tar -zxvf pcre-8.40.tar.gz
+# cd pcre-8.40
+# ./configure
+# make
+# make install
+{% endhighlight %}
+
+**3） 安装zlib依赖库**
+
+参看：http://www.zlib.net
+{% highlight string %}
+# yum install zlib-devel.x86_64
+# yum install zlib.x86_64
+{% endhighlight %}
+或源码安装：
+{% highlight string %}
+# wget http://zlib.net/zlib-1.2.11.tar.gz
+# tar -zxvf zlib-1.2.11.tar.gz
+# cd zlib-1.2.11
+# ./configure
+# make
+# make install
+{% endhighlight %}
+(注：这里可以暂时解压出来，不用进行安装，后续让nginx脚本来进行安装)
+
+**4) 安装ssl依赖库**
+
+执行如下命令进行安装：
+{% highlight string %}
+# yum install openssl.x86_64  
+# yum install openssl-devel.x86_64
+{% endhighlight %}
+
+也可以到```http://rpmfind.net/linux/rpm2html/search.php```找到相应的安装包安装。
+
+**4) 安装openresty**
+
+执行如下的命令进行安装：
+{% highlight string %}
+# ./configure \
+ --with-luajit \
+ --with-http_ssl_module \
+ --with-pcre=../pcre-8.40 \
+ --with-zlib=../zlib-1.2.11
+{% endhighlight %}
+增加```--with-luajit```以支持lua脚本。
+
+### 2.2 测试
+1) 首先配置上面安装的openresty。上面默认安装在```/usr/local/openresty```目录下，修改该目录下的```nginx/conf/nginx.conf```文件：
+{% highlight string %}
+#user  nobody;
+worker_processes  1;
+
+#pid        logs/nginx.pid;
+
+
+events {
+    worker_connections  1024;
+}
+
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+
+   
+    #access_log  logs/access.log  main;
+
+    sendfile        on;
+    #tcp_nopush     on;
+
+    #keepalive_timeout  0;
+    keepalive_timeout  65;
+
+    #gzip  on;
+
+    server {
+        listen       80;
+        server_name  localhost;
+
+        #charset koi8-r;
+
+        #access_log  logs/host.access.log  main;
+
+        location / {
+            default_type text/html;
+            content_by_lua '
+                ngx.say("<p>hello, world</p>")
+            ';
+        }
+
+        #error_page  404              /404.html;
+
+        # redirect server error pages to the static page /50x.html
+        #
+        error_page   500 502 503 504  /50x.html;
+        location = /50x.html {
+            root   html;
+        }
+
+      
+    }
+
+}
+{% endhighlight %}
+
+
+2) 接着执行如下命令启动openresty
+<pre>
+# /usr/local/openresty/nginx/sbin/nginx 
+
+# ps -ef | grep nginx
+root     25588     1  0 21:36 ?        00:00:00 nginx: master process sbin/nginx
+nobody   25589 25588  0 21:36 ?        00:00:00 nginx: worker process
+root     25591  2957  0 21:36 pts/0    00:00:00 grep --color=auto nginx
+</pre>
+
+3) 再接着执行如下命令进行简单测试
+{% highlight string %}
+# curl -XGET http://10.17.156.68
+<p>hello, world</p>
+{% endhighlight %}
+
+可以看到上面打印出了lua脚本设置的```hello,world```。
 
 <br />
 <br />
@@ -125,6 +267,8 @@ perl-Test-Nginx.noarch
 1. [OpenResty® Linux 包](http://openresty.org/cn/linux-packages.html)
 
 2. [OpenResty官方网站](http://openresty.org/cn/)
+
+3. [OpenResty installation](http://openresty.org/cn/installation.html)
 
 <br />
 <br />
