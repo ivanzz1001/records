@@ -278,16 +278,15 @@ test:0:31
 
 这里删除kafka topic分成几个步骤：
 
-* 删除kafka存储目录
+* ```删除kafka存储目录```
 
 通过kafka配置文件server.properties的log.dirs配置项，找到相关topic的数据存储目录(默认为/tmp/kafka-logs)，然后进行删除：
 <pre>
 # rm -rf /opt/oss_kafka/dataDir/kafka/logs/test-0/
 </pre>
 
-<br />
 
-* 删除kafka topic
+* ```删除kafka topic```
 
 首先如果kafka启动时加载的配置文件中server.properties没有配置```delete.topic.enable=true```，那么此时的删除并不是真正的删除，而是把topic标记为```marked for deletion```。此时可以先修改配置，然后执行如下命令重启kafka:
 <pre>
@@ -308,9 +307,8 @@ test - marked for deletion
 </pre>
 可以看到现在将对应的topic标记为	deletion了, 后续要想彻底删除还需要到zookeeper中删除数据。
 
-<br />
 
-* 删除zookeeper中相关topic数据
+* ```删除zookeeper中相关topic数据```
 
 首先登录zookeeper客户端：
 <pre>
