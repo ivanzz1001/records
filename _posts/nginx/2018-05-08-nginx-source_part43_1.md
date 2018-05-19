@@ -87,6 +87,18 @@ description: nginx源代码分析
 #define NGX_LOG_DEBUG_STREAM      0x400
 </pre>
 对于debug级别的日志，在进行日志打印时还会检查相应的掩码。
+{% highlight string %}
+这里注意： 
+
+1） 上面NGX_LOG_STDERR~NGX_LOG_DEBUG表示的是日志打印级别中的大级别，用4个bit位即可表示。
+    并且日志级别只能属于上述大级别中的一个。
+
+2） 而NGX_LOG_DEBUG_CORE~NGX_LOG_DEBUG_STREAM,是debug级别中的小级别，可以同时存在多个小
+    级别，这样需要7个bit位类表示
+
+3) 如果设置为NGX_LOG_DEBUG这样一个debug大级别，则包含所有NGX_LOG_DEBUG_CORE~NGX_LOG_DEBUG_STREAM
+   中的所有小级别，此时log_level会被直接设置为NGX_LOG_DEBUG_ALL
+{% endhighlight %}
 
 **3) debug相应掩码总结**
 
