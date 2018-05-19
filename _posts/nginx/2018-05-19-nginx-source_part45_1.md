@@ -260,7 +260,64 @@ description: nginx源代码分析
 剩余的一些特性我们这里并不详细介绍。
 
 
+## 2. nginx module相关宏定义
+{% highlight string %}
+#define NGX_MODULE_V1                                                         \
+    NGX_MODULE_UNSET_INDEX, NGX_MODULE_UNSET_INDEX,                           \
+    NULL, 0, 0, nginx_version, NGX_MODULE_SIGNATURE
 
+#define NGX_MODULE_V1_PADDING  0, 0, 0, 0, 0, 0, 0, 0
+{% endhighlight %}
+这里我们简要介绍一下这两个宏定义：
+
+* 宏```NGX_MODULE_V1```： 用于初始化一个module
+
+* 宏```NGX_MODULE_V1_PADDING```: 作为一个module中后面几个字段的填充使用
+
+
+## 3. ngx_module_s数据结构
+{% highlight string %}
+struct ngx_module_s {
+    ngx_uint_t            ctx_index;
+    ngx_uint_t            index;
+
+    char                 *name;
+
+    ngx_uint_t            spare0;
+    ngx_uint_t            spare1;
+
+    ngx_uint_t            version;
+    const char           *signature;
+
+    void                 *ctx;
+    ngx_command_t        *commands;
+    ngx_uint_t            type;
+
+    ngx_int_t           (*init_master)(ngx_log_t *log);
+
+    ngx_int_t           (*init_module)(ngx_cycle_t *cycle);
+
+    ngx_int_t           (*init_process)(ngx_cycle_t *cycle);
+    ngx_int_t           (*init_thread)(ngx_cycle_t *cycle);
+    void                (*exit_thread)(ngx_cycle_t *cycle);
+    void                (*exit_process)(ngx_cycle_t *cycle);
+
+    void                (*exit_master)(ngx_cycle_t *cycle);
+
+    uintptr_t             spare_hook0;
+    uintptr_t             spare_hook1;
+    uintptr_t             spare_hook2;
+    uintptr_t             spare_hook3;
+    uintptr_t             spare_hook4;
+    uintptr_t             spare_hook5;
+    uintptr_t             spare_hook6;
+    uintptr_t             spare_hook7;
+};
+
+{% endhighlight %}
+```ngx_module_s```数据结构是对Nginx 模块的一个抽象。下面我们简要介绍一下各字段的含义：
+
+* ```ctx_index```: 
 
 
 
