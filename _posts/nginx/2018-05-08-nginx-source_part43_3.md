@@ -572,9 +572,9 @@ ngx_log_memory_writer(ngx_log_t *log, ngx_uint_t level, u_char *buf,
 {% endhighlight %}
 
 上面函数较为简单，就是往循环memory buf中写日志数据。这里需要注意的一点是：
-{% highlight string %}
+<pre>
 written = ngx_atomic_fetch_add(&mem->written, len);
-{% endhighlight %}
+</pre>
 当多线程向buf中写时，通过如上实现原子操作。
 
 ![ngx-memory-log](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_memory_log.jpg)
