@@ -1040,8 +1040,26 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 ![ngx-conf-ctx](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_conf_ctx.jpg)
 
 <pre>
-注意： 上述ctx_index的初始化是在src/core/ngx_module.c的ngx_count_modules()中完成
+注意： 
+
+1) 上述ctx_index的初始化是在src/core/ngx_module.c的ngx_count_modules()中完成
+
+2) 只有属于NGX_CORE_MODULE类型的模块才在cycle->conf_ctx数组中有相应的入口。
 </pre>
+
+这里我们以解析http模块的server指令为例：
+<pre>
+http{
+   server{
+      listen 80;
+   }
+
+   server{
+      listen 81;
+   }
+}
+</pre>
+在解析到http指令时，调用ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last), 此时cf->ctx值为```cycle->conf_ctx```；而到了解析server指令时，再调用到ngx_conf_handler()函数时，cf->ctx的值为```ngx_http_conf_ctx_t```。
 
 **6) 建立指令上下文部分代码分析**
 {% highlight string %}
@@ -1073,7 +1091,7 @@ ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last)
 
  对于```NGX_MAIN_CONF```类型，例如上图中的```ngx_events_module```以及```ngx_http_module```，则直接保存的地址是&conf_ctx[module_index]; 
 
-对于其他类型，则保存对应数组在```ctx_index```索引处的地址， 例如对于```ngx_event_core_module```,由于cf->ctx当前指向的就是上面所构建的这个```无名指针```,因此这里```confp```就是这个```无名指针指向的地址。
+对于其他类型，则保存对应数组在```ctx_index```索引处的地址， 例如对于```ngx_event_core_module```,由于cf->ctx当前指向的就是上面所构建的这个```无名指针```,因此这里```confp```就是这个```无名指针```指向的地址。
 
 
 **7) nginx module的启动流程**
