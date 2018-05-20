@@ -317,11 +317,30 @@ struct ngx_module_s {
 {% endhighlight %}
 ```ngx_module_s```数据结构是对Nginx 模块的一个抽象。下面我们简要介绍一下各字段的含义：
 
-* ```ctx_index```: 
+* ```ctx_index```: 分类的模块计数器。nginx模块可以分为四种： core、event、http和mail，每个模块都会有各自计数,ctx_index就是每个模块在其所属类组的计数。
+
+* ```index```: 用于指定本模块在```ngx_modules```数组中的索引值
+
+* ```name```: 用于指示模块的名称
+
+* ```spare0/spare1```: 暂时保留，不做使用
+
+* 
 
 
 
 
+
+
+
+
+
+<br />
+<br />
+
+**[参看]**
+
+1. [nginx-module-t数据结构](https://blog.csdn.net/u014082714/article/details/46125135)
 
 <br />
 <br />
