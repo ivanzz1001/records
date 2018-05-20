@@ -325,14 +325,84 @@ struct ngx_module_s {
 
 * ```spare0/spare1```: 暂时保留，不做使用
 
-* 
+* ```version```: 用于指定版本号，当前值为```1010003```，即```1.10.3```版本
+
+* ```commands```: 用于指定该模块的指令集
+
+* ```type```: 用于指定模块的类型
+
+* ```init_master```: 初始化master时执行的回调函数，当前在系统中并未有任何地方用到
+
+* ```init_module```: 在对module执行初始化时执行, 当前会在```ngx_init_modules()```函数调用时用到
+
+* ```init_process```: 在子进程初始化时，会调用module的init_process回调函数
+
+* ```init_thread```: 在线程初始化时，执行本回调函数， 当前在系统中并未有任何地方用到
+
+* ```exit_thread```: 在线程退出时，执行本回调函数，当前在系统中并未有任何地方用到
+
+* ```exit_process```: 在子进程退出时，会执行本回调函数
+
+* ```exit_master```: 在master进程退出时，会执行本回调函数。当前在系统ngx_master_process_exit()函数中会被调用。
+
+* ```spare_hook0/1/2/3/4/5/6/7```: 其他一些hook函数，当前在系统中暂未被使用到
+
+## 4. ngx_core_module_t数据结构
+{% highlight string %}
+typedef struct {
+    ngx_str_t             name;
+    void               *(*create_conf)(ngx_cycle_t *cycle);
+    char               *(*init_conf)(ngx_cycle_t *cycle, void *conf);
+} ngx_core_module_t;
+{% endhighlight %}
+此数据结构作为核心模块的一个context类型，即```ngx_module_s.ctx```。对于core、event、http和mail， 其都属于核心模块，各自都拥有一个context对象。下面介绍一下本数据结构的各字段：
+
+* ```name```: context名称。对于core模块，本字段取值一般为```core```，对于event模块，本字段取值一般为```events```。
+
+* ```create_conf```: 一般在系统初始化调用本回调函数创建相应的上下文结构。例如在整个系统初始化时，会分别调用core、event、http、mail等核心模块的create_conf函数； 在解析到```events```指令时, 又会调用本函数创建整个events模块的上下文结构。
+
+* ```init_conf```: 一般在解析完成相应的指令后，调用本回调函数对一些配置中未设置的变量完成相应的初始化
 
 
 
+## 5. 相关函数声明
+{% highlight string %}
+
+//1) 预先对module进行适当的初始化
+ngx_int_t ngx_preinit_modules(void);
+
+//2) 为cycle->modules变量分配相应的空间
+ngx_int_t ngx_cycle_modules(ngx_cycle_t *cycle);
 
 
+//3) 初始化cycle->modules, 即回调ngx_module_s.init_module()函数
+ngx_int_t ngx_init_modules(ngx_cycle_t *cycle);
 
 
+//4) 用于计算某一种类的module的个数, 并位模块指定ctx_index值
+ngx_int_t ngx_count_modules(ngx_cycle_t *cycle, ngx_uint_t type);
+
+//5) 在执行到load_module指令时，会调用本函数添加一个模块
+ngx_int_t ngx_add_module(ngx_conf_t *cf, ngx_str_t *file,
+    ngx_module_t *module, char **order);
+
+{% endhighlight %}
+
+
+## 6. 相关变量声明
+{% highlight string %}
+extern ngx_module_t  *ngx_modules[];
+extern ngx_uint_t     ngx_max_module;
+
+extern char          *ngx_module_names[];
+{% endhighlight %}
+下面我们简要介绍一下各变量：
+
+* ```ngx_modules```: 全局变量，在nginx编译时将当前所有编译到的模块添加到该数组中
+
+* ```ngx_max_module```: 当前最大模块数，包括编译时所有的静态模块数以及后续可添加的最大动态模块数。
+
+* ```ngx_module_names```: 全局变量，在Nginx编译时将当前所有编译到的模块的名称存放到该数组中
 
 
 <br />
