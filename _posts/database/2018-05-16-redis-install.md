@@ -104,7 +104,7 @@ redis-benchmark  redis-check-aof  redis-check-rdb  redis-cli  redis-sentinel  re
 daemonize yes
 </pre>
 
-上面把```bind 127.0.0.1```注释掉，并且将```daemonize no```修改为```daemonize yes```。然后再启动redis_server:
+上面把```bind 127.0.0.1```注释掉，并且将```daemonize no```修改为```daemonize yes```。另外将protected-mode设置然后再启动redis_server:
 <pre>
 # /usr/local/redis-3.2.11/bin/redis-server /usr/local/redis-3.2.11/bin/redis_6379.conf
 
