@@ -100,6 +100,7 @@ redis-benchmark  redis-check-aof  redis-check-rdb  redis-cli  redis-sentinel  re
 
 # vi /usr/local/redis-3.2.11/bin/redis_6379.conf
 ##bind 127.0.0.1
+#protected-mode yes
 daemonize yes
 </pre>
 
