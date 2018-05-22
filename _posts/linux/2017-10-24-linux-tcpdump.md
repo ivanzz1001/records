@@ -132,6 +132,11 @@ Tcpdump会打印出一个网络接口上匹配布尔表达式```expression```的
 # tcpdump 'tcp[tcpflags] & (tcp-syn|tcp-fin) != 0 and not src and dst net localnet'
 {% endhighlight %} 
 
+* 打印网卡eth0上80端口的tcp数据包
+<pre>
+# tcpdump -i eth0 tcp and port 80 -vv -XX -n
+</pre>
+
 
 
 <br />
