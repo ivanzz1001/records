@@ -14,7 +14,7 @@ description: nginx源代码分析
 <!-- more -->
 
 
-## 1. ngx_open_file_info_t数据结构
+## 1. directio_off宏定义
 {% highlight string %}
 
 /*
@@ -33,7 +33,21 @@ description: nginx源代码分析
 
 #define NGX_OPEN_FILE_DIRECTIO_OFF  NGX_MAX_OFF_T_VALUE
 
+{% endhighlight %}
 
+在objs/ngx_auto_config.h头文件中，有如下定义：
+<pre>
+#ifndef NGX_MAX_OFF_T_VALUE
+#define NGX_MAX_OFF_T_VALUE  9223372036854775807LL
+#endif
+</pre>
+这里定义```NGX_OPEN_FILE_DIRECTIO_OFF```为long long的最大值，一般文件大小都不会超过此值，因此可以将此值作为```directio_off```来用。
+
+
+
+
+## 2. ngx_open_file_info_t数据结构
+{% highlight string %}
 typedef struct {
     ngx_fd_t                 fd;
     ngx_file_uniq_t          uniq;
@@ -67,9 +81,7 @@ typedef struct {
     unsigned                 is_exec:1;
     unsigned                 is_directio:1;
 } ngx_open_file_info_t;
-
 {% endhighlight %}
-
 
 <br />
 <br />
