@@ -49,20 +49,20 @@ description: nginx源代码分析
 ## 2. ngx_open_file_info_t数据结构
 {% highlight string %}
 typedef struct {
-    ngx_fd_t                 fd;
-    ngx_file_uniq_t          uniq;
-    time_t                   mtime;
-    off_t                    size;
-    off_t                    fs_size;
-    off_t                    directio;
-    size_t                   read_ahead;
+    ngx_fd_t                 fd;                     //该文件所对应的文件句柄
+    ngx_file_uniq_t          uniq;                   //该文件所对应的全局唯一标识， 一般取值为inode节点号
+    time_t                   mtime;                  //该文件的最后修改时间
+    off_t                    size;                   //该文件的大小
+    off_t                    fs_size;                //文件所占用的硬盘层面块数block * 512
+    off_t                    directio;               //文件对应的directio大小值， 小于该值采用sendfile来发送， 大于该值采用aio来发送
+    size_t                   read_ahead;             //预先由内核读取的字节数
 
-    ngx_err_t                err;
-    char                    *failed;
+    ngx_err_t                err;                    //该打开的文件所关联的错误信息码
+    char                    *failed;                 //所关联的错误信息
 
-    time_t                   valid;
+    time_t                   valid;                  //文件的有效时间
 
-    ngx_uint_t               min_uses;
+    ngx_uint_t               min_uses;               //
 
 #if (NGX_HAVE_OPENAT)
     size_t                   disable_symlinks_from;
@@ -88,6 +88,15 @@ typedef struct {
 
 
 
+
+<br />
+<br />
+
+**[参看]**
+
+1. [第二章 OpenResty(Nginx+Lua)开发入门](http://jinnianshilongnian.iteye.com/blog/2186448)
+
+2. [nginx open_file_cache指令影响静态文件更新时间](https://www.cnblogs.com/sunsweet/p/3338684.html)
 
 <br />
 <br />
