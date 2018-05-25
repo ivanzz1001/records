@@ -147,6 +147,20 @@ On FreeBSD, the fcntl(O_READAHEAD, size) system call, supported since FreeBSD 9.
 
 * ```valid```: 文件的有效时间
 
+* ```min_uses```: 本字段牵扯到```open_file_cache```指令，指令中inactive参数时间内文件的最少访问次数，如果超过这个数字，该打开的文件描述符将会一直
+
+关于```disable_symlinks_from```与```disable_symlinks```字段，主要用于决定当打开文件的时候如何处理符号链接(symbolic links)。其中前一个字段用于指定从哪一个字段开始检查符号链接， 而后一个字段用于指定是否禁止符号链接。在```objs/ngx_auto_config.h```头文件中有如下定义：
+<pre>
+#ifndef NGX_HAVE_OPENAT
+#define NGX_HAVE_OPENAT  1
+#endif
+</pre>
+
+* ```test_dir```: 有时可能在程序运行过程中，一个directory变成了一个file, 通过此字段控制是否需要再进行dir的检测
+
+* ```test_only```: 是否只用于测试使用
+
+* ```log```: 
 
 
 
