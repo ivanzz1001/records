@@ -49,20 +49,20 @@ description: nginx源代码分析
 ## 2. ngx_open_file_info_t数据结构
 {% highlight string %}
 typedef struct {
-    ngx_fd_t                 fd;                     //该文件所对应的文件句柄
-    ngx_file_uniq_t          uniq;                   //该文件所对应的全局唯一标识， 一般取值为inode节点号
-    time_t                   mtime;                  //该文件的最后修改时间
-    off_t                    size;                   //该文件的大小
-    off_t                    fs_size;                //文件所占用的硬盘层面块数block * 512
-    off_t                    directio;               //文件对应的directio大小值， 小于该值采用sendfile来发送， 大于该值采用aio来发送
-    size_t                   read_ahead;             //预先由内核读取的字节数
+    ngx_fd_t                 fd;
+    ngx_file_uniq_t          uniq;
+    time_t                   mtime;
+    off_t                    size;
+    off_t                    fs_size;
+    off_t                    directio;
+    size_t                   read_ahead;
 
-    ngx_err_t                err;                    //该打开的文件所关联的错误信息码
-    char                    *failed;                 //所关联的错误信息
+    ngx_err_t                err;
+    char                    *failed;
 
-    time_t                   valid;                  //文件的有效时间
+    time_t                   valid;
 
-    ngx_uint_t               min_uses;               //
+    ngx_uint_t               min_uses;
 
 #if (NGX_HAVE_OPENAT)
     size_t                   disable_symlinks_from;
@@ -83,8 +83,69 @@ typedef struct {
 } ngx_open_file_info_t;
 {% endhighlight %}
 
+```ngx_open_file_info_t```用于nginx中描述一个打开的额缓存文件， 下面我们简要分析一下各字段的含义：
+
+* ```fd```: 该文件所对应的文件句柄
+
+* ```uniq```: 该文件所对应的全局唯一标识， 一般取值为inode节点号
+
+* ```mtime```: 该文件的最后修改时间
+
+* ```size```: 该文件的大小
+
+* ```fs_size```: 该文件所占用的硬盘层面的块数block * 512
+
+这里关于size与fs_size的区别，简单说明一下。 首先执行如下命令：
+{% highlight string %}
+# man 2 stat
+
+struct stat {
+   dev_t     st_dev;     /* ID of device containing file */
+   ino_t     st_ino;     /* inode number */
+   mode_t    st_mode;    /* protection */
+   nlink_t   st_nlink;   /* number of hard links */
+   uid_t     st_uid;     /* user ID of owner */
+   gid_t     st_gid;     /* group ID of owner */
+   dev_t     st_rdev;    /* device ID (if special file) */
+   off_t     st_size;    /* total size, in bytes */
+   blksize_t st_blksize; /* blocksize for file system I/O */
+   blkcnt_t  st_blocks;  /* number of 512B blocks allocated */
+   time_t    st_atime;   /* time of last access */
+   time_t    st_mtime;   /* time of last modification */
+   time_t    st_ctime;   /* time of last status change */
+};
+The st_size field gives the size of the file (if it is a regular file or a symbolic link) in bytes.  The size of a symbolic
+link is the length of the  pathname it contains, without a terminating null byte.
+
+The st_blocks field indicates the number of blocks allocated to the file, 512-byte units.  (This may be smaller than st_size/512 
+when the file has holes.)
+{% highlight string %}
+这里求fs_size一般采用如下宏：
+<pre>
+#define ngx_file_fs_size(sb)     ngx_max((sb)->st_size, (sb)->st_blocks * 512)
+</pre>
+一般在文件有```hole```的情况下， 文件的```size```大于```fs_size```， 否则```fs_size```小于等于```size```。
 
 
+* ```directio```: 文件对应的directio大小值， 小于该值采用sendfile来发送， 大于该值采用aio来发送, 这样可以防止进程被阻塞。
+
+* ```read_ahead```: 预先由内核读取的字节数。关于read_ahead， 有如下一段说明：
+<pre>
+Syntax:	read_ahead size;
+Default:	read_ahead 0;
+Context:	http, server, location
+Sets the amount of pre-reading for the kernel when working with file.
+
+On Linux, the posix_fadvise(0, 0, 0, POSIX_FADV_SEQUENTIAL) system call is used, and so the size parameter is ignored.
+
+On FreeBSD, the fcntl(O_READAHEAD, size) system call, supported since FreeBSD 9.0-CURRENT, is used. FreeBSD 7 has to be patched.
+</pre>
+
+* ```err```: 该打开的文件所关联的错误信息码
+
+* ```failed```: 所关联的错误信息
+
+* ```valid```: 文件的有效时间
 
 
 
@@ -97,6 +158,7 @@ typedef struct {
 1. [第二章 OpenResty(Nginx+Lua)开发入门](http://jinnianshilongnian.iteye.com/blog/2186448)
 
 2. [nginx open_file_cache指令影响静态文件更新时间](https://www.cnblogs.com/sunsweet/p/3338684.html)
+
 
 <br />
 <br />
