@@ -158,10 +158,62 @@ On FreeBSD, the fcntl(O_READAHEAD, size) system call, supported since FreeBSD 9.
 
 * ```test_dir```: 有时可能在程序运行过程中，一个directory变成了一个file, 通过此字段控制是否需要再进行dir的检测
 
-* ```test_only```: 是否只用于测试使用
+* ```test_only```: 只用于测试nginx中某一个特定的文件，以了解相关信息，并不会真正把其放入到nginx的静态文件cache中
 
-* ```log```: 
+* ```log```: 本字段当前主要用于指示是否只以```非阻塞只读```方式打开一个文件
 
+* ```errors```: 主要用于指示当操作缓存文件出现错误时，如何处理。 当此字段为0， 则出现错误时返回失败； 当此字段为1， 则出现错误时```可能```会进行重建操作。本字段主要用于指示是否能够忍受errors
+
+* ```events```: 主要用于指示是否为打开的文件绑定相应的事件。在有些操作系统上如删除文件等都会产生相应的事件
+
+* ```is_dir```: 用于指示此文件是否是一个目录
+
+* ```is_file```: 用于指示此文件是否是一个普通的文件
+
+* ```is_link```: 用于指示此文件是否是一个链接文件
+
+* ```is_exec```: 用于支持此文件是否是一个可执行文件
+
+* ```is_directio```: 主要用于指示此文件是否已经开启了directio
+
+## 2. ngx_cached_open_file_t数据结构 
+{% highlight string %}
+typedef struct ngx_cached_open_file_s  ngx_cached_open_file_t;
+
+struct ngx_cached_open_file_s {
+    ngx_rbtree_node_t        node;
+    ngx_queue_t              queue;
+
+    u_char                  *name;
+    time_t                   created;
+    time_t                   accessed;
+
+    ngx_fd_t                 fd;
+    ngx_file_uniq_t          uniq;
+    time_t                   mtime;
+    off_t                    size;
+    ngx_err_t                err;
+
+    uint32_t                 uses;
+
+#if (NGX_HAVE_OPENAT)
+    size_t                   disable_symlinks_from;
+    unsigned                 disable_symlinks:2;
+#endif
+
+    unsigned                 count:24;
+    unsigned                 close:1;
+    unsigned                 use_event:1;
+
+    unsigned                 is_dir:1;
+    unsigned                 is_file:1;
+    unsigned                 is_link:1;
+    unsigned                 is_exec:1;
+    unsigned                 is_directio:1;
+
+    ngx_event_t             *event;
+};
+{% endhighlight %}
 
 
 <br />
@@ -173,6 +225,7 @@ On FreeBSD, the fcntl(O_READAHEAD, size) system call, supported since FreeBSD 9.
 
 2. [nginx open_file_cache指令影响静态文件更新时间](https://www.cnblogs.com/sunsweet/p/3338684.html)
 
+3: [nginx对静态文件cache的处理分析](https://blog.csdn.net/weiyuefei/article/details/35782523)
 
 <br />
 <br />
