@@ -119,7 +119,7 @@ link is the length of the  pathname it contains, without a terminating null byte
 
 The st_blocks field indicates the number of blocks allocated to the file, 512-byte units.  (This may be smaller than st_size/512 
 when the file has holes.)
-{% highlight string %}
+{% endhighlight %}
 这里求fs_size一般采用如下宏：
 <pre>
 #define ngx_file_fs_size(sb)     ngx_max((sb)->st_size, (sb)->st_blocks * 512)
@@ -221,7 +221,7 @@ struct ngx_cached_open_file_s {
 
 **[参看]**
 
-1. [第二章 OpenResty开发入门](http://jinnianshilongnian.iteye.com/blog/2186448)
+1. [第二章 OpenResty(nginx+lua)开发入门](http://jinnianshilongnian.iteye.com/blog/2186448)
 
 2. [nginx open_file_cache指令影响静态文件更新时间](https://www.cnblogs.com/sunsweet/p/3338684.html)
 
