@@ -221,7 +221,7 @@ struct ngx_cached_open_file_s {
 
 **[参看]**
 
-1. [第二章 OpenResty(Nginx+Lua)开发入门](http://jinnianshilongnian.iteye.com/blog/2186448)
+1. [第二章 OpenResty开发入门](http://jinnianshilongnian.iteye.com/blog/2186448)
 
 2. [nginx open_file_cache指令影响静态文件更新时间](https://www.cnblogs.com/sunsweet/p/3338684.html)
 
