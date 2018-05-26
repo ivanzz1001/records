@@ -215,6 +215,142 @@ struct ngx_cached_open_file_s {
 };
 {% endhighlight %}
 
+本数据结构用于表示一个需要被```cached```的打开文件。下面我们简要介绍一下该数据结构：
+
+* ```node```: 用于表示该ngx_cached_open_file_s结构在nginx静态缓存红黑树的哪一个节点上
+
+* ```queue```: 用于表示该ngx_cached_open_file_s结构所在的队列
+
+* ```name```: 用于表示该缓冲的文件的名称
+
+* ```created```: 用于指明该文件是最先是在什么时候被放入静态缓存的
+
+* ```accessed```: 用于指示该缓存文件最近访问时间
+
+* ```fd```: 该缓存文件的文件句柄
+
+* ```uniq```: 该缓存文件的inode节点号，用作唯一标识
+
+* ```mtime```: 对该缓存文件的最近更新时间
+
+* ```uses```: 当前该缓存文件自从被添加到缓存红黑树之后被使用到的次数
+
+关于```disable_symlinks_from```与```disable_symlinks```字段，主要用于决定当打开文件的时候如何处理符号链接(symbolic links)。其中前一个字段用于指定从哪一个字段开始检查符号链接， 而后一个字段用于指定是否禁止符号链接。在```objs/ngx_auto_config.h```头文件中有如下定义：
+<pre>
+#ifndef NGX_HAVE_OPENAT
+#define NGX_HAVE_OPENAT  1
+#endif
+</pre>
+
+* ```count```: 用于指示该缓存文件被成功打开使用的次数
+
+* ```close```: 用于指示是否需要真正被关闭
+
+* ```use_event```: 指示是否使用event
+
+* ```is_dir```: 用于指示此文件是否是一个目录
+
+* ```is_file```: 用于指示此文件是否是一个普通的文件
+
+* ```is_link```: 用于指示此文件是否是一个链接文件
+
+* ```is_exec```: 用于支持此文件是否是一个可执行文件
+
+* ```is_directio```: 主要用于指示此文件是否已经开启了directio
+
+* ```event```: 该打开的缓存文件所关联的事件
+
+
+## 3. ngx_open_file_cache_t结构
+{% highlight string %}
+typedef struct {
+    ngx_rbtree_t             rbtree;
+    ngx_rbtree_node_t        sentinel;
+    ngx_queue_t              expire_queue;
+
+    ngx_uint_t               current;
+    ngx_uint_t               max;
+    time_t                   inactive;
+} ngx_open_file_cache_t;
+{% endhighlight %}
+
+本结构用于缓存nginx中的静态文件。下面简要介绍一下本数据结构：
+
+* ```rbtree```: 缓存文件红黑树的根，主要是为了方便查找
+
+* ```sentinel```: 红黑树sentinel节点
+
+* ```expire_queue```: 缓存文件过期队列
+
+* ```current```: 当前缓存元素的个数
+
+* ```max```: 最大的缓存个数
+
+* ```inactive```: 缓存的过期时间
+
+## 4. ngx_open_file_cache_cleanup_t结构
+{% highlight string %}
+typedef struct {
+    ngx_open_file_cache_t   *cache;
+    ngx_cached_open_file_t  *file;
+    ngx_uint_t               min_uses;
+    ngx_log_t               *log;
+} ngx_open_file_cache_cleanup_t;
+{% endhighlight %}
+本数据结构指示当前要清除的缓存文件结构。下面我们简要介绍一下各字段的含义：
+
+* ```cache```: 用于指示当前要cleanup的cache
+
+* ```file```: 用于指示当前要cleanup的文件
+
+* ```min_uses```: 低于此值则会cleanup
+
+* ```log```: 所对应的日志
+
+## 5. ngx_open_file_cache_event_t结构
+{% highlighlight string %}
+typedef struct {
+
+    /* ngx_connection_t stub to allow use c->fd as event ident */
+    void                    *data;
+    ngx_event_t             *read;
+    ngx_event_t             *write;
+    ngx_fd_t                 fd;
+
+    ngx_cached_open_file_t  *file;
+    ngx_open_file_cache_t   *cache;
+} ngx_open_file_cache_event_t;
+{% endhighlight %}
+本数据结构用于指示nginx静态缓存所对应的事件。下面简要介绍一下各字段的含义：
+
+* ```data```: 可以是任何内容
+
+* ```read```: 读事件
+
+* ```write```: 写事件
+
+* ```fd```: 所关联的文件句柄
+
+* ```file```: 所关联的静态缓冲文件
+
+* ```cache```: 所关联的缓存
+
+## 6. 相关函数声明
+{% highlight string %}
+//1) 初始化一个nginx静态文件缓存
+ngx_open_file_cache_t *ngx_open_file_cache_init(ngx_pool_t *pool,
+    ngx_uint_t max, time_t inactive);
+
+
+//2) 打开一个缓存文件
+ngx_int_t ngx_open_cached_file(ngx_open_file_cache_t *cache, ngx_str_t *name,
+    ngx_open_file_info_t *of, ngx_pool_t *pool);
+
+
+#endif /* _NGX_OPEN_FILE_CACHE_H_INCLUDED_ */
+{% endhighlight %}
+
+
 
 <br />
 <br />
@@ -226,6 +362,8 @@ struct ngx_cached_open_file_s {
 2. [nginx open_file_cache指令影响静态文件更新时间](https://www.cnblogs.com/sunsweet/p/3338684.html)
 
 3: [nginx对静态文件cache的处理分析](https://blog.csdn.net/weiyuefei/article/details/35782523)
+
+
 
 <br />
 <br />
