@@ -308,7 +308,7 @@ typedef struct {
 * ```log```: 所对应的日志
 
 ## 5. ngx_open_file_cache_event_t结构
-{% highlighlight string %}
+{% highlight string %}
 typedef struct {
 
     /* ngx_connection_t stub to allow use c->fd as event ident */
