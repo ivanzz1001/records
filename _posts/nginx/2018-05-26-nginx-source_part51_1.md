@@ -145,10 +145,13 @@ struct ngx_queue_s {
 
 ## 3. 相关函数声明
 {% highlight string %}
+//1) 用于找出一个队列的中间元素。这里可以分成两种情况， 如果队列的总元素个数为奇数， 则直接返回最中间的那个元素；
+//  如果队列总的元素个数为偶数， 则返回该队列第二部分的第一个元素。例如总共有4个元素， 则1、2为第一部分， 3、4为
+//  第二部分
 ngx_queue_t *ngx_queue_middle(ngx_queue_t *queue);
 
 
-
+//) 对队列中的元素进行排序
 void ngx_queue_sort(ngx_queue_t *queue,
     ngx_int_t (*cmp)(const ngx_queue_t *, const ngx_queue_t *));
 
