@@ -363,7 +363,11 @@ ngx_int_t ngx_open_cached_file(ngx_open_file_cache_t *cache, ngx_str_t *name,
 
 3: [nginx对静态文件cache的处理分析](https://blog.csdn.net/weiyuefei/article/details/35782523)
 
+4. [使用nginx的proxy_cache实现静态资源的缓存](http://www.jackieathome.net/archives/411.html)
 
+5. [nginx静态资源缓存策略配置](https://blog.csdn.net/yu12377/article/details/77875045)
+
+6. [Nginx 静态资源缓存设置](https://www.w3cschool.cn/nginxsysc/nginxsysc-cache.html)
 
 <br />
 <br />
