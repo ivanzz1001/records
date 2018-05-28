@@ -129,9 +129,32 @@ struct ngx_queue_s {
 #define ngx_queue_data(q, type, link)                                         \
     (type *) ((u_char *) q - offsetof(type, link))
 {% endhighlight %}
+上面操作较为简单，我们只介绍一下如下几个:
+
+* ```ngx_queue_split```: 本宏定义用于将一个队列从q节点位置分割成两个队列， ```h```与```n```分别为这两个新队列的头。注意，这里```q```与```h```不能指向相同的节点。
+
+
+![ngx-queue-split](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_queue_split.jpg)
+
+
+* ```ngx_queue_add```: 本宏定义用户队列```h```的尾部，插入队列```n```。
+
+
+* ```ngx_queue_data```: 用于求数据部分的首地址
+
+
+## 3. 相关函数声明
+{% highlight string %}
+ngx_queue_t *ngx_queue_middle(ngx_queue_t *queue);
 
 
 
+void ngx_queue_sort(ngx_queue_t *queue,
+    ngx_int_t (*cmp)(const ngx_queue_t *, const ngx_queue_t *));
+
+
+#endif /* _NGX_QUEUE_H_INCLUDED_ */
+{% endhighlight %}
 
 
 
