@@ -829,6 +829,10 @@ OpenSSL 1.0.2k-fips  26 Jan 2017
 
 5. [Linux下OpenSSL 源码安装的9个步骤](https://blog.csdn.net/chengqiuming/article/details/70139714)
 
+6. [openssl - 数字证书的编程解析](https://www.cnblogs.com/huhu0013/p/4791430.html)
+
+7. [SSL多域名绑定证书的解决方案](https://blog.csdn.net/kexiuyi/article/details/51837703)
+
 <br />
 <br />
 <br />
