@@ -35,6 +35,15 @@ description: 红黑树的原理及实现
 
 ### 1.2 二叉查找树
 
+一棵二叉查找树(BST)是一棵二叉树，其中每个节点都含有一个可比较的键（以及相关联的值）且每个节点的键都大于其左子树任意节点的键而小于右子树的任意节点的键。
+
+![ds-bst-figure1](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_bst_figure1.jpg)
+
+一棵二叉树代表了一组键（及其相应值）的集合，而同一集合可以用多棵不同的二叉树表示。如果我们将一棵二叉查找树的所有键投影到一条直线上，保证一个节点的左子树中的键出现在它的左边， 右子树中的键出现在它的右边，那么我们一定可以得到一条有序的键列：
+
+![ds-bst-figure2](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_bst_figure2.jpg)
+
+
 
 
 
