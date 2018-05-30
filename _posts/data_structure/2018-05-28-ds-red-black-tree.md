@@ -74,7 +74,7 @@ description: 红黑树的原理及实现
 ## 2. 平衡树
 在一棵含有```N```个节点的的树中，我们希望树高为```logN```。这样我们就能够保证所有查找都能在```logN```次比较内结束，就和二分查找一样。不幸的是，在动态插入中保证树的完美平衡的代价太高了。我们放松对完美平衡的要求，使符号表api中所有操作均能够在对数时间内完成。
 
-## 2.1  2-3查找树
+## 2.1  ```2-3查找树```
 
 为了保证树的平衡性，我们需要一些灵活性， 因此在这里我们允许树中的一个节点保存多个键：
 
@@ -87,7 +87,61 @@ description: 红黑树的原理及实现
 
 ![ds-23tree-figure1](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_firgure1.jpg)
 
+一棵完美平衡的```2-3查找树```所有空链接到根节点的的距离都相同。
 
+**1) 查找**
+
+要判断一个键是否在树中，我们先将它和根节点中的键比较。如果它和其中任何一个相等，查找命中。否则，我们就根据比较的结果找到指向相应区间的链接，并在其指向的子树中递归的继续查找。如果这是个空链接，查找未命中。
+
+下面给出伪代码：
+{% highlight string %}
+struct two_three_tnode{
+    int type;      //node type  0--2节点  1--3节点
+    int value;
+    struct two_three_tnode *left;
+    struct two_three_tnode *right;
+    char middle[0];        //store the second value and the middle pointer
+};
+
+
+
+struct two_three_tnode *find(struct two_three_tnode *root, int tofind)
+{
+    struct two_three_tnode *p = root;
+
+    while(p)
+    {
+        if(p->type == 0)
+        {
+             if(p->value == tofind)
+                 return p;
+             else if(p->value > tofind)
+                 p = p->left;
+             else
+                 p = p->right;
+        }
+        else if(p->type == 1)
+        {
+            int second = *(int *)(p + sizeof(struct two_three_tnode));
+            struct two_three_tnode *middle = (struct two_three_tnode *)(p + sizeof(struct two_three_tnode) + sizeof(int));
+
+            if(p->value == tofind)
+               return p;
+            else if(second == tofind)
+               return p;
+
+            if(tofind < p->value)
+               p = p->left;
+            else if(tofind > second)
+               p = p->right;
+            else 
+               p = middle;
+        }
+    }
+
+    return NULL;
+}
+{% endhighlight %}
 
 
 
