@@ -145,6 +145,28 @@ call virtual func
 上面我们展示了C++类中相关成员函数的调用方法。
 
 ## 3. 对象内存布局
+下面我们分不同的情况，分别讨论C++对象的内存布局。
+
+注：下文举例的类图中函数均为虚函数（*斜体* 表示该函数为虚函数）
+
+### 3.1 单一类
+
+**1) 空类**
+
+![cpp-obj-nonmemer](https://ivanzz1001.github.io/records/assets/img/cplusplus/cpp_object_nonmember.jpg)
+
+```sizeof(CNull)=1```，用于标识该对象。
+
+**2) 只有成员变量的类**
+{% highlight string %}
+class CVirable{
+private:
+   int m_a;
+   int m_b;
+   int m_c;
+};
+{% endhighlight %}
+类结构图如下：
 
 
 
