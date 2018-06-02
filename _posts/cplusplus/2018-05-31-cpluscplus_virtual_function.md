@@ -313,9 +313,75 @@ g0()
 h0()
 </pre>
 
+### 3.2 单一继承
 
+这里介绍一下```单一继承```情况下的内存模型（含成员变量、虚函数、虚函数覆盖）：
 
+![cpp-obj-model](https://ivanzz1001.github.io/records/assets/img/cplusplus/cpp_object_model_figure5.jpg)
 
+<pre>
+int nChildSize = sizeof(CChildren) = 16
+</pre>
+
+我们通过如下程序进行测试：
+{% highlight string %}
+#include <stdlib.h>
+#include <sys/types.h>
+#include <stdint.h>
+
+class CParent{
+private:
+  int m_nAge;
+public:
+   virtual void f0(){ printf("f0()\n"); }
+   virtual void g0(){ printf("g0()\n"); }
+   virtual void h0(){ printf("h0()\n"); }
+};
+
+class CChildren : public CParent{
+private:
+   int m_nChildren;
+
+public:
+   virtual void f0(){ printf("children f0()\n"); }
+   virtual void g1(){ printf("g1()\n"); }
+   virtual void h0(){ printf("children h0()\n"); }
+};
+
+int main(int argc,char *argv[])
+{
+   CChildren pChildrenA;
+   uintptr_t **p = (uintptr_t **)&pChildrenA;
+ 
+   typedef void (*pvirtualfunc)(CChildren *);
+
+   printf("sizeof(CChildren): %d\n", sizeof(CChildren));
+
+   pvirtualfunc func1 = (pvirtualfunc)**p;
+   func1(&pChildrenA);
+
+   pvirtualfunc func2 = (pvirtualfunc)(*(*p + 1));
+   func2(&pChildrenA);
+
+   pvirtualfunc func3 = (pvirtualfunc)(*(*p + 2));
+   func3(&pChildrenA);
+
+   pvirtualfunc func4 = (pvirtualfunc)(*(*p + 3));
+   func4(&pChildrenA);
+  
+   return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -g -o test test.cpp -lstdc++
+# ./test
+sizeof(CChildren): 16
+children f0()
+g0()
+children h0()
+g1()
+</pre>
 
 <br />
 <br />
