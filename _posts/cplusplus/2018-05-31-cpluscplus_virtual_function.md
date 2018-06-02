@@ -80,6 +80,8 @@ class CDerive : public virtual CBase{
 {% highlight string %}
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <stdint.h>
 
 
 class A{
@@ -116,7 +118,7 @@ int main(int argc,char *argv[])
 
 
     // virtual member function
-    int **p = (int **)&a;
+    uintptr_t **p = (uintptr_t **)&a;
     typedef void (*pvirtual_func)(A *);
     pvirtual_func pvfunc = (pvirtual_func)**p;
     pvfunc(&a);
@@ -130,12 +132,8 @@ int main(int argc,char *argv[])
 {% endhighlight %}
 编译运行：
 <pre>
-# gcc -o test2 test2.cpp -lstdc++ 
-test2.cpp: In function ‘int main(int, char**)’:
-test2.cpp:41:45: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-     pvirtual_func pvfunc = (pvirtual_func)**p;
-
-# ./test2
+# gcc -o test test.cpp -lstdc++
+# ./test
 call static func
 call nonstatic func
 call virtual func
@@ -204,6 +202,57 @@ $4 = (int *) 0x7fffffffdf74
 (gdb) p &pVarA.m_c
 $5 = (int *) 0x7fffffffdf78
 </pre>
+
+
+**3) 只有虚函数的类**
+
+![cpp-obj-model](https://ivanzz1001.github.io/records/assets/img/cplusplus/cpp_object_model_figure3.jpg)
+
+我们通过如下程序测试：
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <stdint.h>
+
+class CVFunction{
+public:
+   virtual void f(){ printf("f()\n"); }
+   virtual void g(){ printf("g()\n"); }
+   virtual void h(){ printf("h()\n"); }
+};
+
+int main(int argc,char *argv[])
+{
+   CVFunction pVFunc;
+   uintptr_t **p = (uintptr_t **)&pVFunc;
+
+ 
+   typedef void (*pvirtualfunc)(CVFunction *);
+
+   pvirtualfunc func1 = (pvirtualfunc)**p;
+   func1(&pVFunc);
+
+   pvirtualfunc func2 = (pvirtualfunc)(*(*p + 1));
+   func2(&pVFunc);
+
+   pvirtualfunc func3 = (pvirtualfunc)(*(*p + 2));
+   func3(&pVFunc);
+  
+   return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -g -o test test.cpp -lstdc++
+# ./test
+f()
+g()
+h()
+</pre>
+
+
+
 
 
 
