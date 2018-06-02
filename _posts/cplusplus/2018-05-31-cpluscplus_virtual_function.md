@@ -208,6 +208,10 @@ $5 = (int *) 0x7fffffffdf78
 
 ![cpp-obj-model](https://ivanzz1001.github.io/records/assets/img/cplusplus/cpp_object_model_figure3.jpg)
 
+<pre>
+int nVFuntionSize = sizeof(CVFuction) = 8（虚表指针）
+</pre>
+
 我们通过如下程序测试：
 {% highlight string %}
 #include <stdio.h>
@@ -227,8 +231,9 @@ int main(int argc,char *argv[])
    CVFunction pVFunc;
    uintptr_t **p = (uintptr_t **)&pVFunc;
 
- 
    typedef void (*pvirtualfunc)(CVFunction *);
+
+   printf("sizeof(CVFuncation): %d\n", sizeof(CVFunction));
 
    pvirtualfunc func1 = (pvirtualfunc)**p;
    func1(&pVFunc);
@@ -246,13 +251,67 @@ int main(int argc,char *argv[])
 <pre>
 # gcc -g -o test test.cpp -lstdc++
 # ./test
+sizeof(CVFuncation): 8
 f()
 g()
 h()
 </pre>
 
 
+**4) 有成员变量、虚函数的类**
 
+![cpp-obj-model](https://ivanzz1001.github.io/records/assets/img/cplusplus/cpp_object_model_figure4.jpg)
+
+<pre>
+int nParentSize = sizeof(CParent) = 16 (找出最大长度的成员长度M（结构体的长度一定是该成员的整数倍））
+</pre>
+
+我们通过如下程序测试：
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <stdint.h>
+
+class CParent{
+private:
+  int m_nAge;
+public:
+   virtual void f0(){ printf("f0()\n"); }
+   virtual void g0(){ printf("g0()\n"); }
+   virtual void h0(){ printf("h0()\n"); }
+};
+
+int main(int argc,char *argv[])
+{
+   CParent pParentA;
+   uintptr_t **p = (uintptr_t **)&pParentA;
+ 
+   typedef void (*pvirtualfunc)(CParent *);
+
+   printf("sizeof(CParent): %d\n", sizeof(CParent));
+
+   pvirtualfunc func1 = (pvirtualfunc)**p;
+   func1(&pParentA);
+
+   pvirtualfunc func2 = (pvirtualfunc)(*(*p + 1));
+   func2(&pParentA);
+
+   pvirtualfunc func3 = (pvirtualfunc)(*(*p + 2));
+   func3(&pParentA);
+  
+   return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -g -o test test.cpp -lstdc++
+# ./test
+sizeof(CParent): 16
+f0()
+g0()
+h0()
+</pre>
 
 
 
