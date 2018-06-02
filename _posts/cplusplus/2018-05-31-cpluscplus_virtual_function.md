@@ -158,18 +158,52 @@ call virtual func
 ```sizeof(CNull)=1```，用于标识该对象。
 
 **2) 只有成员变量的类**
+
+![cpp-obj-model](https://ivanzz1001.github.io/records/assets/img/cplusplus/cpp_object_model_figure2.jpg)
+
+<pre>
+int nVarSize = sizeof(CVariable) = 12
+</pre>
+
+我们用如下程序进行测试：
 {% highlight string %}
-class CVirable{
+#include <stdio.h>
+#include <stdlib.h>
+
+
+class CVariable{
 private:
    int m_a;
    int m_b;
    int m_c;
 };
+
+int main(int argc,char *argv[])
+{
+   CVariable pVarA;
+
+   printf("&pVarA: %p\n", &pVarA);
+   printf("sizeof(CVariable): %d\n", sizeof(CVariable));
+
+   return 0x0;
+}
 {% endhighlight %}
-类结构图如下：
 
-
-
+编译运行：
+<pre>
+# gcc -g -o test test.cpp -lstdc++
+# gdb ./test
+(gdb) p pVarA
+$1 = {m_a = -8096, m_b = 32767, m_c = 0}
+(gdb) p &pVarA
+$2 = (CVariable *) 0x7fffffffdf70
+(gdb) p &pVarA.m_a
+$3 = (int *) 0x7fffffffdf70
+(gdb) p &pVarA.m_b
+$4 = (int *) 0x7fffffffdf74
+(gdb) p &pVarA.m_c
+$5 = (int *) 0x7fffffffdf78
+</pre>
 
 
 
