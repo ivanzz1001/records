@@ -167,7 +167,7 @@ struct test2
 **3） 示例2.3**
 {% highlight string %}
 struct test3{
-	char a;
+    char a;
     struct test2 b;    //见上
     int cc;
 };
@@ -227,9 +227,85 @@ union mm{
 
 
 
+## 9. 运行示例
+
+下面给出上面所讲各例子的运行示例```test.cpp```：
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
 
 
+struct student{
+   char name[5];
+   int num;
+   short score;
+};
 
+struct test1 
+{ 
+    int a; 
+    int b[4]; 
+};
+
+struct test2 
+{ 
+    char a; 
+    int b; 
+    double c; 
+    bool d; 
+};
+
+
+struct test3{
+    char a;
+    struct test2 b;    
+    int cc;
+};
+
+ struct test4{
+    char a;
+    int b;
+ };
+
+ struct test5{
+      char c;
+      struct test4 d;
+      double e;
+      bool f;
+ };
+
+ union mm{
+   char a;
+   int b[5];
+   double c;
+   int d[3];
+ };
+
+int main(int argc,char *argv[])
+{
+    printf("size student: %d\n", sizeof(struct student));
+    printf("size test1: %d\n", sizeof(struct test1));
+    printf("size test2: %d\n", sizeof(struct test2));
+    printf("size test3: %d\n", sizeof(struct test3));
+    printf("size test4: %d\n", sizeof(struct test4));
+    printf("size test5: %d\n", sizeof(struct test5));
+    printf("size mm: %d\n", sizeof(union mm));
+    return 0x0;
+}
+{% endhighlight %}
+
+编译运行：
+<pre>
+# gcc -o test test.cpp -lstdc++
+# ./test
+size student: 16
+size test1: 20
+size test2: 24
+size test3: 40
+size test4: 8
+size test5: 32
+size mm: 24
+</pre>
 
 
 
