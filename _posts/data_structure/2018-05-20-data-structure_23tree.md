@@ -22,7 +22,7 @@ description: 数据结构之2-3树
 
 和以前一样，我们将指向一棵空树的链接称为```空链接```。```2-3查找树```如下图所示：
 
-![ds-23tree-figure1](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_definition.jpg)
+![ds-23tree-definition](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_definition.jpg)
 
 一棵完美平衡的```2-3查找树```所有空链接到根节点的的距离都相同。下面讲述一下```2-3查找树```的基本操作：
 
@@ -40,7 +40,7 @@ description: 数据结构之2-3树
 
 要判断一个键是否存在树中，先将它和根节点中的键比较， 如果它和其中任意一个相等，查找命中； 否则就根据比较的结果找到指向相应区间的链接，并在其指向的子树中递归地继续查找， 如果找到了空链接上，则查找未命中。
 
- 
+![ds-23tree-find](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_find.jpg)
 
 
 
