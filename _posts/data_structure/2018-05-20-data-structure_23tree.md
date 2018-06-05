@@ -43,7 +43,14 @@ description: 数据结构之2-3树
 ![ds-23tree-find](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_find.jpg)
 
 
+## 3. 插入节点
+要在```2-3树```中插入一个新节点，我们可以和```二叉查找树```一样对```2-3树```进行一次未命中查找，然后把新节点挂在树的底部。但这样的话无法保证```2-3树```的完美平衡性。我们使用```2-3树```的主要原因在于它能够在插入之后继续保持平衡。下面我们根据```未命中```查找结束时的节点类型，分多种不同情况说明：
 
+1) 向2-节点中插入新键
+
+当未命中查找结束于一个```2-节点```时，直接将```2-节点```替换为一个```3-节点```，并将要插入的键保存其中：
+
+![ds-23tree-insert1](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_insert_1.jpg)
 
 
 
