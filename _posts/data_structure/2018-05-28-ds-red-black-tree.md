@@ -68,13 +68,18 @@ description: 红黑树的原理及实现
 在由N个随机构建的二叉查找树中， 查找命中平均所需的比较次数为2logN。 N越大这个公式越准确。
 {% endhighlight %}
 
-注： 这里我们主要是通过二叉查找树引出```2-3树```，进而引出```红黑树```， 因此对于二叉查找树并不会详细介绍。欲详细了解，请参看其他章节。
-
 
 ## 2. 平衡树
 在一棵含有```N```个节点的的树中，我们希望树高为```logN```。这样我们就能够保证所有查找都能在```logN```次比较内结束，就和二分查找一样。不幸的是，在动态插入中保证树的完美平衡的代价太高了。我们放松对完美平衡的要求，使符号表api中所有操作均能够在对数时间内完成。
 
-## 2.1  ```2-3查找树```
+这里我们介绍两种平衡树：
+
+* 2-3查找树
+
+* 红黑树
+
+
+## 3. ```2-3查找树```
 
 为了保证树的平衡性，我们需要一些灵活性， 因此在这里我们允许树中的一个节点保存多个键：
 
@@ -89,60 +94,17 @@ description: 红黑树的原理及实现
 
 一棵完美平衡的```2-3查找树```所有空链接到根节点的的距离都相同。
 
-**1) 查找**
+### 3.1 查找
 
-要判断一个键是否在树中，我们先将它和根节点中的键比较。如果它和其中任何一个相等，查找命中。否则，我们就根据比较的结果找到指向相应区间的链接，并在其指向的子树中递归的继续查找。如果这是个空链接，查找未命中。
-
-下面给出伪代码：
-{% highlight string %}
-struct two_three_tnode{
-    int type;      //node type  0--2节点  1--3节点
-    int value;
-    struct two_three_tnode *left;
-    struct two_three_tnode *right;
-    char middle[0];        //store the second value and the middle pointer
-};
+要判断一个键是否在```2-3树```中，我们先将它和根节点中的键比较。如果它和其中任何一个相等，查找命中。否则，我们就根据比较的结果找到指向相应区间的链接，并在其指向的子树中递归的继续查找。如果这是个空链接，查找未命中。
 
 
 
-struct two_three_tnode *find(struct two_three_tnode *root, int tofind)
-{
-    struct two_three_tnode *p = root;
+### 3.2 插入
 
-    while(p)
-    {
-        if(p->type == 0)
-        {
-             if(p->value == tofind)
-                 return p;
-             else if(p->value > tofind)
-                 p = p->left;
-             else
-                 p = p->right;
-        }
-        else if(p->type == 1)
-        {
-            int second = *(int *)(p + sizeof(struct two_three_tnode));
-            struct two_three_tnode *middle = (struct two_three_tnode *)(p + sizeof(struct two_three_tnode) + sizeof(int));
+要在```2-3树```中插入一个新节点，我们可以和二叉查找树一样先进行一次未命中查找，然后把新节点挂在树的底部。但这样的话树无法保持完美平衡。我们使用```2-3树```的主要原因就在于它能够在插入之后继续保持平衡。
 
-            if(p->value == tofind)
-               return p;
-            else if(second == tofind)
-               return p;
-
-            if(tofind < p->value)
-               p = p->left;
-            else if(tofind > second)
-               p = p->right;
-            else 
-               p = middle;
-        }
-    }
-
-    return NULL;
-}
-{% endhighlight %}
-
+如果未命中的的查找结束于一个```2-节点```，我们只要把这个```2-节点```替换成一个```3-节点```，将要插入的键保存在其中即可。如果未命中的查找结束于一个```3节点```，事情就要麻烦一些。下面我们分 
 
 
 
@@ -163,7 +125,7 @@ struct two_three_tnode *find(struct two_three_tnode *root, int tofind)
 
 5：[数据结构： 2-3树与红黑树](http://blog.csdn.net/aircattle/article/details/52347955)
 
-
+6. [数据结构与算法](https://blog.csdn.net/hello_world_lvlcoder/article/category/6655685/1)
 <br />
 <br />
 <br />
