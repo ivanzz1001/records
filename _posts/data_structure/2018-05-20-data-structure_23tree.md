@@ -58,7 +58,11 @@ description: 数据结构之2-3树
 
 ![ds-23tree-insert2](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_insert_2.jpg)
 
+**3) 向一个双亲节点为2-节点的3-节点中插入新键**
 
+先构造一个临时的```4-节点```并将其分解，分解时将中键移动到双亲节点中（中键移动后，其双亲节点的中的位置由键的大小确定）：
+
+![ds-23tree-insert3](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_insert_3.jpg)
 
 
 
