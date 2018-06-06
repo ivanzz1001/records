@@ -65,6 +65,21 @@ description: 数据结构之2-3树
 ![ds-23tree-insert3](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_insert_3.jpg)
 
 
+**4) 向一个双亲节点为3-节点的3-节点插入新键**
+
+一直向上分解构造的临时```4-节点```，并将中键移动到更高层双亲节点，直到遇到一个```2-节点```并将其替换为一个不需要继续分解的```3-节点```，或者是到达树根(```3-节点```)
+
+![ds-23tree-insert4](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_insert_4.jpg)
+
+
+**5） 分解根节点**
+
+如果从插入节点到根节点的路径上全是```3-节点```，根将最终被替换为一个临时的```4-节点```，将临时的```4-节点```分解为三个```2-节点```，分解后树高会增加1：
+
+![ds-23tree-insert5](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_insert_5.jpg)
+
+
+
 
 
 
