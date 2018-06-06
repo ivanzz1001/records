@@ -43,6 +43,11 @@ No query specified
 {% endhighlight %}
 上面导出一个```test_1```数据表的建表过程。
 
+**2) 导出整个数据库表结构**
+{% highlight string %}
+# mysqldump -hhostname -uusername -ppassword -d databasename >> databasename.sql
+{% endhighlight %}
+
 
 
 <br />
