@@ -93,6 +93,18 @@ description: 数据结构之2-3树
 
 ## 4. 变换
 
+**1) 局部变换**
+
+这里我们将对一个```4-节点```的分解叫做```变换```，对一个```4-节点```的变换方式可能有6种：
+
+![ds-23tree-transform1](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_transform_1.jpg)
+
+**2) 全局性质**
+
+
+变换不会影响树的全局```有序性```和```平衡性```，任意空链接到根节点的路径长度依旧是相等的：
+
+
 
 ## 5. 删除
 
