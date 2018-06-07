@@ -32,7 +32,7 @@ Linux oss-uat-06 3.10.0-514.el7.x86_64 #1 SMP Tue Nov 22 16:42:41 UTC 2016 x86_6
 
 关于JDK的安装，请参看其他文档。
 
-##2. 安装zookeeper
+## 2. 安装zookeeper
 
 这里安装的zookeeper采用单机模式工作，因此如下的操作配置都是采用```单机模式配置```:
 
