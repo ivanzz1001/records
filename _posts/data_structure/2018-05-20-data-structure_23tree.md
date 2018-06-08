@@ -138,6 +138,12 @@ description: 数据结构之2-3树
 
 **(1) 叶节点的父节点是 3-节点**
 
+* 情形1： 删除节点是左孩子，中间孩子是2-节点
+
+![ds-23tree-delnode-1](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_delnode_1.jpg)
+
+
+
 
 
 <br />
