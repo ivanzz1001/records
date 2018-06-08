@@ -142,13 +142,33 @@ description: 数据结构之2-3树
 
 ![ds-23tree-delnode-1](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_delnode_1.jpg)
 
+如上图，以关键字```a```、```c```构造一个```3-节点```，并将其作为b的左孩子
 
+
+* ```情形2```: 删除节点是左孩子，中间孩子是3-节点
+
+![ds-23tree-delnode-2](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_delnode_2.jpg)
+
+
+* ```情形3```: 删除节点是中间节点， 右节点是2-节点
+
+
+* ```情形4```: 删除节点是中间节点， 右节点是3-节点
+
+* ```情形5```: 删除节点是右节点， 中间节点是2-节点
+
+* ```情形6```: 删除节点是右节点， 中间节点是3-节点
 
 
 
 <br />
 **(2) 叶节点的父节点是 2-节点**
 
+* ```情形1```: 删除节点是左节点，右节点是2-节点
+
+![ds-23tree-delnode-7](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_delnode_7.jpg)
+
+上面删除节点后，把关键字```b```移动到其右孩子节点中。为了维持树的高度不变，把包含```b```的节点变为空节点。这时我们得到了包含空节点的树，我们需要删除该空节点。根据新的空节点的父节点的情况再分类进行处理，直到没有空节点。
 
 
 
