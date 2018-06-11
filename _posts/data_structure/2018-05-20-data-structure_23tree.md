@@ -152,8 +152,14 @@ description: 数据结构之2-3树
 
 * ```情形3```: 删除节点是中间节点， 右节点是2-节点
 
+![ds-23tree-delnode-3](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_delnode_3.jpg)
+
+
 
 * ```情形4```: 删除节点是中间节点， 右节点是3-节点
+
+![ds-23tree-delnode-4](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_delnode_4.jpg)
+
 
 * ```情形5```: 删除节点是右节点， 中间节点是2-节点
 
