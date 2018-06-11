@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 数据结构之2-3树
+title: 数据结构之2-3树(上）
 tags:
 - data-structure
 categories: data-structure
@@ -190,6 +190,9 @@ description: 数据结构之2-3树
     的一棵子树  ， 此时树高减1， 即h = h -1。将当前节点设置为该合并节点，接着继续执行a) b) c) d)步骤
 </pre>
 
+![ds-23tree-delnode-71](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_delnode_71.jpg)
+
+![ds-23tree-delnode-72](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_delnode_72.jpg)
 
 * ```情形2```: 删除节点是左节点，右节点是3-节点
 
@@ -198,9 +201,8 @@ description: 数据结构之2-3树
 
 * ```情形3```: 删除节点是右节点，左节点是2-节点
 
-与上面```情形1```类似。
+(此种情况与上面 情形1类似，这里不再赘述)
 
-<br />
 
 * ```情形4```: 删除节点是右节点，左节点是3-节点
 
