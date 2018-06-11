@@ -194,6 +194,8 @@ description: 数据结构之2-3树
 
 3. [2-3树](https://baike.baidu.com/item/2-3%E6%A0%91/3484656?fr=aladdin)
 
+4. [从2-3-4树到红黑树（上）](https://www.cnblogs.com/nullzx/p/6111175.html)
+
 <br />
 <br />
 <br />
