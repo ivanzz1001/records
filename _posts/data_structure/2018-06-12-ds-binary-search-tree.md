@@ -75,7 +75,7 @@ struct BSTNode *search(BSTree *root, int key)
 <br />
 **[参看]:**
 
-
+1. [深入理解二叉搜索树（BST）](https://blog.csdn.net/u013405574/article/details/51058133)
 
 <br />
 <br />
