@@ -115,7 +115,10 @@ struct BSTNode *predecessor(BSTNode *x)
 }
 {% endhighlight %}
 
-
+## 4. BST节点插入
+BST节点的插入非常简单，很类似于二叉搜索树的查找过程。当需要插入一个新节点时，从根节点开始，迭代或递归向下移动，直到遇到一个空指针。需要插入的值即被存储在该节点位置。下面给出迭代版插入的伪代码：
+{% highlight string %}
+{% endhighlight %}
 
 
 
