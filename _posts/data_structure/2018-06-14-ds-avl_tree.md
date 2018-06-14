@@ -47,11 +47,35 @@ description: AVL树原理及实现
 
 ![ds-node-right-rotate](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_node_right_rotate.jpg)
 
+下面给出右旋转伪代码：
+{% highlight string %}
+struct AVLNode *right_rotate(struct AVLNode *node)
+{
+    struct AVLNode *left = node->left;
+    node->left = left->right;
+    left->right = node;
 
+    return left;
+}
+{% endhighlight %}
 
 * 以某一节点为轴，它的右枝逆时针旋转，作为新子树的根， 我们称为```逆时钟旋转```(anti clockwise)或者```左旋转```;
 
 ![ds-node-left-rotate](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_node_left_rotate.jpg)
+
+下面给出左旋转伪代码：
+{% highlight string %}
+struct AVLNode *left_rotate(struct AVLNode *node)
+{
+    struct AVLNode *right = node->right;
+    node->right = right->left;
+    right->left = node;
+
+    return right;
+}
+{% endhighlight %}
+
+说明： 对于上面的```右旋转```、```左旋转```, 都不会影响到旋转节点的父节点。
 
 
 
