@@ -90,6 +90,24 @@ AVL树的插入操作首先会按照普通搜索二叉树的插入操作进行�
 
 
 
+**2) 情形2**
+
+节点```X```的右子树比左子树高度大2， 且插入节点位于```X```右孩子节点```XR```的右子树上。
+
+![ds-avl-left-rotate](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_avl_left_rotate.jpg)
+
+
+**3) 情形3**
+
+节点```X```左子树比右子树高度大2， 且插入节点位于```X```左孩子```XL```的右子树上：
+
+![ds-avl-left-right-rotate](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_avl_left_right_rotate.jpg)
+
+**4) 情形4**
+
+节点```X```的右子树比左子树高度大2， 且插入节点位于```X```右孩子```XR```的左子树上：
+
+![ds-avl-right-left-rotate](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_avl_right_left_rotate.jpg)
 
 
 <br />
