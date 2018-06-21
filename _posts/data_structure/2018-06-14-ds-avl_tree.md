@@ -115,7 +115,445 @@ AVL树的插入操作首先会按照普通搜索二叉树的插入操作进行�
 AVL树的删除操作和插入操作一样，首先会按照普通搜索二叉树的删除操作进行。 当删除一个数据后， 和插入操作一样， 我们通常采取的策略是沿着删除数据时所经过的节点回溯， 回溯的过程中会判断该节点的```左右子树```的高度之差是否超过1， 如果超过1， 我们就进行调整， 调整的目的是使得该节点满足AVL树的定义。调整情况可以分为4种，和插入过程完全一样，这里不再赘述。
 
 
+## 5. 相关源代码实现
 
+### 5.1 avltree.h头文件
+
+头文件```avltree.h```:
+{% highlight string %}
+#ifndef __AVLTREE_H_
+#define __AVLTREE_H_
+
+
+
+typedef struct Node{
+	int height;       //the height of the branch
+	int data;
+	struct Node *left;
+	struct Node *right;
+}AVLNode, *AVLTree;
+
+
+int insert_node(AVLTree *root, int data);
+
+int remove_node(AVLTree *root, int data);
+
+int find(AVLTree root, int data);
+
+int destroy(AVLTree *root);
+
+// just for test
+
+void inorder_traverse(AVLTree root);
+
+void preorder_traverse(AVLTree root);
+
+void postorder_traverse(AVLTree root);
+
+
+#endif
+{% endhighlight %)
+
+
+### 5.2 avltree.c源代码文件
+
+源文件```avltree.c```:
+
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include "avltree.h"
+
+
+#define MAX(x1, x2) ((x1) > (x2) ? (x1) : (x2))
+
+
+//some helper functions
+static int getheight(AVLTree node);
+
+static void left_rotate(AVLTree *node);
+
+static void right_rotate(AVLTree *node);
+
+static int findmin(AVLTree node);
+
+
+
+// the height of the empty tree is 0
+static int getheight(AVLTree node)
+{
+	if(!node)
+		return 0;
+
+	return node->height;
+}
+
+static void left_rotate(AVLTree *node)
+{
+    AVLNode *p = *node;
+    AVLNode *r = p->right;
+
+	p->right = r->left;
+	r->left = p;
+	*node = r;
+
+	//change the node's height
+	p->height = MAX(getheight(p->left), getheight(p->right)) + 1;
+
+	r->height = MAX(getheight(r->left), getheight(r->right)) + 1;
+}
+
+
+static void right_rotate(AVLTree *node)
+{
+	AVLNode *p = *node;
+	AVLNode *lnode = p->left;
+
+	p->left = lnode->right;
+	lnode->right = p;
+	*node = lnode;
+
+	//change the node's height
+	p->height = MAX(getheight(p->left), getheight(p->right)) + 1;
+
+	lnode->height = MAX(getheight(lnode->left), getheight(lnode->right)) + 1;
+}
+
+
+static int findmin(AVLTree node)
+{
+	if(node == NULL)
+		return -1;
+
+	while(node->left)
+		node = node->left;
+
+	return node->data;
+}
+
+
+/*
+ * insert data into avltree
+ *
+ * return: 0--success    -1--failure
+ */
+int insert_node(AVLTree *root, int data)
+{
+	if(!*root)
+	{
+	    *root = (AVLNode *)malloc(sizeof(AVLNode));
+		if(!*root)
+			return -1;
+		(*root)->data = data;
+		(*root)->height = 1;
+		(*root)->left = (*root)->right = NULL;
+		return 0x0;
+	}
+
+	if((*root)->data == data)
+		return -1;
+	else if((*root)->data < data)
+	{
+		//insert in right tree
+		if(insert_node(&(*root)->right,data) < 0)
+			return -1;
+
+		int lchild_height = getheight((*root)->left);
+		int rchild_height = getheight((*root)->right);
+
+		//after insert, we should check whether it is balanced
+		//Here because we insert at the right branch, so rchild_height >= lchild_height
+		if(rchild_height - lchild_height == 2)
+		{
+		     if((*root)->right->data < data)
+		     {
+		           //Please reference 'AVLTree insert' chapter , this is the case 2
+		           left_rotate(root);
+		     }
+			 else{
+			 	   //Please reference 'AVLTree insert' chapter, this is the case 4
+			 	   right_rotate(&(*root)->right);
+				   left_rotate(root);
+			 }
+		}
+
+
+	}
+	else{
+		//insert in left tree
+		if(insert_node(&(*root)->left, data) < 0)
+			return -1;
+
+        int lchild_height = getheight((*root)->left);
+		int rchild_height = getheight((*root)->right);
+
+		//after insert, we should check whether it is balanced
+		//Here because we insert at the left branch, so lchild_height >= rchild_height
+		if(lchild_height - rchild_height == 2)
+		{
+		    if((*root)->left->data > data)
+		    {
+		         //Please reference 'AVLTree insert' chapter, this is the case 1
+		         right_rotate(root);
+		    }
+			else{
+				 //Please reference 'AVLTree insert' chapter, this is the case 3
+				 left_rotate(&(*root)->left);
+				 right_rotate(root);
+			}
+		}
+
+	}
+
+    //update the current node height
+    (*root)->height = MAX(getheight((*root)->left), getheight((*root)->right)) + 1;
+	return 0x0;
+}
+
+
+/*
+ * remove data from avltree
+ */
+int remove_node(AVLTree *root, int data)
+{
+    if(*root == NULL)
+    {
+        // the tree is empty or the avltree doesn't have a node which data equals 'data'
+		return -1;
+    }
+
+	//find the node
+	if((*root)->data == data)
+	{
+
+	    if((*root)->left != NULL && (*root)->right != NULL)
+	    {
+	        // the left child and the right child is not null, we find the 'next' node
+	        int key = findmin((*root)->right);
+			(*root)->data = key;
+
+			//remove the 'next' node, and it will must successful
+			remove_node(&(*root)->right, key);
+
+			int lchild_height = getheight((*root)->left);
+			int rchild_height = getheight((*root)->right);
+
+
+			//Bacause here we remove the node at right-branch, so lchild_height >= rchild_height
+			if(lchild_height - rchild_height == 2)
+			{
+				//Note: when remove, here is '>='
+				if(getheight((*root)->left->left) >= getheight((*root)->left->right))
+				{
+				    //Please reference 'AVLTree insert' chapter, this is the case 1
+				    right_rotate(root);
+				}
+				else{
+					//Please reference 'AVLTree insert' chapter, this is the case 3
+					left_rotate(&(*root)->left);
+					right_rotate(root);
+				}
+			}
+
+	    }
+		else if((*root)->left == NULL)
+		{
+		    //Here the left branch is NULL
+		    AVLNode *node = *root;
+			*root = node->right;
+			free(node);
+			node = NULL;
+			return 0x0;
+		}
+		else{
+			//Here the right branch is NULL
+			AVLNode *node = *root;
+			*root = node->left;
+			free(node);
+			node = NULL;
+			return 0x0;
+		}
+	}
+	else if((*root)->data < data)
+	{
+	     //find the node at the right-branch
+	     if(remove_node(&(*root)->right, data) < 0)
+		 	return -1;
+
+		 int lchild_height = getheight((*root)->left);
+		 int rchild_height = getheight((*root)->right);
+
+		 //Because we remove the node at the right-branch, so lchild_height >= rchild_height
+		 if(lchild_height - rchild_height == 2)
+		 {
+		 	  //Note: when remove, here is '>='
+		      if(getheight((*root)->left->left) >= getheight((*root)->left->right))
+		      {
+		            //Please reference 'AVLTree insert' chapter, this is the case 1
+		            right_rotate(root);
+		      }
+			  else{
+			  	   //Please reference 'AVLTree insert' chapter, this is the case 3
+			  	   left_rotate(&(*root)->left);
+				   right_rotate(root);
+			  }
+		 }
+	}
+	else{
+		   //find the node at the left-branch
+		   if(remove_node(&(*root)->left, data) < 0)
+		   		return -1;
+
+		   int lchild_height = getheight((*root)->left);
+		   int rchild_height = getheight((*root)->right);
+
+		   //Because we remove the node at the left-branch, so rchild_height >= lchild_height
+		   if(rchild_height - lchild_height == 2)
+		   {
+		       //Note: when remove, there is '>='
+		       if(getheight((*root)->right->right) >= getheight((*root)->right->left))
+		       {
+		       		//Please reference 'AVLTree insert' chapter, this is the case 2
+		       		left_rotate(root);
+		       }
+			   else{
+			   	    //Please reference 'AVLTree insert' chapter, this is the case 4
+			   		right_rotate(&(*root)->right);
+					left_rotate(root);
+			   }
+		   }
+	}
+
+    //Update the current node height
+    (*root)->height = MAX(getheight((*root)->left), getheight((*root)->right)) + 1;
+	return 0x0;
+
+}
+
+
+/*
+ * return: 0---find successful   1---find failure
+ */
+int find(AVLTree root, int data)
+{
+	if (!root)
+		return -1;
+	else if(root->data == data)
+		return 0;
+	else if(root->data < data)
+		return find(root->right, data);
+	else
+		return find(root->left, data);
+}
+
+//The following function is just an internal helper function
+static inline void destroy_postorder(AVLTree root)
+{
+	if(!root)
+		return;
+	destroy_postorder(root->left);
+	destroy_postorder(root->right);
+	free(root);
+}
+
+int destroy(AVLTree *root)
+{
+	if(!*root)
+		return 0;
+
+	destroy_postorder(*root);
+	*root = NULL;
+	return 0x0;
+}
+
+
+void inorder_traverse(AVLTree root)
+{
+     if(!root)
+	 	return;
+	 inorder_traverse(root->left);
+	 printf("%d ", root->data);
+	 inorder_traverse(root->right);
+}
+
+void preorder_traverse(AVLTree root)
+{
+	if(!root)
+		return;
+
+	printf("%d ", root->data);
+	preorder_traverse(root->left);
+	preorder_traverse(root->right);
+}
+
+void postorder_traverse(AVLTree root)
+{
+	if(!root)
+		return;
+
+	postorder_traverse(root->left);
+	postorder_traverse(root->right);
+	printf("%d ", root->data);
+
+}
+{% endhighlight %}
+
+### 5.3 测试代码
+
+如下是测试代码```main.c```:
+
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include "avltree.h"
+
+
+int main(int argc,char *argv[])
+{
+     int a[] = {1,2,3,4,5,10,9,8,7,6};
+	 int i;
+
+	 AVLTree root = NULL;
+
+	 for (i = 0; i < sizeof(a)/sizeof(int); i++)
+	 {
+	 	if(insert_node(&root, a[i]) != 0)
+	 	{
+	 	     printf("insert node failure\n");
+			 return -1;
+	 	}
+	 }
+
+	inorder_traverse(root);
+	printf("\n");
+
+	remove_node(&root, 3);
+	remove_node(&root, 5);
+	inorder_traverse(root);
+	printf("\n");
+
+
+	insert_node(&root, 100);
+	insert_node(&root, -100);
+	insert_node(&root, -1);
+	inorder_traverse(root);
+
+	destroy(&root);
+
+	inorder_traverse(root);
+	printf("\n");
+	return 0x0;
+}
+{% endhighlight %}
+
+编译运行：
+<pre>
+# gcc -g -o avltree main.c avltree.c
+# ./avltree 
+1 2 3 4 5 6 7 8 9 10 
+1 2 4 6 7 8 9 10 
+-100 -1 1 2 4 6 7 8 9 10 100 
+</pre>
 
 <br />
 <br />
