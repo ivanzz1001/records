@@ -316,17 +316,17 @@ int insert_node(AVLTree *root, int data)
  */
 int remove_node(AVLTree *root, int data)
 {
-    if(*root == NULL)
-    {
-        // the tree is empty or the avltree doesn't have a node which data equals 'data'
+	if(*root == NULL)
+	{
+		// the tree is empty or the avltree doesn't have a node which data equals 'data'
 		return -1;
-    }
+	}
 
 	//find the node
 	if((*root)->data == data)
 	{
 
-	    if((*root)->left != NULL && (*root)->right != NULL)
+		if((*root)->left != NULL && (*root)->right != NULL)
 	    {
 	        // the left child and the right child is not null, we find the 'next' node
 	        int key = findmin((*root)->right);
