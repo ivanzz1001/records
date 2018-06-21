@@ -284,7 +284,7 @@ int insert_node(AVLTree *root, int data)
 		if(insert_node(&(*root)->left, data) < 0)
 			return -1;
 
-        int lchild_height = getheight((*root)->left);
+		int lchild_height = getheight((*root)->left);
 		int rchild_height = getheight((*root)->right);
 
 		//after insert, we should check whether it is balanced
