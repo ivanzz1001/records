@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 数据结构之2-3树(上）
+title: 数据结构之2-3树
 tags:
 - data-structure
 categories: data-structure
