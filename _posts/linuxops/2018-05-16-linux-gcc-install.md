@@ -61,6 +61,31 @@ This is free software; see the source for copying conditions.  There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 </pre>
 
+## 4. 安装gcc-c++
+如果要安装支持编译c++的gcc编译器，则需要安装如下包：
+<pre>
+# ls -al
+total 51584
+drwxrwxr-x  2 root root     4096 May 17 17:11 .
+drwx------ 18 root root     4096 Jun 13 16:27 ..
+-rw-r--r--  1 root root  6225248 May 16 10:51 cpp-4.8.5-11.el7.x86_64.rpm
+-rw-r--r--  1 root root 16957504 May 16 10:53 gcc-4.8.5-11.el7.x86_64.rpm
+-rw-r--r--  1 root root  7519876 May 17 17:07 gcc-c++-4.8.5-11.el7.x86_64.rpm
+-rw-r--r--  1 root root  3767280 May 16 10:53 glibc-2.17-157.el7.x86_64.rpm
+-rw-r--r--  1 root root 12038164 May 16 10:54 glibc-common-2.17-157.el7.x86_64.rpm
+-rw-r--r--  1 root root  1106292 May 16 10:54 glibc-devel-2.17-157.el7.x86_64.rpm
+-rw-r--r--  1 root root   684244 May 16 10:54 glibc-headers-2.17-157.el7.x86_64.rpm
+-rw-r--r--  1 root root  1599280 May 16 10:52 glibc-static-2.17-157.el7.x86_64.rpm
+-rw-r--r--  1 root root   213324 May 16 10:52 glibc-utils-2.17-157.el7.x86_64.rpm
+-rw-r--r--  1 root root    51732 May 16 10:54 libmpc-1.0.1-3.el7.x86_64.rpm
+-rw-r--r--  1 root root    32904 May 16 10:55 libmpc-devel-1.0.1-3.el7.x86_64.rpm
+-rw-r--r--  1 root root   306804 May 17 17:10 libstdc++-4.8.5-11.el7.x86_64.rpm
+-rw-r--r--  1 root root  1574820 May 17 17:11 libstdc++-devel-4.8.5-11.el7.x86_64.rpm
+-rw-r--r--  1 root root   418184 May 17 17:10 libstdc++-static-4.8.5-11.el7.x86_64.rpm
+-rw-r--r--  1 root root   208316 May 16 10:55 mpfr-3.1.1-4.el7.x86_64.rpm
+-rw-r--r--  1 root root    69904 May 16 10:55 mpfr-devel-3.1.1-4.el7.x86_64.rpm
+</pre>
+
 
 
 
