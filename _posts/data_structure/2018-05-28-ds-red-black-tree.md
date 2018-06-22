@@ -38,11 +38,23 @@ description: 红黑树的原理及实现
 
 * 性质2： 根节点是黑色
 
-* 每个叶节点(nil节点, 空节点)是黑色的
+* 性质3： 每个叶节点(nil节点, 空节点)是黑色的。 注意： 这里的叶子节点是```nil叶子```
 
-* 每个红色节点的两个子节点都是黑色。（从每个叶子到根的所有路径上不能有两个连续的红色节点）
+* 性质4： 每个红色节点的两个子节点都是黑色。（从每个叶子到根的所有路径上不能有两个连续的红色节点）
 
-* 从任一节点到其每个叶子的所有路径都包含相同数目的黑色节点
+* 性质5： 从任一节点到其每个```叶子```的所有路径都包含相同数目的黑色节点
+
+<pre>
+注意： 
+1） 红黑树中的叶子节点均指nil叶子
+
+2） 性质5确保没有一条路径会比其他路径长出2倍。因而，红黑树是相对接近平衡的二叉树
+</pre>
+
+![ds-rb-tree](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_rb_tree.jpg)
+
+
+
 
 
 
@@ -64,15 +76,13 @@ description: 红黑树的原理及实现
 
 2. [红黑树的插入与删除](http://m.blog.csdn.net/article/details?id=51504764)
 
-3. [浅谈算法和数据结构：八 平衡查找树之2-3树](http://www.cnblogs.com/yangecnu/p/Introduce-2-3-Search-Tree.html)
+3. [浅谈算法和数据结构： 九 平衡查找树之红黑树](http://www.cnblogs.com/yangecnu/p/Introduce-Red-Black-Tree.html) 
 
-4：[浅谈算法和数据结构： 九 平衡查找树之红黑树](http://www.cnblogs.com/yangecnu/p/Introduce-Red-Black-Tree.html) 
+4. [数据结构： 2-3树与红黑树](http://blog.csdn.net/aircattle/article/details/52347955)
 
-5：[数据结构： 2-3树与红黑树](http://blog.csdn.net/aircattle/article/details/52347955)
+5. [数据结构与算法](https://blog.csdn.net/hello_world_lvlcoder/article/category/6655685/1)
 
-6. [数据结构与算法](https://blog.csdn.net/hello_world_lvlcoder/article/category/6655685/1)
-
-7. [红黑树(一)之 原理和算法详细介绍](http://www.cnblogs.com/skywang12345/p/3245399.html)
+6. [红黑树(一)之 原理和算法详细介绍](http://www.cnblogs.com/skywang12345/p/3245399.html)
 <br />
 <br />
 <br />
