@@ -63,7 +63,13 @@ description: 红黑树的原理及实现
 
 ![ds-rb-23-tree](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_rb_23_tree.jpg)
 
+## 2. 旋转的定义
 
+因为很多书中对旋转的定义不一致，所以我们有必要在这里说明一下：
+
+* 以某一节点为轴，它的左枝顺时针旋转，作为新子树的根， 我们称之为```顺时针旋转```（clockwise)或者```右旋转```;
+
+* 以某一节点为轴，它的右枝逆时针旋转，作为新子树的根， 我们称为```逆时钟旋转```(anti clockwise)或者```左旋转```;
 
 
 
