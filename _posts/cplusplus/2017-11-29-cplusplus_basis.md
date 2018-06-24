@@ -123,6 +123,19 @@ sizeof(float): 4
 sizeof(double): 8
 </pre>
 
+```32bit```操作系统下编译运行：
+<pre>
+# gcc -o test test.c
+# ./test
+sizeof(char): 1
+sizeof(short): 2
+sizeof(int): 4
+sizeof(long): 4
+sizeof(long long): 8
+sizeof(float): 4
+sizeof(double): 8
+</pre>
+
 
 ## 3. 类中静态成员的初始化时间
 {% highlight string %}
