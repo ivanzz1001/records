@@ -71,6 +71,91 @@ description: 红黑树的原理及实现
 
 * 以某一节点为轴，它的右枝逆时针旋转，作为新子树的根， 我们称为```逆时钟旋转```(anti clockwise)或者```左旋转```;
 
+下面我们简要介绍一下```左右旋转```的实现， 这里假设节点数据结构如下：
+{% highlight string %}
+typedef struct RBNode{
+   int key;
+   unsigned char color;
+   struct RBNode *left;
+   struct RBNode *right;
+   struct RBNode *parent;
+}rb_node_t, *rb_tree_t;
+
+{% endhighlight %}
+
+(1) **右旋转**
+
+![ds-node-right-rotate](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_node_right_rotate.jpg)
+
+源代码如下：
+{% highlight string %}
+static struct rb_node_t *rb_rotate_right(rb_tree_t *root, rb_node_t *node)
+{
+    rb_node_t *left = node->left;
+
+    if(node->left = left->right)
+    {
+       left->right->parent = node;
+    }
+
+    left->right = node;
+   
+    if(left->parent = node->parent)
+    {
+       if(node->parent->left == node)
+       {
+          node->parent->left = left;
+       }
+       else{
+          node->parent->right = left;
+       }
+    }
+    else{
+       *root = left;
+    }
+   
+    node->parent = left;
+    return left;
+}
+{% endhighlight %}
+
+
+
+(2) **左旋转**
+
+![ds-node-left-rotate](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_node_left_rotate.jpg)
+
+源代码如下：
+{% highlight string %}
+static struct rb_node_t *rb_rotate_left(rb_tree_t *root, rb_node_t *node)
+{
+    rb_node_t *right = node->right;
+
+    if(node->right = right->left)
+    {
+       right->left->parent = node;
+    }
+    
+    right->left = node;
+    
+    if(right->parent = node->parent)
+    {
+        if(node->parent->left == node)
+        {
+             node->parent->left = right;
+        }
+        else{
+             node->parent->right = right;
+        }
+    }
+    else{
+       *root = right;
+    }
+
+    node->parent = right;
+    return right;
+}
+{% endhighlight %}
 
 
 
