@@ -65,13 +65,7 @@ description: 红黑树的原理及实现
 
 ## 2. 旋转的定义
 
-因为很多书中对旋转的定义不一致，所以我们有必要在这里说明一下：
-
-* 以某一节点为轴，它的左枝顺时针旋转，作为新子树的根， 我们称之为```顺时针旋转```（clockwise)或者```右旋转```;
-
-* 以某一节点为轴，它的右枝逆时针旋转，作为新子树的根， 我们称为```逆时钟旋转```(anti clockwise)或者```左旋转```;
-
-下面我们简要介绍一下```左右旋转```的实现， 这里假设节点数据结构如下：
+因为很多书中对旋转的定义不一致，所以我们有必要在这里说明一下。假设```红黑树```节点数据结构如下：
 {% highlight string %}
 typedef struct RBNode{
    int key;
@@ -83,7 +77,7 @@ typedef struct RBNode{
 
 {% endhighlight %}
 
-(1) **右旋转**
+* 以某一节点为轴，它的左枝顺时针旋转，作为新子树的根， 我们称之为```顺时针旋转```（clockwise)或者```右旋转```;
 
 ![ds-node-right-rotate](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_node_right_rotate.jpg)
 
@@ -120,8 +114,7 @@ static struct rb_node_t *rb_rotate_right(rb_tree_t *root, rb_node_t *node)
 {% endhighlight %}
 
 
-
-(2) **左旋转**
+* 以某一节点为轴，它的右枝逆时针旋转，作为新子树的根， 我们称为```逆时钟旋转```(anti clockwise)或者```左旋转```;
 
 ![ds-node-left-rotate](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_node_left_rotate.jpg)
 
