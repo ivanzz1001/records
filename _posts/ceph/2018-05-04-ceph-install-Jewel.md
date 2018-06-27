@@ -273,7 +273,7 @@ ntpstat                 #查看当前的同步状态
 
 执行如下命令进行安装：
 {% highlight string %}
-sudo yum localinstall *.rpm
+# sudo yum localinstall *.rpm
 {% endhighlight %}
 
 <br />
@@ -282,7 +282,129 @@ sudo yum localinstall *.rpm
 
 在所有节点上执行如下命令安装ceph包：
 {% highlight string %}
-sudo yum localinstall *.rpm
+# ls dependency
+-rw-r--r-- 1 root root  329032 May 11 14:33 dracut-033-502.el7.x86_64.rpm
+-rw-r--r-- 1 root root   56712 May 11 14:35 dracut-config-rescue-033-502.el7.x86_64.rpm
+-rw-r--r-- 1 root root   99772 May 11 14:36 dracut-network-033-502.el7.x86_64.rpm
+-rw-r--r-- 1 root root   84656 May 11 14:31 libgudev1-219-42.el7.x86_64.rpm
+-rw-r--r-- 1 root root  165548 May 11 14:21 libselinux-2.5-11.el7.x86_64.rpm
+-rw-r--r-- 1 root root  190704 May 11 14:23 libselinux-devel-2.5-11.el7.x86_64.rpm
+-rw-r--r-- 1 root root  240032 May 11 14:22 libselinux-python-2.5-11.el7.x86_64.rpm
+-rw-r--r-- 1 root root  123524 May 11 14:21 libselinux-ruby-2.5-11.el7.x86_64.rpm
+-rw-r--r-- 1 root root  154776 May 11 14:20 libselinux-utils-2.5-11.el7.x86_64.rpm
+-rw-r--r-- 1 root root  148492 May 11 14:01 libsemanage-2.5-8.el7.x86_64.rpm
+-rw-r--r-- 1 root root  294780 May 11 14:03 libsepol-2.5-6.el7.x86_64.rpm
+-rw-r--r-- 1 root root   75980 May 11 14:11 libsepol-devel-2.5-6.el7.x86_64.rpm
+-rw-r--r-- 1 root root  878956 May 11 14:19 policycoreutils-2.5-17.1.el7.x86_64.rpm
+-rw-r--r-- 1 root root 5403380 May 11 14:28 systemd-219-42.el7.x86_64.rpm
+-rw-r--r-- 1 root root  384156 May 11 14:30 systemd-libs-219-42.el7.x86_64.rpm
+-rw-r--r-- 1 root root   71532 May 11 14:29 systemd-sysv-219-42.el7.x86_64.rpm
+-rwxrwxrwx 1 root root    51824 Jun 30  2017 at-3.1.13-22.el7.x86_64.rpm
+-rwxrwxrwx 1 root root    87272 Jul 21  2017 bash-completion-2.1-6.el7.noarch.rpm
+-rwxrwxrwx 1 root root   117272 Jun 30  2017 bc-1.06.95-13.el7.x86_64.rpm
+-rwxrwxrwx 1 root root   127112 Jun 30  2017 cryptsetup-1.7.2-1.el7.x86_64.rpm
+-rwxrwxrwx 1 root root   221172 Jun 30  2017 cryptsetup-libs-1.7.2-1.el7.x86_64.rpm
+-rwxrwxrwx 1 root root   152944 Jun 30  2017 cups-client-1.6.3-26.el7.x86_64.rpm
+-rwxrwxrwx 1 root root   364052 Jun 30  2017 cups-libs-1.6.3-26.el7.x86_64.rpm
+-rwxrwxrwx 1 root root   275236 Jun 30  2017 device-mapper-1.02.135-1.el7_3.1.x86_64.rpm
+-rwxrwxrwx 1 root root   181540 Jun 30  2017 device-mapper-event-1.02.135-1.el7_3.1.x86_64.rpm
+-rwxrwxrwx 1 root root   181024 Jun 30  2017 device-mapper-event-libs-1.02.135-1.el7_3.1.x86_64.rpm
+-rwxrwxrwx 1 root root   340844 Jun 30  2017 device-mapper-libs-1.02.135-1.el7_3.1.x86_64.rpm
+-rwxrwxrwx 1 root root   376756 Jun 30  2017 device-mapper-persistent-data-0.6.3-1.el7.x86_64.rpm
+-rw-r--r-- 1 root root   329032 May 11 15:42 dracut-033-502.el7.x86_64.rpm
+-rw-r--r-- 1 root root    56712 May 11 15:42 dracut-config-rescue-033-502.el7.x86_64.rpm
+-rw-r--r-- 1 root root    99772 May 11 15:42 dracut-network-033-502.el7.x86_64.rpm
+-rwxrwxrwx 1 root root    73448 Jun 30  2017 ed-1.9-4.el7.x86_64.rpm
+-rwxrwxrwx 1 root root    47816 Jun 30  2017 fcgi-2.4.0-25.el7.x86_64.rpm
+-rwxrwxrwx 1 root root    95100 Jun 30  2017 fuse-libs-2.9.2-7.el7.x86_64.rpm
+-rwxrwxrwx 1 root root   191380 Jun 30  2017 gdisk-0.8.6-5.el7.x86_64.rpm
+-rwxrwxrwx 1 root root  1276549 Jul 21  2017 gevent-1.1.2-cp27-cp27mu-manylinux1_x86_64.whl
+-rwxrwxrwx 1 root root 13754851 Jul 21  2017 gevent.tar.gz
+-rwxr-xr-x 1 root root   278772 Oct 17  2017 gperftools-libs-2.4-8.el7.x86_64.rpm
+-rwxrwxrwx 1 root root    41939 Jul 21  2017 greenlet-0.4.10-cp27-cp27mu-manylinux1_x86_64.whl
+-rwxrwxrwx 1 root root    85348 Jun 30  2017 hdparm-9.43-5.el7.x86_64.rpm
+-rwxrwxrwx 1 root root   165208 Jun 30  2017 leveldb-1.12.0-11.el7.x86_64.rpm
+-rwxrwxrwx 1 root root   150356 Jun 30  2017 libbabeltrace-1.2.4-3.el7.x86_64.rpm
+-rw-r--r-- 1 root root    84656 May 11 15:42 libgudev1-219-42.el7.x86_64.rpm
+-rw-r--r-- 1 root root   165548 May 11 15:42 libselinux-2.5-11.el7.x86_64.rpm
+-rw-r--r-- 1 root root   190704 May 11 15:42 libselinux-devel-2.5-11.el7.x86_64.rpm
+-rw-r--r-- 1 root root   240032 May 11 15:42 libselinux-python-2.5-11.el7.x86_64.rpm
+-rw-r--r-- 1 root root   123524 May 11 15:42 libselinux-ruby-2.5-11.el7.x86_64.rpm
+-rw-r--r-- 1 root root   154776 May 11 15:42 libselinux-utils-2.5-11.el7.x86_64.rpm
+-rw-r--r-- 1 root root   148492 May 11 15:42 libsemanage-2.5-8.el7.x86_64.rpm
+-rw-r--r-- 1 root root   294780 May 11 15:42 libsepol-2.5-6.el7.x86_64.rpm
+-rw-r--r-- 1 root root    75980 May 11 15:42 libsepol-devel-2.5-6.el7.x86_64.rpm
+-rwxr-xr-x 1 root root    57604 Oct 12  2017 libunwind-1.1-5.el7_2.2.x86_64.rpm
+-rwxrwxrwx 1 root root   180520 Jun 30  2017 lttng-ust-2.4.1-4.el7.x86_64.rpm
+-rwxrwxrwx 1 root root  1157740 Jun 30  2017 lvm2-2.02.166-1.el7_3.1.x86_64.rpm
+-rwxrwxrwx 1 root root  1007568 Jun 30  2017 lvm2-libs-2.02.166-1.el7_3.1.x86_64.rpm
+-rwxrwxrwx 1 root root   262480 Jun 30  2017 m4-1.4.16-10.el7.x86_64.rpm
+-rwxrwxrwx 1 root root   249504 Jun 30  2017 mailx-12.5-12.el7_0.x86_64.rpm
+-rwxrwxrwx 1 root root  1198961 Jul 21  2017 pip-8.1.2-py2.py3-none-any.whl
+-rw-r--r-- 1 root root   878956 May 11 15:42 policycoreutils-2.5-17.1.el7.x86_64.rpm
+-rwxrwxrwx 1 root root    92252 Jul 21  2017 python-2.7.5-48.el7.x86_64.rpm
+-rwxrwxrwx 1 root root   402296 Jul 21  2017 python-devel-2.7.5-48.el7.x86_64.rpm
+-rwxrwxrwx 1 root root   208808 Jul 21  2017 python-flask-0.10.1-4.el7.noarch.rpm
+-rwxrwxrwx 1 root root    24100 Jul 21  2017 python-itsdangerous-0.23-2.el7.noarch.rpm
+-rwxrwxrwx 1 root root   527832 Oct 12  2017 python-jinja2-2.7.2-2.el7.noarch.rpm
+-rwxrwxrwx 1 root root  5911152 Jul 21  2017 python-libs-2.7.5-48.el7.x86_64.rpm
+-rwxrwxrwx 1 root root  1593980 Jul 21  2017 python-pip-7.1.0-1.el7.noarch.rpm
+-rwxrwxrwx 1 root root   575384 Jul 21  2017 python-werkzeug-0.9.1-2.el7.noarch.rpm
+-rwxrwxrwx 1 root root    77608 Jul 21  2017 python-wheel-0.24.0-2.el7.noarch.rpm
+-rwxrwxrwx 1 root root    38428 Jun 30  2017 redhat-lsb-core-4.1-27.el7.centos.1.x86_64.rpm
+-rwxrwxrwx 1 root root    15616 Jun 30  2017 redhat-lsb-submod-security-4.1-27.el7.centos.1.x86_64.rpm
+-rw-r--r-- 1 root root   423852 Oct 12  2017 selinux-policy-3.13.1-102.el7_3.16.noarch.rpm
+-rw-r--r-- 1 root root  6667768 Oct 12  2017 selinux-policy-targeted-3.13.1-102.el7_3.16.noarch.rpm
+-rwxrwxrwx 1 root root   265768 Jun 30  2017 spax-1.5.2-13.el7.x86_64.rpm
+-rw-r--r-- 1 root root  5403380 May 11 15:42 systemd-219-42.el7.x86_64.rpm
+-rw-r--r-- 1 root root   384156 May 11 15:42 systemd-libs-219-42.el7.x86_64.rpm
+-rw-r--r-- 1 root root    71532 May 11 15:42 systemd-sysv-219-42.el7.x86_64.rpm
+-rwxrwxrwx 1 root root    31064 Jun 30  2017 time-1.7-45.el7.x86_64.rpm
+-rwxrwxrwx 1 root root    74732 Jun 30  2017 userspace-rcu-0.7.16-1.el7.x86_64.rpm
+-rwxr-xr-x 1 root root    63068 Oct 17  2017 xmlstarlet-1.6.1-1.el7.x86_64.rpm
+
+# ls ceph-jewel
+-rw-r--r-- 1 root root    62432 May 11 21:43 boost-iostreams-1.53.0-27.el7.x86_64.rpm
+-rw-r--r-- 1 root root    40044 May 11 21:43 boost-random-1.53.0-27.el7.x86_64.rpm
+-rw-r--r-- 1 root root   307448 May 11 21:43 boost-regex-1.53.0-27.el7.x86_64.rpm
+-rwxrwxrwx 1 root root     3044 Oct 19  2017 ceph-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root  4395996 Oct 19  2017 ceph-base-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root 17350260 Oct 19  2017 ceph-common-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root     3264 Oct 19  2017 ceph-devel-compat-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root    23224 Oct 19  2017 cephfs-java-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root  1940112 Oct 19  2017 ceph-fuse-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root     3228 Oct 19  2017 ceph-libs-compat-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root  2929948 Oct 19  2017 ceph-mds-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root  2926808 Oct 19  2017 ceph-mon-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root  9500120 Oct 19  2017 ceph-osd-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root   272384 Oct 19  2017 ceph-radosgw-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root     6608 Oct 19  2017 ceph-resource-agents-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root    20660 Oct 19  2017 ceph-selinux-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root 72683128 Oct 19  2017 ceph-test-10.2.10-0.el7.x86_64.rpm
+-rw-r--r-- 1 root root    93904 May 11 21:43 easymock2-2.5.2-12.el7.noarch.rpm
+-rw-r--r-- 1 root root   127488 May 11 15:42 hamcrest-1.3-6.el7.noarch.rpm
+-rw-r--r-- 1 root root   267284 May 11 15:42 junit-4.11-8.el7.noarch.rpm
+-rwxrwxrwx 1 root root  1947560 Oct 19  2017 libcephfs1-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root    14060 Oct 19  2017 libcephfs1-devel-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root  1644400 Oct 19  2017 libcephfs_jni1-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root     3552 Oct 19  2017 libcephfs_jni1-devel-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root  1991788 Oct 19  2017 librados2-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root   488692 Oct 19  2017 librados2-devel-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root  1913212 Oct 19  2017 libradosstriper1-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root     8972 Oct 19  2017 libradosstriper1-devel-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root  2629456 Oct 19  2017 librbd1-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root    13584 Oct 19  2017 librbd1-devel-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root  3080368 Oct 19  2017 librgw2-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root     6256 Oct 19  2017 librgw2-devel-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root     3152 Oct 19  2017 python-ceph-compat-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root    80128 Oct 19  2017 python-cephfs-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root   149256 Oct 19  2017 python-rados-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root    80628 Oct 19  2017 python-rbd-10.2.10-0.el7.x86_64.rpm
+-rw-r--r-- 1 root root   173992 May 11 15:42 qdox-1.12.1-10.el7.noarch.rpm
+-rwxrwxrwx 1 root root   444364 Oct 19  2017 rbd-fuse-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root  1660168 Oct 19  2017 rbd-mirror-10.2.10-0.el7.x86_64.rpm
+-rwxrwxrwx 1 root root   485248 Oct 19  2017 rbd-nbd-10.2.10-0.el7.x86_64.rpm
+# sudo yum localinstall *.rpm
 {% endhighlight %}
 
 <br />
