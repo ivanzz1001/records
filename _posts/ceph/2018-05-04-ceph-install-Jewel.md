@@ -231,8 +231,8 @@ lsmod | grep rbd   #查看模块是否已经装载
 
 在各节点执行如下命令：
 {% highlight string %}
-rpm –qa | grep ntp     #查看当前是否已经安装ntp
-ps –ef | grep ntp      # 查看ntp服务器是否启动
+rpm -qa | grep ntp     #查看当前是否已经安装ntp
+ps -ef | grep ntp      # 查看ntp服务器是否启动
 ntpstat                 #查看当前的同步状态
 {% endhighlight %}
 
