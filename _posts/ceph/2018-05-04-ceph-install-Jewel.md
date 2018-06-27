@@ -804,6 +804,11 @@ vde  253:64   0  15G  0 disk
 # parted -s /dev/vde mkpart primary 0% 33%
 # parted -s /dev/vde mkpart primary 33% 67%
 # parted -s /dev/vde mkpart primary 67% 100%
+
+
+//说明： parted也可以使用如下方式来分区
+# parted -s /dev/sda mkpart primary 0 10GiB
+# parted -s /dev/sda mkpart primary 10Gib 100%
 {% endhighlight %}
 
 查看分区后的状态(注：在实际挂载之前需要先进行格式化)：
