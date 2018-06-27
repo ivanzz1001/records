@@ -404,6 +404,7 @@ ntpstat                 #查看当前的同步状态
 -rwxrwxrwx 1 root root   444364 Oct 19  2017 rbd-fuse-10.2.10-0.el7.x86_64.rpm
 -rwxrwxrwx 1 root root  1660168 Oct 19  2017 rbd-mirror-10.2.10-0.el7.x86_64.rpm
 -rwxrwxrwx 1 root root   485248 Oct 19  2017 rbd-nbd-10.2.10-0.el7.x86_64.rpm
+
 # sudo yum localinstall *.rpm
 {% endhighlight %}
 
