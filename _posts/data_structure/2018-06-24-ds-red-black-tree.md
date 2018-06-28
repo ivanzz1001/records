@@ -152,9 +152,9 @@ static rb_node_t *rb_rotate_left(rb_tree_t *root, rb_node_t *node)
 
 
 
-## 3. 红黑树的插入
+## 3. 红黑树节点的插入
 
-### 3.1 红黑树插入的基本原理
+### 3.1 插入的基本原理
 和```AVL树```一样，在插入和删除节点之后，红黑树也是通过旋转来调整树的平衡的。红黑树插入```节点z```的方法和普通二叉搜索树一样，都是将新```节点z```作为一个叶子节点插入到树的底部。不同的是，红黑树将```新节点z```作为一个红色节点，将其孩子指针指向```nil叶子```, 然后当新节点z的父节点为红色时，由于违反了```性质4```，因此需要对其进行调整（如果```新节点z```的父节点为黑色，且z本身是红色，因此不会违反任何性质）。
 <pre>
 红黑树调整算法的设计要遵循一个原则： 同一时刻红黑树只能违反最多一条性质。
@@ -205,7 +205,6 @@ static rb_node_t *rb_rotate_left(rb_tree_t *root, rb_node_t *node)
 
 ### 3.2 插入相关算法
 {% highlight string %}
-
 int rb_insert_fixup(rb_tree_t *root, rb_node_t *node)
 {
     rb_node_t *parent;
@@ -255,16 +254,16 @@ int rb_insert_fixup(rb_tree_t *root, rb_node_t *node)
 		 else{
 		 	rb_node_t *uncle = grand_parent->left;
 
-            //Case 1: uncle is RED
-            if(uncle && uncle->color == COLOR_RED)
-            {
-                 parent->color = COLOR_BLACK;
-				 uncle->color = COLOR_BLACK;
-				 grand_parent->color = COLOR_RED;
+			//Case 1: uncle is RED
+			if(uncle && uncle->color == COLOR_RED)
+			{
+				parent->color = COLOR_BLACK;
+				uncle->color = COLOR_BLACK;
+				grand_parent->color = COLOR_RED;
 
-				 node = grand_parent;
-				 continue;
-            }
+				node = grand_parent;
+				continue;
+			}
 
 			//Case 2: uncle is BLACK, and node is parent's left child
 			if(parent->left == node)
@@ -290,6 +289,7 @@ int rb_insert_fixup(rb_tree_t *root, rb_node_t *node)
 	(*root)->color = COLOR_BLACK;
 	return 0x0;
 }
+
 
 int rb_insert(rb_tree_t *root, rb_node_t *node)
 {
@@ -327,7 +327,9 @@ int rb_insert(rb_tree_t *root, rb_node_t *node)
 }
 {% endhighlight %}
 
+## 4. 红黑树节点的删除
 
+### 4.1 删除的基本原理
 
 
 
