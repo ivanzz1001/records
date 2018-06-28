@@ -330,7 +330,138 @@ int rb_insert(rb_tree_t *root, rb_node_t *node)
 ## 4. 红黑树节点的删除
 
 ### 4.1 删除的基本原理
+红黑树只有在黑色节点被删除的时候才需要进行调整，因为只有这种情况下才会引起对```性质5```的违反（或许还有```性质4```)。
 
+红黑树也是一种```二叉搜索树```，因此在删除红黑树一个节点的时候，首先要执行```二叉搜索树```的删除过程； 然后再针对删除后可能会违反的红黑树性质，通过```旋转和重新着色```等一些列操作来修正该树， 使之重新称为一棵红黑树。
+
+**(1) 二叉搜索树删除**
+
+针对二叉搜索树删除节点的3种情况:
+
+* 如果```节点z```没有孩子节点，那么只需要简单的将其删除即可，并修改父节点，用NULL来替换z；
+
+* 如果```节点z```只有一个孩子，那么将孩子节点提升到z的位置，并修改z的父节点，用z的孩子替换z；
+
+* 如果```节点z```有两个孩子，那么查找z的后继y，此外后继一定在z的右子树中， 然后让y替换z
+
+这三种情况中，前两种较为简单，3相对棘手， 我们通过示意图描述这几种情况：
+
+
+![ds-bst-delete](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_bst_delete.jpg)
+从上图我们可以看到，针对```情形3```，又可以分出两种子情形：
+
+(1) z的后继q位于右子树中，但没有左孩子
+
+(2) z的后继q位于右子树中，但是并不是z的右孩子, 此时要用q的右孩子替换z
+
+下面我们给出相关源码：
+{% highlight string %}
+int rbtree_delete(rb_tree_t *root, int key)
+{
+    rb_node_t *p = *root;
+
+    //find the node
+	while(p)
+	{
+	     if(p->key == key)
+		 	break;
+		 else if(p->key > key)
+		 	p = p->left;
+		 else
+		 	p = p->right;
+	}
+
+	if(!p)
+		return -1;
+
+
+    if(p->left && p->right)
+    {
+         //get Successor node
+         rb_node_t *successor = p->right;
+
+		 while(successor->left)
+		 	successor = successor->left;
+
+		 if(p->parent)
+		 {
+		      if(p->parent->left == p)
+			      p->parent->left = successor;
+			  else
+			  	  p->parent->right = successor;
+		 }
+		 else{
+		 	  *root = successor;
+		 }
+
+		 rb_node_t *successor_child = successor->right;
+		 rb_node_t *successor_parent = successor->parent;
+		 int color = successor->color;      //save the color
+
+		 if(successor_parent == p)
+		 {
+		     successor_parent = successor;
+		 }
+		 else{
+		 	if(successor_child)
+				successor_child->parent = successor_parent;
+
+			successor_parent->left = successor_child;
+
+			successor->right = p->right;
+			p->right->parent = successor;
+		 }
+
+		 successor->parent = p->parent;
+		 successor->color = p->color;
+		 successor->left = p->left;
+		 p->left->parent = successor;
+
+		 if(color == COLOR_BLACK)
+		 	rbtree_delete_fixup(root, successor_child, successor_parent);
+
+		 free(p);
+		 return 0x0;
+
+    }
+
+
+    rb_node_t *child = NULL;
+	rb_node_t *parent = NULL;
+	int color;
+
+	if(p->left)
+		child = p->left;
+	else
+		child = p->right;
+
+
+	parent = p->parent;
+	color = p->color;   //save the color
+
+	if(parent)
+	{
+	    if(parent->left == p)
+			parent->left = child;
+		else
+			parent->right = child;
+	}
+	else{
+		*root = child;
+	}
+
+
+    if(color == COLOR_BLACK)
+		rbtree_delete_fixup(root, child, parent);
+
+    free(p);
+
+	return 0x0;
+
+}
+{% endhighlight %}
+
+注意： 上面替换后的节点（即后继节点)都是平衡的， 这是因为它到达叶子节点的路径都不经过其本身。
 
 
 
