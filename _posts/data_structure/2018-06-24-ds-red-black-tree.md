@@ -493,6 +493,15 @@ int rbtree_delete(rb_tree_t *root, int key)
 
 ![delfixup-case1](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_rbtree_delfixup_case1.jpg)
 
+针对情况1， ```x```是平衡的，但因为节点B的左子树被删去了一个黑色节点，导致节点B的左子树黑高少了1，所以节点B是不平衡的。此时， ```ha==hb==hr-1```， ```hr==hd==he==hf```。可以对节点B进行一次左旋，然后修改节点B和节点D的颜色，转变成```情况2、3、4```进行处理（上图转换后，```x```仍为A节点，B节点仍是不平衡的）
+
+**2) x的兄弟节点w是黑色的，并且w的两个子节点都是黑色的**
+
+如下图所示，这里又可以分成两种子情况：
+
+![delfixup-case2](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_rbtree_delfixup_case2.jpg)
+
+
 
 
 <br />
