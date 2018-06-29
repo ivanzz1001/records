@@ -509,6 +509,15 @@ int rbtree_delete(rb_tree_t *root, int key)
 
 ![delfixup-case3](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_rbtree_delfixup_case3.jpg)
 
+简单证明一下对```节点w```右旋转后节点w的红黑性质不会被破坏。旋转前，节点w是平衡的，所以```hr==hd==he+1==hf+1```。旋转后，节点w指向了节点C。此时，节点w的左子树高度为```hr```, 右子树的高度为```he+1==hr```，所以节点w依然是平衡的。再看节点D，左子树高度为```hd```， 右子树高度为```he+1==hd```，所以节点D也是平衡的。综上所述，这一旋转操作不会影响节点B的右子树的红黑性质，仅仅将其转变成情况4进行处理而已。
+
+**4) x的兄弟节点w是黑色的，并且w的右孩子是红色的**
+
+对于这种情形，可以分为如下4种子情形：
+
+* 情形4.1
+
+![delfixup-case41](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_rbtree_delfixup_case41.jpg)
 
 
 
