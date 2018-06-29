@@ -519,6 +519,15 @@ int rbtree_delete(rb_tree_t *root, int key)
 
 ![delfixup-case41](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_rbtree_delfixup_case41.jpg)
 
+考察上图，因为删除节点导致节点B不平衡。其中，```ha==hb==hr==hd```，```he==hf==ha+1```。对节点B进行一次左旋转，同时修改节点D的颜色为其原```父节点B```的颜色，修改节点B的颜色为黑色（节点B颜色的修改可以直接修改，不用考虑当前B为红色还是黑色），节点E的颜色也修改成黑色（直接修改）。可以证得节点B已经达到平衡，同时节点D也达到平衡。并且该树从根开始的黑高在```删除前```和```删除并旋转操作后```不变， 因此不会影响到其他树的平衡。也就是说，执行完```情况4.1```的操作之后，整棵树已经平衡了。
+
+
+* 情形4.2
+
+![delfixup-case42](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_rbtree_delfixup_case42.jpg)
+
+
+
 
 
 <br />
