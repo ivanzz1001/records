@@ -526,8 +526,29 @@ int rbtree_delete(rb_tree_t *root, int key)
 
 ![delfixup-case42](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_rbtree_delfixup_case42.jpg)
 
+考察上面，```ha==hb```，```hr==hd==he==hf==ha+1==hb+1```。对节点B进行左旋转后，将D修改为与B相同的颜色（即更改成为其父节点的颜色），然后将节点B和节点E的颜色直接修改为黑色。可以证得，旋转后节点B是平衡的， 节点D也是平衡的。并且该树从根开始的黑高在```删除前```和```删除并旋转操作后```不变， 因此不会影响到其他树的平衡。也就是说，执行完```情况4.2```的操作之后，整棵树已经平衡了。
 
 
+* 情况4.3
+
+![delfixup-case43](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_rbtree_delfixup_case43.jpg)
+
+考察上图，```ha==hb==hr==hd```,```he==hf==ha+1```。对节点B进行左旋转后，将节点D修改为与节点B相同的颜色， 然后将节点B和节点E的颜色直接修改为黑色。可以证得，旋转后节点B是平衡的， 节点D也是平衡的。并且该树从根开始的黑高在```删除前```和```删除并旋转操作后```不变，因此不会影响到其他树的平衡。而除非旋转操作后，x节点为根节点，违反```性质2```，但是我们在```x```为根节点时就会退出循环，并且会直接再将```x```染成黑色，此时整棵树就平衡了。
+
+* 情况4.4
+
+![delfixup-case44](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_rbtree_delfixup_case44.jpg)
+      
+考察上图，```hr==hd==he==hf```, ```ha==hb==hr-1```。对节点B进行左旋转，并将节点D修改为节点B相同的颜色， 然后将节点B和节点E直接修改为黑色。可以证得，节点B是平衡的，节点D也是平衡的。并且该树从根开始的黑高在```删除前```和```删除并旋转操作后```不变，因此不会影响到其他树的平衡。而除非旋转操作后, x节点为根节点， 违反```性质2```, 但是我们在```x```为根节点时就会退出循环， 并且会直接再将```x```染成黑色， 此时整棵树就平衡了。
+
+<pre>
+注： 上述的1)、2）、3）、4）四种情况对节点x是一棵左子树而言的，当x是一棵右子树时其操作与上述操作完全对称。
+</pre>
+
+下面给出```删除修正```操作的源代码：
+{% highlight string %}
+
+{% endhighlight %}
 
 
 <br />
