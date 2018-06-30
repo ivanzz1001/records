@@ -591,7 +591,7 @@ static int rbtree_delete_fixup(rb_tree_t *root, rb_node_t *node, rb_node_t *pare
 				   // right child is COLOR_BLACK
 
 
-                   brother->left->color = COLOR_BLACK;
+				   brother->left->color = COLOR_BLACK;
 				   brother->color = COLOR_RED;
 				   rb_rotate_right(root,brother);
 				   brother = parent->right;
@@ -639,7 +639,7 @@ static int rbtree_delete_fixup(rb_tree_t *root, rb_node_t *node, rb_node_t *pare
 				   // left child is COLOR_BLACK
 
 
-                   brother->right->color = COLOR_BLACK;
+				   brother->right->color = COLOR_BLACK;
 				   brother->color = COLOR_RED;
 				   rb_rotate_left(root,brother);
 				   brother = parent->left;
@@ -666,6 +666,12 @@ static int rbtree_delete_fixup(rb_tree_t *root, rb_node_t *node, rb_node_t *pare
 
 }
 {% endhighlight %}
+
+
+
+## 5. 红黑树操作的时间复杂度
+红黑树插入需要```O(log(n))```次， 对插入节点后的调整所做的旋转操作不会超过2次（注： 这里是2次是指单次回溯），删除节点后的调整所做的旋转操作不会超过3次（注： 这里3次是指单次回溯），沿树回溯至多```O(log(n))```次。总而言之，红黑树插入和删除的时间复杂度均为```O(log(n))```。
+
 
 
 <br />
