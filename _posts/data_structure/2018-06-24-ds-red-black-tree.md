@@ -294,7 +294,7 @@ int rb_insert_fixup(rb_tree_t *root, rb_node_t *node)
 }
 
 
-int rb_insert(rb_tree_t *root, rb_node_t *node)
+int insert_rbtree(rb_tree_t *root, rb_node_t *node)
 {
 	rb_node_t *p = *root;
 	rb_node_t *q = NULL;
@@ -359,7 +359,7 @@ int rb_insert(rb_tree_t *root, rb_node_t *node)
 
 下面我们给出相关源码：
 {% highlight string %}
-int rbtree_delete(rb_tree_t *root, int key)
+int delete_rbtree(rb_tree_t *root, int key)
 {
     rb_node_t *p = *root;
 
