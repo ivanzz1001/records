@@ -67,6 +67,9 @@ description: 红黑树的原理及实现
 
 因为很多书中对旋转的定义不一致，所以我们有必要在这里说明一下。假设```红黑树```节点数据结构如下：
 {% highlight string %}
+#define COLOR_RED  0x0
+#define COLOR_BLACK 0x1
+
 typedef struct RBNode{
    int key;
    unsigned char color;
@@ -548,7 +551,120 @@ int rbtree_delete(rb_tree_t *root, int key)
 
 下面给出```删除修正```操作的源代码：
 {% highlight string %}
+static int rbtree_delete_fixup(rb_tree_t *root, rb_node_t *node, rb_node_t *parent)
+{
+	rb_node_t *brother = NULL;
 
+	while((!node || node->color == COLOR_BLACK) && node != *root)
+	{
+	    if(parent->left == node)
+	    {
+	        //The left branch
+
+
+			//Note: brother can't be NULL, because we have delete a black node, 
+			//and the tree is balanced before we delete the node
+			brother = parent->right;
+
+			if(brother->color == COLOR_RED)
+			{
+			    //1) Case 1: x's brother is COLOR_RED
+				brother->color = COLOR_BLACK;
+			    parent->color = COLOR_RED;
+				rb_rotate_left(root,node);
+				brother = parent->right;
+			}
+
+
+			if((!brother->left || brother->left->color == COLOR_BLACK) &&
+				(!brother->right || brother->right->color == COLOR_BLACK))
+			{
+			   //2) Case 2: x's brother is COLOR_BLACK, is its two child is NULL or COLOR_BLACK
+			   brother->color = COLOR_RED;
+			   node = parent;
+			   parent = node->parent;
+			}
+			else{
+				if(!brother->right || brother->right->color == COLOR_BLACK)
+				{
+				   //3) Case 3: x's brother is COLOR_BLACK, and brother left child is COLOR_RED, 
+				   // right child is COLOR_BLACK
+
+
+                   brother->left->color = COLOR_BLACK;
+				   brother->color = COLOR_RED;
+				   rb_rotate_right(root,brother);
+				   brother = parent->right;
+				}
+
+				//4) Case 4: x's brother is COLOR_BLACK, and brother's right child is COLOR_RED
+				brother->color = parent->color;
+				parent->color = COLOR_BLACK;
+				brother->right->color = COLOR_BLACK;
+				rb_rotate_left(root, parent);
+
+				node = *root;
+				break;
+	
+			}
+			
+			
+	    }
+		else{
+			//The right branch
+			brother = parent->left;
+
+
+			if(brother->color == COLOR_RED)
+			{
+			    //1) Case 1: x's brother is COLOR_RED
+				brother->color = COLOR_BLACK;
+			    parent->color = COLOR_RED;
+				rb_rotate_right(root,parent);
+				brother = parent->left;
+			}
+
+			if((!brother->left || brother->left->color == COLOR_BLACK) &&
+				(!brother->right || brother->right->color == COLOR_BLACK))
+			{
+			   //2) Case 2: x's brother is COLOR_BLACK, is its two child is NULL or COLOR_BLACK
+			   brother->color = COLOR_RED;
+			   node = parent;
+			   parent = node->parent;
+			}
+			else{
+				if(!brother->left || brother->left->color == COLOR_BLACK)
+				{
+				   //3) Case 3: x's brother is COLOR_BLACK, and brother right child is COLOR_RED, 
+				   // left child is COLOR_BLACK
+
+
+                   brother->right->color = COLOR_BLACK;
+				   brother->color = COLOR_RED;
+				   rb_rotate_left(root,brother);
+				   brother = parent->left;
+				}
+
+				//4) Case 4: x's brother is COLOR_BLACK, and brother's left child is COLOR_RED
+				brother->color = parent->color;
+				parent->color = COLOR_BLACK;
+				brother->left->color = COLOR_BLACK;
+				rb_rotate_right(root, parent);
+
+				node = *root;
+				break;
+			}
+		}
+	}
+
+
+	if(node)
+	{
+	    node->color = COLOR_BLACK;
+	}
+	return 0x0;
+
+}
 {% endhighlight %}
 
 
