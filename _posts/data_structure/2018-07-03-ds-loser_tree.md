@@ -19,12 +19,12 @@ description: 败者树
 ![ds-loser-tree](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_loser_tree.jpg)
 
 
+```上图(b)```所示，当第3个归并段中第2个记录参加归并时，选得的最小关键字记录为第一个归并段中的记录。为了防止在归并过程中某个归并段变空，可以在每个归并段中附加一个关键字为最大值的记录。当选出“冠军”记录的关键字为最大值时，表明此次归并已经完成。败者树的初始化也容易实现，只要先令所有的非终端节点指向一个含最小关键字的叶子节点，然后从各个叶子节点出发调整非终端节点为新的败者即可。
 
 
+## 2. 败者树实现
 
-## 1. 败者树实现
-
-### 1.1 败者树头文件
+### 2.1 败者树头文件
 
 头文件```loser_tree.h```:
 {% highlight string %}
@@ -68,7 +68,7 @@ void multiways_merge(struct LoserTree *loserTree);
 #endif
 {% endhighlight %}
 
-### 1.2 败者树源文件
+### 2.2 败者树源文件
 
 源文件```loser_tree.c```:
 {% highlight string %}
@@ -241,7 +241,7 @@ void multiways_merge(struct LoserTree *loserTree)
 }
 {% endhighlight %}
 
-### 1.3 测试
+### 2.3 测试
 
 如下是测试文件```main.c```:
 {% highlight string %}
