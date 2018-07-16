@@ -165,6 +165,8 @@ export TZ='Asia/Shanghai'
 
 3. [显示各个时区](http://blog.csdn.net/youcharming/article/details/43700287)
 
+4. [ubuntu修改时区和时间的方法](https://blog.csdn.net/u012839224/article/details/78705622)
+
 <br />
 <br />
 <br />
