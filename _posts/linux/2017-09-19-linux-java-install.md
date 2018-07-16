@@ -181,6 +181,13 @@ public class HelloWorld{
 [root@localhost java-src]# java com.TT.HelloWorld
 Hello,world
 </pre>
+说明：可以通过```java -cp```来指定classpath，例如：
+{% highlight string %}
+# javac -cp ./my-oss-sdk-2.2.2.jar ObjectClientTest.java
+# java -cp .:./logback-classic-1.1.7.jar:./logback-core-1.1.7.jar:./slf4j-api-1.7.20.jar:./jcl-over-slf4j-1.7.25.jar \
+ :./commons-codec-1.9.jar:./gson-2.8.0.jar:./hamcrest-core-1.3.jar:./httpclient-4.5.3.jar:./httpcore-4.4.6.jar \
+ :./httpmime-4.5.3.jar:./my-oss-sdk-2.2.2.jar ObjectClientTest
+{% endhighlight %}
 
 
 ## 5. open-jdk依赖
