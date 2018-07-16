@@ -181,6 +181,7 @@ public class HelloWorld{
 [root@localhost java-src]# java com.TT.HelloWorld
 Hello,world
 </pre>
+
 说明：可以通过```java -cp```来指定classpath，例如：
 {% highlight string %}
 # javac -cp ./my-oss-sdk-2.2.2.jar ObjectClientTest.java
