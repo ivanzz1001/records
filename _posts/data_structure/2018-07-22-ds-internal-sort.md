@@ -51,7 +51,7 @@ description: 内部排序
 //use 'Straight Insertion Sort'
 void InsertSort(SqList *L)
 {
-	for(i = 2;i<L->length;i++)
+	for(i = 2;i<=L->length;i++)
 	{
 		if(LT(L->r[i].key, L->r[i-1].key)
 		{
@@ -79,7 +79,32 @@ void InsertSort(SqList *L)
 
 **1） 折半插入排序**
 
+由于插入排序的基本操作是在一个有序表中进行查找和插入。因此这个```查找```操作可以利用```折半查找```来实现，由此进行的插入排序称之为```折半插入排序```(Binary Insertion Sort)。
+{% highlight string %}
+void BInsertSort(SqList *L)
+{
+	for(i = 2;i<=L->length;i++)
+	{
+		L.r[0] = L.r[i];
+		
+		low = 1, high = i-1;
+		while(low <= high)
+		{
+			m = (low + high) >> 1;
 
+			if(LT(L->r[0].key, L->r[m].key))
+				high = m -1;
+			else
+				low = m+1;
+		}
+
+		for(j=i-1;j>=high+1;j--)
+			L->r[j+1] = L->r[j];
+
+		L->r[high+1] = L->r[0];
+	}
+}
+{% endhighlight %}
 
 
 <br />
