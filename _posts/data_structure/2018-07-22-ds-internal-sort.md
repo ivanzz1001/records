@@ -105,6 +105,72 @@ void BInsertSort(SqList *L)
 	}
 }
 {% endhighlight %}
+从上面可以看出，折半插入排序所需附加存储空间和直接插入排序相同，从时间上比较，折半插入排序仅减少了关键字间的比较次数，而记录的移动次数不变。因此，折半插入排序的时间复杂度仍为O(n^2)。
+
+**2) 2-路插入排序**
+
+```2-路```插入排序是在折半插入排序的基础上再改进之，其目的是减少排序过程中移动记录的次数，但为此需要```n```个记录的辅助空间。具体做法是：另设一个和```L.r```同类型的数组```d```，首先将```L.r[1]```赋值给```d[1]```，并将```d[1]```看成是在排好序的序列中处于中间位置的记录， 然后从```L.r```中第2个记录起依次插入到```d[1]```之前或之后的有序序列中。先将待插记录的关键字和```d[1]```的关键字进行比较，若```L.r[i].key```小于```d[1].key```，则将```L.r[i]```插入到```d[1]```之前的有序表中。反之，则将```L.r[i]```插入到```d[1]```之后的有序表中。在实现算法时，可将```d```看成是一个循环向量，并设两个指针```first```和```final```分别指示排序过程中得到的有序序列中的第一个和最后一个记录在d中的位置。
+
+{% highlight string %}
+void BWInsertSort(SqList *L, SqList *D)
+{
+	int first, last, i;
+	first = last = 1;
+
+	int CAPACITY = L->capacity;
+	D.r[1] = L.r[1];
+	
+	for(i = 1;i<=L->length;i++)
+	{
+		if(L.r[i] < D.r[1])
+		{
+			low = first;
+			high = 1;
+			while(low <= high)
+			{
+				middle = (low + high) >> 1;
+				
+				if(GE[L->r[i].key, D->r[(middle +  CAPACITY) % CAPACITY].key))
+				{
+					low = middle + 1;
+				}
+				else
+					high = middle -1;
+			}
+
+			for(j=first;j<=low-1;j++)
+			{
+				D.r[(first -1 + CAPACITY) % CAPACITY] = D.r[(first + CAPACITY) % CAPACITY].r;
+			}
+			D.r[(low - 1 + CAPACITY) % CAPACITY] = L.r[i];
+			first--;
+		}
+		else{
+			low = 1;
+			high = last;
+		
+			while(low <= high)
+			{
+				middle = (low + high)>>1;
+				if(LT(L->r[i].key, D->r[middle].key))
+				{
+					high = middle-1;
+				}
+				else
+					low = middle + 1;
+			}
+			
+
+		}
+	}
+	
+}
+{% endhighlight %}
+
+
+在```2-路```插入排序中，移动记录的次数约为```(n^2)/8```。因此，```2-路```插入排序只能减少移动记录的次数，而不能绝对避免移动记录
+
+
 
 
 <br />
