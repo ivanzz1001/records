@@ -190,9 +190,32 @@ typedef struct{
 typedef struct{
 	SLNode r[SIZE];				//0号单元为表头节点
 	int length;					//链表当前长度
-};
+}SLinkListType;
 {% endhighlight %}
+假设以上述说明的```静态链表```类型作为待排记录序列的存储结构，并且，为了插入方便起见，设数组中下标为```0```的分量为头节点，并令表头节点记录的关键字取最大整数```MAXINT```。则表插入排序的过程描述如下： 首先将静态链表中数组下标为```1```的分量和表头节点构成一个循环链表，然后依次将下标为```2```至```n```的分量按记录关键字非递减有序插入到循环链表中。
+{% highlight string %}
 
+void ListInsertSort(SLinkListType list)
+{
+	list.r[1].next = 0;
+
+	for(i = 2;i<=list.length;i++)
+	{
+		current = 0;
+		while(list.r[current].next)
+		{
+			next = list.r[current].next
+			if(LT(list->r[i].rc,list.r[next].rc))
+				break;
+			current = next
+		}
+		
+		list.r[i].next = list.r[current].next;
+		list.r[current].next = i;
+	}
+}
+
+{% endhighlight %}
 
 <br />
 <br />
