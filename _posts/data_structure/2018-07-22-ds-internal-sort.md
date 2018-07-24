@@ -140,9 +140,9 @@ void BWInsertSort(SqList *L, SqList *D)
 
 			for(j=first;j<=low-1;j++)
 			{
-				D.r[(first -1 + CAPACITY) % CAPACITY] = D.r[(first + CAPACITY) % CAPACITY].r;
+				D->r[(first -1 + CAPACITY) % CAPACITY] = D->r[(first + CAPACITY) % CAPACITY].r;
 			}
-			D.r[(low - 1 + CAPACITY) % CAPACITY] = L.r[i];
+			D->r[(low - 1 + CAPACITY) % CAPACITY] = L.r[i];
 			first--;
 		}
 		else{
@@ -160,7 +160,11 @@ void BWInsertSort(SqList *L, SqList *D)
 					low = middle + 1;
 			}
 			
-
+			for(j = last; j>=high+1;j--)
+				D->r[j+1] = D->r[j];
+			
+			D->r[hight+1] = L->r[i];
+			last++;
 		}
 	}
 	
@@ -168,9 +172,26 @@ void BWInsertSort(SqList *L, SqList *D)
 {% endhighlight %}
 
 
-在```2-路```插入排序中，移动记录的次数约为```(n^2)/8```。因此，```2-路```插入排序只能减少移动记录的次数，而不能绝对避免移动记录
+在```2-路```插入排序中，移动记录的次数约为```(n^2)/8```。因此，```2-路```插入排序只能减少移动记录的次数，而不能绝对避免移动记录。并且，当```L->r[1]```是待排序记录中的最小或最大记录时，```2-路```插入排序就完全失去它的优越性。因此，若希望在排序过程中不移动记录，只有改变存储结构，进行```表插入排序```。
+
+**3) 表插入排序**
+
+{% highlight string %}
+#define SIZE	100				//静态链表容量
+
+//表节点类型
+typedef struct{
+	RcdType rc;					//记录项
+	int next;					//指针项
+}SLNode;
 
 
+//静态链表类型
+typedef struct{
+	SLNode r[SIZE];				//0号单元为表头节点
+	int length;					//链表当前长度
+};
+{% endhighlight %}
 
 
 <br />
