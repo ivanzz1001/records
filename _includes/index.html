@@ -9,7 +9,7 @@
   <nav id="page-nav" class="clearfix{% if site.index.expand != true  %} unexpand{% endif %}">
   <nav id="page-nav" class="clearfix">
     {% if paginator.previous_page %}
-    <a class="extend prev" rel="prev" href="{{ paginator.previous_page_path }}"><span></span>Prev</a>
+    <a class="extend prev" rel="prev" href="records/{{ paginator.previous_page_path }}"><span></span>Prev</a>
     {% endif %}
     {% if paginator.page == 1 %}
     <span class="page-number current">1</span>
@@ -24,7 +24,7 @@
     {% endif %}
     {% endfor %}
      {% if paginator.next_page %}
-    <a class="extend next" rel="next" href="{{ paginator.next_page_path }}">Next<span></span></a>
+    <a class="extend next" rel="next" href="records/{{ paginator.next_page_path }}">Next<span></span></a>
     {% endif %}
   </nav>
   </nav>
