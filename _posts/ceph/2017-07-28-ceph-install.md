@@ -109,7 +109,12 @@ yum install expat-devel
 
 
 
+<br />
+<br />
 
+**参考**:
+
+1. [指定ceph版本下载](https://github.com/ceph/ceph/releases?after=v12.2.4)
 
 <br />
 <br />
