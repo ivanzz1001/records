@@ -20,7 +20,7 @@
     {%if i == paginator.page %}
     <span class="page-number current">{{ i }}</span>
     {% else %}
-    <a class="page-number" href="/page{{ i }}">{{ i }}</a>
+    <a class="page-number" href="/records/page{{ i }}">{{ i }}</a>
     {% endif %}
     {% endfor %}
      {% if paginator.next_page %}
