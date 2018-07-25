@@ -263,7 +263,7 @@ void Arrange(SLinkListType SL)
 
 ## 3. 希尔插入排序
 
-
+希尔插入排序(Shell's Sort)又称“缩小增量排序”(Diminishing Increment Sort)
 
 
 
