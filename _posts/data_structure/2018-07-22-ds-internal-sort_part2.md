@@ -102,7 +102,7 @@ void QuickSort(SqList)
 {
 	QSort(sqList, 1, L.length);
 }
-{% highlight %}
+{% endhighlight %}
 
 **2) 迭代形式快速排序**
 {% highlight string %}
