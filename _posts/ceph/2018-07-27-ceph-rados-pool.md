@@ -25,6 +25,8 @@ description: radosgw 各个pool作用及联系
 
 1. [radosgw 各个pool作用及联系](https://blog.csdn.net/dengxiafubi/article/details/77099131)
 
+2. [ceph radosgw gc](https://blog.csdn.net/ganggexiongqi/article/details/51160001)
+
 <br />
 <br />
 <br />
