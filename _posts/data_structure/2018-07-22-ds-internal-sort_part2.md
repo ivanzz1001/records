@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 内部排序
+title: 内部排序（中）
 tags:
 - data-structure
 categories: data-structure
