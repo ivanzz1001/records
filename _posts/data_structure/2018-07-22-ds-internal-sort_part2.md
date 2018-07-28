@@ -196,9 +196,20 @@ void SelectSort(SqList L)
 
 若将和此序列对应的一维数组（即以一维数组作此序列的存储结构）看成是一棵完全二叉树，则堆的含义表明： 完全二叉树中所有非终端节点的值均不大于（或不小于）其左、右孩子节点的值。由此，若序列{k1, k2, ..., kn}是堆，则堆顶元素（或完全二叉树的根）必为序列中n个元素的最小值（或最大值）。例如，下列两个序列为堆，对应的完全二叉树如下所示：
 
+![ds-heap-example](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_heap_example.jpg)
+
+若在输出堆顶的最小值之后，使得剩余```n-1```个元素的序列又建成一个堆，则得到n个元素的次小值。如此反复执行，便能得到一个有序序列，这个过程称之为```堆排序```。由此，实现堆排序需要解决两个问题：
+
+* 如何由一个无序序列建成一个堆？
+
+* 如何在输出堆顶元素之后，调整剩余元素成为一个新的堆？
+
+下面我们先讨论第二个问题。例如，下图(a)是个堆，假设输出堆顶元素之后，以堆中最后一个元素替代之，如图(b)所示。此时根节点的左右子树均为堆，则仅需自上至下进行调整即可。
+
+![ds-heap-adjust](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_heap_adjust.jpg)
 
 
-
+![ds-heap-build](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_heap_build.jpg)
 
 
 
