@@ -117,26 +117,91 @@ int Index(SString S, SString T, int pos)
 现在讨论一般情况。假设主串为'S1S2...Sn', 模式串为'P1P2...Pm', 从上面分析可知，为了实现改进算法，需要解决下述问题： 当匹配过程中产生“失配”（及Si != Pj)时，模式串“向右滑动”可行的距离多远，换句话说，当主串中第i个字符与模式中第j个字符“失配”（即比较不等）时，主串中第i个字符（i指针不回溯）应与模式中那个字符再比较？
 
 假设此时应与模式中第k(k<j)个字符继续比较，则模式中前k-1个字符的子串必须满足如下关系式(4-2)，且不可能存在k'>k满足如下关系式(4-2):
-<pre>
+{% highlight string %}
 'P1P2...Pk-1' = 'Si-k+1Si-k+2...Si-1'            (4-2)
-</pre>
+{% endhighlight %}
 而已经得到的```部分匹配```的结果是：
-<pre>
+{% highlight string %}
 'Pj-k+1Pj-k+2...Pj-1' = 'Si-k+1Si-k+2...Si-1'    (4-3)
-</pre>
+{% endhighlight %}
 由上式(4-2)和式(4-3)推得下列等式：
-<pre>
+{% highlight string %}
 'P1P2...Pk-1' = 'Pj-k+1Pj-k+2...Pj-1'            (4-4)
-</pre>
-反之，若模式串中存才满足式(4-4)的两个子串，则当匹配过程中，主串中第i个字符与模式中第j个字符比较不相等时，仅需将模式向右滑动至模式中第k个字符和主串中第i个字符对齐，此时，模式中头k-1个字符的子串'P1P2...Pk-1'必定与主串中第i个字符之前长度为k-1的子串'Si-k+1Si-k+2...Si-1'相等，由此，匹配仅需从模式中第k个字符与主串中第i个字符比较起继续进行。
+{% endhighlight %}
+反之，若模式串中存才满足式(4-4)的两个子串，则当匹配过程中，主串中第i个字符与模式中第j个字符比较不相等时，仅需将模式向右滑动至模式中第k个字符和主串中第i个字符对齐，此时，模式中头k-1个字符的子串```'P1P2...Pk-1'```必定与主串中第i个字符之前长度为k-1的子串```'Si-k+1Si-k+2...Si-1'```相等，由此，匹配仅需从模式中第k个字符与主串中第i个字符比较起继续进行。
 
 若令```next[j]=k```，则next[j]表明当模式中第j个字符与主串中相应字符“失配”时，在模式中需重新和主串中该字符进行比较的字符的位置。由此，可引出模式串的next函数的定义：
 
 ![ds-string-kmp1](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_string_kmp1.jpg)
+由此定义可推出下列模式串的next函数值：
+
+![ds-string-kmp2](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_string_kmp2.jpg)
+
+在求得模式的next函数之后，匹配可如下进行： 假设以指针i和j分别指示主串和模式中正待比较的字符，令i的初值为pos，j的初值为1。若在匹配过程中```si=pj```，则i和j分别增1，否则，i不变，而j退到next[j]的位置再比较，若相等，则指针各自增1，否则j再退到下一个next值的位置，依次类推，直至下列两种可能：
+
+* 1） j退到某个next值（next[next[...next[j]..]])时字符比较相等，则指针各自增1，继续进行匹配；
+
+* 2） j退到值为0（即模式的第一个字符**失配**),此时需将模式继续向右滑动一个位置，即从主串的下一个字符```Si+1```起和模式重新开始匹配。
+
+如下图是上述匹配过程的一个例子(模式为'abaabcac')：
+{% highlight string %}
+                   ↓i=2
+            主串 a c a b a a b a a b c a c a a b c
+第一趟匹配
+            模式 a b
+                   ↑j=2  next[2]=1
 
 
+                   ↓i=2
+            主串 a c a b a a b a a b c a c a a b c
+第二趟匹配
+            模式   a b
+                   ↑j=1  next[1] = 0
 
 
+                     ↓i=3 ---> ↓i=8
+            主串 a c a b a a b a a b c a c a a b c
+第三趟匹配
+            模式     a b a a b c
+                     ↑j=1 ---->↑j=6   next[6] = 3
+
+
+                               ↓i=8 -----> ↓i=14
+            主串 a c a b a a b a a b c a c a a b c
+第四趟匹配
+            模式          (a b)a a b c a c
+                               ↑j=3 ------>↑j=9   
+{% endhighlight %}
+
+**1） KMP算法**
+
+KMP算法如下所示，它在形式上与开头介绍的```直接定位函数类似```。不同之处仅在于：当匹配过程中产生```失配```时，指针i不变，指针j退回到next[j]所指示的位置上重新进行比较，并且当指针j退至零时，指针i和指针j需同时增1.即若主串的第i个字符和模式的第1个字符不等，应从主串的第i+1个字符起重新进行匹配。
+{% highlight string %}
+//利用模式串T的next函数求T在主串S中第pos个字符之后的位置的
+//KMP算法。其中，T非空，1<=pos<=StrLength(S)
+int Index_KMP(SString S, SString T, int pos)
+{
+	i = pos;
+	j = 1;
+
+	while(i <= S[0] && j <= T[0])
+	{
+		if(j == 0 || s[i] == s[j])
+		{
+			++i;
+			++j;
+		}
+		else{
+			j = next[j];
+		}
+	}
+
+	if(j > T[0])
+		return i-T[0];
+	else
+		return 0;
+}
+{% endhighlight %}
 
 <br />
 <br />
