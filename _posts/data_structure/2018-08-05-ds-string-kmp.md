@@ -130,6 +130,11 @@ int Index(SString S, SString T, int pos)
 </pre>
 反之，若模式串中存才满足式(4-4)的两个子串，则当匹配过程中，主串中第i个字符与模式中第j个字符比较不相等时，仅需将模式向右滑动至模式中第k个字符和主串中第i个字符对齐，此时，模式中头k-1个字符的子串'P1P2...Pk-1'必定与主串中第i个字符之前长度为k-1的子串'Si-k+1Si-k+2...Si-1'相等，由此，匹配仅需从模式中第k个字符与主串中第i个字符比较起继续进行。
 
+若令```next[j]=k```，则next[j]表明当模式中第j个字符与主串中相应字符“失配”时，在模式中需重新和主串中该字符进行比较的字符的位置。由此，可引出模式串的next函数的定义：
+
+![ds-string-kmp1](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_string_kmp1.jpg)
+
+
 
 
 
