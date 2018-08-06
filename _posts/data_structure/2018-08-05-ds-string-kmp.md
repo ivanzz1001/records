@@ -173,7 +173,7 @@ int Index(SString S, SString T, int pos)
                                ↑j=3 ------>↑j=9   
 {% endhighlight %}
 
-**1） KMP算法**
+### 2.1 KMP算法
 
 KMP算法如下所示，它在形式上与开头介绍的```直接定位函数类似```。不同之处仅在于：当匹配过程中产生```失配```时，指针i不变，指针j退回到next[j]所指示的位置上重新进行比较，并且当指针j退至零时，指针i和指针j需同时增1.即若主串的第i个字符和模式的第1个字符不等，应从主串的第i+1个字符起重新进行匹配。
 {% highlight string %}
@@ -204,7 +204,7 @@ int Index_KMP(SString S, SString T, int pos)
 {% endhighlight %}
 
 
-**2） 求next函数**
+### 2.2 求next函数
 
 ```KMP算法```是在已知模式串的next函数值的基础上执行的，那么，如何求得模式串的next函数值呢？ 从上述讨论可见，此函数值仅取决于模式串本身而和相匹配的主串无关。我们可从分析其定义出发用递推的方法求得next函数值。
 
@@ -214,7 +214,10 @@ int Index_KMP(SString S, SString T, int pos)
 </pre>
 其中k为满足```1<k<j```的某个值，并且不可能存在```k'>k```满足等式(4-7)。此时```next[j+1]=?```可能有两种情况：
 
-* 若```Pk=Pj```，则表明在模式串中
+
+**1) 情形1： Pk=Pj**
+
+若```Pk=Pj```，则表明在模式串中
 <pre>
 'P1P2...Pk = 'Pj-k+1Pj-k+2...Pj'                   (4-8)
 </pre>
@@ -223,7 +226,12 @@ int Index_KMP(SString S, SString T, int pos)
 next[j+1] = next[j] + 1                            (4-9)
 </pre>
 
-* 若```Pk!=Pj```，则表明在模式串中
+<br/>
+
+
+**2) 情形2: Pk!=Pj**
+
+若```Pk!=Pj```，则表明在模式串中
 <pre>
 'P1P2...Pk' != 'Pj-k+1Pj-k+2...Pj'
 </pre>
