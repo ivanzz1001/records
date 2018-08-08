@@ -70,6 +70,178 @@ else
 ![ds-huffman-create](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_huffman_create.jpg)
 
 
+
+## 2. 赫夫曼编码
+目前，进行快速远距离通信的主要手段是电报，即将需传送的文字转换成由二进制的字符组成的字符串。例如，假设需传送的电文为'A B A C C D A'，它只有4种字符，只需两个字符的串便可分辨。假设A、B、C、D的编码分别为00、01、10和11，则上述7个字符的电文便为'00010010101100'，总长14位，对方接收时，可按二位一分进行译码。
+
+当然，在传送电文时，希望总长尽可能短。如果对每个字符设计长度不等的编码，且让电文中出现次数较多的字符采用尽可能短的编码，则传送电文的总长便可减少。如果设计A、B、C、D的编码分别为0、00、1和01，则上述7个字符的电文可转换成总长为9的字符串'00001101'。但是，这样的电文无法翻译，例如传送过去的字符串中前4个字符的子串'0000'就有多种译法，或是```AAAA```，或是```ABA```，也可以是```BB```等。因此，若要设计长短不等的编码，则必须是任一个字符的编码都不能是另一个字符的编码的前缀，这种编码称作**前缀编码**。
+
+可以利用二叉树来设计二进制的前缀编码。假设有一棵如下图所示的二叉树，其四个叶子节点分别表示A、B、C、D这4个字符，且约定左分支表示字符'0'，右分支表示字符'1'，则可以从根节点到叶子节点的路径上分支字符组成字符串作为该叶子节点字符的编码。可以证明，如此得到的必为二进制前缀编码。如下图所示，所得到的A、B、C、D的二进制前缀编码分别为0、10、110和111。
+
+![ds-prefix-encoding](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_prefix_encoding.jpg)
+
+又如何得到使电文总长度最短的二进制前缀编码呢？ 假设每种字符在电文中出现的次数为```Wi```，其编码长度为```Li```，电文中只有n种字符，则电文总长度为```W1L1 + W2L2 + ... + WnLn```。对应的二叉树上，若置```Wi```为叶子节点的权，```Li```恰为从根到叶子节点的路径长度。则```W1L1 + W2L2 + ... + WnLn```恰为二叉树上带权路径长度。由此可见，设计电文总长度最短的二进制前缀编码即为以n种字符出现的频率作权，设计一颗赫夫曼树的问题，由此得到的二进制前缀编码称为赫夫曼编码。
+
+下面讨论具体做法。
+
+由于赫夫曼树中没有度为1的节点（这类树又称严格的(strict)或正则的二叉树），则一颗有n个叶子节点的赫夫曼树共有2n-1个节点，可以存储在一个大小为2n-1的一维数组中。如何选定节点结构？ 由于在构造赫夫曼树之后，为求编码需从叶子节点出发走一条从叶子到根的路径； 而为译码需从根出发走一条从根到叶子的路径。则对每个节点而言，既需知双亲的信息，又需知孩子节点的信息。由此，设定下述存储结构：
+{% highlight string %}
+typedef struct{
+	unsigned int weight;
+	unsigned int parent,lchild,rchild;
+}HTNode, *HuffmanTree;				//动态分配数组存赫夫曼树
+
+typedef char **HuffmanCode;			//动态分配数组存储赫夫曼编码表
+{% endhighlight %}
+
+求赫夫曼编码算法如下：
+{% highlight string %}
+//w存放n个字符的权值（均>0)，构造赫夫曼树HT，并求出n个字符的赫夫曼编码HC。
+void HuffmanCoding(HuffmanTree *HT, HuffmanCode *HC,int *w, int n)
+{
+	if(n <= 1)
+		return;
+
+	m = 2*n -1;
+
+	(*HT) = (HuffmanTree)malloc((m+1) * sizeof(HTNode));		//0号单元未用
+	for(p = *HT, i = 1; i<=n; ++i, ++p, ++w)
+		*p = {*w, 0, 0,0};
+	for(; i<=m;++i, ++p)
+		*p = {0,0,0,0};
+
+	//1) 构建赫夫曼树
+	for(i = n+1; i<=m;++i)
+	{
+		//在HT[1..i-1]中选择parent为0且weight最小的两个节点，其序号分别为s1和s2，且s1 <= s2
+		Select(HT, i-1, s1, s2);
+
+		HT[s1].parent = i;
+		HT[s2].parent =i;
+		HT[i].lchild = s1;
+		HT[i].rchild = s2;
+		HT[i].weight = HT[s1].weight + HT[s2].weight;
+	}
+
+
+	//2) 从叶子到根逆向求每个字符的赫夫曼编码
+	*HC = (HuffmanCode)malloc((n+1)*sizeof(char *));	//分配n个字符编码的头指针向量，0号单元未用
+	
+	//分配求编码的空间（除第一层外，每层最少有两个节点，因此层高最大为(2n-2)/2=n-1
+	cd = (char *)malloc(n*sizeof(char));				
+	cd[n-1] = '\0';										//编码结束符
+	for(i = 1;i<=n;i++)									//逐个字符求赫夫曼编码
+	{
+		start = n-1;										//编码结束符位置
+		for(c = i, f = HT[i].parent; f != 0; c = f, f = HT[f].parent)
+		{
+			if(HT[f].lchild == c)
+				cd[--start] = '0';
+			else
+				cd[--start] = '1';
+		}
+
+		HC[i] = (char *)malloc((n-start)*sizeof(char)); //为第i个字符编码分配空间
+		strcpy(HC[i], &cd[start]);			            //从cd复制编码(串)到HC
+	}
+
+	free(cd);			//释放工作空间
+}
+{% endhighlight %}
+向量HT的前n个分量表示叶子节点，最后一个分量表示根节点。各字符编码长度不等，所以按实际长度动态分配空间。在上面的算法中求每个字符的赫夫曼编码是从叶子到根逆向处理的。也可以从根出发，遍历整棵赫夫曼树，求得各个叶子节点所表示的字符的赫夫曼编码。如下所示：
+{% highlight string %}
+//w存放n个字符的权值（均>0)，构造赫夫曼树HT，并求出n个字符的赫夫曼编码HC。
+void HuffmanCoding(HuffmanTree *HT, HuffmanCode *HC,int *w, int n)
+{
+	if(n <= 1)
+		return;
+
+	m = 2*n -1;
+
+	(*HT) = (HuffmanTree)malloc((m+1) * sizeof(HTNode));		//0号单元未用
+	for(p = *HT, i = 1; i<=n; ++i, ++p, ++w)
+		*p = {*w, 0, 0,0};
+	for(; i<=m;++i, ++p)
+		*p = {0,0,0,0};
+
+	//1) 构建赫夫曼树
+	for(i = n+1; i<=m;++i)
+	{
+		//在HT[1..i-1]中选择parent为0且weight最小的两个节点，其序号分别为s1和s2，且s1 <= s2
+		Select(HT, i-1, s1, s2);
+
+		HT[s1].parent = i;
+		HT[s2].parent =i;
+		HT[i].lchild = s1;
+		HT[i].rchild = s2;
+		HT[i].weight = HT[s1].weight + HT[s2].weight;
+	}
+
+
+	//2) 从叶子到根逆向求每个字符的赫夫曼编码
+	*HC = (HuffmanCode)malloc((n+1)*sizeof(char *));	//分配n个字符编码的头指针向量，0号单元未用
+	p = m;
+	cdlen = 0;
+
+	for(i = 1;i<=m;++i)
+		HT[i].weight = 0;			//遍历赫夫曼树时用作节点状态标志
+
+	while(p)
+	{
+		if(HT[p].weight == 0)		//向左
+		{
+			HT[p].weight = 1;
+			if(HT[p].lchild != 0)
+			{
+				p = HT[p].lchild;
+				cd[cdlen++] = '0';
+			}
+			else if(HT[p].rchild == 0)		//登记叶子节点的字符的编码
+			{
+				(*HC)[p] = (char *)malloc((cdlen + 1) * sizeof(char));
+				cd[cdlen] = '\0';
+				strcpy((*HC)[p], cd); 
+			}
+		}
+		else if(HT[p].weight == 1)     //向右
+		{
+			HT[p].weight =2;
+			if(HT[p].rchild != 0)
+			{
+				p = HT[p].rchild;
+				cd[cdlen++] = '1';
+			}
+		}
+		else{						//退回
+			HT[p].weight = 0;
+			p = HT[p].parent;
+			--cdlen;
+		}
+	}
+}
+
+{% endhighlight %}
+
+译码的过程是分解电文中字符串，从根出发，按字符'0'或'1'确定找左孩子或右孩子，直至叶子节点，便求得该子串相应的字符。
+
+## 3. 赫夫曼编码举例
+例： 已知某系统在通信联络中只可能出现8种字符，其概率分别为0.05，0.29，0.07，0.08， 0.14，0.23，0.03，0.11，试设计赫夫曼编码。
+
+
+如下我们构造赫夫曼树：设权w=(5,29,7,8,14,23,3, 11)，n=8，则m=15，按上述算法可构建一棵赫夫曼树，如下图所示：
+
+![ds-huffman-tree](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_huffman_tree.jpg)
+
+其存储结构HT的初始状态如下图(a)所示，其终结状态如下图(b)所示，所得赫夫曼编码如图(c)所示：
+
+![ds-huffman-code](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_huffman_code.jpg)
+
+
+
+
+
+
+
 <br />
 <br />
 
