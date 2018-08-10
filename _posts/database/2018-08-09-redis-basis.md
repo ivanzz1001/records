@@ -67,7 +67,64 @@ OK
 
 
 ## 3. Redis命令
-这里
+这里我们将Redis命令归结为如下几类： 1) Redis数据库管理命令； 2） Redis键(key)操作命令； 3) Redis各数据类型操作命令； 4) Redis HyperLogLog操作命令； 5) Redis发布订阅； 6） Redis事务。 下面我们分这些类型分别进行讲解。
+
+### 3.1 Redis客户端连接相关命令
+
+**1) Redis客户端连接命令**
+
+通过redis-cli可以远程连接redis服务器。例如：
+{% highlight string %}
+# ./redis-cli -h 127.0.0.1 -p 6379 -a "mypass"
+127.0.0.1:6379> ping
+PONG
+{% endhighlight %}
+
+**2) 验证密码是否正确**
+{% highlight string %}
+127.0.0.1:6379> auth "password"
+OK
+{% endhighlight %}
+
+**3) 打印字符串**
+{% highlight string %}
+127.0.0.1:6379> echo "hello,world"
+"hello,world"
+{% endhighlight %}
+
+**4)  切换数据库**
+{% highlight string %}
+127.0.0.1:6379> select 2
+OK
+{% endhighlight %}
+
+**5) 当前当前关闭连接**
+{% highlight string %}
+127.0.0.1:6379[2]> quit
+{% endhighlight %}
+
+### 3.2 Redis服务器命令
+Redis服务器命令主要用于管理Redis服务。例如，我们可以通过如下方式获取Redis服务器的统计信息：
+{% highlight string %}
+127.0.0.1:6379> info
+# Server
+redis_version:3.2.11
+redis_git_sha1:00000000
+redis_git_dirty:0
+redis_build_id:97eb487d6f26f02a
+redis_mode:standalone
+os:Linux 3.10.0-514.el7.x86_64 x86_64
+arch_bits:64
+multiplexing_api:epoll
+gcc_version:4.8.5
+process_id:16518
+run_id:3025e67d25d24431296d22e460a6f17802381621
+....
+{% endhighlight %}
+关于Redis服务器相关命令还有很多，请参看如下列表：
+
+![db-redis-command](https://ivanzz1001.github.io/records/assets/img/db/db_redis_server_cmd.jpg)
+
 
 
 
