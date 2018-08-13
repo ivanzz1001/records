@@ -291,7 +291,7 @@ Redis的Set时String类型的无序集合。集合成员是唯一的，这就意
 
 ### 3.8 Redis有序集合(Sorted Set)操作命令
 Redis有序集合和集合一样，也是string类型元素的集合，且不允许重复的成员，不同的是每个元素都会关联一个double类型的分数。Redis正是通过分数来为集合中的成员进行从小到大的排序。
-有序集合的成员是唯一的，但分数(score)却可以重复。在redis sorted sets里面当items内容大于64的时候同时使用了hash和skiplist两种设计实现。这也会为了排序和查找性能做的优化。因此： 
+有序集合的成员是唯一的，但分数(score)却可以重复。在redis sorted sets里面当items内容大于64的时候同时使用了hash和skiplist两种设计实现。这也是为了排序和查找性能做的优化。因此： 
 <pre>
 添加和删除都需要修改skiplist，所以复杂度为O(log(n))。 
 
@@ -347,6 +347,33 @@ Redis有序集合和集合一样，也是string类型元素的集合，且不允
 |   18   |ZSCORE key member: 返回有序集中，成员的分数值                                        |
 |   19   |ZUNIONSTORE destination numkeys key [key ...]: 计算给定的一个或多个有序集的并集，并存储在新的 key中|
 |   20   |ZSCAN key cursor [MATCH pattern] [COUNT count]: 迭代有序集合中的元素（包括元素成员和元素分值）|
+
+
+
+### 3.9 Redis HyperLogLog操作命令
+Redis 2.8.9版本添加了HyperLogLog结构。Redis HyperLogLog是用来做基数统计的算法，HyperLogLog的优点是，在输入元素的数量或体积非常非常大时，计算基数所需的空间总是固定的，并且很小的。在Redis里面，每个HyperLogLog键只需要花费12KB内存，就可以计算接近2^64个不同元素的基数。这和计算基数时，数据元素越多耗费内存就越多的集合形成鲜明的对比。但是，因为HyperLogLog只会根据输入元素来计算基数，所以HyperLogLog不能像集合那样，返回输入的各元素。
+
+什么是**基数**呢? 比如数据{1，3，5，7，5，7，8},那么这个数据集的基数集为{1,3,5,7,8}，基数（不重复元素）为5。基数估计就是在误差可接受的范围内，快速计算基数。
+
+参看如下实例：
+{% highlight string %}
+127.0.0.1:6379> PFADD runoobkey "redis"
+(integer) 1
+127.0.0.1:6379> PFADD runoobkey "mongodb"
+(integer) 1
+127.0.0.1:6379> PFADD runoobkey "mysql"
+(integer) 1
+127.0.0.1:6379> PFCOUNT runoobkey
+(integer) 3
+{% endhighlight %}
+下面列出Hyperloglog操作的一些命令：
+
+| 序号   |        命令及描述                                                                   | 
+|:------:|:------------------------------------------------------------------------------------|
+|   1    |PFADD key element [element ...]: 添加指定元素到HyperLogLog中                         |
+|   2    |PFCOUNT key [key...]: 返回给定HyperLogLog的基数估算值                                |
+|   3    |PFMERGE destkey sourcekey [sourcekey...]:将多个HyperLogLog合并为一个HyperLogLog      | 
+
 
 
 <br />
