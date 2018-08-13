@@ -129,11 +129,11 @@ run_id:3025e67d25d24431296d22e460a6f17802381621
 ### 3.3 Redis键(key)操作命令
 Redis键命令用于管理redis键。主要有如下：
 
-|序号|        命令及描述                                                                   | 
-|:--:|:-----------------------------------------------------------------------------------:|
-|  1 |DEL key: 该命令用于在key存在时删除key                                                |
-|  5 |EXPIREAT key timestamp: EXPIREAT的作用域EXPIRE类似，都用于为key设置过期时间。不同在于EXPIREAT命令接受的时间参数是unix时间错(unix timestamp)|
-|  7 |PEXPIREAT key milliseconds-timestamp: 设置key的过期时间戳(unix timestamp)以毫秒计算  |      
+| 序号 |        命令及描述                                                                   | 
+|:----:|:-----------------------------------------------------------------------------------|
+|  1   |DEL key: 该命令用于在key存在时删除key                                                |
+|  5   |EXPIREAT key timestamp: EXPIREAT的作用域EXPIRE类似，都用于为key设置过期时间。不同在于EXPIREAT命令接受的时间参数是unix时间错(unix timestamp)|
+|  7   |PEXPIREAT key milliseconds-timestamp: 设置key的过期时间戳(unix timestamp)以毫秒计算  |      
 
 
 
