@@ -130,13 +130,49 @@ run_id:3025e67d25d24431296d22e460a6f17802381621
 Redis键命令用于管理redis键。主要有如下：
 
 | 序号   |        命令及描述                                                                   | 
-|:------:|:-----------------------------------------------------------------------------------|
+|:------:|:------------------------------------------------------------------------------------|
 |  1     |DEL key: 该命令用于在key存在时删除key                                                |
+|  2     |DUMP key: 序列化给定key，并返回被序列化的值                                          |
+|  3     |EXISTS key: 检查给定key是否存在                                                      |
+|  4     |EXPIRE key seconds: 为给定key设置过期时间                                            |
 |  5     |EXPIREAT key timestamp: EXPIREAT的作用域EXPIRE类似，都用于为key设置过期时间。不同在于EXPIREAT命令接受的时间参数是unix时间错(unix timestamp)|
-|  7     |PEXPIREAT key milliseconds-timestamp: 设置key的过期时间戳(unix timestamp)以毫秒计算  |      
+|  6     |PEXPIRE key milliseconds: 设置key的过期时间，以毫秒计                                |
+|  7     |PEXPIREAT key milliseconds-timestamp: 设置key的过期时间戳(unix timestamp)以毫秒计算  |
+|  8     |KEYS pattern: 查找所有符合给定模式(pattern)的key                                     |
+|  9     |MOVE key db: 将当前数据库的key移动到给定的数据库db当中                               |
+|  10    |PERSIST key: 移除key的过期时间，key将保持永久                                        |
+|  11    |PTTL key: 以毫秒为单位返回key的剩余过期时间                                          |
+|  12    |TTL key: 以秒为单位，返回给定key的剩余生存时间(TTL: time to live)                    |
+|  13    |RANDOMKEY: 从当前数据库中随机返回一个key                                             |
+|  14    |RENAME key newkey: 修改key的名称                                                     |
+|  15    |RENAMENX key newkey: 仅当newkey不存在时，将key改为newkey                             |
+|  16    |TYPE key: 返回key所存储的值的类型                                                    |     
 
+### 3.4 Redis字符串(string)操作命令
+Redis字符串(string)数据类型的相关命令用于管理redis字符串值。主要有如下：
 
-
+| 序号   |        命令及描述                                                                   | 
+|:------:|:------------------------------------------------------------------------------------|
+|  1     |SET key value: 设置指定key的值                                                       |
+|  2     |GET key: 获取指定key的值                                                             |
+|  3     |GETRANGE key start end: 返回key中字符串值的子字符                                    |
+|  4     |GETSET key value: 将给定key的值设为value，并返回key的旧值(old value)                 |
+|  5     |GETBIT key offset: 对key所存储的字符串值，获取指定偏移量上的位(bit)                  |
+|  6     |MGET key1[key2...]: 获取一个或多个给定key的值                                        |
+|  7     |SETBIT key offset value: 对key所存储的字符串值，设置或清除指定偏移量上的位(bit)      |
+|  8     |SETEX key seconds value: 将值value关联到key，并将key的过期时间设为seconds(以秒为单位)|
+|  9     |SETNX key value: 只有在key不存在时设置key的值                                        |
+|  10    |SETRANGE key offset value: 用value参数覆写给定key所存储的字符串值，从偏移量offset开始|
+|  11    |STRLEN key: 返回key所存储的字符串值的长度                                            |
+|  12    |MSET key1 value1 [key2 value2 ...]: 同时设置一个或多个key-value对                    |
+|  13    |MSETNX key1 value1 [key2 value2 ...]: 同时设置一个或多个key-value对，当且仅当所有给定key不存在|
+|  14    |PSETEX key milliseconds value: 这个命令和SETEX命令相似，但它以毫秒为单位设置key的生存时间，而不是像SETEX那样以秒为单位|
+|  15    |INCR key: 将key中存储的数字增1                                                       |
+|  16    |INCRBY key increment: 将key所存储的值加上给定的增量值(increment)                     |
+|  17    |INCRBYFLOAT key increment: 将key所存储的值加上给定的浮点增量值(increment)            |
+|  18    |DECR key: 将key中存储的数字值减1                                                     |
+|  19    |DECRBY key decrement: 将key中存储的数字值减去给定的值(decrement)                     |
+|  20    |APPEND key value: 如果key已经存在是一个字符串，APPEND命令将指定的value追加到该key原来值(value)的末尾|
 
 
 <br />
