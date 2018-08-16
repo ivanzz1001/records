@@ -334,6 +334,11 @@ int main(int argc,char *argv[])
 }
 {% endhighlight %}
 
+
+## 4. 说明
+值得指出的是，实际上在对URL进行urlencode的时候（例如: http://127.0.0.1:8000/file/测试/只用于测试.txt?username=小明)，不能简单的调用上面的URLEncode()函数，否则可能把```:```、```/```这样的字符也进行编码，而实际上
+一个对如```http://```这样的部分是不需要进行修正的。
+
 <br />
 <br />
 
