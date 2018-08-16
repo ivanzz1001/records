@@ -191,10 +191,191 @@ EXEC
 
 
 
+## 3. Redis脚本
+Redis脚本使用lua解释器来执行脚本。Redis2.6版本通过内嵌支持lua环境。执行脚本的常用命令为```EVAL```。EVAL命令的基本语法如下：
+{% highlight string %}
+redis 127.0.0.1:6379> EVAL script numkeys key [key ...] arg [arg ...]
+{% endhighlight %} 
+
+例如，下面的示例演示了redis脚本的工作过程：
+{% highlight string %}
+127.0.0.1:6379> EVAL "return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}" 2 key1 key2 first second
+1) "key1"
+2) "key2"
+3) "first"
+4) "second"
+{% endhighlight %}
+
+下面我们列出Redis脚本操作的一些命令：
 
 
+| 序号   |        命令及描述                                                                   | 
+|:------:|:------------------------------------------------------------------------------------|
+|   1    |EVAL script numkeys key [key ...] arg [arg ...]: 执行lua脚本                         |
+|   2    |EVALSHA sha1 numkeys key [key ...] arg [arg ...]: 执行lua脚本                        |
+|   3    |SCRIPT EXISTS script [script...]: 查看指定的脚本是否已经被保存在缓存当中             |
+|   4    |SCRIPT FLUSH: 从脚本缓存中移除所有脚本                                               |
+|   5    |SCRIPT KILL: 杀死当前正在运行的lua脚本                                               |
+|   6    |SCRIPT LOAD script: 将脚本script添加到脚本缓存中，但并不立即执行这个脚本             |
 
 
+## 4.  Redis数据备份与恢复
+
+**1） Redis数据备份**
+
+**SAVE**命令用于创建当前数据库的备份。其基本使用方法如下：
+{% highlight string %}
+redis 127.0.0.1:6379> SAVE 
+OK
+{% endhighlight string %}
+该命令将在redis安装目录中创建dump.rdb文件。
+<pre>
+默认在配置文件中，通常有如下两个配置：
+dbfilename dump.rdb
+dir ./
+</pre>
+
+
+**2） 数据恢复**
+
+如果需要恢复数据，只需要将相应文件名的文件放到正确的目录即可。获取redis目录可以使用```CONFIG```命令，如下所示：
+{% highlight string %}
+127.0.0.1:6379> CONFIG get dir
+1) "dir"
+2) "/usr/local/redis-3.2.11/bin"
+127.0.0.1:6379> CONFIG GET dbfilename
+1) "dbfilename"
+2) "dump.rdb"
+{% endhighlight %}
+
+**3) 后台保存数据**
+
+创建Redis备份文件也可以使用命令```BGSAVE```，该命令在后台执行。例如：
+{% highlight string %}
+127.0.0.1:6379> BGSAVE
+
+Background saving started
+{% endhighlight %}
+
+## 5. Redis安全
+我们可以通过redis配置文件设置密码参数，这样客户端连接到redis服务就需要密码验证，这样可以让你的redis服务更安全。我们可以通过如下命令查看是否设置了密码验证：
+{% highlight string %}
+127.0.0.1:6379> CONFIG get requirepass
+1) "requirepass"
+2) ""
+{% endhighlight %}
+默认情况下，```requirepass```参数为空，这就意味着你无需通过密码验证就可以连接到redis服务。你可以通过如下的命令来修改该参数：
+{% highlight string %}
+127.0.0.1:6379> CONFIG SET requirepass "runoob"
+OK
+127.0.0.1:6379> CONFIG get requirepass
+(error) NOAUTH Authentication required.
+127.0.0.1:6379> auth runoob
+OK
+127.0.0.1:6379> config get requirepass
+1) "requirepass"
+2) "runoob"
+{% endhighlight %}
+
+设置了密码之后，我们重新连接到redis服务器，就需要密码验证，否则无法执行命令。例如：
+{% highlight string %}
+[root@bogon ~]# /usr/local/redis-3.2.11/bin/redis-cli 
+127.0.0.1:6379> keys *
+(error) NOAUTH Authentication required.
+127.0.0.1:6379> auth runoob
+OK
+127.0.0.1:6379> keys *
+1) "foo"
+127.0.0.1:6379> get foo
+"1"
+{% endhighlight %}
+
+## 6. Redis性能测试
+
+**1） 基本语法**
+redis的性能测试是通过同时执行多个命令实现的。redis性能测试的基本命令如下：
+<pre>
+# redis-benchmark [option] [option value]
+</pre>
+
+例如，以下示例同时执行10000个请求来检测性能：
+<pre>
+#redis-benchmark -n 10000  -q
+
+PING_INLINE: 141043.72 requests per second
+PING_BULK: 142857.14 requests per second
+SET: 141442.72 requests per second
+GET: 145348.83 requests per second
+INCR: 137362.64 requests per second
+LPUSH: 145348.83 requests per second
+LPOP: 146198.83 requests per second
+SADD: 146198.83 requests per second
+SPOP: 149253.73 requests per second
+LPUSH (needed to benchmark LRANGE): 148588.42 requests per second
+LRANGE_100 (first 100 elements): 58411.21 requests per second
+LRANGE_300 (first 300 elements): 21195.42 requests per second
+LRANGE_500 (first 450 elements): 14539.11 requests per second
+LRANGE_600 (first 600 elements): 10504.20 requests per second
+MSET (10 keys): 93283.58 requests per second
+</pre>
+
+**2) 测试工具参数**
+
+Redis性能测试工具可选参数如下所示：
+
+|  序号 |  选项  |            描述                          |     默认值   | 
+|:-----:|:------:|:-----------------------------------------|:-------------|
+|   1   |   -h   |指定服务器主机名                          |127.0.0.1     |
+|   2   |   -p   |指定服务器端口                            |6379          |
+|   3   |   -s   |指定服务器socket                          |              |
+|   4   |   -c   |指定并发连接数                            |50            |
+|   5   |   -n   |指定请求数                                |10000         |
+|   6   |   -d   |以字节的形式指定SET/GET值的数据大小       |2             |
+|   7   |   -k   |1=keep alive  0=reconnect                 |1             |
+|   8   |   -r   |SET/GET/INCR使用随机key，SADD使用随机值   |              |
+|   9   |   -P   |通过管道传输<numreq>请求                  |1             |
+|   10  |   -q   |强制退出redis。仅显示query/sec值          |              |
+|   11  |  --csv |以CSV格式输出                             |              |
+|   12  |   -l   |生成循环，永久执行测试                    |              |
+|   13  |   -t   |仅运行以逗号分割的测试命令列表            |              |
+|   14  |   -I   |Idle模式。仅打开N个idle连接并等待         |              |
+
+注： 上面12选项是```l```(小写L)
+
+## 7. Redis客户端连接
+
+Redis通过监听一个TCP端口或者Unix socket的方式来接收来自客户端的连接，当一个连接建立后，Redis内部会进行以下操作：
+
+* 首先，客户端socket会被设置为非阻塞模式，因为Redis在网络事件处理上采用的是非阻塞多路复用模型
+
+* 然后，为这个socket设置```TCP_NODELAY```属性，禁用Nagle算法。
+
+* 然后创建一个可读的文件事件用于监听这个客户端socket的数据发送
+
+**1） 最大连接数**
+
+在 Redis2.4 中，最大连接数是被直接硬编码在代码里面的，而在2.6版本中这个值变成可配置的。```maxclients```的默认值是 10000，你也可以在 redis.conf 中对这个值进行修改。
+<pre>
+config get maxclients
+
+1) "maxclients"
+2) "10000"
+<pre>
+
+我们也可以在服务启动时设置最大连接数，例如我们设置最大连接数为为100000:
+<pre>
+# redis-server --maxclients 100000
+</pre>
+
+**2) 客户端命令**
+
+|  序号 |      命令      |               描述                            |
+|:-----:|:--------------:|:----------------------------------------------|
+|   1   |CLIENT LIST     |返回连接到 redis 服务的客户端列表              |
+|   2   |CLIENT SETNAME  |设置当前连接名称                               |
+|   3   |CLIENT GETNAME  |获取通过 CLIENT SETNAME 命令设置的服务名称     |
+|   4   |CLIENT PAUSE    |挂起客户端连接，指定挂起的时间以毫秒计         |
+|   5   |CLIENT KILL     |关闭客户端连接                                 |
 
 
 
