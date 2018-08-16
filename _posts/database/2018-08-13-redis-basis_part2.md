@@ -360,7 +360,7 @@ config get maxclients
 
 1) "maxclients"
 2) "10000"
-<pre>
+</pre>
 
 我们也可以在服务启动时设置最大连接数，例如我们设置最大连接数为为100000:
 <pre>
