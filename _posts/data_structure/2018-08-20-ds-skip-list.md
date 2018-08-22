@@ -348,6 +348,1024 @@ int get_random_level(double p)
 
 ![ds-skiplist-insert2](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_skiplist_insert2.jpg)
 
+下面我们给出```跳跃表```插入算法：
+{% highlight string %}
+int get_random_level(double p)
+{
+	int level = 1;
+	double convert = p * RAND_MAX;
+
+	while((double)random() < convert)
+		level++;
+
+	if(level > SKIPLIST_MAX_LEVEL)
+		level = SKIPLIST_MAX_LEVEL;
+
+	return level;
+}
+
+
+static void skiplist_get_update(skiplist *sl, skiplist_node *node, skiplist_node ***update)
+{
+	int max_level = SKIPLIST_MAX_LEVEL;
+	skiplist_node **update_origin = (skiplist_node **)malloc(sizeof(skiplist_node *) * max_level);
+	if(!update_origin)
+	{
+		*update = NULL;
+		return;
+	}
+
+	skiplist_node *p = sl->header;
+	int i = 0;
+
+	while(i < max_level)
+	{
+		update_origin[i++] = sl->header;	/*初始值设置为头结点*/
+	}
+
+	//search from top to bottom
+	for(i = sl->level -1; i>=0;i--)
+	{
+		while(p->level[i].forward && (p->level[i].forward->score <= node->score)
+		{
+			p = p->level[i].forward;
+		}
+
+		update_origin[i] = p;
+	}
+
+	*update = update_origin;
+}
+
+
+
+/*
+ * Insert status code
+ *
+ * insert success/refuse(has the same node)/insert failure
+ */
+#define INSERT_CODE_SUCCESS 1
+#define INSERT_CODE_REFUSE  2
+#define INSERT_CODE_FAILURE -1
+
+int skiplist_insert(skiplist *sl, double score, void *obj)
+{
+	int i;
+	int matches;
+	void **search_result = NULL;
+	skiplist_search(sl,score, &match, obj,&search_result);
+	if(matches > 0)
+	{
+		free(search_result);
+		return INSERT_CODE_REFUSE;		/*duplicated node*/
+	}
+
+	int level = get_random_level(0.25);
+	skiplist_node *node = create_skiplist_node(level, score, obj);
+	skiplist_node **update = NULL;		/*存放每一层插入节点*/
+
+	skiplist_get_update(sl,node,&update);
+	if(!update)
+		return INSERT_CODE_FAILURE;
+
+	//insert from top to bottom
+	for(i = level -1; i>=0;i--)
+	{
+		node->level[i].forward = update[i]->level[i].forward;
+		update[i]->level[i].forward = node;
+	}
+
+	//update backward
+	//if backward node is header,then set it to NULL
+	node->backward = (update[0] == sl->header) ? NULL : update[0];
+
+	//update node
+	if(node->level[0].forward)
+		node->level[0].forward->backward = node;
+	else
+		sl->tail = node;
+
+	//update the skiplist's maxt level
+	if(sl->level < level)
+		sl->level = level;
+
+	sl->length++;
+
+	//free update
+	free(update);
+	return INSERT_CODE_SUCCESS;
+
+}
+{% endhighlight %}
+
+### 2.6 跳跃表的删除
+在各个层中找到包含x的节点，使用标准的```delete from list```方法删除该节点。请参看下图删除71:
+
+![ds-skiplist-delete](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_skiplist_delete.jpg)
+
+下面给出相应的代码实现：
+{% highlight string %}
+static void skiplist_get_update_new(skiplist *sl, skiplist_node *node, skiplist_node ***update)
+{
+	int max_level = SKIPLIST_MAX_LEVEL;
+	skiplist_node **update_origin = (skiplist_node **)malloc(sizeof(skiplist_node *)*max_level);
+	if(!update_origin)
+	{
+		*update = NULL;
+		return;
+	}
+
+	skiplist_node *p = sl->header;
+	int i = 0;
+	while(i < max_level)
+	{
+		update_origin[i++] = sl->header;   //init update_origin
+	}
+
+	for(i = sl->level-1;i>=0;i--)
+	{
+		while(p->level[i].forward && (p->level[i].forward->score <= node->score))
+		{
+			if(p->level[i].forward->score == node->score)
+			{
+				if(sl->match)
+				{
+					if(sl->match(node->obj,p->level[i].forward->obj))
+						break;
+				}
+				else{
+					if(node->obj == p->level[i].forward->obj)
+						break;
+				}
+			}
+
+			p = p->level[i].forward;
+		}
+
+		update_origin[i] = p;
+	}
+
+	*update = update_origin;
+}
+
+
+static void skiplist_remove_node(skiplist *sl, skiplist_node *node)
+{
+	if(!node)
+		return;
+
+	skiplist_node *pre = node->backward;
+	skiplist_node *next = node->level[0].forward;
+
+	if(pre)
+	{
+		int i;
+
+		//update 'pre' node
+		skiplist_node **update = NULL;
+		skiplist_get_update_new(sl, node, &update);
+		if(!update)
+			return;
+
+		for(i = node->levels-1;i>=0;i--)
+		{
+			update[i]->level[i].forward = node->level[i].forward;
+		}
+
+		//update 'next'
+		if(next)
+			next->backward = pre;
+		else
+			sl->tail = pre;
+
+		//update the node's level, tranverse the skiplist
+		#if 0
+			if(node->levels >= sl->level)
+			{
+				skiplist_node *p = sl->header;
+				while(p->level[0].forward)
+				{
+					if(p->level[0].forward->levels > sl->level)
+						sl->level = p->level[0].forward->levels;
+					p = p->level[0].forward;
+				}
+			}
+		#else
+			//the following is more efficient
+			for(i = sl->level-1;i>=0;i--)
+			{
+				if(sl->header->forward[i] == NULL)
+					sl->level--;
+			}
+        }
+		#endif
+
+		sl->length--;
+
+		if(sl->free)
+			sl->free(node->obj);
+		free(node);
+	}
+}
+
+
+void skiplist_remove(skiplist *sl, double score, int *count, void *filter)
+{
+	int matches;
+	int i;
+	skiplist_node **nodes = skiplist_search_all(sl,score, &matches);
+
+	for(i = 0;i<matches;i++)
+	{
+		/*如果传递了过滤的对象,则根据这个对象来进行过?/
+		if(filter)
+		{
+			if(sl->match)
+			{
+				if(sl->match(nodes[i]->obj, filter))
+					skiplist_remove_node(sl, nodes[i]);
+			}
+			else{
+				if(nodes[i]->obj == filter)
+					skiplist_remove_node(sl, nodes[i]);
+			}
+		}
+		else{
+			skiplist_remove_node(sl, nodes[i]);
+		}
+	}
+}
+
+{% endhighlight %}
+
+
+### 2.7 跳跃表的销毁
+如下给出跳跃表销毁代码：
+{% highlight string %}
+/*
+ * Description: destroy skip list
+ */
+void skiplist_destroy(skiplist *sl)
+{
+	skiplist_node *p = sl->header->level[0].forward;
+	skiplist_node *next;
+
+	while(p)
+	{
+		next = p->level[0].forward;
+		if(sl->free)
+			sl->free(p->obj);
+		free(p);
+		p = next;
+	}
+
+	free(sl->header);
+	free(sl);
+}
+{% endhighlight %}
+
+
+## 3. 跳跃表完整实现
+下面我们给出跳跃表的完整实现代码。分为如下三个部分：
+
+* 头文件（skiplist.h)
+
+* 源文件(skiplist.c)
+
+* 测试文件(skiplist_test.c)
+
+### 3.1 跳跃表实现头文件
+如下是头文件skiplist.h:
+
+{% highlight string %}
+#ifndef __SKIPLIST_H_
+#define __SKIPLIST_H_
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct skiplist_node{
+	double score;
+	void *obj;
+	struct skiplist_node *backward;
+
+	int levels;
+	struct skiplist_node_level{
+		struct skiplist_node *forward;
+		//unsigned int span;
+	}level[];
+}skiplist_node;
+
+typedef struct skiplist{
+	struct skiplist_node *header;
+	struct skiplist_node *tail;
+
+	int level;
+	int length;
+
+	void (*free)(void *obj);
+	int (*match)(void *obj1, void *obj2);
+};
+
+#define SKIPLIST_MAX_LEVEL 32
+
+
+skiplist *skiplist_create();
+#define skiplist_is_empty(sl)       ((sl)->length==0)
+#define skiplist_max_level(sl)      ((sl)->level)
+
+
+/*
+ * Description: insert
+ * 1: score 可以相同
+ * 2: score和obj都相同则拒绝插入
+ */
+int skiplist_insert(skiplist *sl, double score, void *obj);
+
+/*
+ * Description: search by score
+ *  1: 如果没有过滤 返回score相同所有obj
+  * 2: 如果家里filter过滤则,返回与filter匹配的结果(match返回1)
+ */
+void skiplist_search(skiplist *sl, double score, int *count, void *filter, void ***search_result);
+
+/*
+ * Description: remove node by score
+ * 1: 如果没有过滤 返回score相同所有obj
+ * 2: 如果家里filter过滤则,返回与filter匹配的结果(match返回1)
+ */
+void skiplist_remove(skiplist *sl, double score, int *count, void *filter);
+
+
+/*
+ * Description: destroy skiplist
+ */
+void skiplist_destroy(skiplist *sl);
+
+
+/*
+ * Description: Get the first N elements in skip list
+ */
+void skiplist_first_n(skiplist *sl, int n, int *count, void ***objs);
+
+
+/*
+ * Description: Get the last N elements in skip list
+ */
+void skiplist_last_n(skiplist *sl, int n, int *count, void ***objs);
+
+
+
+//set skiplist destroy function
+#define skiplist_set_free(sl,func)   ((sl)->free = func)
+
+//set skiplist match function
+#define skiplist_set_match(sl,func)  ((sl)->match=func)
+
+
+
+/*
+ * Description: print skiplist status
+ */
+void skiplist_status(skiplist *sl);
+
+
+#endif
+{% endhighlight %}
+
+
+### 3.2 跳跃表实现源文件
+如下是头文件skiplist.c:
+
+{% highlight string %}
+#include "skiplist.h"
+
+
+//For internal use
+typedef struct s_queue{
+	int matches;
+	int slots;
+	void **objs;
+}s_queue;
+
+s_queue *s_queue_init()
+{
+	int slots = 4;
+	s_queue *queue = (s_queue *)malloc(sizeof(s_queue));
+	if(!queue)
+		return NULL;
+	queue->objs = (void **)malloc(sizeof(void *)*slots);
+	if(!queue->objs)
+	{
+		free(queue);
+		return NULL;
+	}
+	queue->slots = slots;
+	queue->matches = 0x0;
+	return queue;
+}
+
+int s_queue_push(s_queue *queue, void *obj)
+{
+	if(queue->matches >= queue->slots)
+	{
+		int slots = queue->slots >> 1;
+		void **objs = (void **)realloc(queue->objs, slots * sizeof(void *));
+		if(!objs)
+			return -1;
+
+		queue->objs = objs;
+		queue->slots = slots;
+	}
+
+	queue->objs[queue->matches++] = obj;
+	return 0x0;
+
+}
+
+
+
+// create skiplist node
+skiplist_node *create_skiplist_node(int levels, double score, void *obj)
+{
+	skiplist_node *node = (skiplist_node *)malloc(sizeof(skiplist_node) + levels * sizeof(struct skiplist_node_level));
+	if(!node)
+		return NULL;
+
+	node->levels = levels;
+	node->score = score;
+	node->obj = obj;
+	node->backward = NULL;
+
+	while(levels)
+	{
+		node->level[--levels].forward = NULL;
+	}
+
+	return node;
+
+}
+
+
+//Init skiplist
+skiplist *skiplist_create()
+{
+	skiplist *sl = (skiplist *)malloc(sizeof(skiplist));
+	if(!sl)
+		return NULL;
+	sl->header = create_skiplist_node(SKIPLIST_MAX_LEVEL,0.0,NULL);
+	if(!sl->header)
+	{
+		free(sl);
+		return NULL;
+	}
+
+	sl->tail = NULL;
+	sl->level = 0x0;
+	sl->length = 0x0;
+	sl->free = NULL;
+	sl->match = NULL;
+
+	srandom(time(0));   //for later used
+	return sl;
+}
+
+static skiplist_node **skiplist_search_all(skiplist *sl, double score, int *count)
+{
+	int i;
+	skiplist_node *p = sl->header;
+	skiplist_node **result = NULL;
+	s_queue *queue = s_queue_init();
+	if(!queue)
+		return NULL;
+
+	for(i = sl->level-1; i >= 0; i--)
+	{
+		while(p->level[i].forward && (p->level[i].forward->score <= score))
+		{
+			if(p->level[i].forward->score == score)
+			{
+				s_queue_push(queue, p->level[i].forward);
+				goto SEARCH_END;
+			}
+			p = p->level[i].forward;
+		}
+	}
+SEARCH_END:
+
+	if(*count = queue->matches)
+	{
+		result = queue->objs;
+	}
+	else{
+		//have no matched object,
+		free(queue->objs);
+	}
+	free(queue);
+
+	return result;
+}
+
+
+void skiplist_search(skiplist *sl, double score, int *count, void *filter, void ***search_result)
+{
+	int matches = 0x0;
+	int i;
+	s_queue *queue = s_queue_init();
+	if(!queue)
+	{
+		*count = 0;
+		*search_result = NULL;
+		return;
+	}
+
+	skiplist_node ** nodes = skiplist_search_all(sl, score, &matches);
+
+	for(i = 0;i<matches;i++)
+	{
+		if(filter)
+		{
+			if(sl->match)
+			{
+				if(sl->match(nodes[i]->obj, filter))
+					s_queue_push(queue, nodes[i]->obj);
+			}
+			else{
+				if(nodes[i]->obj == filter)
+					s_queue_push(queue, nodes[i]->obj);
+			}
+		}
+	}
+
+	if(*count = queue->matches)
+	{
+		*search_result = queue->objs;
+	}
+	else{
+		free(queue->objs);
+		*search_result = NULL;
+	}
+
+	free(nodes);
+
+}
+
+
+int get_random_level(double p)
+{
+	int level = 1;
+	double convert = p * RAND_MAX;
+
+	while((double)random() < convert)
+		level++;
+
+	if(level > SKIPLIST_MAX_LEVEL)
+		level = SKIPLIST_MAX_LEVEL;
+
+	return level;
+}
+
+
+static void skiplist_get_update(skiplist *sl, skiplist_node *node, skiplist_node ***update)
+{
+	int max_level = SKIPLIST_MAX_LEVEL;
+	skiplist_node **update_origin = (skiplist_node **)malloc(sizeof(skiplist_node *) * max_level);
+	if(!update_origin)
+	{
+		*update = NULL;
+		return;
+	}
+
+	skiplist_node *p = sl->header;
+	int i = 0;
+
+	while(i < max_level)
+	{
+		update_origin[i++] = sl->header;	/*初始值设置为头结点*/
+	}
+
+	//search from top to bottom
+	for(i = sl->level -1; i>=0;i--)
+	{
+		while(p->level[i].forward && (p->level[i].forward->score <= node->score)
+		{
+			p = p->level[i].forward;
+		}
+
+		update_origin[i] = p;
+	}
+
+	*update = update_origin;
+}
+
+
+
+/*
+ * Insert status code
+ *
+ * insert success/refuse(has the same node)/insert failure
+ */
+#define INSERT_CODE_SUCCESS 1
+#define INSERT_CODE_REFUSE  2
+#define INSERT_CODE_FAILURE -1
+
+int skiplist_insert(skiplist *sl, double score, void *obj)
+{
+	int i;
+	int matches;
+	void **search_result = NULL;
+	skiplist_search(sl,score, &match, obj,&search_result);
+	if(matches > 0)
+	{
+		free(search_result);
+		return INSERT_CODE_REFUSE;		/*duplicated node*/
+	}
+
+	int level = get_random_level(0.25);
+	skiplist_node *node = create_skiplist_node(level, score, obj);
+	skiplist_node **update = NULL;		/*存放每一层插入节点*/
+
+	skiplist_get_update(sl,node,&update);
+	if(!update)
+		return INSERT_CODE_FAILURE;
+
+	//insert from top to bottom
+	for(i = level -1; i>=0;i--)
+	{
+		node->level[i].forward = update[i]->level[i].forward;
+		update[i]->level[i].forward = node;
+	}
+
+	//update backward
+	//if backward node is header,then set it to NULL
+	node->backward = (update[0] == sl->header) ? NULL : update[0];
+
+	//update node
+	if(node->level[0].forward)
+		node->level[0].forward->backward = node;
+	else
+		sl->tail = node;
+
+	//update the skiplist's maxt level
+	if(sl->level < level)
+		sl->level = level;
+
+	sl->length++;
+
+	//free update
+	free(update);
+	return INSERT_CODE_SUCCESS;
+
+}
+
+
+
+static void skiplist_get_update_new(skiplist *sl, skiplist_node *node, skiplist_node ***update)
+{
+	int max_level = SKIPLIST_MAX_LEVEL;
+	skiplist_node **update_origin = (skiplist_node **)malloc(sizeof(skiplist_node *)*max_level);
+	if(!update_origin)
+	{
+		*update = NULL;
+		return;
+	}
+
+	skiplist_node *p = sl->header;
+	int i = 0;
+	while(i < max_level)
+	{
+		update_origin[i++] = sl->header;   //init update_origin
+	}
+
+	for(i = sl->level-1;i>=0;i--)
+	{
+		while(p->level[i].forward && (p->level[i].forward->score <= node->score))
+		{
+			if(p->level[i].forward->score == node->score)
+			{
+				if(sl->match)
+				{
+					if(sl->match(node->obj,p->level[i].forward->obj))
+						break;
+				}
+				else{
+					if(node->obj == p->level[i].forward->obj)
+						break;
+				}
+			}
+
+			p = p->level[i].forward;
+		}
+
+		update_origin[i] = p;
+	}
+
+	*update = update_origin;
+}
+
+
+static void skiplist_remove_node(skiplist *sl, skiplist_node *node)
+{
+	if(!node)
+		return;
+
+	skiplist_node *pre = node->backward;
+	skiplist_node *next = node->level[0].forward;
+
+	if(pre)
+	{
+		int i;
+
+		//update 'pre' node
+		skiplist_node **update = NULL;
+		skiplist_get_update_new(sl, node, &update);
+		if(!update)
+			return;
+
+		for(i = node->levels-1;i>=0;i--)
+		{
+			update[i]->level[i].forward = node->level[i].forward;
+		}
+
+		//update 'next'
+		if(next)
+			next->backward = pre;
+		else
+			sl->tail = pre;
+
+		//update the node's level, tranverse the skiplist
+		#if 0
+			if(node->levels >= sl->level)
+			{
+				skiplist_node *p = sl->header;
+				while(p->level[0].forward)
+				{
+					if(p->level[0].forward->levels > sl->level)
+						sl->level = p->level[0].forward->levels;
+					p = p->level[0].forward;
+				}
+			}
+		#else
+			//the following is more efficient
+			for(i = sl->level-1;i>=0;i--)
+			{
+				if(sl->header->forward[i] == NULL)
+					sl->level--;
+			}
+        }
+		#endif
+
+		sl->length--;
+
+		if(sl->free)
+			sl->free(node->obj);
+		free(node);
+	}
+}
+
+
+void skiplist_remove(skiplist *sl, double score, int *count, void *filter)
+{
+	int matches;
+	int i;
+	skiplist_node **nodes = skiplist_search_all(sl,score, &matches);
+
+	for(i = 0;i<matches;i++)
+	{
+		/*如果传递了过滤的对象,则根据这个对象来进行过?/
+		if(filter)
+		{
+			if(sl->match)
+			{
+				if(sl->match(nodes[i]->obj, filter))
+					skiplist_remove_node(sl, nodes[i]);
+			}
+			else{
+				if(nodes[i]->obj == filter)
+					skiplist_remove_node(sl, nodes[i]);
+			}
+		}
+		else{
+			skiplist_remove_node(sl, nodes[i]);
+		}
+	}
+}
+
+void skiplist_status(skiplist *sl)
+{
+	skiplist_node *p = sl->header;
+	int i = 1;
+	printf("skiplist: length=%d, max_level=%d\n",sl->length, sl->level);
+	while(p->level[0].forward)
+	{
+		printf("node[%d], score=%f, level=%d\n", i++, p->level[0].forward->score, p->level[0].forward->levels);
+		p = p->level[0].forward;
+	}
+}
+
+/*
+ * Description: get skiplist first N elements
+ */
+void skiplist_first_n(skiplist *sl, int n, int *count, void ***objs)
+{
+	skiplist_node *p = sl->header;
+	s_queue *queue = s_queue_init();
+	if(!queue)
+	{
+		*count = 0;
+		*objs = NULL;
+		return;
+	}
+
+	while(n--)
+	{
+		if(p->level[0].forward)
+		{
+			s_queue_push(queue, p->level[0].forward);
+		}
+		else{
+			break;
+		}
+
+		p = p->level[0].forward;
+	}
+
+	*count = queue->matches;
+	*objs = queue->objs;
+
+	if(queue->matches == 0)
+	{
+		*objs = NULL;
+		free(queue->objs);
+	}
+	free(queue);
+}
+
+
+/*
+ * Description: get skiplist last N elements
+ */
+void skiplist_last_n(skiplist *sl, int n, int *count, void ***objs)
+{
+	skiplist_node *p = sl->tail;
+	s_queue *queue = s_queue_init();
+	if(!queue)
+	{
+		*count = 0;
+		*objs = NULL;
+		return;
+	}
+
+	while(n--)
+	{
+		if(p)
+		{
+			s_queue_push(queue, p);
+		}
+		else{
+			break;
+		}
+		p = p->backward;
+	}
+
+	*count = queue->matches;
+	*objs = queue->objs;
+
+	if(queue->matches == 0)
+	{
+		*objs = NULL;
+		free(queue->objs);
+	}
+	free(queue);
+}
+
+
+/*
+ * Description: destroy skip list
+ */
+void skiplist_destroy(skiplist *sl)
+{
+	skiplist_node *p = sl->header->level[0].forward;
+	skiplist_node *next;
+
+	while(p)
+	{
+		next = p->level[0].forward;
+		if(sl->free)
+			sl->free(p->obj);
+		free(p);
+		p = next;
+	}
+
+	free(sl->header);
+	free(sl);
+}
+
+{% endhighlight %}
+
+### 3.3 跳跃表测试
+如下是跳跃表测试代码：
+
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include "skiplist.h"
+
+
+
+typedef struct demo{
+	int id;
+}demo;
+
+
+int match(void *obj_1, void *obj_2)
+{
+	demo *obj1 = (demo *)obj_1;
+	demo *obj2 = (demo *)obj_2;
+
+	return (obj1->id == obj2->id);
+}
+
+
+int main(int argc,char *argv[])
+{
+	skiplist *sl = skiplist_create();
+	skiplist_set_match(sl, match);
+
+	demo *p1, *p2;
+	int i;
+
+	p1 = (demo *)malloc(sizeof(demo));
+	if(!p1)
+		return -1;
+	p1->id = 1;
+
+	p2 = (demo *)malloc(sizeof(demo));
+	if(!p2)
+	{
+		//just exit, let the system free p1
+		return -1;
+	}
+	p2->id = 2;
+
+	for(i = 0; i<20; i++)
+	{
+        skiplist_insert(sl,i,p1);
+    }
+
+
+	//1) find
+	printf("查找...\n");
+	int matches;
+    void **search_result;
+    skiplist_search(sl, 2, &matches, NULL, &search_result);
+
+    printf("matches=%d\n",matches);
+    for(i=0; i<matches; i++)
+	{
+        printf("%d\n",((demo*)search_result[i])->id);
+    }
+
+    if(matches)
+		free(search_result);
+    printf("\n");
+
+
+	//2) delete
+    printf("删除5个\n");
+    int removes;
+    for(i=5; i<10; i++)
+    	skiplist_remove(sl,i,&removes,NULL);
+
+
+ 	//3) print first 5
+    printf("打印前5个\n");
+    void **objs;
+    skiplist_node  *obj;
+    skiplist_first_n(sl,5,&matches,&objs);
+    for(i=0;i<matches;i++)
+	{
+        obj = (skiplist_node*)objs[i];
+        printf("%f\n",obj->score);
+    }
+    printf("\n");
+
+
+	//4) print last 5
+	printf("打印最后5个\n");
+    skiplist_last_n(sl,5,&matches,&objs);
+    for(i=0;i<matches;i++){
+        obj = (skiplist_node*)objs[i];
+        printf("%f\n",obj->score);
+    }
+    skiplist_status(sl);
+
+
+ 	//5) destroy
+    skiplist_destroy(sl);
+}
+{% endhighlight %}
+编译运行：
+
 
 <br />
 <br />
