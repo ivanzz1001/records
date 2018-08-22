@@ -334,6 +334,20 @@ int get_random_level(double p)
 }
 {% endhighlight %} 
 
+确定好层数```K```之后，然后在```level 1...level K```各个层的链表都插入元素。参看如下示例：
+
+**1） 插入119， K=2**
+
+下图显示在插入119， K=2时的情形：
+
+![ds-skiplist-insert1](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_skiplist_insert1.jpg)
+
+**2) 插入119, K=4**
+
+下图显示在插入119， K=2时的情形：
+
+![ds-skiplist-insert2](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_skiplist_insert2.jpg)
+
 
 <br />
 <br />
