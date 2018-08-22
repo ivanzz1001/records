@@ -42,15 +42,15 @@ skip list是一种随机化的数据结构，其效率可比拟于二叉查找�
 ### 2.2 跳跃表数据结构
 {% highlight string %}
 typedef struct skiplist_node{
+	double score;
+	void *obj;
+	struct skiplist_node *backward;
+
 	int levels;
 	struct skiplist_node_level{
 		struct skiplist_node *forward;
 		//unsigned int span;
 	}level[];
-	struct skiplist_node *backward;
-
-	double score;
-	void *obj;
 }skiplist_node;
 
 typedef struct skiplist{
@@ -95,7 +95,7 @@ typedef struct skiplist{
 
 * levels: 用于保存节点的层数。比如上边score为1.0的节点，层数为4； score为2.0的节点，层数为2； score为3.0的节点，层数为5.
 
-* level: 代表着各层，节点中L1、L2、L3等字样标记节点的各个层。L1代表第一层， L2代表第二层，以此类推。每个层有一个前进指针和跨度(注：上面数据结构中我们注释了span,暂未使用）。前进指针用于访问位于表尾方向的其他节点，而跨度则记录了前进指针所指向节点和当前节点的距离。在上面图中，连线上带有数字的箭头就代表前进指针，而那个数字就是跨度。当程序从表头向表尾进行遍历时，访问会沿着层的前进指针进行。
+* level: 代表着各层，节点中L1、L2、L3等字样标记节点的各个层。L1代表第一层， L2代表第二层，以此类推。每个层有一个前进指针和跨度(注：上面数据结构中我们注释了span,暂未使用）。前进指针用于访问位于表尾方向的其他节点，而跨度则记录了前进指针所指向节点和当前节点的距离。在上面图中，连线上带有数字的箭头就代表前进指针，而那个数字就是跨度。当程序从表头向表尾进行遍历时，访问会沿着层的前进指针进行。注意这里```level```定义的是一个零长度数组，因此需要放在结构体的最后。实际上，我们可以定义为```level[1]```，因为对于一个节点至少有一个前进指针，这样我们就可以把该字段存放在任何位置了。
 
 * backward指针： 节点中用```BW```字样标记节点的后退指针，它指向位于当前节点的前一个节点。后退指针在程序从表尾向表头遍历时使用。
 
@@ -106,7 +106,233 @@ typedef struct skiplist{
 注意表头节点和其他节点的构造是一样的：表头节点也有后退指针、分值和成员对象，不过表头节点的这些属性都不会被用到，所以上图省略了这些部分，只显示了表头节点的各个层。
 
 ### 2.3 跳跃表的初始化
+如下图所示是一个初始化的空跳跃表：
 
+![ds-skip-list-empty](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_skip_list_empty.jpg)
+
+下面给出相应的代码实现：
+{% highlight string %}
+// create skiplist node
+skiplist_node *create_skiplist_node(int levels, double score, void *obj)
+{
+	skiplist_node *node = (skiplist_node *)malloc(sizeof(skiplist_node) + levels * sizeof(struct skiplist_node_level));
+	if(!node)
+		return NULL;
+
+	node->levels = levels;
+	node->score = score;
+	node->obj = obj;
+	node->backward = NULL;
+
+	while(levels)
+	{
+		node->level[--levels].forward = NULL;
+	}
+
+	return node;
+
+}
+
+//Init skiplist
+skiplist *skiplist_create()
+{
+	skiplist *sl = (skiplist *)malloc(sizeof(skiplist));
+	if(!sl)
+		return NULL;
+	sl->header = create_skiplist_node(SKIPLIST_MAX_LEVEL,0.0,NULL);
+	if(!sl->header)
+	{
+		free(sl);
+		return NULL;
+	}
+
+	sl->tail = NULL;
+	sl->level = 0x0;
+	sl->length = 0x0;
+	sl->free = NULL;
+	sl->match = NULL;
+
+	srandom(time(0));   //for later used
+	return sl;
+}
+{% endhighlight %}
+
+### 2.4 跳跃表的搜索
+在跳跃表中查找一个元素```x```，按照如下几个步骤进行：
+{% highlight string %}
+1) 从最上层的链的开头开始；
+
+2)  假设当前位置为```p```，它向右指向的节点为```q```，且q的值为```y```，将```y```与```x```作比较：
+    2.1) x == y，输出查询成功及相关信息；
+    2.2) x > y, 从p向右移动到q的位置；
+    2.3) x < y, 从p向下移动一格；
+
+3) 如果当前位置在最底层的链中，且还要往下移动的话，则输出查询失败；
+{% endhighlight %}
+参看下图所示：
+
+![ds-skip-list-search](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_skip_list_search.jpg)
+
+下面我们给出跳跃表搜索的代码：
+{% highlight string %}
+//这里我们参照相关代码，添加了一个内部使用的队列（实际上，我们不需要这样一个队列)
+//For internal use
+typedef struct s_queue{
+	int matches;
+	int slots;
+	void **objs;
+}s_queue;
+
+s_queue *s_queue_init()
+{
+	int slots = 4;
+	s_queue *queue = (s_queue *)malloc(sizeof(s_queue));
+	if(!queue)
+		return NULL;
+	queue->objs = (void **)malloc(sizeof(void *)*slots);
+	if(!queue->objs)
+	{
+		free(queue);
+		return NULL;
+	}
+	queue->slots = slots;
+	queue->matches = 0x0;
+	return queue;
+}
+
+int s_queue_push(s_queue *queue, void *obj)
+{
+	if(queue->matches >= queue->slots)
+	{
+		int slots = queue->slots >> 1;
+		void **objs = (void **)realloc(queue->objs, slots * sizeof(void *));
+		if(!objs)
+			return -1;
+
+		queue->objs = objs;
+		queue->slots = slots;
+	}
+
+	queue->objs[queue->matches++] = obj;
+	return 0x0;
+
+}
+
+static skiplist_node **skiplist_search_all(skiplist *sl, double score, int *count)
+{
+	int i;
+	skiplist_node *p = sl->header;
+	skiplist_node **result = NULL;
+	s_queue *queue = s_queue_init();
+	if(!queue)
+		return NULL;
+
+	for(i = sl->level-1; i >= 0; i--)
+	{
+		while(p->level[i].forward && (p->level[i].forward->score <= score))
+		{
+			if(p->level[i].forward->score == score)
+			{
+				s_queue_push(queue, p->level[i].forward);
+				goto SEARCH_END;
+			}
+			p = p->level[i].forward;
+		}
+	}
+SEARCH_END:
+
+	if(*count = queue->matches)
+	{
+		result = queue->objs;
+	}
+	else{
+		//have no matched object, 
+		free(queue->objs);		
+	}
+	free(queue);
+	
+	return result;
+}
+
+
+void skiplist_search(skiplist *sl, double score, int *count, void *filter, void ***search_result)
+{
+	int matches = 0x0;
+	int i;
+	s_queue *queue = s_queue_init();
+	if(!queue)
+	{
+		*count = 0;
+		*search_result = NULL;
+		return;
+	}
+	
+	skiplist_node ** nodes = skiplist_search_all(sl, score, &matches);
+	
+	for(i = 0;i<matches;i++)
+	{
+		if(filter)
+		{
+			if(sl->match)
+			{
+				if(sl->match(nodes[i]->obj, filter))
+					s_queue_push(queue, nodes[i]->obj);
+			}
+			else{
+				if(nodes[i]->obj == filter)
+					s_queue_push(queue, nodes[i]->obj);
+			}
+		}
+	}
+
+	if(*count = queue->matches)
+	{
+		*search_result = queue->objs;
+	}
+	else{
+		free(queue->objs);
+		*search_result = NULL;
+	}
+
+	free(nodes);
+	
+}
+{% endhighlight %}
+
+### 2.5 跳跃表的插入
+在插入时首先确定要占据的层数K，这里通常会用到如下两种方法：
+
+* 抛硬币方式：即采用类似于抛硬币的方式，只要是正面就累加，直到遇到反面才停止，最后记录正面的次数并将其作为要添加新元素的层。
+{% highlight string %}
+int get_random_level()
+{
+	int level = 1;
+
+	while(random() % 2)
+		level++;
+
+	if(level > MAX_LEVEL)
+		level = MAX_LEVEL;
+	return level;
+}
+{% endhighlight %}
+
+* 统计概率方式： 先给定一个概率```p```,产生一个0到1之间的随机数，如果这个随机数小于```p```，则将高度加1，直到产生的随机数大于概率p才停止，根据给出的结论，当概率为1/2或者1/4的时候，整体的性能会比较好（其实当p=1/2时，也就是抛硬币的方法）
+{% highlight string %}
+int get_random_level(double p)
+{
+	int level = 1;
+	double convert = p * RANDMAX;
+
+	while((double)random() < convert)
+		level++;
+	
+	if(level > MAX_LEVEL)
+		level = MAX_LEVEL;
+
+	return level;
+}
+{% endhighlight %} 
 
 
 <br />
