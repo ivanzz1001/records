@@ -386,7 +386,7 @@ static void skiplist_get_update(skiplist *sl, skiplist_node *node, skiplist_node
 	//search from top to bottom
 	for(i = sl->level -1; i>=0;i--)
 	{
-		while(p->level[i].forward && (p->level[i].forward->score <= node->score)
+		while(p->level[i].forward && (p->level[i].forward->score <= node->score))
 		{
 			p = p->level[i].forward;
 		}
@@ -413,7 +413,7 @@ int skiplist_insert(skiplist *sl, double score, void *obj)
 	int i;
 	int matches;
 	void **search_result = NULL;
-	skiplist_search(sl,score, &match, obj,&search_result);
+	skiplist_search(sl,score, &matches, obj,&search_result);
 	if(matches > 0)
 	{
 		free(search_result);
@@ -454,7 +454,6 @@ int skiplist_insert(skiplist *sl, double score, void *obj)
 	//free update
 	free(update);
 	return INSERT_CODE_SUCCESS;
-
 }
 {% endhighlight %}
 
@@ -554,18 +553,17 @@ static void skiplist_remove_node(skiplist *sl, skiplist_node *node)
 			//the following is more efficient
 			for(i = sl->level-1;i>=0;i--)
 			{
-				if(sl->header->forward[i] == NULL)
+				if(sl->header->level[i].forward == NULL)
 					sl->level--;
 			}
-        }
 		#endif
+			sl->length--;
 
-		sl->length--;
-
-		if(sl->free)
+			if(sl->free)
 			sl->free(node->obj);
-		free(node);
+			free(node);
 	}
+
 }
 
 
@@ -595,7 +593,6 @@ void skiplist_remove(skiplist *sl, double score, int *count, void *filter)
 		}
 	}
 }
-
 {% endhighlight %}
 
 
@@ -664,7 +661,7 @@ typedef struct skiplist{
 
 	void (*free)(void *obj);
 	int (*match)(void *obj1, void *obj2);
-};
+}skiplist;
 
 #define SKIPLIST_MAX_LEVEL 32
 
@@ -854,7 +851,7 @@ SEARCH_END:
 
 	if(*count = queue->matches)
 	{
-		result = queue->objs;
+		result = (skiplist_node **)queue->objs;
 	}
 	else{
 		//have no matched object,
@@ -893,6 +890,9 @@ void skiplist_search(skiplist *sl, double score, int *count, void *filter, void 
 				if(nodes[i]->obj == filter)
 					s_queue_push(queue, nodes[i]->obj);
 			}
+		}
+		else{
+			s_queue_push(queue, nodes[i]->obj);
 		}
 	}
 
@@ -946,7 +946,7 @@ static void skiplist_get_update(skiplist *sl, skiplist_node *node, skiplist_node
 	//search from top to bottom
 	for(i = sl->level -1; i>=0;i--)
 	{
-		while(p->level[i].forward && (p->level[i].forward->score <= node->score)
+		while(p->level[i].forward && (p->level[i].forward->score <= node->score))
 		{
 			p = p->level[i].forward;
 		}
@@ -973,7 +973,7 @@ int skiplist_insert(skiplist *sl, double score, void *obj)
 	int i;
 	int matches;
 	void **search_result = NULL;
-	skiplist_search(sl,score, &match, obj,&search_result);
+	skiplist_search(sl,score, &matches, obj,&search_result);
 	if(matches > 0)
 	{
 		free(search_result);
@@ -1108,18 +1108,17 @@ static void skiplist_remove_node(skiplist *sl, skiplist_node *node)
 			//the following is more efficient
 			for(i = sl->level-1;i>=0;i--)
 			{
-				if(sl->header->forward[i] == NULL)
+				if(sl->header->level[i].forward == NULL)
 					sl->level--;
 			}
-        }
 		#endif
+			sl->length--;
 
-		sl->length--;
-
-		if(sl->free)
+			if(sl->free)
 			sl->free(node->obj);
-		free(node);
+			free(node);
 	}
+
 }
 
 
@@ -1291,7 +1290,7 @@ int main(int argc,char *argv[])
 	skiplist *sl = skiplist_create();
 	skiplist_set_match(sl, match);
 
-	demo *p1, *p2;
+	demo *p1;
 	int i;
 
 	p1 = (demo *)malloc(sizeof(demo));
@@ -1299,13 +1298,6 @@ int main(int argc,char *argv[])
 		return -1;
 	p1->id = 1;
 
-	p2 = (demo *)malloc(sizeof(demo));
-	if(!p2)
-	{
-		//just exit, let the system free p1
-		return -1;
-	}
-	p2->id = 2;
 
 	for(i = 0; i<20; i++)
 	{
@@ -1314,7 +1306,7 @@ int main(int argc,char *argv[])
 
 
 	//1) find
-	printf("查找...\n");
+	printf("search...\n");
 	int matches;
     void **search_result;
     skiplist_search(sl, 2, &matches, NULL, &search_result);
@@ -1322,7 +1314,7 @@ int main(int argc,char *argv[])
     printf("matches=%d\n",matches);
     for(i=0; i<matches; i++)
 	{
-        printf("%d\n",((demo*)search_result[i])->id);
+        printf("id: %d\n",((demo*)search_result[i])->id);
     }
 
     if(matches)
@@ -1331,14 +1323,14 @@ int main(int argc,char *argv[])
 
 
 	//2) delete
-    printf("删除5个\n");
+    printf("remove 5 elements \n");
     int removes;
     for(i=5; i<10; i++)
     	skiplist_remove(sl,i,&removes,NULL);
 
 
  	//3) print first 5
-    printf("打印前5个\n");
+    printf("print the first 5 elements\n");
     void **objs;
     skiplist_node  *obj;
     skiplist_first_n(sl,5,&matches,&objs);
@@ -1351,12 +1343,15 @@ int main(int argc,char *argv[])
 
 
 	//4) print last 5
-	printf("打印最后5个\n");
+	printf("print the last 5 element\n");
     skiplist_last_n(sl,5,&matches,&objs);
     for(i=0;i<matches;i++){
         obj = (skiplist_node*)objs[i];
         printf("%f\n",obj->score);
     }
+	printf("\n");
+
+
     skiplist_status(sl);
 
 
@@ -1365,6 +1360,45 @@ int main(int argc,char *argv[])
 }
 {% endhighlight %}
 编译运行：
+<pre>
+# gcc -o skiplist_test *.c
+# ./skiplist_test 
+search...
+matches=1
+id: 1
+
+remove 5 elements 
+print the first 5 elements
+0.000000
+1.000000
+2.000000
+3.000000
+4.000000
+
+print the last 5 element
+19.000000
+18.000000
+17.000000
+16.000000
+15.000000
+
+skiplist: length=15, max_level=6
+node[1], score=0.000000, level=2
+node[2], score=1.000000, level=1
+node[3], score=2.000000, level=1
+node[4], score=3.000000, level=1
+node[5], score=4.000000, level=2
+node[6], score=10.000000, level=1
+node[7], score=11.000000, level=1
+node[8], score=12.000000, level=1
+node[9], score=13.000000, level=6
+node[10], score=14.000000, level=1
+node[11], score=15.000000, level=1
+node[12], score=16.000000, level=2
+node[13], score=17.000000, level=1
+node[14], score=18.000000, level=2
+node[15], score=19.000000, level=2
+</pre>
 
 
 <br />
