@@ -187,7 +187,11 @@ size_t redisPopcount(void *s, long count) {
 <br />
 <br />
 
+**[参看]**
+
 1. [variable-precision SWAR算法“计算汉明重量”](https://blog.csdn.net/u010320108/article/details/60878085)
+
+2. [variable-precision SWAR算法解析](https://blog.csdn.net/jasonbaoly/article/details/47336899)
 
 <br />
 <br />
