@@ -235,8 +235,164 @@ mysql> FLUSH PRIVILEGES;
 Query OK, 0 rows affected (0.00 sec)
 {% endhighlight %}
 
-## 1. 表操作
+### 2.4 MySQL配置文件
+MySQL的配置文件为```/etc/my.cnf```，一般情况下，不需要修改该配置文件，该文件默认配置如下：
+{% highlight string %}
+[mysqld]
+datadir=/var/lib/mysql
+socket=/var/lib/mysql/mysql.sock
 
+# Disabling symbolic-links is recommended to prevent assorted security risks
+symbolic-links=0
+
+log-error=/var/log/mysqld.log
+pid-file=/var/run/mysqld/mysqld.pid
+{% endhighlight %}
+
+### 2.5 管理MySQL的命令
+下面列出了使用MySQL数据库过程中常用的命令：
+
+* USE <dbname>: 用于选择要操作的数据库
+{% highlight string %}
+mysql> use app;
+Database changed
+{% endhighlight %}
+
+* SHOW databases: 列出MySQL数据库管理系统的数据库列表
+{% highlight string %}
+mysql> SHOW databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| app                |
+| mysql              |
+| performance_schema |
+| sys                |
++--------------------+
+5 rows in set (0.00 sec)
+{% endhighlight %}
+
+*  SHOW tables: 用于显示指定数据库的所有表，使用该命令前需要使用```use```命令来选择要操作的数据库
+{% highlight string %}
+mysql> use app;
+Reading table information for completion of table and column names
+You can turn off this feature to get a quicker startup with -A
+
+Database changed
+mysql> show tables;
++---------------+
+| Tables_in_app |
++---------------+
+| appinfo       |
+| bucketinfo    |
++---------------+
+2 rows in set (0.00 sec)
+{% endhighlight %}
+
+* SHOW COLUMNS FROM <table>: 显示数据表的属性，属性类型，主键信息，是否为NULL，默认值等其他信息
+{% highlight string %}
+mysql> show columns from appinfo;
++-----------------+---------------------+------+-----+---------+----------------+
+| Field           | Type                | Null | Key | Default | Extra          |
++-----------------+---------------------+------+-----+---------+----------------+
+| seqid           | bigint(20) unsigned | NO   | PRI | NULL    | auto_increment |
+| appid           | varchar(64)         | NO   | UNI | NULL    |                |
+| appkey          | varchar(64)         | NO   |     | NULL    |                |
+| projectid       | varchar(64)         | NO   | MUL | NULL    |                |
+| activity        | tinyint(4)          | NO   |     | NULL    |                |
+| isshow          | tinyint(4)          | NO   |     | NULL    |                |
+| create_uid      | varchar(128)        | NO   |     | NULL    |                |
+| last_modify_uid | varchar(128)        | NO   |     | NULL    |                |
+| create_ts       | bigint(20)          | NO   |     | NULL    |                |
+| last_modify_ts  | bigint(20)          | NO   |     | NULL    |                |
++-----------------+---------------------+------+-----+---------+----------------+
+10 rows in set (0.01 sec)
+{% endhighlight %}
+
+* SHOW CREATE TABLE <table>: 查看创建数据库表的语句
+{% highlight string %}
+mysql> show create table appinfo \G
+*************************** 1. row ***************************
+       Table: appinfo
+Create Table: CREATE TABLE `appinfo` (
+  `seqid` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `appid` varchar(64) COLLATE utf8_unicode_ci NOT NULL,
+  `appkey` varchar(64) COLLATE utf8_unicode_ci NOT NULL,
+  `projectid` varchar(64) COLLATE utf8_unicode_ci NOT NULL,
+  `activity` tinyint(4) NOT NULL,
+  `isshow` tinyint(4) NOT NULL,
+  `create_uid` varchar(128) COLLATE utf8_unicode_ci NOT NULL,
+  `last_modify_uid` varchar(128) COLLATE utf8_unicode_ci NOT NULL,
+  `create_ts` bigint(20) NOT NULL,
+  `last_modify_ts` bigint(20) NOT NULL,
+  PRIMARY KEY (`seqid`),
+  UNIQUE KEY `key_appid` (`appid`),
+  KEY `key_project` (`projectid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci
+1 row in set (0.00 sec)
+{% endhighlight %}
+
+* SHOW INDEX FROM <table>: 显示数据表的详细索引信息，包括```PRIMARY KEY```(主键)
+{% highlight string %}
+mysql> show index from appinfo;
++---------+------------+-------------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+
+| Table   | Non_unique | Key_name    | Seq_in_index | Column_name | Collation | Cardinality | Sub_part | Packed | Null | Index_type | Comment | Index_comment |
++---------+------------+-------------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+
+| appinfo |          0 | PRIMARY     |            1 | seqid       | A         |           0 |     NULL | NULL   |      | BTREE      |         |               |
+| appinfo |          0 | key_appid   |            1 | appid       | A         |           0 |     NULL | NULL   |      | BTREE      |         |               |
+| appinfo |          1 | key_project |            1 | projectid   | A         |           0 |     NULL | NULL   |      | BTREE      |         |               |
++---------+------------+-------------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+
+3 rows in set (0.01 sec)
+{% endhighlight %}
+
+* SHOW TABLE STATUS LIKE[FROM <dbname>] [LIKE 'pattern'] \G: 该命令将输出MySQL数据库管理系统的性能及统计信息
+{% highlight string %}
+mysql> SHOW TABLE STATUS from app \G
+*************************** 1. row ***************************
+           Name: appinfo
+         Engine: InnoDB
+        Version: 10
+     Row_format: Dynamic
+           Rows: 0
+ Avg_row_length: 0
+    Data_length: 16384
+Max_data_length: 0
+   Index_length: 32768
+      Data_free: 0
+ Auto_increment: 1
+    Create_time: 2018-05-16 16:10:02
+    Update_time: NULL
+     Check_time: NULL
+      Collation: utf8_unicode_ci
+       Checksum: NULL
+ Create_options: 
+        Comment: 
+*************************** 2. row ***************************
+           Name: bucketinfo
+         Engine: InnoDB
+        Version: 10
+     Row_format: Dynamic
+           Rows: 0
+ Avg_row_length: 0
+    Data_length: 16384
+Max_data_length: 0
+   Index_length: 32768
+      Data_free: 0
+ Auto_increment: 1
+    Create_time: 2018-05-16 16:10:02
+    Update_time: NULL
+     Check_time: NULL
+      Collation: utf8_unicode_ci
+       Checksum: NULL
+ Create_options: 
+        Comment: 
+2 rows in set (0.00 sec)
+{% endhighlight %}
+
+
+
+## 2. 表操作
 
 
 **1) 导出mysql建表语句**
@@ -272,6 +428,9 @@ Create Table: CREATE TABLE `catalogue_index_0` (
 
 
 
+
+
+
 <br />
 <br />
 **[参看]**:
@@ -281,6 +440,8 @@ Create Table: CREATE TABLE `catalogue_index_0` (
 2. [mySQL](https://baike.baidu.com/item/mySQL/471251?fr=aladdin)
 
 3. [MySQL用户权限(Host,User,Password)管理(mysql.user)](https://blog.csdn.net/typa01_kk/article/details/49126365)
+
+4. [MySQL教程](http://www.runoob.com/mysql/mysql-administration.html)
 
 
 <br />
