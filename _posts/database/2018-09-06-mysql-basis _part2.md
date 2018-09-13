@@ -202,6 +202,8 @@ FIXED[(M[,D])] [UNSIGNED] [ZEROFILL]
 
 类似于```DOUBLE```。
 
+<br />
+
 ### 2.2 日期和时间类型
 
 对于```MySQL	5.6.4```及以上版本，```TIME```，```DATETIME```和```TIMESTAMP```支持低于秒级的精度，最高可达到微妙级(即6个小数位)。要想定义一个带有小数部分的时间，使用语法： ```type_name(fsp)```，其中```type_name```可以为:```TIME```或```DATETIME```或```TIMESTAMP```，```fsp```用于指定精度。例如：
@@ -235,7 +237,7 @@ CREATE TABLE t1 (t TIME(3), dt DATETIME(6));
 时间类型，范围从```-838:59:59.000000```至```838:59:59.000000```。 MySQL以```HH:MM:SS[.fraction]```格式显示```TIME```数据，但是在赋值的时候允许使用字符串或者数字。
 
 
-**5) YEAR[(2|4)]类型**
+**5） YEAR[(2/4)]类型**
 
 ```YEAR```类型，显示宽度可以为2或者4，默认是4位。```YEAR(2)```和```YEAR(4)```只是在显示的时候有区别，表示的范围是相同的。对于4位格式，表示的范围1901至2155（0000保留); 对于2位格式，表示的范围从70~69，表示1970年至2069年。MySQL以```YYYY```或```YY```的格式显示```YEAR```类型，但是在赋值的时候允许使用字符串或者数字。
 
@@ -248,6 +250,7 @@ SELECT SEC_TO_TIME(SUM(TIME_TO_SEC(time_col))) FROM tbl_name;
 SELECT FROM_DAYS(SUM(TO_DAYS(date_col))) FROM tbl_name;
 </pre>
 
+<br />
 
 ### 2.3 字符串类型
 
@@ -263,6 +266,40 @@ c1 VARCHAR(20) CHARACTER SET utf8,
 c2 TEXT CHARACTER SET latin1 COLLATE latin1_general_cs
 );
 </pre>
+上述创建表的语句，首先创建了一个名称为```c1```的列，所采用的字符集为```utf-8```，针对该字符集采用其默认的校对集； 接着创建了一个名称为```c2```的列， 所采用的字符集为```latin1```，针对该字符集采用```latin1_general_cs```校对集。
+
+注意上面```CHARACTER SET```也可以写成```CHARSET```。
+
+* 如果在创建列时指定```CHARACTER SET binary```属性，那么MySQL会将该类型转换成适当的类型：```CHAR```类型被转换成```BINARY```,```VARCHAR```类型被转换成```VARBINARY```，```TEXT```类型被转换成```BLOB```类型。而对于```ENUM```及```SET```类型则不会进行转换。假设我们有如下定义：
+<pre>
+CREATE TABLE t
+(
+c1 VARCHAR(10) CHARACTER SET binary,
+c2 TEXT CHARACTER SET binary,
+c3 ENUM('a','b','c') CHARACTER SET binary
+);
+</pre>
+经过MySQL自动转换后，则变成：
+{% highlight string %}
+CREATE TABLE t
+(
+c1 VARBINARY(10),
+c2 BLOB,
+c3 ENUM('a','b','c') CHARACTER SET binary
+);
+{% endhighlight %}
+
+* ```BINARY```属性等价于采用该表默认的字符集与该字符集对应的二进制校对集。在这种情况下，比较与排序都是基于该字符编码值来进行的。
+
+* ```ASCII```属性是```CHARACTER SET latin1```简写
+
+* ```UNICODE```属性是```CHARACTER SET ucs2```的简写
+
+字符列的比较和排序都是基于该列的校对集。对于```CHAR```、```VARCHAR```、```TEXT```、```ENUM```和```SET```数据类型，你可以对该列指定```BINARY```属性或者binary校对集(_bin)，这样就会使得在比较和排序的时候使用对应的字符编码数值来作为基准，而不是使用字典顺序。
+
+* [NATIONAL] CHAR[(M)] [CHARACTER SET charset_name] [COLLATE collation_name]
+ 
+
 
 
 
