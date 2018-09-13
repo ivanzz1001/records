@@ -202,6 +202,18 @@ FIXED[(M[,D])] [UNSIGNED] [ZEROFILL]
 
 类似于```DOUBLE```。
 
+
+下面做一个简单总结：
+
+![db-mysql](https://ivanzz1001.github.io/records/assets/img/db/mysql_integer_type.jpg)
+
+对于MySQL ```DECIMAL```为定点数类型，语法格式为```DECIMAL(a,b)```，其中```a```表示数字的位数，```b```表示小数部分的位数。例如：
+<pre>
+salary DECIMAL(5,2)
+</pre>
+则所允许的范围是[-999.99, 999.99]。
+
+
 <br />
 
 ### 2.2 日期和时间类型
@@ -297,7 +309,47 @@ c3 ENUM('a','b','c') CHARACTER SET binary
 
 字符列的比较和排序都是基于该列的校对集。对于```CHAR```、```VARCHAR```、```TEXT```、```ENUM```和```SET```数据类型，你可以对该列指定```BINARY```属性或者binary校对集(_bin)，这样就会使得在比较和排序的时候使用对应的字符编码数值来作为基准，而不是使用字典顺序。
 
-* [NATIONAL] CHAR[(M)] [CHARACTER SET charset_name] [COLLATE collation_name]
+* [NATIONAL] CHAR[(M)] [CHARACTER SET charset_name] [COLLATE collation_name]： 一个固定长度的字符串，如果长度不够则右填充空格（注意：我们在进行SQL操作的时候，MySQL会自动的将后面填充的空格去除）。```M```表示字符串长度，取值范围是[0,255]，假如省略的话则默认长度为1。
+
+实际上，```CHAR```是```CHARACTER```的简写。MySQL在通常情况下会使用一些预定义好```NATIONAL CHAR```(或```NCHAR```)来作为该列的字符集编码，默认情况下采用```UTF-8```编码。
+
+另外，```CHAR BYTE```数据类型等价于```BINARY```数据类型。
+
+MySQL允许创建类型为```CHAR(0)```的列，这通常在兼容一下老的应用程序的时候很有用： 你需要有这么一列，但是并不会用到它的值。```CHAR(0) NULL```只允许两个值: ```NULL```或```''```(空字符串)
+
+* [NATIONAL] VARCHAR(M) [CHARACTER SET charset_name] [COLLATEcollation_name]: 一个可变长度的字符串，```M```代表该列的最大字符数。```M```的取值范围是[0,65535]，```VARCHAR```最大的有效长度取决于一行所允许的最长字节数(65535)以及对应的字符编码。例如：```UTF-8```编码的字符每一个最长可以达到3字节，这样在utf8编码下```VARCHAR```最长为21844.
+
+```VARCHAR```存储数据的格式为： 长度+数据。其中```长度```部分占用1个或2个字节，假如数据的长度小于等于255，则可用1个字节来存储， 否则需要用两个字节来进行存储。
+
+```VARCHAR```数据类型是```CHARACTER VARYING```的简写。MySQL会用预先定义好的字符集来对VARCHAR列进行编码。
+
+* BINARY(M): ```BINARY```类型类似于```CHAR```类型，但是其用于存储```二进制字节(byte)```。
+
+* VARBINARY(M): 类似于```VARCHAR```类型，但是其用于存储```二进制字节(byte)```，M代表允许的最大字节数。
+
+* TINYBLOB: 最大允许255个字节
+
+* TINYTEXT [CHARACTER SET charset_name] [COLLATE collation_name]： 最长允许255个字符。假如是属于```宽字符```的话，则允许的长度会更少。
+
+* BLOB[(M)]: 最大允许65535个字节，
+
+* TEXT[(M)] [CHARACTER SET charset_name] [COLLATE collation_name]: 最长允许65535个字符。假如是属于```宽字符```的话，则允许的长度会更少。
+
+* MEDIUMBLOB: 最长允许```2^24-1```个字节(16777215)。
+
+* MEDIUMTEXT [CHARACTER SET charset_name] [COLLATE collation_name]： 最长允许```2^24-1```个字符(16777215)。假如是属于```宽字符```的话，则允许的长度会更少。
+
+* LONGBLOB： 最长允许4GB字节。而实际应用中依赖于client/Server通信协议所允许的最大长度
+
+* LONGTEXT [CHARACTER SET charset_name] [COLLATE collation_name]: 最大长度允许4GB字节。对于宽字符，则允许的长度会更少。而实际应用中依赖于client/Server通信协议所允许的最大长度
+
+* ENUM('value1','value2',...) [CHARACTER SET charset_name] [COLLATE collation_name]： 枚举类型，取值只能为```value1```、...、```value2```，```NULL```或者特殊错误值```''```。在内部实现上，枚举是采用数字来表示。理论上，允许的最大枚举个数为65535，而实际上一般小于3000.
+
+* SET('value1','value2',...) [CHARACTER SET charset_name] [COLLATE collation_name]: 集合类型。该列取值只允许是集合中的一个或多个元素
+
+
+
+
  
 
 
