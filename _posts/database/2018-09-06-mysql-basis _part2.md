@@ -336,6 +336,11 @@ MySQL允许创建类型为```CHAR(0)```的列，这通常在兼容一下老的�
 
 * SET('value1','value2',...) [CHARACTER SET charset_name] [COLLATE collation_name]: 集合类型。该列取值只允许是集合中的一个或多个元素
 
+<pre>
+说明： 对于CHAR、VARCHAR类型，MySQL都是采用字符个数而非字节个数来统计长度的。例如CHAR(3),对于latin字
+母来说占用的最长字节长度是3字节；而对于utf-8类型的中文来说，占用的最长字节长度为9字节。
+</pre>
+
 
 ## 3. MySQL 数值类型(Numeric Type)
 
@@ -444,6 +449,22 @@ dt1 DATETIME ON UPDATE CURRENT_TIMESTAMP, -- default NULL
 dt2 DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP -- default 0
 );
 </pre>
+
+## 5. String类型
+string类型主要包括```CHAR```、```VARCHAR```、```BINARY```、```VARBINARY```、```BLOB```、```TEXT```、```ENUM```和```SET```8种类型。本章会介绍一下这些类型的使用。
+
+### 5.1 CHAR与VARCHAR类型
+```CHAR```与```VARCHAR```类型类似，但是在存储于获取数据的时候会有些不同。在最大长度以及如何处理尾部空格方面也有些不同。```CHAR```与```VARCHAR```都是通过在声明时指定一个长度来表明所允许的最大长度。例如: ```CHAR(30)```可以容纳最长30个字符。
+
+对于```CHAR```类型的列来说，其长度是固定的（即你创建表时指定的长度），且范围是[0,255]。当存储```CHAR```类型列时，右侧会用空格填充至所指定的长度。而当获取该列时，尾部的空格会被移除（除非SQL模式中PAD_CHAR_TO_FULL_LENGTH是enable的）
+
+对于```VARCHAR```类型的列，其长度是可变长的。取值范围是[0,65535]。最大的有效长度取决于一行(row)所允许的最大大小（65535)以及相应的字符集编码。```VARCHAR```类型末尾并不会被空格填充至指定的宽度。
+
+在MySQL的```strict```模式下，假如插入的数据长度大于```CHAR```、```VARCHAR```所声明的长度，那么将会插入失败，并返回错误；在其他模式下则可能会对插入的数据进行截断，并返回警告信息。
+
+
+
+
 
 
 ## 2. 表操作
