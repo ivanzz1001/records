@@ -395,7 +395,55 @@ MySQL允许使用```BIT```类型来存储二进制位。```BIT(M)```表示可以
 ![db-date-time](https://ivanzz1001.github.io/records/assets/img/db/mysql_datetime_zero.jpg)
 
 
+### 4.1 DATE、DATETIME和TIMESTAMP类型
+```DATE```、```DATETIME```以及```TIMESTAMP```则三种类型是有关联的。MySQL在存储```TIMESTAMP```类型数据时，会将当前时区的时间转换成UTC时间，然后在获取时又会将UTC时间转换回当前时区时间（对于```DATATIME```则不会做这样的时区转换）。
 
+### 4.2 自动初始化与更新TIMESTAMP和DATETIME
+从MySQL5.6.5开始，```TIMESTAMP```和```DATETIME```列可以自动的初始化和更新为当前时间。要实现这样一个功能，需要在创建该列时使用```DEFAULT CURRENT_TIMESTAMP```或(和)```ON UPDATE CURRENT_TIMESTAMP```这样的语句。另外如果要初始化为一个常量值，也可以通过```DEFATLT <constant>```来实现，例如：```DEFAULT 0```或```DEFAULT '2000-01-01 00:00:00'```。
+
+对于```DATETIME```及```TIMESTAMP```列，在创建时我们可以同时指定```default```和```auto-update```值，也可以单独指定其中一个。下面我们简单介绍一下如何指定：
+
+* 同时指定```DEFAULT CURRENT_TIMESTAMP```和```ON UPDATE CURRENT_TIMESTAMP```，这样就会使得当前列以当前时间作为默认值，并且在更新时也会自动设为当前时间
+<pre>
+CREATE TABLE t1 (
+ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+dt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+</pre>
+
+* 只设置默认值为当前时间或一个常量值
+<pre>
+CREATE TABLE t1 (
+ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+dt DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE t1 (
+ts TIMESTAMP DEFAULT 0,
+dt DATETIME DEFAULT 0
+);
+</pre>
+
+* 设置默认值为一个常量，更新值为当前时间
+<pre>
+CREATE TABLE t1 (
+ts TIMESTAMP DEFAULT 0 ON UPDATE CURRENT_TIMESTAMP,
+dt DATETIME DEFAULT 0 ON UPDATE CURRENT_TIMESTAMP
+);
+</pre>
+
+* 只设置定更新值为当前时间（在这种情况下，对于```TIMESTAMP```类型，默认值则会自动取为0或者NULL; ```DATETIME``类型，默认值会自动取为NULL或0)
+<pre>
+CREATE TABLE t1 (
+ts1 TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- default 0
+ts2 TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP -- default NULL
+);
+
+CREATE TABLE t1 (
+dt1 DATETIME ON UPDATE CURRENT_TIMESTAMP, -- default NULL
+dt2 DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP -- default 0
+);
+</pre>
 
 
 ## 2. 表操作
