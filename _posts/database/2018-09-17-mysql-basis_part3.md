@@ -253,6 +253,266 @@ and (latin1_swedish_ci,IMPLICIT) for operation 'concat'
 +-------------------------+
 </pre>
 
+* 带有两个或两个以上string参数的Function会继承```最宽```参数的```repertoire```作为返回结果的repertoire(```UNICODE```比```ASCII```宽)。考虑如下```CONCAT()```调用：
+<pre>
+CONCAT(_ucs2 X'0041', _ucs2 X'0042')
+CONCAT(_ucs2 X'0041', _ucs2 X'00C2')
+</pre>
+上面第一个调用，返回结果的```repertoire```是```ASCII```，这是因为两个参数都在ascii字符集范围内。而对于第二个调用，返回结果的```repertoire```是```UNICODE```，这是因为第二个参数并不在ascii字符集范围内。
+
+* 函数返回结果的```repertoire```仅仅只受某一个参数字符集和校对集的影响
+<pre>
+IF(column1 < column2, 'smaller', 'greater')
+</pre>
+返回结果的```repertoire```是```ASCII```，这是因为两个字符串参数都是```ASCII repertoire```。函数的第一个参数并不会影响返回结果的```repertoire```。
+
+### 2.2 UTF8 For Metadata
+这里我们将```utf8 for metadata```翻译为```采用utf8字符集的元数据```。在MySQL中，任何描述一个数据库的数据都被称为```元数据```，这包括：列名、数据库名、用户名、版本名称、和大部分通过```SHOW```命令返回的字符串结果。此外，元数据还包括数据库```INFORMATION_SCHEMA```中所有的table的内容，这是因为这些表本身包含了数据库对象信息。
+
+典型的```metadata```必须满足如下两个需求：
+
+* 所有的元数据必须有相同的字符集。否则，针对```INFORMATION_SCHEMA```数据库中的表不管是做```SHOW```命令操作，还是执行```SELECT```查询操作都可能会运行不正常，这是因为在这些表中即使针对同一列(column)，在不同的行都可能会有不同的字符集。
+
+* 元数据必须包含所有语言中的所有字符。否则，用户很可能不能用他们的本土语言来命名```表```和```列```。
+
+为了满足这两个需求，MySQL采用```UNICODE```字符集（即UTF-8)来存储元数据。这样即使采用本土语言的话也不会造成任何问题。这里你应该记住，```metadata都采用utf8字符集```。
+
+由于元数据上面的这些需求，使得```USER()```、```CURRENT_USER()```、```SESSION_USER()```、```SYSTEM_USER()```、```DATABASE()```和```VERSION()```这些函数的返回结果均采用utf8字符集编码。
+
+MySQL server设置```character_set_system```系统变量的值为元数据的字符集：
+{% highlight string %}
+mysql> SHOW VARIABLES LIKE 'character_set_system';
++----------------------+-------+
+| Variable_name | Value |
++----------------------+-------+
+| character_set_system | utf8 |
++----------------------+-------+
+{% endhighlight %}
+虽然说元数据是采用```UNICODE```来存储的，但是这并不意味着执行查询操作时返回的```column headers```信息以及```DESCRIBE```函数的返回结果都必须与```character_set_system```所设置的字符集一致。当你使用```SELECT column1 FROM t```时，```column1```这个头本身也会从MySQL Server返回给客户端，而其字符集编码是受```character_set_results```系统变量决定的，该变量的默认值为utf8。假如你想要MySQL Server将元数据的结果以不同的字符集返回，那么可以使用```SET NAMES```语句来强制MySQL Server端进行字符集转换。```SET NAMES```命令会设置```character_set_results```系统变量和一些其他的相关系统变量。另一方面，客户端应用程序在从server端收到响应结果后，也可以进行字符集转换。值得指出的是在客户端进行转换通常会更加高效，但是并不能够保证所有的客户端都支持这样的转换。
+
+假如```character_set_results```被设置为了```NULL```，则并不会进行转换，MySQL直接将元数据以其原始的字符集进行返回（即```character_set_system所设置的字符集)。
+
+来自MySQL Server端的错误消息也与metadata一样自动的进行字符集转换。
+
+假如在一条SQL语句中，你正使用类似于```USER()```这样的函数(注： 返回结果为utf8字符集)来比较或赋值，这时你并不需要担心，因为MySQL会自动的帮你进行转换：
+<pre>
+SELECT * FROM t1 WHERE USER() = latin1_column;
+</pre>
+上面这条语句之所以可以正常的工作，这是因为在比较之前，```latin1_column```的内容会自动转换成utf8字符集。
+<pre>
+INSERT INTO t1 (latin1_column) SELECT USER();
+</pre>
+上面这条语句之所以可以正常工作，是因为在进行赋值之前，```USER()```函数的返回结果会自动转换为latin1字符集。
+
+尽管自动字符集转换本身并不属于SQL标准，标准并未说明任何一个所支持的字符集都是```UNICODE```字符集的子集。但是大家知道```what applies to a superset can apply to a subset```，因此我们相信针对unicode的校对集可以用在其他非Unicode类型的字符串上。
+
+## 3. 设置字符集与校对集
+在四个不同的层级（server、database、table、column）都有默认的字符集与校对集设置。在如下章节的描述尽管看起来可能很复杂，但实际上这样一个多级默认值可以让用户很明晰的知道返回结果的字符集。
+
+```CHARACTER SET```子句被用于设置一个字符集。此外,```CHARSET```也被用于设置字符集，与```CHARACTER SET```等价。
+
+字符集问题不仅会影响数据存储，也会影响客户端与MySQL服务器之间的通信。假如一个客户端应用程序与一个非默认字符集的```MySQL Server```进行通信，这时你需要知道确切的字符集。例如，如果要使用```utf8``` unicode字符集，客户端需要在连接MySQL服务器之后执行如下的命令：
+<pre>
+SET NAMES 'utf8';
+</pre>
+更多关于client/server通信之间的字符集问题，请参看如下的章节。
+
+### 3.1 校对集命名规范
+
+MySQL校对集的名字通常遵循如下规范：
+
+* 校对集的名字以其所对应的字符集名字开头，后面跟着一个或多个后缀以表明该校对集的特性。例如: ```utf8_general_ci```与```latin1_swedish_cli```是针对```utf8```和```latin1```字符集的校对集。这里需要指出的是，```binary```字符集，它只有一个校对集，且名称也叫```binary```，并没有任何后缀。
+
+* 针对特定语言的校对集包含该语言名称。例如： ```utf8-turkish_ci```与```utf8_hungarian_ci```按utf8字符集```turkish```、```Hungarian```校对集进行排序。
+
+* 校对集的后缀用于指明该校对集是否大小写敏感、音调敏感(accent sensitive)或者是直接binary比较。下表列出了后缀表示的一些含义：
+
+![mysql-collation-sense](https://ivanzz1001.github.io/records/assets/img/db/mysql_collation_sensitive.jpg)
+
+对于非二进制(nonbinary)校对集名称来说，如果没有指定```accent sensitiviey```，那么其就由```case sensitivity```决定。假如一个校对集名称并未包含```_ai```或```_as```，则名字中的```_ci```后缀隐含着```_ai```, 名字中的```_cs```隐含着```_as```。例如，```latin1_general_ci```显示的指明了忽略大小写，同时隐含的指明了```accent insensitive```；而```latin1_general_cs```显示的指明了大小写敏感，同时隐含的指明了```accent sensitive```。
+
+对于```binary```字符集的```binary```校对集，比较是基于字节数字的值来进行的。针对非二进制字符集(nobinary character set)的```_bin```校对集，比较是基于该字符编码的数值来进行的（有一些字符可能占用多个字节），
+
+* 针对unicode字符集来说，校对集的名称也可能会含有一个版本号，以表明采用的是哪个版本的UCA(Unicode Collation Algorithm)。基于```UCA```的校对集假如不包含版本的话，则默认采用的是UCA 4.0.0版本。
+
+* ```utf8_unicode_ci```(并没有版本号）是基于UCA 4.0.0算法
+
+### 3.2 Server级别字符集和校对集
+MySQL Server有一个server字符集和server校对集。这可以在MySQL Server启动的时候通过命令行或者配置文件来设置，也可以在运行时通过命令来进行设置。
+
+起初，server的字符集与校对集依赖于你启动ysqld时传入的选项，你可以使用```--character-set-server```来设置server字符集。另外，你也可以在后面添加```--collation-server```来设置校对集。假如你并未进行设置的话，则等价于设置为```--character-set-server=latin1```。假如你只设置了字符集（例如:latin1)，并未设置校对集，则等价于设置:
+<pre>
+--character-set-server=latin1 --collationserver=latin1_swedish_ci
+</pre>
+这是因为latin1的默认校对集为```latin1_swedish_ci```。因此，如下三个命令的含义是一致的：
+<pre>
+mysqld
+mysqld --character-set-server=latin1
+mysqld --character-set-server=latin1 \
+--collation-server=latin1_swedish_ci
+</pre>
+
+其中一种方法来改变mysqld启动时的默认值就是通过重新编译源代码：
+<pre>
+cmake . -DDEFAULT_CHARSET=latin1
+
+或
+cmake . -DDEFAULT_CHARSET=latin1 -DDEFAULT_COLLATION=latin1_german1_ci
+</pre>
+```mysqld```与```cmake```都会检查```字符集/校对集```的组合是否有效，假如无效的话，两个程序都会打印出相关的错误信息并退出。
+
+假如在通过```CREATE DATABASE```子句创建数据库的时候未指定数据库的```字符集```与```校对集```，则默认会采用server的```字符集```与```校对集```。
+
+当前运行的MySQL Server的字符集与校对集是由```character_set_server```与```collation_server```这两个系统变量决定的，这些值可以在运行时被更改。
+
+
+### 3.3 数据库级别字符集与校对集
+每一个数据库都有一个数据库级别的字符集与校对集。可以在执行```CREATE DATABASE```或者```ALTER DATABASE```的时候添加相应的选项来指定该数据库的字符集与校对集:
+<pre>
+CREATE DATABASE db_name
+[[DEFAULT] CHARACTER SET charset_name]
+[[DEFAULT] COLLATE collation_name]
+ALTER DATABASE db_name
+[[DEFAULT] CHARACTER SET charset_name]
+</pre>
+这里假如将关键字```DATABASE```换成```SCHEMA```,则是创建数据库schema。
+
+所有的数据库选项都存放在一个名为```db.opt```的文本文件中，该文件可以在数据库目录中找到。上面的```CHARACTER SET```与```COLLATE```子句可以使得在创建数据库时指定不同的字符集与校对集。例如：
+<pre>
+CREATE DATABASE db_name CHARACTER SET latin1 COLLATE latin1_swedish_ci;
+</pre>
+
+MySQL按如下的步骤来选择的数据库的字符集与校对集：
+
+* 假如```CHARACTER SET charset_name```与```COLLATE collation_name```都被指定，则charset_name字符集、collation_name校对集会被使用；
+
+* 假如只指定了```CHARACTER SET charset_name```，而并未指定```COLLATE```，那么charset_name字符集会被使用，并采用该字符集默认的校对集。要查看一个字符集所对应的默认校对集可以通过执行```SHOW CHARACTER SET```命令或者查询```INFORMATION_SCHEMA CHARACTER_SETS```表。
+
+* 假如只指定了```COLLATE collation_name```，并未指定```CHARACTER SET```，则与collation_name所关联的字符集会被使用，校对集使用collation_name。
+
+* 否则（```CHARACTER SET```与```COLLATE```均为被指定），采用server的字符集与校对集
+
+```默认数据库```(default database)的字符集与校对集由```character_set_database```与```collation_database```这两个系统变量决定。无论什么时候默认数据库改变，MySQL server都会去设置这两个值。假如没有默认数据库的话，则这两个值与系统级别的```character_set_server```与```collation_server```相同。
+
+要查看一个数据库的默认字符集与校对集，可以通过如下的命令：
+<pre>
+USE db_name;
+SELECT @@character_set_database, @@collation_database;
+</pre>
+另外，如果不想切换数据库，那么可以通过如下的命令来查看：
+<pre>
+SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME
+FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'db_name';
+</pre>
+
+数据库的```字符集```与```校对集```会从以下方面影响MySQL Server的操作：
+
+* 对于```CREATE TABLE```语句，假如在创建表的时候并未指定字符集与校对集，则会继承所对应库的字符集与校对集。如果要覆盖该继承，则需要在创建表的时候显示通过```CHARACTER SET```与```COLLATE```来指定。
+
+* 针对```LOAD DATA```命令，如果并未指定```CHARACTER SET```子句，则MySQL server会使用```character_set_database```系统变量所指定的字符集来解释文件内容。如果要覆盖此字符集，需要提供一个显示的```CHARACTER SET```子句。
+
+* 针对存储方法（存储过程或函数），在该方法创建时并未指定```CHARACTER SET```与```COLLATE```属性的话，那么则会采用数据库的字符集与校对集。
+
+### 3.4 表级别字符集与校对集
+每一个表都有对应的字符集与校对集。在```CREATE TABLE```或者```ALTER TABLE```时可以加上字符集与校对集相关的选项：
+<pre>
+CREATE TABLE tbl_name (column_list)
+[[DEFAULT] CHARACTER SET charset_name]
+[COLLATE collation_name]]
+ALTER TABLE tbl_name
+[[DEFAULT] CHARACTER SET charset_name]
+[COLLATE collation_name]
+</pre>
+
+例如：
+{% highlight string %}
+CREATE TABLE t1 ( ... )
+CHARACTER SET latin1 COLLATE latin1_danish_ci;
+{% endhighlight %}
+MySQL会按照如下的方式来选择表的字符集与校对集：
+
+* 假如在创建表时同时指定了```CHARACTER SET charset_name```与```COLLATE collation_name```，则所指定的charset_name及collation_name会被使用；
+
+* 假如创建表时只指定了```CHARACTER SET charset_name```，并未指定```COLLATE```，那么charset_name默认的校对集将会被使用。要查看一个字符集所对应的默认校对集可以通过执行```SHOW CHARACTER SET```命令或者查询```INFORMATION_SCHEMA CHARACTER_SETS```表。
+
+* 假如只指定了```COLLATE collation_name```，并未指定```CHARACTER SET```，则与collation_name所关联的字符集会被使用，校对集使用collation_name。
+
+* 否则（```CHARACTER SET```与```COLLATE```均为被指定），采用database的字符集与校对集
+
+
+假如一个表的列(column)并未指定字符集与校对集的话，那么将会使用该表对应的```字符集```与```校对集```。注意：表的字符集与校对集是MySQL的扩展，标准的SQL是没有表级别的字符集与校对集的。
+
+### 3.5 列级别字符集与校对集
+每一个```character```列(即类型为```CHAR```、```VARCHAR```或```TEXT```)都有一个```列级别```的字符集与校对集。可以在定义列时加上字符集与校对集选项：
+<pre>
+col_name {CHAR | VARCHAR | TEXT} (col_length)
+[CHARACTER SET charset_name]
+[COLLATE collation_name]
+</pre>
+这些子句也可以用于```ENUM```或者```SET```列：
+<pre>
+col_name {ENUM | SET} (val_list)
+[CHARACTER SET charset_name]
+[COLLATE collation_name]
+</pre>
+例如：
+{% highlight string %}
+CREATE TABLE t1
+(
+col1 VARCHAR(5)
+CHARACTER SET latin1
+COLLATE latin1_german1_ci
+);
+ALTER TABLE t1 MODIFY
+col1 VARCHAR(5)
+CHARACTER SET latin1
+COLLATE latin1_swedish_ci;
+{% endhighlight %}
+
+MySQL会按照如下的方式来选择表的字符集与校对集：
+
+* 假如在创建列时同时指定了```CHARACTER SET charset_name```与```COLLATE collation_name```，则所指定的charset_name及collation_name会被使用；
+<pre>
+CREATE TABLE t1
+(
+col1 CHAR(10) CHARACTER SET utf8 COLLATE utf8_unicode_ci
+) CHARACTER SET latin1 COLLATE latin1_bin;
+</pre>
+上面指定了该列的字符集与校对集，因此会使用```utf8```字符集```utf8_unicode_ci```校对集。
+
+
+* 假如创建列时只指定了```CHARACTER SET charset_name```，并未指定```COLLATE```，那么charset_name默认的校对集将会被使用。
+<pre>
+CREATE TABLE t1
+(
+col1 CHAR(10) CHARACTER SET utf8
+) CHARACTER SET latin1 COLLATE latin1_bin;
+</pre>
+这里在创建列时只指定了字符集，并未指定校对集。因此会使用utf8字符集，采用utf8默认的校对集```utf8_general_ci```。。要查看一个字符集所对应的默认校对集可以通过执行```SHOW CHARACTER SET```命令或者查询```INFORMATION_SCHEMA CHARACTER_SETS```表。
+
+* 假如只指定了```COLLATE collation_name```，并未指定```CHARACTER SET```，则与collation_name所关联的字符集会被使用，校对集使用collation_name。
+<pre>
+CREATE TABLE t1
+(
+col1 CHAR(10) COLLATE utf8_polish_ci
+) CHARACTER SET latin1 COLLATE latin1_bin;
+</pre>
+这里在创建列时只指定了校对集，并未指定字符集。校对集是```utf8_polish_ci```，与该校对集关联的字符集是```utf8```。
+
+* 否则（```CHARACTER SET```与```COLLATE```均为被指定），则继承table的字符集与校对集
+<pre>
+CREATE TABLE t1
+(
+col1 CHAR(10)
+) CHARACTER SET latin1 COLLATE latin1_bin;
+</pre>
+上面创建列时，并未指定字符集与校对集，因此采用表级别的字符集```latin1```与校对集```latin1_bin```。
+
+```CHARACTER SET```与```COLLATE```是标准SQL所支持的。假如你使用```ALTER TABLE```来将一列从一种字符集转换成另一种字符集，MySQL首先会阐释映射该值，但是假如字符集不兼容的话，则可能产生数据丢失。
+
+### 3.6 字符串常量的字符集与校对集
+每一个字符串常量都有一个对应的字符集与校对集。
+
 
 
 
@@ -263,6 +523,9 @@ and (latin1_swedish_ci,IMPLICIT) for operation 'concat'
 
 1. [MySQL教程](http://www.runoob.com/mysql/mysql-administration.html)
 
+2. [MySQL 里设置或修改系统变量的几种方法](https://www.cnblogs.com/devcjq/articles/6409470.html)
+
+3. [MySQL 5.6 Reference Manual SET/SHOW的使用(p1842)]()
 
 <br />
 <br />
