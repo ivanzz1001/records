@@ -237,6 +237,61 @@ SELECT _utf8'def';
 SELECT N'MySQL';
 </pre>
 
+这里尽管在开始时将字符集设置为了```utf8```，但是实际上字符串所包含的字符均为```ASCII```范围内的字符，因此它们的```repertoire```是```ASCII```而不是```UNICODE```。
+
+* ```ASCII```字符集的列。下表中，```c1```具有```ASCII``` repertoire
+<pre>
+CREATE TABLE t1 (c1 CHAR(1) CHARACTER SET ascii);
+</pre>
+下面的列子展示了由于没有一个合适的```repertoire```而导致的错误：
+<pre>
+CREATE TABLE t1 (
+c1 CHAR(1) CHARACTER SET latin1,
+c2 CHAR(1) CHARACTER SET ascii);
+INSERT INTO t1 VALUES ('a','b');
+</pre>
+假设没有```repertoire```,将会发生如下的错误：
+<pre>
+ERROR 1267 (HY000): Illegal mix of collations (latin1_swedish_ci,IMPLICIT)
+and (ascii_general_ci,IMPLICIT) for operation 'concat'
+</pre>
+使用```repertoire```之后，子集可以无损的转换成超级(ascii转换成latin1)，这样就可以正确的返回结果（这是MySQL默认支持的）：
+<pre>
++---------------+
+| CONCAT(c1,c2) |
++---------------+
+| ab            |
++---------------+
+</pre>
+
+* 只携带一个字符串参数的Function会继承该参数的```repertoire```。例如```UPPER(_utf8'abc')```具有ascii ```respertoire```,这是因为它的参数具有```ascii``` respertoire。
+
+* 针对一个返回值为字符串的函数（注意：该函数不带字符串参数），则会采用```character_set_connection```（参看p585)作为返回结果的字符集，假如```character_set_connection```是ascii的话，则返回结果```respertoire```是ASCII，否则为```UNICODE```.
+<pre>
+FORMAT(numeric_column, 4);
+</pre>
+下面的例子展示了```respertoire```是如何影响MySQL的查询结果的：
+<pre>
+SET NAMES ascii;
+CREATE TABLE t1 (a INT, b VARCHAR(10) CHARACTER SET latin1);
+INSERT INTO t1 VALUES (1,'b');
+SELECT CONCAT(FORMAT(a, 4), b) FROM t1;
+</pre>
+假如没有```repertoire```的话，将会发生如下的错误：
+<pre>
+ERROR 1267 (HY000): Illegal mix of collations (ascii_general_ci,COERCIBLE)
+and (latin1_swedish_ci,IMPLICIT) for operation 'concat'
+</pre>
+而在有```repertoire```的情况下，将能够返回如下的结果：
+<pre>
++-------------------------+
+| CONCAT(FORMAT(a, 4), b) |
++-------------------------+
+| 1.0000b |
++-------------------------+
+</pre>
+
+
 
 
 <br />
