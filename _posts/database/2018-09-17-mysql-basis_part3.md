@@ -488,7 +488,7 @@ CREATE TABLE t1
 col1 CHAR(10) CHARACTER SET utf8
 ) CHARACTER SET latin1 COLLATE latin1_bin;
 </pre>
-这里在创建列时只指定了字符集，并未指定校对集。因此会使用utf8字符集，采用utf8默认的校对集```utf8_general_ci```。。要查看一个字符集所对应的默认校对集可以通过执行```SHOW CHARACTER SET```命令或者查询```INFORMATION_SCHEMA CHARACTER_SETS```表。
+这里在创建列时只指定了字符集，并未指定校对集。因此会使用utf8字符集，采用utf8默认的校对集```utf8_general_ci```。要查看一个字符集所对应的默认校对集可以通过执行```SHOW CHARACTER SET```命令或者查询```INFORMATION_SCHEMA CHARACTER_SETS```表。
 
 * 假如只指定了```COLLATE collation_name```，并未指定```CHARACTER SET```，则与collation_name所关联的字符集会被使用，校对集使用collation_name。
 <pre>
@@ -513,7 +513,296 @@ col1 CHAR(10)
 ### 3.6 字符串常量的字符集与校对集
 每一个字符串常量都有一个对应的字符集与校对集。
 
+对于```SELECT 'string'```这样一个简单的子句，string具有该连接(connection)所默认的字符集与校对集，连接默认的字符集与校对集可以通过系统变量```character_set_connection```和```collation_connection```来获取。
 
+一个字符串常量也有一个可选的```字符集说明```（introducer)与```COLLATE```子句，这样可以表明该字符串常量所采用的字符集与校对集：
+<pre>
+[_charset_name]'string' [COLLATE collation_name]
+</pre>
+这里```_charset_name```就是上面提到的```introducer```。它告诉MySQL分析器“接下来的字符串使用的是charset_name字符集”。这里需要注意的是，```introducer```只是一个指示作用，并不会像```CONVERT()```函数那样将该字符串转换为```introducer```字符集。例如：
+<pre>
+SELECT 'abc';
+SELECT _latin1'abc';
+SELECT _binary'abc';
+SELECT _utf8'abc' COLLATE utf8_danish_ci;
+</pre>
+字符集```introducer```和```COLLATE```子句的实现是依据标准SQL文档的。
+
+MySQL会按照如下的方式来决定一个```字符串常量```的字符集与校对集：
+
+* 假如同时指定了```_charset_name```与```COLLATE collation_name```，则字符集```charset_name```和校对集```collation_name```将会被使用。```collation_name```必须是该```charset_name```所支持的校对集。
+
+* 假如```_charset_name```被指定，但是```COLLATE```未被指定的话，则字符集```charset_name```与其默认的校对集将会被使用。要查看一个字符集所对应的默认校对集可以通过执行```SHOW CHARACTER SET```命令或者查询```INFORMATION_SCHEMA CHARACTER_SETS```表。
+
+
+* 假如只指定了```COLLATE collation_name```，但是并未指定```charset_name```，那么由```character_set_connection```系统变量所指定的默认字符集与```collation_name```校对集将会被使用。这里注意```collation_name```必须要被该默认字符集所支持。
+
+* 否则（```_charset_name```与```COLLATE collation_name```均未被指定），由系统变量```character_set_connection```与```collation_connection```所指定的默认字符集与校对集将会被使用。
+
+例如：
+
+* 针对一个非二进制字符串，指定了```latin1```字符集和```latin1_german1_ci```:
+<pre>
+SELECT _latin1'Müller' COLLATE latin1_german1_ci;
+</pre>
+
+
+* 针对一个非二进制字符串，指定了```utf8```字符集和默认的校对集(utf8默认的校对集是```utf8_general_ci```)：
+<pre>
+SELECT _utf8'Müller';
+</pre>
+
+* 二进制字符串采用```binary```字符集和其默认的校对集(binary):
+<pre>
+SELECT _binary'Müller';
+</pre>
+
+* 非二进制字符串采用该连接默认的字符集和```utf8_general_ci```校对集（注意：假如连接默认的字符集不是utf8的话，将会失败):
+<pre>
+SELECT 'Müller' COLLATE utf8_general_ci;
+</pre>
+
+* 使用连接默认的字符集与校对集：
+<pre>
+SELECT 'Müller';
+</pre>
+
+```introducer```用于指示接下来的字符串常量所采用的字符集，但是并不会改变SQL解析器对该字符串常量转义的处理，转义总是由解析器根据```character_set_connection```指定的字符集来进行处理。
+
+下面的例子显示了使用```character_set_connection```字符集来处理转义。该例子使用```SET NAMES```来改变```character_set_connection```字符集，然后通过```HEX()```函数来显示结果（这样就可以看到确切的返回结果）：
+
+**例1**
+{% highlight string %}
+mysql> SET NAMES latin1;
+mysql> SELECT HEX('à\n'), HEX(_sjis'à\n');
++------------+-----------------+
+| HEX('à\n') | HEX(_sjis'à\n') |
++------------+-----------------+
+| E00A | E00A |
++------------+-----------------+
+{% endhighlight %}
+这里,```à```(十六进制值是E0)后面跟着一个```'\n'```，该转义字符表示一个换行符。该转义序列通过```character_set_connection```所设置的```latin1```字符集被解释成为一个换行符(十六进制值为0A)。这即使在第二个字符串```_sjis'à\n'```也是正确的。也就是说,```_sjis```这个introducer并不会影响解析器对转义字符的解析。
+
+**例2**
+{% highlight string %}
+mysql> SET NAMES sjis;
+mysql> SELECT HEX('à\n'), HEX(_latin1'à\n');
++------------+-------------------+
+| HEX('à\n') | HEX(_latin1'à\n') |
++------------+-------------------+
+| E05C6E | E05C6E |
++------------+-------------------+
+{% endhighlight %}
+
+这里```character_set_connection```是```sjis```，在该字符集下序列```à\```(十六进制是E0和5C)是一个有效的宽字节字符。因此，开始的两个字节会被解释成为一个单独的```sjis```字符，这里```\```并不会被解释为转义字符。接下来的```n```(十六进制为6E)也不再是转义序列的一部分。因此这里可以看到```_latin1```这个introducer并不会影响解析器对转义字符的处理。
+
+### 3.7 The National Character Set
+标准的SQL定义了```NCHAR```和```NATIONAL CHAR```以指示类型为```CHAR```的列使用一些预定义好的字符集。在MySQL中使用```utf8```作为预定好的字符集。因此如下的例子是等价的：
+<pre>
+CHAR(10) CHARACTER SET utf8
+NATIONAL CHARACTER(10)
+NCHAR(10)
+</pre>
+下面的例子也是等价的：
+<pre>
+VARCHAR(10) CHARACTER SET utf8
+NATIONAL VARCHAR(10)
+NVARCHAR(10)
+NCHAR VARCHAR(10)
+NATIONAL CHARACTER VARYING
+</pre>
+
+你也可以使用```N'literal'```(或```n'literal'```)来创建一个national字符集。例如：
+<pre>
+SELECT N'some text';
+SELECT n'some text';
+SELECT _utf8'some text';
+</pre>
+上面三个是等价的。
+
+### 3.8 Character Set Introducers
+一个string literal、hexadecimal literal、bit-value literal都可以添加一个字符集说明符和```COLLATE```子句。语法如下：
+<pre>
+[_charset_name] literal [COLLATE collation_name]
+</pre>
+例如：
+{% highlight string %}
+SELECT 'abc';
+SELECT _latin1'abc';
+SELECT _binary'abc';
+SELECT _utf8'abc' COLLATE utf8_danish_ci;
+SELECT _latin1 X'4D7953514C';
+SELECT _utf8 0x4D7953514C COLLATE utf8_danish_ci;
+SELECT _latin1 b'1000001';
+SELECT _utf8 0b1000001 COLLATE utf8_danish_ci;
+{% endhighlight %}
+而MySQL对决定这些字面量的字符集与校对集的方法与```字符串常量```的类似，这里不再赘述。
+
+### 3.9 指定字符集与校对集示例
+**1) 例1**
+{% highlight string %}
+CREATE TABLE t1
+(
+c1 CHAR(10) CHARACTER SET latin1 COLLATE latin1_german1_ci
+) DEFAULT CHARACTER SET latin2 COLLATE latin2_bin;
+{% endhighlight %}
+这里我们给列```c1```指定了latin1字符集和```latin1_german1_ci```校对集。这里在定义中显示的直接指定。需要注意的是，我们这里将一个字符集为```latin1```的列存放在字符集为```latin2```的表中，这样并不会产生任何问题。
+
+**2) 例2**
+{% highlight string %}
+CREATE TABLE t1
+(
+c1 CHAR(10) CHARACTER SET latin1
+) DEFAULT CHARACTER SET latin1 COLLATE latin1_danish_ci;
+{% endhighlight %}
+这里我们对列```c1```使用```latin1```字符集和默认的校对集。这里的默认校对集是指```latin1```对应的默认校对集```latin1_swedish_ci```.
+
+**3) 例3**
+{% highlight string %}
+CREATE TABLE t1
+(
+c1 CHAR(10)
+) DEFAULT CHARACTER SET latin1 COLLATE latin1_danish_ci;
+{% endhighlight %}
+我们这里定义了一列```c1```，其拥有默认的字符集与校对集。在这种情况下，MySQL会检查表级别的字符集与校对集，因此这里列```c1```的的字符集是```latin1```、校对集是```latin1_danish_ci```。
+
+**4） 例4**
+{% highlight string %}
+CREATE DATABASE d1
+DEFAULT CHARACTER SET latin2 COLLATE latin2_czech_ci;
+USE d1;
+CREATE TABLE t1
+(
+c1 CHAR(10)
+);
+{% endhighlight %}
+这里我们创建列```c1```时并未指定任何的字符集与校对集。我们也并未在表级别指定字符集与校对集，在这种情况下，MySQL会检查数据库级别的字符集与校对集，从而决定表级别的字符集与校对集，然后再决定列级别。因此，这里列```c1```的字符集是```latin2```、校对集是```latin2_czech_ci```。
+
+## 4. 连接(Connection)的字符集与校对集
+一个```connection```就是指一个客户端应用程序连接到MySQL服务器，并与其所交互的服务器开启的一个会话。客户端通过该会话连接发送SQL语句，例如查询语句。然后服务器通过该连接返回响应结果或者错误消息。本节主要包括如下几个方面的内容：
+
+* 连接字符集与校对集系统变量(connection character set and collation system variables)
+
+* 用于配置连接字符集的SQL语句（SQL Statements for Connection Character Set Configuration)
+
+* 客户端应用程序连接字符集配置（Client Program Connection Character Set Configuration)
+
+* 用于错误处理的连接字符集配置（Connection Character Set Configuration Error Handling)
+
+### 4.1 Connection字符集与校对集系统变量
+有多个MySQL客户端与服务端交互相关的字符集/校对集系统变量。其中的一些我们前面提到过：
+
+* ```character_set_server```和```collation_server```系统变量用于指示服务器端的字符集与校对集；
+
+* ```character_set_database```和```collation_database```系统变量用于指示```默认数据库```的字符集与校对集；
+
+另外，字符集与校对集系统变量也涉及到client/server之间的消息处理。每一个客户端都有一个针对该连接的会话字符集与校对集系统变量(session-specific character set and collation)。这些会话系统变量会在连接的时候被初始化，但是可以在会话过程中被更改。
+
+有多个关于客户端连接(client connection)方面的字符集与校对集方面的问题，可以通过系统变量来进行回答：
+
+* 当SQL语句离开客户端之后，它是采用什么样的字符集？ 
+
+MySQL Server会使用```character_set_client```系统变量来决定客户端发送过来的SQL语句的字符集。
+
+* 在服务器接收到客户端发送过来的SQL语句后，MySQL Server采用何种字符集来解析它们？
+
+为了确定要用何种字符集，MySQL Server会根据```character_set_connection```和```collation_connection```系统变量：
+
+1） MySQL Server会将Client发送的SQL语句从```character_set_client```转换成```character_set_connection```字符集。这里有一个特例需要注意，针对带有```introducer```的字符串字面量，比如```_utf8mb4```或者```_latin2```，此时MySQL Server采用```introducer```所指定的字符集与校对集来解析该字符串字面量。
+
+2） ```collation_connection```对于比较字符串字面量是很重要的。对于列(column)类型是字符串的值，采用的是该列本身的校对集来比较，而不是用```collation_connection```指定的校对集。
+
+
+* 在MySQL将查询结果返回给客户端之前，应当对查询结果采用何种字符集？
+
+```character_set_results```系统变量用于决定MySQL Server采用何种字符集将查询结果返回给客户端。返回值包括：result data(比如column values)、results metadata(比如column names)、错误消息(error messages)。
+
+<br />
+客户端可以对这些系统变量值进行微调，或者是直接采用默认值。假如你不想使用默认值，你必须为每一个连接到服务器连接进行字符设置。
+
+### 4.2 配置连接字符集的SQL语句
+有两个SQL语句可用于设置连接相关的字符集系统变量：
+
+* SET NAMES 'charset_name' [COLLATE 'collation_name']
+
+这里```SET NAMES```用于指示将采用何种字符集向MySQL服务器发送SQL语句。因此，```SET NAMES 'cp1251'```这样一条SQL语句告诉MySQL服务器，后序从本客户端发送出去的消息都采用```cp1251```字符集。它也用于指定服务器应该以何种字符集来返回结果信息（例如，当你执行```SELECT```语句返回查询结果的时候，其用于指定采用何种字符集）
+
+一条```SET NAMES 'charset_name'```语句等价于如下三条语句：
+<pre>
+SET character_set_client = charset_name;
+SET character_set_results = charset_name;
+SET character_set_connection = charset_name;
+</pre>
+这里设置```character_set_connection```为charset_name，也隐含着将```collation_connection```设置为charset_name所默认的校对集。我们一般并不需要显示的设定collation。我们我们要显示的为```collation_connection```设定校对集，可以通过如下：
+<pre>
+SET NAMES 'charset_name' COLLATE 'collation_name'
+</pre>
+
+* SET CHARACTER SET 'charset_name'
+
+```SET CHARACTER SET```类似于```SET NAMES```，但是将```character_set_connection```和```collation_connection```的值设置为```character_set_database```和```collation_database```（即用于设置默认数据库的字符集与校对集）。
+
+一条```SET CHARACTER SET charset_name```语句等价于如下三条语句：
+<pre>
+SET character_set_client = charset_name;
+SET character_set_results = charset_name;
+SET collation_connection = @@collation_database;
+</pre>
+设置```collation_connection```也隐含着设置```character_set_connection```。（因为一个collation默认对应着一个字符集）。这里我们并没有必要显示的设置```character_set_connection```。
+
+<br />
+如果要查看当前我们为连接所设置的字符集与校对集，使用如下命令：
+{% highlight string %}
+SHOW SESSION VARIABLES LIKE 'character\_set\_%';
+SHOW SESSION VARIABLES LIKE 'collation\_%';
+{% endhighlight %}
+
+另外，假如你并不想要MySQL Server在返回结果或者错误消息时进行字符集相关的转换，那么可以将```character_set_results```设置为```NULL```或者```binary```:
+<pre>
+SET character_set_results = NULL;
+SET character_set_results = binary;
+</pre>
+
+### 4.3 配置客户端程序的连接字符集
+客户端应用程序如mysql, mysqladmin, mysqlcheck, mysqlimport, 和 mysqlshow按如下的步骤来决定默认字符集：
+
+* 假如没有任何其他信息，默认情况下每个客户端在编译时设置的默认字符集为```latin1```;
+
+* 上述每一个客户端应用都会根据操作系统的设置自动检测使用哪种字符集，例如在Unix系统下检测```LANG```或```LC_ALL```这样的环境变量。
+
+* 上述每一个客户端应用程序都支持一个```--default-character-set```选项，该选项使用户能够显示的指定采用何种字符集。
+
+
+
+对于```mysql```这一客户端工具，你可以在配置文件中进行如下配置：
+<pre>
+[mysql]
+default-character-set=koi8r
+</pre>
+也可以直接在连接上之后，通过执行```SET NAMES```语句进行修改。
+
+## 5. 配置应用程序字符集与校对集
+对于应用程序来说，如果采用MySQL默认的字符集与校对集（latin1, latin1_swedish_ci)，那么一般不需要做任何的配置。假如应用程序需要用不同的字符集与校对集来存储数据，那么你可以通过如下几种方式来进行字符集的配置：
+
+* 为每个数据库指定字符设置。
+<pre>
+CREATE DATABASE mydb
+CHARACTER SET utf8
+COLLATE utf8_general_ci;
+</pre>
+
+* 在MySQL Server启动的时候，为server指定字符集配置；
+<pre>
+[mysqld]
+character-set-server=utf8
+collation-server=utf8_general_ci
+</pre>
+
+* 在编译MySQL源代码的时候指定默认的字符集配置；
+<pre>
+cmake . -DDEFAULT_CHARSET=utf8 \
+-DDEFAULT_COLLATION=utf8_general_ci
+</pre>
 
 
 
