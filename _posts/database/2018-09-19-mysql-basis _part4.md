@@ -49,6 +49,130 @@ SQL有很多模式，下面我们介绍几种常用的重要的SQL模式：
 * TRANDITIONAL： 使MySQL接近于传统的SQL数据库系统。简单的描述即为“在插入错误的值到一列时直接返回错误，而不是警告”。
 
 
+## 2. 修改MySQL系统变量
+下面以设置MySQL 系统变量```wait_timeout```为例。
+
+### 2.1 设置全局变量
+
+**1） 修改参数文件，然后重启MySQL**
+{% highlight string %}
+# vi /etc/my.cnf
+
+[mysqld]
+
+wait_timeout=10
+
+# service mysqld restart
+{% endhighlight %}
+此种方法太过生硬，并且要重启MySQL，一般不推荐。
+
+
+**2) 在命令行通过SET来设置，然后再修改参数文件**
+
+如果要修改全局变量，必须要显示指定```GLOBAL```或者```@@global.```，同时必须要有```SUPER```权限：
+{% highlight string %}
+mysql> SET GLOBAL wait_timeout=10;
+
+or
+
+mysql> set @@global.wait_timeout=10;
+{% endhighlight %}
+然后通过下面的命令查看设置是否成功：
+{% highlight string %}
+然后查看设置是否成功:
+
+mysql> SELECT @@global.wait_timeout=10;
+
+or
+
+mysql> SHOW GLOBAL variables like 'wait_timeout';
++---------------+-------+
+
+| Variable_name | Value |
+
++---------------+-------+
+
+| wait_timeout  | 10    | 
+
++---------------+-------+
+{% endhighlight %}
+如果查询时使用的是```SHOW VARIABLES```的话，会发现设置并没有生效，除非重新登录再查看。这是因为使用```SHOW VARIABLES```的话就等同于使用```SHOW SESSION VARIABLES```，查询的是会话变量，只有使用```SHOW GLOBAL VARIABLES```查询的才是全局变量。如果仅仅想修改会话变量的话，可以使用类似```SET wait_timeout=10;```或```SET SESSION wait_timeout=10;````这样的语法。
+
+当前只修改了正在运行的MySQL实例参数，但下次重启mysqld又会回到默认值，所以别忘了修改参数文件：
+{% highlight string %}
+# vi /etc/my.cnf
+
+[mysqld]
+
+wait_timeout=10
+{% endhighlight %}
+
+
+### 2.2 修改会话变量
+如果要修改会话变量值，可以指定```SESSION```或者```LOCAL```关键字，或者通过```@@session```、```@@local```、```@@```限定符， 又或者不加任何关键字与限定符。例如：
+{% highlight string %}
+SET SESSION wait_timeout = 10;
+
+or
+
+SET LOCAL wait_timeout = 10;
+
+or
+
+SET @@session.wait_timeout = 10;
+
+or
+
+SET @@local.wait_timeout = 10;
+
+or
+
+SET @@wait_timetout = 10;
+
+or 
+
+SET wait_timeout = 10;
+{% endhighlight %} 
+然后查看设置是否成功：
+{% highlight string %}
+mysql> select @@wait_timeout;
+
+or
+
+mysql> select @@session.wait_timeout;
+
+or
+
+mysql> select @@local.wait_timeout;
+
+or
+
+mysql> show variables like 'wait_timeout';
+
+or
+
+mysql> show local variables like 'wait_timeout';
+
+or
+
+mysql> show session variables like 'wait_timeout';
+
++---------------+-------+
+
+| Variable_name | Value |
+
++---------------+-------+
+
+| wait_timeout  | 10    | 
+
++---------------+-------+
+{% endhighlight %}
+
+另外，如果要将一个全局系统变量设置为MySQL编译时的默认值，或者将一个session系统变量设置为当前的全局值，可以将该变量的值设置为```DEFAULT```。例如：
+{% highlight string %}
+SET @@session.max_join_size = DEFAULT;
+SET @@session.max_join_size = @@global.max_join_size;
+{% endhighlight %}
 
 
 
