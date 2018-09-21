@@ -117,6 +117,84 @@ OR, ||
 相同优先级的运算符，具有从左到右的结合性（注： 赋值运算符结合性为从右到左）。
 
 
+### 2.2 比较函数和操作符
+
+![mysql-function-operator](https://ivanzz1001.github.io/records/assets/img/db/db_mysql_funcoper.jpg)
+
+下面我们对其中一些函数或操作符进行简单介绍：
+
+* ```<=>```: NULL-safe比较操作符。该操作符类似于```=```操作符做相等比较，但是假如比较的两个操作数都是NULL的话返回```1```，只有一个操作数是```NULL```的话则返回```0```.
+{% highlight string %}
+mysql> SELECT 1 <=> 1, NULL <=> NULL, 1 <=> NULL;
+-> 1, 1, 0
+mysql> SELECT 1 = 1, NULL = NULL, 1 = NULL;
+-> 1, NULL, NULL
+{% endhighlight %}
+
+* IS boolean_value： 用于测试一个值是否是给定的布尔值，这里```boolean_value```可以为```TRUE```、```FALSE```、或者```UNKNOWN```。
+{% highlight string %}
+mysql> SELECT 1 IS TRUE, 0 IS FALSE, NULL IS UNKNOWN;
+-> 1, 1, 1
+{% endhighlight %}
+
+* IS NULL: 用于测试一个值是否为NULL
+{% highlight string %}
+mysql> SELECT 1 IS NULL, 0 IS NULL, NULL IS NULL;
+-> 0, 0, 1
+{% endhighlight %}
+
+
+* expr BETWEEN min AND max: 假如```expr```大于等于min，并且小于等于max，则返回1，否则返回0。
+{% highlight string %}
+mysql> SELECT 2 BETWEEN 1 AND 3, 2 BETWEEN 3 and 1;
+-> 1, 0
+mysql> SELECT 1 BETWEEN 2 AND 3;
+-> 0
+mysql> SELECT 'b' BETWEEN 'a' AND 'c';
+-> 1
+mysql> SELECT 2 BETWEEN 2 AND '3';
+-> 1
+mysql> SELECT 2 BETWEEN 2 AND 'x-3';
+-> 0
+{% endhighlight %}
+
+
+* COALESCE(value,...): 返回列表中的第一个非空值，假如没有非空值，则返回NULL
+{% highlight string %}
+mysql> SELECT COALESCE(NULL,1);
+-> 1
+mysql> SELECT COALESCE(NULL,NULL,NULL);
+-> NULL
+{% endhighlight %}
+
+* GREATEST(value1,value2,...): 返回参数中的最大值
+{% highlight string %}
+mysql> SELECT GREATEST(2,0);
+-> 2
+mysql> SELECT GREATEST(34.0,3.0,5.0,767.0);
+-> 767.0
+mysql> SELECT GREATEST('B','A','C');
+-> 'C'
+{% endhighlight %}
+
+
+* expr IN (value,...): 假如expr等于列表中的任何一个值，则返回1，否则返回0
+{% highlight string %}
+mysql> SELECT 2 IN (0,3,5,7);
+-> 0
+mysql> SELECT
+{% endhighlight %}
+
+* INTERVAL(N,N1,N2,N3,...): 返回第一个比参数值```N```更小的参数索引。这里需确保N1<N2<...<Nn
+{% highlight string %}
+mysql> SELECT INTERVAL(23, 1, 15, 17, 30, 44, 200);
+-> 3
+mysql> SELECT INTERVAL(10, 1, 10, 100, 1000);
+-> 2
+mysql> SELECT INTERVAL(22, 23, 30, 44, 200);
+-> 0
+{% endhighlight %}
+
 <br />
 <br />
 **[参看]**:
