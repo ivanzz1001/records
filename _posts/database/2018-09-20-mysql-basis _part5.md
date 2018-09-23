@@ -195,6 +195,170 @@ mysql> SELECT INTERVAL(22, 23, 30, 44, 200);
 -> 0
 {% endhighlight %}
 
+
+## 3. 字符串函数
+MySQL中的字符串相关函数、操作符有很多，如下只列出部分：
+
+|      NAME        |        DESCRIPTION                                            | 
+|:----------------:|:--------------------------------------------------------------|
+|   ASCII()        |返回最左边一个字符的数值                                          |
+|   BIN()          |返回一个数字的二进制字符串表示                                     |
+|  BIT_LENGTH()    |返回参数的bit数长度                                              |
+|  CHAR()          |返回传入数字所表示的字符                                          |
+|  CHAR_LENGTH()   |返回传入参数的字符数目                                            |
+|CHARACTER_LENGTH()|等价于CHAR_LENGTH()                                             |
+|  CONCAT()        |拼接两个字符串                                                   |
+|  CONCAT_WS()     |采用分隔符拼接两个字符串                                          |
+|  ELT()           |返回指定索引处的字符串                                            |
+|  EXPORT_SET()    |返回一个字符串： 假如value中的对应bit被设置，则返回所对应的字符串     |
+|  FIELD()         |返回第一个参数在后续子序列参数中的索引值                            |
+|  FIND_IN_SET()   |返回第一个参数在集合中的索引值                                     |
+|  FORMAT()        |格式化一个数字                                                   |
+|  FROM_BASE64()   |解码Base64编码的字符串                                           |
+|  HEX()           |返回一个数的十六进制表示                                          |
+|  INSERT()        |在一个指定的位置插入一个字符串                                     |
+|  INSTR()         |返回一个子字符串第一次出现的位置索引                                |
+|  LCASE()         |等价于LOWER()                                                   |
+|  LEFT()          |返回最左边的N个字符                                              |
+|  LENGTH()        |返回一个字符串所占用的字节数                                      |
+|  LIKE            |简单模式匹配                                                    |
+|  NOT LIKE        |简单模式匹配                                                    |
+|  LOAD_FILE()     |加载一个指定的文件                                               |
+|  LOCATE()        |返回一个子串第一次出现的位置                                      |
+|  LOWER()         |返回字符串的小写表示形式                                          |
+|  SPACE()         |返回指定书目的空格字符串                                          |
+|  STRCMP()        |比较两个字符串                                                   |
+|  TO_BASE64()     |将参数转换成Base64编码                                           |
+|  TRIM()          |移除开始于结束的空格                                              |
+|  UPPER()         |将一个字符串转变成大写表示                                        |
+
+
+### 3.1 字符串比较
+
+下面我们介绍一下```LIKE```、```NOT LIKE```这对简单的模式匹配操作符的用法。其语法如下：
+
+<pre>
+expr LIKE pat [ESCAPE 'escape_char']
+expr NOT LIKE pat [ESCAPE 'escape_char']
+</pre>
+SQL模式匹配操作符，返回结果为1(TRUE)或者0(FALSE)。假如```expr```或```pat```任何一个为NULL的话，返回结果为NULL。
+
+
+在SQL标准中，```LIKE```会基于```每一个```字符进行比较，这样其就可能产生于```=```操作符不同的结果：
+{% highlight string %}
+mysql> SELECT 'ä' LIKE 'ae' COLLATE latin1_german2_ci;
++-----------------------------------------+
+| 'ä' LIKE 'ae' COLLATE latin1_german2_ci |
++-----------------------------------------+
+| 0 |
++-----------------------------------------+
+mysql> SELECT 'ä' = 'ae' COLLATE latin1_german2_ci;
++--------------------------------------+
+| 'ä' = 'ae' COLLATE latin1_german2_ci |
++--------------------------------------+
+| 1 |
++--------------------------------------+
+{% endhighlight %}
+
+特别的是，在进行```CHAR```或```VARCHAR```类型的数据比较时，对于```LIKE```并不会忽略尾部的空格，而对于```=```操作符，则会忽略尾部的空格。
+{% highlight string %}
+mysql> SELECT 'a' = 'a ', 'a' LIKE 'a ';
++------------+---------------+
+| 'a' = 'a ' | 'a' LIKE 'a ' |
++------------+---------------+
+| 1 | 0 |
++------------+---------------+
+1 row in set (0.00 sec)
+{% endhighlight %}
+
+对于```LIKE```，你可以使用如下两种通配符：
+
+* ```%```: 可以匹配0个或任意多个字符
+
+* ```_```: 匹配一个字符
+{% highlight string %}
+mysql> SELECT 'David!' LIKE 'David_';
+-> 1
+mysql> SELECT 'David!' LIKE '%D%v%';
+-> 1
+{% endhighlight %}
+另外，如果要针对通配符本身(```%```与```_```)来进行比较，那么需要采用转义字符进行转义。默认的转义字符是```\```。
+
+* ```\%```匹配一个```%```字符
+
+* ```\_```匹配一个```_```字符
+
+{% highlight string %}
+mysql> SELECT 'David!' LIKE 'David\_';
+-> 0
+mysql> SELECT 'David_' LIKE 'David\_';
+-> 1
+{% endhighlight %}
+
+如果要指定一个不同的转义字符，那么可以使用```ESCAPE```子句：
+{% highlight string %}
+mysql> SELECT 'David_' LIKE 'David|_' ESCAPE '|';
+-> 1
+{% endhighlight %}
+
+在一般情况下，字符串的比较都是不区分大小写的。除非进行相应的指定：
+{% highlight string %}
+mysql> SELECT 'abc' LIKE 'ABC';
+-> 1
+mysql> SELECT 'abc' LIKE _latin1 'ABC' COLLATE latin1_general_cs;
+-> 0
+mysql> SELECT 'abc' LIKE _latin1 'ABC' COLLATE latin1_bin;
+-> 0
+mysql> SELECT 'abc' LIKE BINARY 'ABC';
+-> 0
+{% endhighlight %}
+
+## 4. Numeric Functions and Operators
+下面列出了一些常见的数学函数和操作符：
+
+
+|      NAME        |        DESCRIPTION                                            | 
+|:----------------:|:--------------------------------------------------------------|
+|   ABC()          |返回一个数的绝对值                                               |
+|	ACOS()         |返回一个圆弧的cos值                                              |
+|   CEIL()         |返回第一个不小于指定参数的整数值                                   |
+|   CEILLING()     |返回第一个不小于指定参数的整数值                                   |
+|   CONV()         |将一个数在不同的进制之间转换                                       |
+|   CRC32()        |求一个数的CRC32值                                               |
+|   FLOOR()        |返回不大于指定参数的最大整数值                                    |
+|   RAND()         |返回一个随机浮点值                                              |
+
+## 5. 日期和时间函数
+
+下面是一些常用的```日期与时间```函数：
+
+
+|      NAME                  |        DESCRIPTION                                            | 
+|:--------------------------:|:--------------------------------------------------------------|
+|     ADDDATE()              |向一个Date类型的值中添加time value(intervals)                    |
+|     ADDTIME()              |增加时间值                                                      |
+|  CONVERT_TZ()              |将一个时区转换成另外一个时区                                      |
+|  CURDATE()                 |返回当前Date值                                                  |
+|CURRENT_DATE(),CURRENT_DATE |返回当前Date值                                                  |
+|CURRENT_TIME(),CURRENT_TIME |返回当前时间值                                                  |
+|CURRENT_TIMESTAMP(),CURRENT_TIMESTAMP|返回当前时间戳,等价于NOW()                              |
+|CURTIME()                   |返回当前时间                                                    |
+|   DATE()                   |返回一个Date或DateTime类型值的Date部分                           |
+|   DATEDIFF()               |两个日期进行减法操作                                             |
+|   DATE_FORMAT()            |格式化一个日期                                                  |
+|   NOW()                    |返回当前日期和时间                                              |
+|   SEC_TO_TIME()            |将秒数格式化为```HH:MM:SS```                                   |
+
+
+
+
+
+
+
+
+
+
+
 <br />
 <br />
 **[参看]**:
