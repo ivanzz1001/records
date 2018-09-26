@@ -104,63 +104,69 @@ alter_specification:
 
 * 修改表
 
+
 ### 2.1 创建数据库表
 
 基本语法如下：
 {% highlight string %}
 CREATE [TEMPORARY] TABLE [IF NOT EXISTS] tbl_name
-(create_definition,...)
-[table_options]
-[partition_options]
+	(create_definition,...)
+	[table_options]
+	[partition_options]
 
 CREATE [TEMPORARY] TABLE [IF NOT EXISTS] tbl_name
-[(create_definition,...)]
-[table_options]
-[partition_options]
-[IGNORE | REPLACE]
-[AS] query_expression
+	[(create_definition,...)]
+	[table_options]
+	[partition_options]
+	[IGNORE | REPLACE]
+	[AS] query_expression
 
 CREATE [TEMPORARY] TABLE [IF NOT EXISTS] tbl_name
-{ LIKE old_tbl_name | (LIKE old_tbl_name) }
+	{ LIKE old_tbl_name | (LIKE old_tbl_name) }
 
 create_definition:
-col_name column_definition
-| [CONSTRAINT [symbol]] PRIMARY KEY [index_type] (key_part,...)
-[index_option] ...
-| {INDEX|KEY} [index_name] [index_type] (key_part,...)
-[index_option] ...
-| [CONSTRAINT [symbol]] UNIQUE [INDEX|KEY]
-[index_name] [index_type] (key_part,...)
-[index_option] ...
-| {FULLTEXT|SPATIAL} [INDEX|KEY] [index_name] (key_part,...)
-[index_option] ...
-| [CONSTRAINT [symbol]] FOREIGN KEY
-[index_name] (col_name,...) reference_definition
-| CHECK (expr)
+	col_name column_definition
+	| [CONSTRAINT [symbol]] PRIMARY KEY [index_type] (key_part,...)
+		[index_option] ...
+	| {INDEX|KEY} [index_name] [index_type] (key_part,...)
+		[index_option] ...
+	| [CONSTRAINT [symbol]] UNIQUE [INDEX|KEY]
+		[index_name] [index_type] (key_part,...)
+		[index_option] ...
+	| {FULLTEXT|SPATIAL} [INDEX|KEY] [index_name] (key_part,...)
+		[index_option] ...
+	| [CONSTRAINT [symbol]] FOREIGN KEY
+		[index_name] (col_name,...) reference_definition
+	| CHECK (expr)
 
 column_definition:
-data_type [NOT NULL | NULL] [DEFAULT default_value]
-[AUTO_INCREMENT] [UNIQUE [KEY]] [[PRIMARY] KEY]
-[COMMENT 'string']
-[COLUMN_FORMAT {FIXED|DYNAMIC|DEFAULT}]
-[STORAGE {DISK|MEMORY|DEFAULT}]
-[reference_definition]
+	data_type [NOT NULL | NULL] [DEFAULT default_value]
+		[AUTO_INCREMENT] [UNIQUE [KEY]] [[PRIMARY] KEY]
+		[COMMENT 'string']
+		[COLUMN_FORMAT {FIXED|DYNAMIC|DEFAULT}]
+		[STORAGE {DISK|MEMORY|DEFAULT}]
+		[reference_definition]
+
 data_type:
-(see Chapter 11, Data Types)
+	(see Chapter 11, Data Types)
+
 key_part:
-col_name [(length)] [ASC | DESC]
+	col_name [(length)] [ASC | DESC]
+
 index_type:
-USING {BTREE | HASH}
+	USING {BTREE | HASH}
+
 index_option:
-KEY_BLOCK_SIZE [=] value
-| index_type
-| WITH PARSER parser_name
-| COMMENT 'string'
+	KEY_BLOCK_SIZE [=] value
+	| index_type
+	| WITH PARSER parser_name
+	| COMMENT 'string'
+
 reference_definition:
-REFERENCES tbl_name (key_part,...)
-[MATCH FULL | MATCH PARTIAL | MATCH SIMPLE]
-[ON DELETE reference_option]
-[ON UPDATE reference_option]
+	REFERENCES tbl_name (key_part,...)
+	[MATCH FULL | MATCH PARTIAL | MATCH SIMPLE]
+	[ON DELETE reference_option]
+	[ON UPDATE reference_option]
 {% endhighlight %}
 
 例如，下面创建名为```runoob```的表：
@@ -220,6 +226,358 @@ DROP [TEMPORARY] TABLE [IF EXISTS]
 tbl_name [, tbl_name] ...
 [RESTRICT | CASCADE]
 {% endhighlight %}
+```DROP TABLE```用于移除一个或多个表，对于每一个表你必须具有```DROP```权限。
+
+### 2.3 修改表
+修改表的基本语法如下：
+{% highlight string %}
+ALTER [ONLINE|OFFLINE] [IGNORE] TABLE tbl_name
+[alter_specification [, alter_specification] ...]
+[partition_options]
+
+alter_specification:
+table_options
+| ADD [COLUMN] col_name column_definition
+    [FIRST | AFTER col_name]
+| ADD [COLUMN] (col_name column_definition,...)
+| ADD {INDEX|KEY} [index_name]
+    [index_type] (key_part,...) [index_option] ...
+| ADD [CONSTRAINT [symbol]] PRIMARY KEY
+    [index_type] (key_part,...) [index_option] ...
+| ADD [CONSTRAINT [symbol]]
+    UNIQUE [INDEX|KEY] [index_name]
+    [index_type] (key_part,...) [index_option] ...
+| ADD FULLTEXT [INDEX|KEY] [index_name]
+    (key_part,...) [index_option] ...
+| ADD SPATIAL [INDEX|KEY] [index_name]
+    (key_part,...) [index_option] ...
+| ADD [CONSTRAINT [symbol]]
+    FOREIGN KEY [index_name] (col_name,...)
+    reference_definition
+| ALGORITHM [=] {DEFAULT|INPLACE|COPY}
+| ALTER [COLUMN] col_name {SET DEFAULT literal | DROP DEFAULT}
+| CHANGE [COLUMN] old_col_name new_col_name column_definition
+    [FIRST|AFTER col_name]
+| [DEFAULT] CHARACTER SET [=] charset_name [COLLATE [=] collation_name]
+| CONVERT TO CHARACTER SET charset_name [COLLATE collation_name]
+| {DISABLE|ENABLE} KEYS
+| {DISCARD|IMPORT} TABLESPACE
+| DROP [COLUMN] col_name
+| DROP {INDEX|KEY} index_name
+| DROP PRIMARY KEY
+| DROP FOREIGN KEY fk_symbol
+| FORCE
+| LOCK [=] {DEFAULT|NONE|SHARED|EXCLUSIVE}
+| MODIFY [COLUMN] col_name column_definition
+    [FIRST | AFTER col_name]
+| ORDER BY col_name [, col_name] ...
+| RENAME [TO|AS] new_tbl_name
+| ADD PARTITION (partition_definition)
+| DROP PARTITION partition_names
+| TRUNCATE PARTITION {partition_names | ALL}
+| COALESCE PARTITION number
+| REORGANIZE PARTITION partition_names INTO (partition_definitions)
+| EXCHANGE PARTITION partition_name WITH TABLE tbl_name
+| ANALYZE PARTITION {partition_names | ALL}
+| CHECK PARTITION {partition_names | ALL}
+| OPTIMIZE PARTITION {partition_names | ALL}
+| REBUILD PARTITION {partition_names | ALL}
+| REPAIR PARTITION {partition_names | ALL}
+| REMOVE PARTITIONING
+{% endhighlight %}
+```ALTER TABLE```用于改变表的结构。例如，你可以添加或删除一列，创建或销毁索引，更改已存在列的类型，重命名列或表。
+
+下面给出一些示例，假如我们通过如下语句创建了表```t1```:
+{% highlight string %}
+CREATE TABLE t1 (a INTEGER, b CHAR(10));
+{% endhighlight %}
+
+* 将表从```t1```命名为```t2```
+{% highlight string %}
+ALTER TABLE t1 RENAME t2;
+{% endhighlight %}
+
+* 将列```a```从```INTEGER```类型转换为```TINYINT NOT NULL```类型，并且将列```b```从```CHAR(10```类型转换为```CHAR(20)```类型，且将列```b```的名称由b更改为```c```
+{% highlight string %}
+ALTER TABLE t2 MODIFY a TINYINT NOT NULL, CHANGE b c CHAR(20);
+{% endhighlight %}
+
+* 添加一个新的```TIMESTAMP```类型的列```d```
+{% highlight string %}
+ALTER TABLE t2 ADD d TIMESTAMP;
+{% endhighlight %}
+
+* 在列```d```上增加一个索引，在列```a```上增一个```UNIQUE```索引
+{% highlight string %}
+ALTER TABLE t2 ADD INDEX (d), ADD UNIQUE (a);
+{% endhighlight %}
+
+* 移除列```c```
+{% highlight string %}
+ALTER TABLE t2 DROP COLUMN c;
+{% endhighlight %}
+
+## 3. 视图操作
+视图操作主要包括：
+
+* 创建视图
+
+* 修改视图
+
+* 删除视图
+
+### 3.1 创建视图
+创建视图语法如下：
+{% highlight string %}
+CREATE
+	[OR REPLACE]
+	[ALGORITHM = {UNDEFINED | MERGE | TEMPTABLE}]
+	[DEFINER = { user | CURRENT_USER }]
+	[SQL SECURITY { DEFINER | INVOKER }]
+	VIEW view_name [(column_list)]
+	AS select_statement
+	[WITH [CASCADED | LOCAL] CHECK OPTION]
+{% endhighlight %}
+```CREATE VIEW```语句用于创建一个新的视图，或者替换一个老的视图（假如指定了```OR REPLACE```)。假如视图不存在，```CREATE OR REPLACE VIEW```等价于```CREATE VIEW```；假如视图已经存在，则```CREATE OR REPLACE```会替换该视图。
+
+```select_statement```是一个```SELECT```子句，用于体统视图的定义。说明： select_statement可以从一个基础表中查询，也可以从另一个视图中查询。
+
+说明： MySQL数据库视图在创建的时候就已经固定下来了(即创建时视图就处于```frozen```状态)，并不会受到后续底层表定义的影响。例如，假如在一个表上通过```SELECT *```定义了一个视图，假如后面再在表中增加了一列，那么其并不会成为该视图的一部分；而如果后续删除了表的一列，那么在查看视图的时候将会产生错误。
+
+
+下面给出一个示例：
+{% highlight string %}
+mysql> CREATE TABLE t (qty INT, price INT);
+mysql> INSERT INTO t VALUES(3, 50);
+mysql> CREATE VIEW v AS SELECT qty, price, qty*price AS value FROM t;
+mysql> SELECT * FROM v;
++------+-------+-------+
+| qty | price | value |
++------+-------+-------+
+| 3 | 50 | 150 |
++------+-------+-------+
+{% endhighlight %}
+
+
+### 3.2 修改视图
+
+修改视图的基本语法如下：
+{% highlight string %}
+ALTER
+[ALGORITHM = {UNDEFINED | MERGE | TEMPTABLE}]
+[DEFINER = { user | CURRENT_USER }]
+[SQL SECURITY { DEFINER | INVOKER }]
+VIEW view_name [(column_list)]
+AS select_statement
+[WITH [CASCADED | LOCAL] CHECK OPTION]
+{% endhighlight %}
+上述语句用于修改一个视图（视图必须已经存在）。执行该语句时，必须要有```CREATE VIEW```以及```DROP VIEW```的权限。
+
+### 3.3 删除视图
+
+删除视图语法如下：
+{% highlight string %}
+DROP VIEW [IF EXISTS]
+	view_name [, view_name] ...
+[RESTRICT | CASCADE]
+{% endhighlight %}
+用于删除一个或多个视图。
+
+## 4. 索引操作
+索引操作主要包括：
+
+* 创建索引
+
+* 删除索引
+
+### 4.1 创建索引
+创建索引语法如下：
+{% highlight string %}
+CREATE [ONLINE | OFFLINE] [UNIQUE | FULLTEXT | SPATIAL] INDEX index_name
+	[index_type]
+	ON tbl_name (key_part,...)
+	[index_option]
+	[algorithm_option | lock_option] ...
+
+key_part:
+	col_name [(length)] [ASC | DESC]
+
+index_option:
+	KEY_BLOCK_SIZE [=] value
+	| index_type
+	| WITH PARSER parser_name
+	| COMMENT 'string'
+
+index_type:
+	USING {BTREE | HASH}
+
+algorithm_option:
+	ALGORITHM [=] {DEFAULT | INPLACE | COPY}
+
+lock_option:
+	LOCK [=] {DEFAULT | NONE | SHARED | EXCLUSIVE}
+{% endhighlight %}
+通常你会在使用```CREATE TABLE```语句创建表时同时创建出该表上的所有索引。这里```CREATE INDEX```允许向一个已存在的表中添加索引。可以通过```SHOW INDEX FROM tbl_name```来查看一个表上的索引。
+
+实际上，```CREATE INDEX```会被映射成一个```ALTER TABLE```语句来创建索引。注意，```CREATE INDEX```并不能被用于创建一个```PRIMARY KEY```。
+
+**1） UNIQUE INDEX**
+
+可以在一个表上创建```UNIQUE```索引，```FULLTEXT```索引，```SPATIAL```索引。这里我们主要介绍一下```唯一索引```。一个```UNIQUE```索引会创建约束：要求索引上的值都是唯一的。假如你向表中插入一个新的行，若造成```UNIQUE```索引列的值重复，则会产生相应的错误。假如你在一列上创建一个```前缀UNIQUE```索引，那你需要保证在前缀长度范围内数据是唯一的。注： 对于```UNIQUE```索引，如果该列本身允许```NULL```，则允许有重复的NULL。
+
+假如在一个表的一个```单独```的列上（要求该列的数据类型为```整数类型```)创建```PRIMARY KEY```或```UNIQUE NOT NULL```索引，那么你可以在```SELECT```语句中使用```_rowid```来引用索引列：
+
+* 假如```PRIMARY KEY```索引对应的列是一个```单独的列```，并且列的数据类型是```整数类型```，那么你可以使用```_rowid```来引用该列；假如有一个```PRIMARY KEY```索引，并且该索引列并不是一个单独的整数类型列，那么```_rowid```并不能被使用。
+
+* 否则，可以使用```_rowid```来引用第一个类型为整数的单独```UNIQUE NOT NULL```索引列。假如第一个```UNIQUE NOT NULL```索引列并不是```单独的整数类型列```，那么```_rowid```将不能被使用。
+
+**2) 索引类型(index_type)**
+
+在创建索引时，底层一般都是用```BTREE```或者```HASH```来作为数据结构。一般来说，对于```InnoDB```以及```MyISAM```底层是采用```BTREE```来做索引的；对于```MEMORY```以及```NDB```存储引擎，底层可以采用```BTREE```来做索引，也可以采用```HASH```来做索引。
+
+### 4.2 删除索引
+删除索引语法如下：
+{% highlight string %}
+DROP INDEX [ONLINE|OFFLINE] index_name ON tbl_name
+	[algorithm_option | lock_option] ...
+
+algorithm_option:
+ALGORITHM [=] {DEFAULT|INPLACE|COPY}
+
+lock_option:
+	LOCK [=] {DEFAULT|NONE|SHARED|EXCLUSIVE}
+{% endhighlight %}
+上面表示从表```tbl_name```上删除名称为```index_name```的索引。注意，对于```PRIMARY KEY```这样的索引，其```index_name```为```PRIMARY```。
+
+## 5. 数据操作
+表的数据操作这里我们主要介绍：
+
+* 表数据的插入
+
+* 表数据的删除
+
+* 表数据的更新
+
+* 表数据的查询
+
+另外，其实也包括调用```存储过程```以及一些其他的操作。关于MySQL存储过程，我们后面的章节再进行讲解。
+
+### 5.1 数据插入
+
+插入的基本语法如下：
+{% highlight string %}
+INSERT [LOW_PRIORITY | DELAYED | HIGH_PRIORITY] [IGNORE]
+	[INTO] tbl_name
+	[PARTITION (partition_name [, partition_name] ...)]
+	[(col_name [, col_name] ...)]
+	{VALUES | VALUE} (value_list) [, (value_list)] ...
+	[ON DUPLICATE KEY UPDATE assignment_list]
+
+INSERT [LOW_PRIORITY | DELAYED | HIGH_PRIORITY] [IGNORE]
+	[INTO] tbl_name
+	[PARTITION (partition_name [, partition_name] ...)]
+	SET assignment_list
+	[ON DUPLICATE KEY UPDATE assignment_list]
+
+INSERT [LOW_PRIORITY | HIGH_PRIORITY] [IGNORE]
+	[INTO] tbl_name
+	[PARTITION (partition_name [, partition_name] ...)]
+	[(col_name [, col_name] ...)]
+	SELECT ...
+	[ON DUPLICATE KEY UPDATE assignment_list]
+
+value:
+	{expr | DEFAULT}
+
+value_list:
+	value [, value] ...
+
+assignment:
+	col_name = value
+
+assignment_list:
+	assignment [, assignment] ...
+{% endhighlight %}
+
+```INSERT```用于插入一条新的数据到一个已存在的表中。```INSERT ... VALUES```和```INSERT ... SET```形式的的插入语句显示的指定要插入的值，而```INSERT ... SELECT```形式的插入语句插入从另外一个表中查询出来的结果。而```INSERT```后跟```ON DUPLICATE KEY UPDATE```子句的话，如果在插入时导致一个```UNIQUE```索引或```PRIMARY KEY```重复的话，则该重复的值会被更新。
+
+在进行表插入时需要具有该表的```INSERT```权限。而假如```ON DUPLICATE KEY UPDATE```子句被使用的话，那么还要求具有```UPDATE```权限。
+
+
+### 5.2 数据删除
+删除的基本语法如下：
+{% highlight string %}
+DELETE [LOW_PRIORITY] [QUICK] [IGNORE] FROM tbl_name
+	[PARTITION (partition_name [, partition_name] ...)]
+	[WHERE where_condition]
+	[ORDER BY ...]
+	[LIMIT row_count]
+{% endhighlight %}
+
+```DELETE```删除语句用于从表```tbl_name```删除数据，并且返回删除的行数。删除的可选条件```WHERE```用于指定删除哪些满足条件的行，假如并未指定```WHERE```条件的话，则所有的数据均会被删除。假如```LIMIT```子句被指定的话，则会最多删除指定的行数。
+
+假如```ORDER BY```子句被指定的话，则会按照指定的顺序来进行删除。这在搭配```LIMIT```一起使用时很有效。例如，下面的语句首先查找到匹配```WHERE```条件的记录，然后再按```timestamp_column```列对这些行进行排序，最后再删除第一个元素（oldest):
+<pre>
+DELETE FROM somelog WHERE user = 'jcole'
+ORDER BY timestamp_column LIMIT 1;
+</pre>
+
+
+### 5.3 数据更新
+```UPDATE```是一个数据库操作语句(DML)，用于修改一个表中的记录:
+{% highlight string %}
+UPDATE [LOW_PRIORITY] [IGNORE] table_reference
+	SET assignment_list
+	[WHERE where_condition]
+	[ORDER BY ...]
+	[LIMIT row_count]
+
+value:
+	{expr | DEFAULT}
+
+assignment:
+	col_name = value
+
+assignment_list:
+	assignment [, assignment] ...
+{% endhighlight %} 
+```UPDATE```语句用于更新一个表中已存在的列。假如一个```UPDATE```语句包含了一个```ORDER BY```子句的话，则会依照指定的顺序更新行记录，这在一些特性情形下是很有用的（如果不按顺序，可能会导致错误）。假设有一个表```t```包含了一个```UNIQUE```索引列```id```，下面的更新语句则可能会导致```duplicate-key```错误：
+<pre>
+UPDATE t SET id = id + 1;
+</pre>
+例如， 假设该表含有```id```为1和2的两条记录，假如在2被更新为3之前将1更新为2，则会产生错误。为了避免这个问题，增加一个```ORDER BY```语句使得id更大的记录优先被更新：
+<pre>
+UPDATE t SET id = id + 1 ORDER BY id DESC;
+</pre>
+
+### 5.4 数据查询
+数据查询语法如下：
+{% highlight string %}
+SELECT
+	[ALL | DISTINCT | DISTINCTROW ]
+	  [HIGH_PRIORITY]
+	  [STRAIGHT_JOIN]
+	  [SQL_SMALL_RESULT] [SQL_BIG_RESULT] [SQL_BUFFER_RESULT]
+	  [SQL_CACHE | SQL_NO_CACHE] [SQL_CALC_FOUND_ROWS]
+	select_expr [, select_expr ...]
+	[FROM table_references
+	  [PARTITION partition_list]
+	[WHERE where_condition]
+	[GROUP BY {col_name | expr | position}
+	  [ASC | DESC], ... [WITH ROLLUP]]
+	[HAVING where_condition]
+	[ORDER BY {col_name | expr | position}
+	  [ASC | DESC], ...]
+	[LIMIT {[offset,] row_count | row_count OFFSET offset}]
+	[PROCEDURE procedure_name(argument_list)]
+	[INTO OUTFILE 'file_name'
+		[CHARACTER SET charset_name]
+		export_options
+	  | INTO DUMPFILE 'file_name'
+	  | INTO var_name [, var_name]]
+	[FOR UPDATE | LOCK IN SHARE MODE]]
+{% endhighlight %}
+
 
 
 
