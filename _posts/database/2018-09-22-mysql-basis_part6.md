@@ -577,6 +577,59 @@ SELECT
 	  | INTO var_name [, var_name]]
 	[FOR UPDATE | LOCK IN SHARE MODE]]
 {% endhighlight %}
+```SELECT```用于从一个或多个表中查询数据。针对```SELECT```最常用的子句有如下：
+
+* 每一个```select_expr```用于指示想要获取的列。必须至少有一列
+
+* ```table_reference```用于指定要从那个（些）表中查询数据。关于```JOIN```的查询语法我们后边会进行介绍
+
+* 假如指定了```WHERE```子句的话，其用于指示查询条件。
+
+此外，```SELECT```也能够被用于```查询行值```来进行计算，而不需要指定任何一个表。例如：
+{% highlight string %}
+mysql> SELECT 1 + 1;
+-> 2
+{% endhighlight %}
+在这种不需要指定表的情况下，也允许通过指定一个Dummy 表```DUAL```：
+{% highlight string %}
+mysql> SELECT 1 + 1 FROM DUAL;
+-> 2
+{% endhighlight %}
+
+一般情况下，```SELECT```子句的顺序必须严格按照上面的语法顺序。例如```HAVING```子句必须在```GROUP BY```子句之后并且在```ORDER BY```子句之前。
+
+
+**1） select_expr**
+
+```select_expr```用于指明要查询哪些列，其可以是```一列```，或者是一个```表达式```，或者是```*```(表示查询所有）：
+
+* 假若查询列表只是一个单独的```*```，表示用于查询所有表的所有列
+{% highlight string %}
+SELECT * FROM t1 INNER JOIN t2 ...
+{% endhighlight %}
+
+* ```tbl_name.*```用于限定查询某一个表的所有列
+{% highlight string %}
+SELECT t1.*, t2.* FROM t1 INNER JOIN t2 ...
+{% endhighlight %}
+
+* 在其他形式下，使用一个未限定的```*```可能会造成SQL语法解析错误，为了避免这个问题，请使用限定的```tbl_name.*```来引用
+{% highlight string %}
+SELECT AVG(score), t1.* FROM t1 ...
+{% endhighlight %}
+
+
+* 可以使用```AS alias_name```来为```select_expr```指定一个别名，该别名可以被后续的```GROUP BY```、```ORDER BY```以及```HAVING```子句所使用。例如：
+{% highlight string %}
+SELECT CONCAT(last_name,', ',first_name) AS full_name FROM mytable ORDER BY full_name;
+{% endhighlight %}
+其实你也可以使用```tbl_name AS alias_name```来对table进行重命名。例如：
+{% highlight string %}
+SELECT t1.name, t2.salary FROM employee AS t1, info AS t2
+WHERE t1.name = t2.name;
+{% endhighlight %}
+
+
 
 
 
