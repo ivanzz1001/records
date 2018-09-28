@@ -629,6 +629,57 @@ SELECT t1.name, t2.salary FROM employee AS t1, info AS t2
 WHERE t1.name = t2.name;
 {% endhighlight %}
 
+* 在```ORDER BY```、```GROUP BY```子句中，可以使用列名(column names)、列的别名(column aliases)、或列号(column position)来引用```SELECT```查询出的列。列号(column position)从```1```开始：
+{% highlight string %}
+SELECT college, region, seed FROM tournament ORDER BY region, seed;
+
+SELECT college, region AS r, seed AS s FROM tournament ORDER BY r, s;
+
+SELECT college, region, seed FROM tournament ORDER BY 2, 3;
+{% endhighlight %}
+这里如果要逆向排序的话，可以在```ORDER BY```子句的列名后面添加```DESC```关键字。
+
+* ```GROUP BY```子句允许你增加一个```WITH ROLLUP```修饰符，以使在```分组```的基础上有一个更高层的```总结视图```
+{% highlight string %}
+CREATE TABLE sales
+(
+year INT,
+country VARCHAR(20),
+product VARCHAR(32),
+profit INT
+);
+
+mysql> SELECT year, SUM(profit) AS profit
+FROM sales
+GROUP BY year WITH ROLLUP;
++------+--------+
+| year | profit |
++------+--------+
+| 2000 | 4525 |
+| 2001 | 3010 |
+| NULL | 7535 |
++------+--------+
+{% endhighlight %}
+
+
+**2) SELECT ... INTO 语法**
+
+```SELECT ... INTO```形式使得```SELECT```能够将查询结果存入变量或文件：
+
+* SELECT ... INTO var_list: 用于查询列并将查询值存入变量
+
+* SELECT ... INTO OUTFILE: 将查询到的值写入一个文件。可以指定列和行的结束符以格式话输出到文件。注意这里是将查询出来的数据写入到```MySQL server```机器上的某一个文件中，文件必须要存在并且能够被访问。另外，假如你想要将查询出的结果保存到一个远程客户端，那么你必须在远程客户端使用```MySQL Client```软件连接上SQL Server,然后通过```mysql -e "SELECT ..." > file_name```来将文件保存在客户端宿主机上。关于更详细的数据导入导出相关语法我们后序会进行介绍，这里只给出一个例子：
+{% highlight string %}
+SELECT a,b,a+b INTO OUTFILE '/tmp/result.txt'
+FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"'
+LINES TERMINATED BY '\n'
+FROM test_table;
+{% endhighlight %}
+
+* SELECT ... INTO DUMPFILE: 将查询出来的```单独一行```数据写入到文件，不进行任何格式化
+
+
+
 
 
 
