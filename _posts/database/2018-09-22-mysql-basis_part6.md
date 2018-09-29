@@ -194,7 +194,7 @@ CREATE TABLE IF NOT EXISTS `runoob_tbl`(
 
 一个```PRIMARY KEY```可以是一个多列(multi-column)索引，对于一个多列索引的话，你并不能够在创建列的时候直接在后面指定```PRIMARY KEY```，你可以在一个单独的```PRIMARY KEY(key_par,...)```子句中指定。
 
-* KEY | INDEX: 在这里```KEY```通常等价于```INDEX```。主要为了兼容其他的数据库系统。
+* KEY/INDEX: 在这里```KEY```通常等价于```INDEX```。主要为了兼容其他的数据库系统。
 
 * UNIQUE: 唯一索引会创建一个约束要求索引中的所有值都是唯一的。对于所有存储引擎来说，一个```UNIQUE```索引是允许存在多个```NULL```值的（假设该列允许的话）。
 
@@ -679,6 +679,276 @@ FROM test_table;
 * SELECT ... INTO DUMPFILE: 将查询出来的```单独一行```数据写入到文件，不进行任何格式化
 
 
+## 6. 示例
+
+### 6.1 GROUP BY的使用
+```GROUP BY```语句根据一个或多个列对结果进行分组。在分组的列上我们可以使用COUNT、SUM、AVG等函数。
+
+**1)  构建示例表**
+
+将下面的语句写入到文件```employee_tbl.sql```：
+{% highlight string %}
+SET NAMES utf8;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+--  Table structure for `employee_tbl`
+-- ----------------------------
+DROP TABLE IF EXISTS `employee_tbl`;
+CREATE TABLE `employee_tbl` (
+  `id` int(11) NOT NULL,
+  `name` char(10) NOT NULL DEFAULT '',
+  `date` datetime NOT NULL,
+  `singin` tinyint(4) NOT NULL DEFAULT '0' COMMENT '登录次数',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+-- ----------------------------
+--  Records of `employee_tbl`
+-- ----------------------------
+BEGIN;
+INSERT INTO `employee_tbl` VALUES ('1', '小明', '2016-04-22 15:25:33', '1');
+INSERT INTO `employee_tbl` VALUES ('2', '小王', '2016-04-20 15:25:47', '3');
+INSERT INTO `employee_tbl` VALUES ('3', '小丽', '2016-04-19 15:26:02', '2');
+INSERT INTO `employee_tbl` VALUES ('4', '小王', '2016-04-07 15:26:14', '4');
+INSERT INTO `employee_tbl` VALUES ('5', '小明', '2016-04-11 15:26:40', '4');
+INSERT INTO `employee_tbl` VALUES ('6', '小明', '2016-04-04 15:26:54', '2');
+COMMIT;
+
+SET FOREIGN_KEY_CHECKS = 1;
+{% endhighlight %}
+然后登录数据库，导入```employ_tbl.sql```,从而创建测试表：
+{% highlight string %}
+# mysql -uroot -ptestAa@123
+mysql> use test;
+mysql> source /home/ivan1001/test-src/employee_tbl.sql
+Query OK, 0 rows affected (0.00 sec)
+
+Query OK, 0 rows affected (0.02 sec)
+
+Query OK, 0 rows affected (0.20 sec)
+
+Query OK, 0 rows affected (0.07 sec)
+
+Query OK, 0 rows affected (0.00 sec)
+
+Query OK, 1 row affected (0.00 sec)
+
+Query OK, 1 row affected (0.00 sec)
+
+Query OK, 1 row affected (0.00 sec)
+
+Query OK, 1 row affected (0.00 sec)
+
+Query OK, 1 row affected (0.00 sec)
+
+Query OK, 1 row affected (0.00 sec)
+
+Query OK, 0 rows affected (0.01 sec)
+
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> select * from employee_tbl;
++----+--------+---------------------+--------+
+| id | name   | date                | singin |
++----+--------+---------------------+--------+
+|  1 | 小明   | 2016-04-22 15:25:33 |      1 |
+|  2 | 小王   | 2016-04-20 15:25:47 |      3 |
+|  3 | 小丽   | 2016-04-19 15:26:02 |      2 |
+|  4 | 小王   | 2016-04-07 15:26:14 |      4 |
+|  5 | 小明   | 2016-04-11 15:26:40 |      4 |
+|  6 | 小明   | 2016-04-04 15:26:54 |      2 |
++----+--------+---------------------+--------+
+6 rows in set (0.03 sec)
+{% endhighlight %}
+
+**2) 使用GROUP BY语句分组查询**
+{% highlight string %}
+mysql> SELECT NAME, COUNT(*) FROM employee_tbl GROUP BY name;
++--------+----------+
+| NAME   | COUNT(*) |
++--------+----------+
+| 小丽   |        1 |
+| 小明   |        3 |
+| 小王   |        2 |
++--------+----------+
+3 rows in set (0.12 sec)
+{% endhighlight %}
+
+**3) 使用WITH ROLLUP**
+
+```WITH ROLLUP```可以实现分组统计数据基础上再进行相同的统计(SUM/AVG/COUNT)。例如我们将以上的数据表按名字进行分组，再统计每个人登录的次数：
+{% highlight string %}
+mysql> SELECT name, SUM(singin) as singin_count FROM  employee_tbl GROUP BY name WITH ROLLUP;
++--------+--------------+
+| name   | singin_count |
++--------+--------------+
+| 小丽   |            2 |
+| 小明   |            7 |
+| 小王   |            7 |
+| NULL   |           16 |
++--------+--------------+
+4 rows in set (0.08 sec)
+{% endhighlight %}
+
+其中记录```NULL```表示所有人的登录次数。我们可以使用```coalesce```来设置一个可取代```NULL```的名称， ```coalesce```的语法：
+<pre>
+select coalesce(a,b,c);
+</pre>
+参数说明： 如果a==NULL，则选择b； 如果b==NULL，则选择c；如果都为NULL，则返回NULL
+
+以下实例中如果名字为NULL，我们使用```总数```来替代：
+{% highlight string %}
+mysql> SELECT coalesce(name,'总数'), SUM(singin) as singin_count FROM  employee_tbl GROUP BY name WITH ROLLUP;
++-------------------------+--------------+
+| coalesce(name,'总数')   | singin_count |
++-------------------------+--------------+
+| 小丽                    |            2 |
+| 小明                    |            7 |
+| 小王                    |            7 |
+| 总数                    |           16 |
++-------------------------+--------------+
+4 rows in set (0.03 sec)
+{% endhighlight %}
+
+
+### 6.2 MySQL NULL值处理
+我们已经知道，MySQL使用SQL SELECT 命令及WHERE子句来读取数据表中的数据，但是当提供的查询条件字段为```NULL```时，该命令可能就无法正常工作。为了处理这种情况，MySQL提供了三大运算符：
+
+* **IS NULL**: 当列的值为NULL，此运算符返回true
+
+* **IS NOT NULL**: 当列的值不为NULL，此运算符返回true
+
+* **<=>**: 安全的NULL比较操作符(不同于```=```运算符)，当比较两个NULL值时返回true
+
+在MySQL中，NULL通过```=```运算符与任何数比较都返回```NULL```:
+{% highlight string %}
+mysql> select 0=NULL, 1=NULL, NULL=NULL, 1<>NULL, 0<>NULL, NULL<>NULL;
++--------+--------+-----------+---------+---------+------------+
+| 0=NULL | 1=NULL | NULL=NULL | 1<>NULL | 0<>NULL | NULL<>NULL |
++--------+--------+-----------+---------+---------+------------+
+|   NULL |   NULL |      NULL |    NULL |    NULL |       NULL |
++--------+--------+-----------+---------+---------+------------+
+1 row in set (0.00 sec)
+{% endhighlight %}
+
+**1) 示例**
+
+尝试以下实例：
+{% highlight string %}
+mysql> use test;
+Database changed
+mysql> CREATE TABLE runoob_test_tbl (
+    -> runoob_author varchar(40) NOT NULL,
+    -> runoob_count int
+    -> )ENGINE InnoDB DEFAULT CHARACTER SET utf8;
+Query OK, 0 rows affected (0.54 sec)
+
+mysql> INSERT INTO runoob_test_tbl (runoob_author, runoob_count) VALUES ('RUNOOB', 20);
+mysql> INSERT INTO runoob_test_tbl (runoob_author, runoob_count) VALUES ('菜鸟教程', NULL);
+mysql> INSERT INTO runoob_test_tbl (runoob_author, runoob_count) VALUES ('Google', NULL);
+mysql> INSERT INTO runoob_test_tbl (runoob_author, runoob_count) VALUES ('FK', 20);
+
+mysql> select * from runoob_test_tbl;
++---------------+--------------+
+| runoob_author | runoob_count |
++---------------+--------------+
+| RUNOOB        |           20 |
+| 菜鸟教程      |         NULL |
+| Google        |         NULL |
+| FK            |           20 |
++---------------+--------------+
+4 rows in set (0.00 sec)
+{% endhighlight %}
+
+如下我们可以看到，```=```与```!=```运算符是不起作用的：
+{% highlight string %}
+mysql> select * from runoob_test_tbl where runoob_count=NULL;
+Empty set (0.01 sec)
+
+mysql> select * from runoob_test_tbl where runoob_count!=NULL;
+Empty set (0.00 sec)
+{% endhighlight %}
+
+要查找表中的数据必须使用```IS NULL```或```IS NOT NULL```或```<=>```操作符：
+{% highlight string %}
+mysql> select * from runoob_test_tbl where runoob_count IS NULL;
++---------------+--------------+
+| runoob_author | runoob_count |
++---------------+--------------+
+| 菜鸟教程      |         NULL |
+| Google        |         NULL |
++---------------+--------------+
+2 rows in set (0.01 sec)
+
+mysql> select * from runoob_test_tbl where runoob_count<=>NULL;
++---------------+--------------+
+| runoob_author | runoob_count |
++---------------+--------------+
+| 菜鸟教程      |         NULL |
+| Google        |         NULL |
++---------------+--------------+
+2 rows in set (0.00 sec)
+
+mysql> select * from runoob_test_tbl where runoob_count IS NOT NULL;
++---------------+--------------+
+| runoob_author | runoob_count |
++---------------+--------------+
+| RUNOOB        |           20 |
+| FK            |           20 |
++---------------+--------------+
+2 rows in set (0.00 sec)
+{% endhighlight %}
+
+
+### 6.3 MySQL复制表
+如果我们要完全复制MySQL的数据表，包括表的结构、索引、默认值等。这里我们介绍一下如何完整的复制MySQL数据表，步骤如下：
+
+* 使用```SHOW CREATE TABLE```命令获取创建数据表的语句，该语句包含了原数据表的结构、索引等；
+
+* 获取表的元数据之后，使用该元数据创建新表
+
+* 如果想复制表的内容，可以使用```INSERT INTO ... SELECT```语句来实现
+
+**1） 获取数据表的完整结构**
+{% highlight string %}
+mysql> SHOW CREATE TABLE runoob_tbl \G
+*************************** 1. row ***************************
+       Table: runoob_tbl
+Create Table: CREATE TABLE `runoob_tbl` (
+  `runoob_id` int(11) NOT NULL AUTO_INCREMENT,
+  `runoob_title` varchar(100) NOT NULL DEFAULT '',
+  `runoob_author` varchar(40) NOT NULL DEFAULT '',
+  `submission_date` date DEFAULT NULL,
+  PRIMARY KEY (`runoob_id`),
+  UNIQUE KEY `AUTHOR_INDEX` (`runoob_author`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+1 row in set (0.02 sec)
+{% endhighlight %}
+
+**2) 创建新表**
+
+采用上面的获取到的表结构```元数据```，我们来创建新表```clone_tbl```:
+{% highlight string %}
+CREATE TABLE `clone_tbl` (
+  `runoob_id` int(11) NOT NULL AUTO_INCREMENT,
+  `runoob_title` varchar(100) NOT NULL DEFAULT '',
+  `runoob_author` varchar(40) NOT NULL DEFAULT '',
+  `submission_date` date DEFAULT NULL,
+  PRIMARY KEY (`runoob_id`),
+  UNIQUE KEY `AUTHOR_INDEX` (`runoob_author`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+{% endhighlight %}
+
+**3) 克隆旧表中的数据**
+
+执行完上面的步骤之后，我们通过```INSERT INTO ... SELECT```来将旧表中的数据拷贝到新表：
+{% highlight string %}
+mysql> INSERT INTO clone_tbl (runoob_id, runoob_title, runoob_author, submission_date) 
+    -> SELECT runoob_id, runoob_title, runoob_author, submission_date FROM runoob_tbl;
+Query OK, 3 rows affected (0.06 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+{% endhighlight %}
 
 
 
