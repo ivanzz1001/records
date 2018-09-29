@@ -48,11 +48,25 @@ SQL有很多模式，下面我们介绍几种常用的重要的SQL模式：
 
 * TRANDITIONAL： 使MySQL接近于传统的SQL数据库系统。简单的描述即为“在插入错误的值到一列时直接返回错误，而不是警告”。
 
+## 2. 获取服务器元数据
+MySQL有很多元数据，这里我们列出几个常用的：
 
-## 2. 修改MySQL系统变量
+* **SELECT VERSION()**: 服务器版本信息
+
+* **SELECT DATABASE()**: 当前数据库名(或者返回为NULL)
+
+* **SELECT USER()**: 当前用户名
+
+* **SHOW STATUS**: 服务器状态
+
+* **SHOW VARIABLES**: 获取当前会话的配置变量
+
+
+
+## 3. 修改MySQL系统变量
 下面以设置MySQL 系统变量```wait_timeout```为例。
 
-### 2.1 设置全局变量
+### 3.1 设置全局变量
 
 **1） 修改参数文件，然后重启MySQL**
 {% highlight string %}
@@ -108,7 +122,7 @@ wait_timeout=10
 {% endhighlight %}
 
 
-### 2.2 修改会话变量
+### 3.2 修改会话变量
 如果要修改会话变量值，可以指定```SESSION```或者```LOCAL```关键字，或者通过```@@session```、```@@local```、```@@```限定符， 又或者不加任何关键字与限定符。例如：
 {% highlight string %}
 SET SESSION wait_timeout = 10;
