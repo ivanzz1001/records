@@ -310,7 +310,7 @@ skip-grant-tables
 
 也可以专门新建一个账户用于远程访问：
 <pre>
-# create user 'test_user'@'%' identified by '123456';
+# create user 'test_user'@'%' identified by 'testAa@123';
 # GRANT ALL PRIVILEGES ON *.* TO 'test_user'@'%' IDENTIFIED BY 'testAa@123' WITH GRANT OPTION;
 # flush privileges;
 
