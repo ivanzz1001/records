@@ -485,8 +485,86 @@ SELECT MASTER_POS_WAIT('master_log_file', master_log_pos [, timeout])
 
 ### 3.3 RESET SLAVE语法
 {% highlight string %}
-
+RESET SLAVE [ALL]
 {% endhighlight %}
+```REST SLAVE```使得slave清除掉master binlog中的复制位置。本语句的主要目的是为了清空复制环境以获得一个干净的初始状态：清除master信息以及relaylog信息，删除所有的relaylog文件，并建立一个全新的relaylog文件。也会将通过```CHANGE MASTER TO```语句的```MASTER_DELAY```选项设置的值置为0。但是```RESET SLAVE```并不会改变```gtid_executed```及```gtid_purged```的值。要执行```RESET SLAVE```指令，你必须首先要停止slave的复制线程，因此在执行本指令前一般要先执行```STOP SLAVE```。
+
+
+### 3.4 设置全局sql_slave_skip_counter语法
+{% highlight string %}
+SET GLOBAL sql_slave_skip_counter = N
+{% endhighlight %}
+该语句用于指示跳过接下来的```N```个事件，该语句在进行复制恢复的时候很有用： 假如在恢复过程中出现了若干条语句执行错误，则可以使用本语句进行跳过。
+
+
+### 3.5 START SLAVE语法
+{% highlight string %}
+START SLAVE [thread_types] [until_option] [connection_options]
+
+thread_types:
+	[thread_type [, thread_type] ... ]
+
+thread_type:
+	IO_THREAD | SQL_THREAD
+
+until_option:
+	UNTIL { {SQL_BEFORE_GTIDS | SQL_AFTER_GTIDS} = gtid_set
+		| MASTER_LOG_FILE = 'log_name', MASTER_LOG_POS = log_pos
+		| RELAY_LOG_FILE = 'log_name', RELAY_LOG_POS = log_pos
+		| SQL_AFTER_MTS_GAPS }
+
+connection_options:
+	[USER='user_name'] [PASSWORD='user_pass'] [DEFAULT_AUTH='plugin_name'] [PLUGIN_DIR='plugin_dir']
+
+gtid_set:
+	uuid_set [, uuid_set] ...
+	| ''
+
+uuid_set:
+	uuid:interval[:interval]...
+
+uuid:
+	hhhhhhhh-hhhh-hhhh-hhhh-hhhhhhhhhhhh
+
+h:
+	[0-9,A-F]
+
+interval:
+	n[-n]
+(n >= 1)
+{% endhighlight %}
+假如在执行```START SLAVE```时并不指定```thread_type```选项，则同时会启动IO线程与SQL线程，其中IO线程负责从master读取事件并将读取到的事件存放到```relaylog```中，SQL线程负责从relaylog中读取事件并执行。执行```START SLAVE```需要有```SUPER```权限。
+
+假如```START SLAVE```启动线程成功的话，则不会返回任何错误消息。然而即使启动成功，假如之后连接master失败，又或者读取binlog失败的话，slave还是会停止，而此时```START SLAVE```并不会产生任何警告信息。你必须通过查看slave的错误日志消息来查看slave线程的状态，或者通过```SHOW SLAVE STATUS```来获得相应的状态。
+
+
+从MySQL5.6.6版本起，```START SLAVE ... UTIL```支持两个额外的```GTID```选项。这两个选项后面都可以跟随一个或多个```gtid_set```作为参数。当并未指定```thread_type```选项时，```START SLAVE UNTIL SQL_BEFORE_GTIDS```会使得slave的SQL线程在处理到```gtid_set```集合中某一个事件时就停止； 而```START SLAVE UNTIL SQL_AFTER_GTIDS```会使得slave的两个线程会处理到```gtid_set```集合中的最后一个事件时停止。```SQL_THREAD```以及```IO_THREAD```都支持```SQL_BEFORE_GTIDS```与```SQL_AFTER_GTIDS```。例如：
+<pre>
+START SLAVE SQL_THREAD UNTIL SQL_BEFORE_GTIDS =3E11FA47-71CA-11E1-9E33-C80AA9429562:11-56
+</pre>
+上面会使得slave的SQL线程在处理到server_uuid为```3E11FA47-71CA-11E1-9E33-C80AA9429562```的master序号```11```的事件时就会停止。换句话说，序号是```10```(包括10）之前的事件slave都会进行处理。
+<pre>
+START SLAVE SQL_THREAD UNTIL SQL_AFTER_GTIDS = 3E11FA47-71CA-11E1-9E33-C80AA9429562:11-56
+</pre>
+上面会使得slave的SQL线程处理server_uuid为```3E11FA47-71CA-11E1-9E33-C80AA9429562```的master的所有事务，这包括```10```(包括是10）之前的事件，也包括```11```至```56```这个区间的事件，处理完成之后slave将会停止不再处理任何其他的事件。换句话说，slave的SQL线程处理的最后一个事件序号为56。
+
+另外从MySQL5.6.6版本开始，还支持```START SLAVE UNTIL SQL_AFTER_MTS_GAPS```。该语句会导致以```多SQL线程```运行模式的slave在relaylog中找不到更多```gaps```时就会停止。该语句可以搭配```SQL_THREAD```选项来使用，但是不能搭配```IO_THREAD```选项。```START_SLAVE UNTIL SQL_AFTER_MTS_GAPS```应该用在slave在```多线程```模式遇到失败情况，需要转成```单线程```运行模式的情形中。下面的例子演示了一个处于```failed```状态以```多线程```模式的slave转换成```单线程```运行模式：
+{% highlight string %}
+START SLAVE UNTIL SQL_AFTER_MTS_GAPS;
+SET @@GLOBAL.slave_parallel_workers = 0;
+START SLAVE SQL_THREAD;
+{% endhighlight %}
+假如你在```relay_log_recovery```启用的情况下以```多线程```模式运行slave失败，则你必须要在执行```CHANGE MASTER TO```语句执行之前先执行```START SLAVE UNTIL SQL_AFTER_MTS_GAPS```。
+<pre>
+注： 你一般可以通过SHOW PROCESSLIST来查看START SLAVE以及CHANGE MASTER TO的相关执行状态
+</pre>
+
+
+
+
+
+
+
 
 
 <br />
@@ -500,6 +578,9 @@ SELECT MASTER_POS_WAIT('master_log_file', master_log_pos [, timeout])
 
 3. [mysql （master/slave）复制原理及配置](https://www.cnblogs.com/jirglt/p/3549047.html)
 
+4. [MySQL主从复制(Master-Slave)实践](https://www.cnblogs.com/gl-developer/p/6170423.html)
+
+5. [](https://blog.csdn.net/ahzxj2012/article/details/54017969)
 
 
 <br />
