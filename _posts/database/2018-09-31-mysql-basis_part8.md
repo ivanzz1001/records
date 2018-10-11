@@ -559,8 +559,19 @@ START SLAVE SQL_THREAD;
 注： 你一般可以通过SHOW PROCESSLIST来查看START SLAVE以及CHANGE MASTER TO的相关执行状态
 </pre>
 
+```START SLAVE```在SQL线程以及IO线程启动完成之后，就会打印出相应的信息。然而，IO线程虽然启动，但是可能还没有连接上master。正是由于这个原因，如果使用```SHOW SLAVE STATUS```显示```SLAVE_SQL_RUNNING=YES```，也并不能保证slave启动一定成功，很有可能只是IO线程启动成功，但还没有真正连接上master。
 
+### 3.5 STOP SLAVE语法
+{% highlight string %}
+STOP SLAVE [thread_types]
 
+thread_types:
+	[thread_type [, thread_type] ... ]
+
+thread_type: IO_THREAD | SQL_THREAD
+{% endhighlight %}
+
+用于停止slave线程。在执行```STOP SLAVE```时需要有```SUPER```权限。一般我们是在停止slave服务器之前执行```STOP SLAVE```命令。
 
 
 
