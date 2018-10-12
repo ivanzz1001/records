@@ -235,19 +235,325 @@ mysql> SHOW MASTER STATUS;
 <br />
 通过上面的步骤就可以知道slave的起始复制点，然后就可以在这一点开启我们的日志复制进程。
 
-假如在slave开启复制前，你有一些历史数据需要被同步，那么需要维持上面```步骤1)```的读锁，然后执行```1.5 使用mysqldump创建数据快照```或者```1.6 使用raw文件来创建数据快照```。这里```read lock```的主要目的是为了防止将历史数据拷贝到slave的过程中，master上相应的数据又做了改变。
+假如在slave开启复制前，你有一些历史数据需要被同步，那么需要维持上面```步骤1)```的读锁，然后执行```1.5 使用mysqldump创建数据快照```或者```1.6 使用raw数据文件创建数据快照```。这里```read lock```的主要目的是为了防止将历史数据拷贝到slave的过程中，master上相应的数据又做了改变。
+
+
+我们可以通过如下的命令查看binlog存放的位置：
+{% highlight string %}
+mysql> show variables like '%log_bin%';
++---------------------------------+------------------------------------+
+| Variable_name                   | Value                              |
++---------------------------------+------------------------------------+
+| log_bin                         | ON                                 |
+| log_bin_basename                | /var/lib/mysql/master-logbin       |
+| log_bin_index                   | /var/lib/mysql/master-logbin.index |
+| log_bin_trust_function_creators | OFF                                |
+| log_bin_use_v1_row_events       | OFF                                |
+| sql_log_bin                     | ON                                 |
++---------------------------------+------------------------------------+
+6 rows in set (0.00 sec)
+
+# ls /var/lib/mysql/
+app         ca.pem           ib_buffer_pool  ib_logfile1           master-logbin.000002  mysql.sock          private_key.pem  server-key.pem
+auto.cnf    client-cert.pem  ibdata1         ibtmp1                master-logbin.index   mysql.sock.lock     public_key.pem   sys
+ca-key.pem  client-key.pem   ib_logfile0     master-logbin.000001  mysql                 performance_schema  server-cert.pem  test
+
+# cat /var/lib/mysql/master-logbin.index 
+./master-logbin.000001
+./master-logbin.000002
+{% endhighlight %}
 
 
 ### 1.5 使用mysqldump创建数据快照
 
-创建master中已有数据库快照的其中一种方法就是使用```mysqldump```工具来dump出所有你想要复制的数据库。一旦dump出来了所有的数据，然后你可以将这些数据导入到slave，之后再开启复制进程。
+创建master中已有数据库快照的其中一种方法就是使用```mysqldump```工具来dump出所有你想要复制的数据库。一旦dump出来了所有的数据，然后你就可以将这些数据导入到slave，之后再开启复制进程。
+
+下面的例子会将所有的数据库都dump到一个名称为```dumpdb.db```文件中，在dump时采用了```--master-data```选项，这样就会自动的加上```CHANGE MASTER TO```语句，从而在导入slave后可以开启复制进程：
+{% highlight string %}
+# mysqldump -hlocalhost -uroot -ptestAa@123 --all-databases --master-data > dbdump.db
+mysqldump: [Warning] Using a password on the command line interface can be insecure.
+
+# more dbdump.db 
+-- MySQL dump 10.13  Distrib 5.7.22, for Linux (x86_64)
+--
+-- Host: localhost    Database: 
+-- ------------------------------------------------------
+-- Server version       5.7.22-log
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Position to start replication or point-in-time recovery from
+--
+
+CHANGE MASTER TO MASTER_LOG_FILE='master-logbin.000002', MASTER_LOG_POS=747;
+
+--
+-- Current Database: `app`
+--
+
+CREATE DATABASE /*!32312 IF NOT EXISTS*/ `app` /*!40100 DEFAULT CHARACTER SET utf8 */;
+
+USE `app`;
+{% endhighlight %}
+从上面我们看到在开始添加上了```CHANGE MASTER TO```，后面就是各个数据库、表的相应数据。
+
+假如你在导出数据时不使用```--master-data```选项，那么你必须在执行```mysqldump```前在另一个session中手动执行```FLUSH TABLES WITH READ LOCK```，等到数据完成之后退出该session以解除对表的读锁或直接再另外开一个session执行```UNLOCK TABLE```来解锁。并且你还需要通过执行```SHOW MASTER STATUS```来确定当前导出的数据快照所对应的binlog偏移，然后在后续启动slave时执行```CHANGE MASTER TO```。
+
+当然你也可以只导出指定的数据库，此种情况下请记住在slave处也必须要过滤掉那些你并不想要复制的数据库。例如：
+{% highlight string %}
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| app                |
+| mysql              |
+| performance_schema |
+| sys                |
+| test               |
++--------------------+
+6 rows in set (0.00 sec)
+
+# mysqldump -hlocalhost -uroot -ptestAa@123  --master-data --databases app test> selected.db
+mysqldump: [Warning] Using a password on the command line interface can be insecure.
+
+# more selected.db 
+-- MySQL dump 10.13  Distrib 5.7.22, for Linux (x86_64)
+--
+-- Host: localhost    Database: app
+-- ------------------------------------------------------
+-- Server version       5.7.22-log
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Position to start replication or point-in-time recovery from
+--
+
+CHANGE MASTER TO MASTER_LOG_FILE='master-logbin.000002', MASTER_LOG_POS=747;
+
+--
+-- Current Database: `app`
+--
+
+CREATE DATABASE /*!32312 IF NOT EXISTS*/ `app` /*!40100 DEFAULT CHARACTER SET utf8 */;
+
+USE `app`;
+
+--
+-- Table structure for table `appinfo`
+--
+{% endhighlight %}
+上面只导出了```app```以及```test```这两个数据库。
+
+
+### 1.6 使用Raw数据文件创建数据快照
+假如你的数据库本身比较庞大，拷贝```raw```数据文件会比采用mysqldump导出然后再导入slave来的更为高效。这项技术跳过了在插入数据时可能需要大量的更新索引从而造成的低效（因为mysqldump导出的其实是一条条SQL语句，在slave上导入时其实是执行相应SQL语句的过程，这也包括数据的插入）。
+
+使用本方法时，如果用于存放数据的表采用了复杂的缓存(cache)和日志算法(logging algorithms)的话，则需要一些额外的步骤来产生一个```即时```的snapshot: 即时在你执行了```FLUSH TABLES WITH READ LOCK;```，初始的拷贝命令还是可能会遗漏掉cache信息和日志更新信息。另外，假如master与slave的```ft_stopword_file```, ```ft_min_word_len```或者```ft_max_word_len```的值不同，且所拷贝的数据表具有全文索引的话，本方法也存在一定的缺陷不是很可靠。
+
+
+假如你当前使用的是```InnoDB```表，你可以使用```MySQL企业版备份组件```中的```mysqlbackup```命令来产生一致性的数据快照。该命令同样会记录快照所对应的binlog以及偏移。```MySQL企业版备份组件```是一个商业化收费套件，这里我们不进行介绍。
+
+上面介绍的两种方式都存在一定的不足，其实我们可以使用```冷备份```(cold backup)来获得```InnoDB```类型表的可靠数据快照： 在```slow shutdown```MySQL Server之后来拷贝数据。
+
+而如果要创建```MyISAM```类型表的```原始数据快照```(raw data snapshot)，你可以使用标准的```cp```或```copy```命令工具进行直接拷贝，或者使用```scp```或```rsync```进行远程拷贝。
+
+在创建```Raw```数据文件快照时，通常我们不需要用到如下文件：
+
+* 有关```mysql```数据库的文件
+
+* master info repository文件
+
+* master的binlog文件（注：一般binlog的索引文件我们还是需要的）
+
+* 任何的relay日志文件
+
+例如master数据目录下一般有如下文件：
+{% highlight string %}
+# ls /var/lib/mysql
+app         ca.pem           ib_buffer_pool  ib_logfile1           master-logbin.000002  mysql            performance_schema  server-cert.pem  test
+auto.cnf    client-cert.pem  ibdata1         ibtmp1                master-logbin.000003  mysql.sock       private_key.pem     server-key.pem
+ca-key.pem  client-key.pem   ib_logfile0     master-logbin.000001  master-logbin.index   mysql.sock.lock  public_key.pem      sys
+{% endhighlight %}
+
+我们一般只需要打包如下文件：
+<pre>
+app		ib_logfile0		ib_logfile1		ibdata1		test
+</pre>
 
 
 
+如果要```确保```原始数据(raw data)的一致性，我们可以在创建快照的过程中关闭master服务器，具体步骤如下：
+
+**1） 获得读锁和master的状态**
+{% highlight string %}
+//1. session1连接上获取读锁
+mysql> FLUSH TABLES WITH READ LOCK;
+Query OK, 0 rows affected (0.00 sec)
 
 
+//2. session连接上获得master的状态
+mysql> SHOW MASTER STATUS;
++----------------------+----------+--------------+------------------+-------------------+
+| File                 | Position | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set |
++----------------------+----------+--------------+------------------+-------------------+
+| master-logbin.000002 |      747 |              |                  |                   |
++----------------------+----------+--------------+------------------+-------------------+
+1 row in set (0.00 sec)
+{% endhighlight %}
+
+**2) 关闭master server**
+
+在另一个会话窗口执行如下命令来关闭master server:
+{% highlight string %}
+# mysqladmin -hlocalhost -uroot -ptestAa@123 shutdown
+mysqladmin: [Warning] Using a password on the command line interface can be insecure.
+{% endhighlight %}
 
 
+**3) 拷贝MySQL数据文件**
+
+通常我们可以直接将数据打包即可，例如：
+{% highlight string %}
+# tar -zcvf /var/lib/mysql/ ./db.tar.gz
+{% endhighlight %}
+
+**4) 重启master服务器**
+{% highlight string %}
+# systemctl start mysqld
+# systemctl status mysqld
+{% endhighlight %}
+
+
+假如我们使用的并不是```InnoDB```类型的表，则你可以在不需要关闭master的情况下来创建快照。具体参看如下步骤：
+
+**1） 获得读锁和master的状态**
+{% highlight string %}
+//1. session1连接上获取读锁
+mysql> FLUSH TABLES WITH READ LOCK;
+Query OK, 0 rows affected (0.00 sec)
+
+
+//2. session连接上获得master的状态
+mysql> SHOW MASTER STATUS;
++----------------------+----------+--------------+------------------+-------------------+
+| File                 | Position | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set |
++----------------------+----------+--------------+------------------+-------------------+
+| master-logbin.000002 |      747 |              |                  |                   |
++----------------------+----------+--------------+------------------+-------------------+
+1 row in set (0.00 sec)
+{% endhighlight %}
+
+**2) 拷贝MySQL数据文件**
+
+通常我们可以直接将数据打包即可，例如：
+{% highlight string %}
+# tar -zcvf /var/lib/mysql/ ./db.tar.gz
+{% endhighlight %}
+
+
+**3） 解除读锁**
+{% highlight string %}
+mysql> UNLOCK TABLES;
+{% endhighlight %}
+
+<br />
+
+在我们通过上述方法创建了数据快照后，将相应的数据快照拷贝到slave上。
+
+### 1.7 全新环境创建master/slave复制
+最简单和直接的方法是在一个全新的环境下来创建master和slave复制。请参看如下步骤：
+
+* 配置master
+
+* 启动mysql master
+
+* 创建一个用于复制的用户(user)
+
+* 获得master的状态信息(master status)，或者创建snapshot时的mysql binlog索引文件
+
+* 在master上释放读锁
+{% highlight string %}
+mysql> UNLOCK TABLES;
+{% endhighlight %}
+
+* 更新slave的配置
+
+* 执行```CHANGE MASTER TO```语句来设置master复制服务器的配置（请参看```1.10 slave主机上设置master配置```)
+
+<br />
+我们在每一个slave上执行上述步骤就可以建立起master-slave之间的复制。
+
+上面的步骤显示了在一个全新的环境下建立主从复制，因此并没有任何历史数据需要进行交换与导入。后面如果我们建立好复制环境后，需要将来自另外一个服务器的数据导入到master，那么我们可以执行如下命令：
+{% highlight string %}
+# mysql -h master < fulldb.dump
+{% endhighlight %}
+这样在执行完成后master上的数据将会自动同步到slave上。
+
+### 1.8 已有历史数据环境创建复制
+当已有历史数据的情况下，你需要决定在slave开始复制数据之前，如何最好的将master中的历史数据导入到slave中。基本的操作步骤如下：
+
+**1)** 在master上创建一个用于复制的用户(user)
+
+**2)** 假如master当前并未设置server-id或并未开启binlog功能，则需要关闭master服务器来进行设置；假如你需要关闭mysql master服务器的话， 正好可以利用这个机会来获取数据库快照。此时你需要首先获得master状态(参看```1.4 获取master二进制日志复制点```)，然后关闭master，再修改配置，最后通过```raw数据文件```来创建数据库快照(参看```1.6 使用Raw数据文件创建快照```)
+
+**3)** 假如master当前已经设置好了server-id并开启了binlog功能，首先获取到master状态(参看```1.4 获取master二进制日志复制点```),然后使用```mysqldump```来创建数据库快照（参看```1.5 使用mysqldump创建数据快照```)或者使用raw数据来创建快照(参看```1.6 使用Raw数据文件创建快照```)
+
+**4)** 更新slave配置
+
+**5)** 导入快照数据到slave。 这里根据你创建数据快照的方式不同，采用不同的方式导入
+
+* 采用mysqldump创建的数据快照
+
+a) 使用```--skip-slave-start```选项来启动slave，这样复制进程并不会被启动。可以通过修改```my.cnf```配置文件，在```[mysqld]```段落下添加```skip-slave-start```:
+{% highlight string %}
+[mysqld]
+server-id=148
+
+skip-slave-start
+{% endhighlight %}
+
+b) 执行如下命令将dump文件导入到slave中
+{% highlight string %}
+# mysql -hlocalhost -uroot -ptestAa@123 < fulldb.dump 
+{% endhighlight %}
+
+* 采用raw数据文件创建的数据快照
+
+a) 将快照数据解压到从机目录
+<pre>
+# tar -zxvf dumpdb.tar.gz -C /var/lib/mysql
+# chown -R mysql:mysql /var/lib/mysql/*
+</pre>
+注意请确保解压后的文件slave有相应的权限来访问这些数据(可以参看文件原来的权限）。
+
+b) 使用```--skip-slave-start```选项来启动slave，这样复制进程并不会被启动。可以通过修改```my.cnf```配置文件，在```[mysqld]```段落下添加```skip-slave-start```:
+{% highlight string %}
+[mysqld]
+server-id=148
+
+skip-slave-start
+{% endhighlight %}
 
 
 
