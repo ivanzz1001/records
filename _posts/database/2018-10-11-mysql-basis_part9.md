@@ -555,10 +555,107 @@ server-id=148
 skip-slave-start
 {% endhighlight %}
 
+**6）** 配置slave从master的指定复制点开始复制。即需要告诉slave从master的哪一个binlog的哪一个偏移开始复制数据。（参看```1.10 slave主机上设置master配置```)
+
+**7)** 启动slave线程
+{% highlight string %}
+mysql> START SLAVE;
+{% endhighlight %}
+
+<br />
+在执行完上述这些步骤之后，slave就会连接到master，并在指定的复制点开始数据同步。假如你忘记了设置master的server-id，则master会拒绝slave的连接； 而假如你忘记了设置slave的server-id，则则slave的错误日志中可以获得如下日志信息（一般为 /var/log/mysqld.log)：
+{% highlight string %}
+Warning: You should set server-id to a non-0 value if master_host
+is set; we will force server id to 2, but this MySQL server will
+not act as a slave.
+{% endhighlight %}
+
+slave会使用其所存储的```master info repository```来跟踪其当前已经处理到master binlog的什么位置。该repository可以是一个文件，也可以是一个table，具体是什么取决于```--master-info-repository```选项。假如master以```--master-info-repository=FILE```形式运行，则你可以在slave的数据目录下找到两个名称分别为```master.info```与```relay-log.info```的文件；而如果配置为```TABLE```，那么相应的信息会存放在```mysql.master_slave_info```表中。在任何情况下，你都不应该修改这些文件的内容，即使在了解该文件各个字段的含义时，也不建议直接修改，如果确实要修改的话，可以通过```CHANGE MASTER TO```语句来进行。
+
+### 1.9 添加slave到已存在的复制环境中
+你可以在不停止```master```的情况下将另外一个slave添加到已存在的复制环境中。要实现这样的功能，你可以通过拷贝已存在的slave的数据目录来建立该新的slave，并且给该新建的slave一个新的server-id。
+
+要拷贝一个已存在的slave，请按如下步骤执行：
+
+**1)** 停止已存在的slave，并记录slave的状态信息，特别是master binlog文件与relay log文件的偏移。你可以通过如下的命令来查看：
+{% highlight string %}
+mysql> STOP SLAVE;
+mysql> SHOW SLAVE STATUS\G
+{% endhighlight %}
+
+**2)** 关闭已存在的slave
+{% highlight string %}
+# mysqladmin shutdown
+{% endhighlight %}
+
+**3)** 拷贝已存在slave的数据目录到新的slave主机上，包括日志文件以及relay log文件。
+
+<br />
+说明：
+<pre>
+1） 在拷贝之前，需要确认已存在的slave上所有相关的信息都已经存放到对应的数据目录文件中。例如，对于InnoDB系统表空间、undo表空间、和redo日志也许会存放在另外位置，
+ InnoDB表空间文件与file-per-table tablespaces也许都会放在其他的目录。slave的binlog与relaylog也可能有它们自己的独立目录。你需要通过查看系统变量来确定对应的这些文件
+ 存放在什么地方，然后把所有这些文件拷贝到新的从机上。
+
+2） 在拷贝的时候，假如master info repository信息是以文件方式存放的，则对应的文件也应该拷贝过去； 如果是以table方式存放的，则对应的表存放在数据目录中。
+
+3） 在拷贝完成之后，从拷贝目录删除掉auto.cnf，这样新建的slave将会以一个不同的uuid来启动。
+</pre>
+
+在添加新的复制slave时经常遇到的类似如下这样的警告和错误信息：
+{% highlight string %}
+071118 16:44:10 [Warning] Neither --relay-log nor --relay-log-index were used; so
+replication may break when this MySQL server acts as a slave and has his hostname
+changed!! Please use '--relay-log=new_slave_hostname-relay-bin' to avoid this problem.
+071118 16:44:10 [ERROR] Failed to open the relay log './old_slave_hostname-relay-bin.003525'
+(relay_log_pos 22940879)
+071118 16:44:10 [ERROR] Could not find target log during relay log initialization
+071118 16:44:10 [ERROR] Failed to initialize the master info structure
+{% endhighlight %}
+这种情形一般发生在未指定```--relay-log```选项的情况下，因为relaylog一般以```host name```来命名。同样，在未指定```--relay-log-index```的情况下，也可能会出现这样的问题。因此，如果遇到这样的问题，我们一般通过添加```--relay-log```或```--relay-log-index```这样的选项来解决。假如在有些MySQL版本中没有这样的选项，请使用如下两个：
+<pre>
+existing_slave_hostname-relay-bin
+existing_slave_hostname-relay-bin.index
+</pre>
+另外，假如你在尝试了如下4)、5）、6）、7）步骤之后仍遇到前面的问题，请按如下a)、b）、c)步骤来解决
+<pre>
+a) 假如当前你还未在新创建的slave上执行'STOP SLAVE', 则执行STOP SLAVE； 假如你已经重新启动了已存在的slave，则在已存在的slave上也同样执行STOP SLAVE;
+
+b) 拷贝已存在slave的relaylog索引文件到新的slave数据目录中，并替换原来老的relaylog索引文件；
+
+c) 执行如下4)、5)、6)、7)步骤
+</pre>
+
+**4)** 当拷贝完成，重启已存在的slave
+
+**5）** 在新创建的slave上，修改配置文件，并给该新创建的slave指定一个唯一的server id。
+
+**6）** 启动新创建的slave服务器，启动时指定```--skip-slave-start```选项，使得复制进程不会启动。执行```SHOW SLAVE STATUS```语句以确定```新建的slave```与```已存在的slave```相比较配饰是否正确。也需要再次检查server id与UUID是否唯一。
+
+**7）** 通过执行```START SLAVE```语句来启动新建的slave
+{% highlight string %}
+mysql> START SLAVE;
+{% endhighlight %}
+
+到此为止，新建的slave就会用其对应的master info repository信息来开始同步进程。
 
 
+### 1.10 slave主机上设置master配置
+要建立master slave之间的复制，你必须要告诉slave必要的连接信息。你可以在slave上执行如下的命令来完成：
+{% highlight string %}
+mysql> CHANGE MASTER TO
+-> MASTER_HOST='master_host_name',
+-> MASTER_USER='replication_user_name',
+-> MASTER_PASSWORD='replication_password',
+-> MASTER_LOG_FILE='recorded_log_file_name',
+-> MASTER_LOG_POS=recorded_log_position;
+{% endhighlight %}
+```CHANGE MASTER TO```语句还有很多其他的选项。例如能够使用SSL建立安全的复制。
 
-
+注意：
+<pre>
+主从复制并不能使用unix socket来进行。你必须要确保slave能够通过TCP/IP来连接到master。
+</pre>
 
 
 
