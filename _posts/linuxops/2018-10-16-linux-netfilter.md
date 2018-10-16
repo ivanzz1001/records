@@ -33,11 +33,11 @@ description: Linux Netfilter
 
 2. [iptables常用实例备查](http://seanlook.com/2014/02/26/iptables-example/)
 
-3. [iptables防火墙原理详解](https://blog.csdn.net/silent123go/article/details/52588518)
+3. [iptables防火墙原理详解](http://seanlook.com/2014/02/23/iptables-understand/)
 
 4. [IPTables](https://www.centos.org/docs/5/html/Deployment_Guide-en-US/ch-iptables.html)
 
-5. [ Firewalls](https://www.centos.org/docs/5/html/Deployment_Guide-en-US/ch-fw.html)
+5. [Firewalls](https://www.centos.org/docs/5/html/Deployment_Guide-en-US/ch-fw.html)
 
 
 <br />
