@@ -166,10 +166,46 @@ MySQL可以使用```statement-based```日志(SBL)、```row-based```日志(RBL)�
 
 * 当使用```statement-based```格式的日志时，对于哪些被认为是```非安全```的statement，在记录日志时会添加上相应的警告信息，而对于哪些被认为是```安全```的statement则进行直接的日志记录。
 
+<br />
+如下的一些statement被认为是不安全的：
+
+* 包含系统函数的statement: 因为这些函数在不同的主机上可能会返回不同的值。这些函数主要包括
+<pre>
+FOUND_ROWS()、GET_LOCK()、IS_FREE_LOCK()、IS_USED_LOCK()、LOAD_FILE()、MASTER_POS_WAIT()、
+PASSWORD()、RAND()、RELEASE_LOCK()、ROW_COUNT()、SESSION_USER()、SLEEP()、SYSDATE()、
+SYSTEM_USER()、USER()、UUID()、UUID_SHORT()
+</pre>
+
+* 有一些```非确定性```函数是```安全的```。尽管这些函数是非确定性的，但它们在日志记录和复制时，我们认为是安全的。这些函数主要包括
+<pre>
+CONNECTION_ID()、CURDATE()、CURRENT_DATE()、CURRENT_TIME()、CURRENT_TIMESTAMP()、CURTIME()、LAST_INSERT_ID()、
+LOCALTIME()、LOCALTIMESTAMP()、NOW()、UNIX_TIMESTAMP()、UTC_DATE()、UTC_TIME()、UTC_TIMESTAMP()
+</pre>
+
+
+* 对系统变量的引用： 使用```statement-based```复制时，对于大部分系统变量来说都不能被正确的复制
+
+* UDFS: 这里因为我们并不能控制```UDFs```的具体实现，因此这里我们认为是不安全的
+
+* 自动触发或更新带有```AUTO_INCREMENT```列表： 这一般在复制时认为是不安全的，因为有可能在master与slave上执行更新的顺序会不一样。另外，对于列为```AUTO_INCREMENT```的复合主键，假如该列并不是复合主键的第一列，那么在执行```INSERT```插入时我们也认为是不安全的。
+
+* INSERT DELAYED语句： 该statement被认为是不安全的，这是因为在执行插入时中间有可能会并发的执行其他的语句。
+
+* 在复合primary key或者unique key的表上执行```INSERT ... ON DUPLICATE KEY UPDATE```被认为是不安全的：因为这取决于存储引擎按什么样的顺序来检索这些key，不同的存储引擎检索顺序有可能是不一样的，因此最后更新的行也有可能会不一样。
+
+* 使用带LIMIT字段的更新： 因为获取行数据的顺序是未定的，因此我们认为这种更新是不安全的
+
+* 访问或引用log表： 因为系统日志表在master与slave上有可能是不同的
+
+* LOAD DATA INFILE语句： 该语句被认为是不安全的，假如```binlog_format=mix```时该语句会在日志中以```row-based```格式来记录。
+<pre>
+注意： 当binlog_format=statements时，LOAD DATA INFILE并不会产生相应的警告信息，这一点与其他的非安全语句不同
+</pre>
 
 
 
-
+## 4. 基于GTID的复制
+本章会简单介绍一下基于GTID(Global Transaction Identifiers)的复制，GTID是在```MySQL5.6.5```版本开始引入的，
 
 
 
