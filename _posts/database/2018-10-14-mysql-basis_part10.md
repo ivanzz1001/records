@@ -335,10 +335,67 @@ mysql> SET @@global.read_only = ON;ze
 //slave
 # mysqld_safe --gtid_mode=ON --log-bin --log-slave-updates --enforce-gtid-consistency --skip-slave-start &
 {% endhighlight %}
+注意： 上面需要根据自身情况，以决定是否要添加额外的启动选项
 
 
+**4）配置slave指向的master**
 
+我们需要配置slave以master作为复制源，并使用```GTID-based auto-position```以替代```file-based position```。在master上执行```CHANGE MASTER TO```语句，并使用```MASTER_AUTO_POSITION```选项以告诉slave每一个事务都会由GTID标识：
+{% highlight string %}
+mysql> CHANGE MASTER TO
+> MASTER_HOST = host,
+> MASTER_PORT = port,
+> MASTER_USER = user,
+> MASTER_PASSWORD = password,
+> MASTER_AUTO_POSITION = 1;
+{% endhighlight %}
+说明： 假如你在上面```步骤1)```已经进行了这些配置，则可以忽略这一步的修改。
 
+在这一步骤中，我们并没有指定```MASTER_LOG_FILE```选项，也没有指定```MASTER_LOG_POS```选项，因为我们这里指定了```MASTER_AUTO_POSITION=1```，因此不能指定这些选项。如果我们同时指定，则会产生相应的错误。
+
+**5） 重新建立新的backup**
+
+那些在你启用```GTID```功能以前所做的备份在当前已经不能再被使用。你必须在这一时刻重新创建备份。例如，你可以在你需要备份的服务器上执行```FLUSH LOGS```。然后你就可以显式的来执行备份。
+
+**6） 启动slave，并禁止read-only模式**
+
+通过如下的命令来启动slave:
+{% highlight string %}
+mysql> START SLAVE;
+{% endhighlight %}
+然后在master上执行如下命令以禁用```read_only```:
+{% highlight string %}
+mysql> SET @@global.read_only = OFF;
+{% endhighlight %}
+到此```GTID-based```复制就已经开始运行了，你就可以在master开始进行相应的读写操作了。
+
+### 4.3 使用GTID来进行系统恢复及水平扩展
+
+从```MySQL5.6.9```版本起，当使用带GTID功能的复制时，我们可以有多种方式来水平扩充slave，或者在master失败的情况下将一个slave提升为master。在本节，我们主要讨论如下4个方面的内容：
+
+* 简单复制(Simple replication)
+
+* 拷贝数据或事务到slave
+
+* 注入空事务（insjecting empty transactions)
+
+* 排除gtid_purged的事务
+
+在MySQL的主从复制中添加```GTID```的主要目的是为了简化复制数据流(replication data flow)的管理以及对系统错误的恢复。在数据库更新的时候GTIDs扮演了一个核心角色： 服务器会自动的跳过那些拥有gtid且以前被处理过的事务。这对于```自动化的复制位置```以及正确的错误恢复来说至关重要。
+
+组成一个事务的```标识```(identifier)和```事件集合```都会被记录到binlog中。这在从一个已有数据的服务器向另一个新的服务器复制数据时存在一些挑战。为了在新的服务器上重新产生这些标识(identifier)，需要将这些标识从老的服务器拷贝到新的服务器，并且保证标识与实际事件(event)的一一对应， 而这是在系统需要做恢复或切换的情况下，要求迅速的将某一个slave提升为master时所必要的。
+
+**1） 简单复制**
+
+这是最简单的方法来在新的服务器上重新产生标识符(identifier)和事务(transaction): 你只需要简单的将该新的服务器变成```拥有完整历史执行记录的master```的slave即可。并且在master与slave上同时启用```GTID```功能。请参看上一节```使用GTID来建立主从复制```.
+
+一旦复制被启动，新的服务器就可以从master拷贝整个binlog，这样就可以获得所有的GTID信息。
+
+本方法是最简单和有效的，但是需要slave从master读取binlog。但这在有的时候，slave服务器需要花费大量的时间来进行同步，因此该方法并不适合快速的错误恢复或从backup中恢复。本节后面会说明如何避免通过从master拷贝binlog文件数据来拉取整个执行的历史记录到新的服务器。
+
+**2) 拷贝数据和事务到slave**
+
+ 
 
 
 
@@ -360,7 +417,7 @@ mysql> SET @@global.read_only = ON;ze
 
 4. [MySQL主从复制(Master-Slave)实践](https://www.cnblogs.com/gl-developer/p/6170423.html)
 
-5. [](https://blog.csdn.net/ahzxj2012/article/details/54017969)
+5. [MySQL 设置基于GTID的复制](http://blog.51cto.com/13540167/2086045)
 
 
 <br />
