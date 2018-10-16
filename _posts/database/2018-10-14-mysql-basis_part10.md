@@ -205,7 +205,145 @@ LOCALTIME()、LOCALTIMESTAMP()、NOW()、UNIX_TIMESTAMP()、UTC_DATE()、UTC_TIM
 
 
 ## 4. 基于GTID的复制
-本章会简单介绍一下基于GTID(Global Transaction Identifiers)的复制，GTID是在```MySQL5.6.5```版本开始引入的，
+本章会简单介绍一下基于GTID(Global Transaction Identifiers)的复制，GTID是在```MySQL5.6.5```版本开始引入的。当使用GTIDs时，每一个在原始服务器上提交的事件都可以被标识及跟踪，并将该提交的事件应用到slave上。这就意味着当使用GTIDs的时候，并没有必要参看binlog文件及相应的位置偏移就可以将相应的事件直接同步到slave，这极大的简化了相应任务的执行。因为```GTID-based```复制是完全```transaction-based```，因此可以很容易就可以知道主从是否一致； 只要相应的事件已经提交到了master，则肯定也提交到了slave，因此主从之间的一致性是可以保证的。你可以使用带GTIDs的```statement-based```复制或者```row-based```复制，但是我们建议使用```row-based```复制。
+
+本章我们主要会介绍一下如下方面的内容：
+
+* GTIDs是被定义和创建的，在MySQL Server中是如何展示的
+
+* 建立和启动基于GTID复制(GTID-based replication)的步骤
+
+* 使用GTIDs时，如何增加新的复制服务器
+
+* 使用基于GTIDs的复制时的相关限制
+
+* 禁用GTIDs的相关步骤
+
+
+### 4.1 GTIDs概要
+一个```global transaction identifier```(GTID)就是一个唯一的标识符，当每一个事务提交到master时，就会创建一个GTID，并将该GTID与该事件相关联。该标识符不仅仅在master上是唯一的，而且在整个复制集群中都是唯一的。GTID与事务之间是一一对应的关系。
+
+一个GTID是由两部分组成，中间以冒号分割：
+<pre>
+GTID = source_id:transaction_id
+</pre>
+
+其中```source_id```用于标识产生该标识的源服务器。通常情况下，会采用MySQL服务器的```server_uuid```来标识source_id。```transaction_id```是一个用于标示提交到源服务器事务的序号，其通常是按提交顺序来决定的； 例如，第一个被提交的事务其```transaction_id```为1，那么第10个被提交到该服务器的事务其```transaction_id```就为10。注意，一个事务的```transaction_id```是不可能为0的。例如：第23个提交到server_uuid为```3E11FA47-71CA-11E1-9E33-C80AA9429562```的MySQL服务器的事务，其GTID如下
+<pre>
+3E11FA47-71CA-11E1-9E33-C80AA9429562:23
+</pre>
+
+在一些输出（如```SHOW SLAVE STATUS```)及binlog中都以这样的格式来表示GTIDs。我们也可以通过如下的命令:
+<pre>
+mysqlbinlog --base64-output=DECODE-ROWS
+</pre>
+来查看日志文件中的GTIDs。
+
+另外，对于在执行如```SHOW MASTER STATUS```或者```SHOW SLAVE STATUS```命令时，相应的输出会将来自于相同server的GTIDs合并到一起来显示，例如：
+<pre>
+3E11FA47-71CA-11E1-9E33-C80AA9429562:1-5
+</pre>
+注意，从MySQL5.6.6版本开始，我们也会采用该格式来指定```START SLAVE```选项```SQL_BEFORE_GTIDS```或```SQL_AFTER_GTID```的参数。
+
+<br />
+**1) GTID SETs**
+
+```GTID```集合的表示方法如下：
+{% highlight string %}
+gtid_set:
+	uuid_set [, uuid_set] ...
+	| ''
+
+uuid_set:
+	uuid:interval[:interval]...
+
+uuid:
+	hhhhhhhh-hhhh-hhhh-hhhh-hhhhhhhhhhhh
+
+h:
+	[0-9|A-F]
+
+interval:
+	n[-n]
+
+	(n >= 1)
+{% endhighlight %}
+
+**2) GTID的生成及生命周期**
+
+```GTID```的生成及生命周期包含如下一些步骤：
+
+* 1) 事务是在master上被提交和执行的： 一个事务的GTID是通过使用master的server_uuid和当前未被使用的最小非0事务序列号组成的。GTID会被写入到binlog中，后面跟着的就是该事务本身
+
+* 2） 在binlog中的数据被传送到slave，并存储到slave的relaylog后，slave就会读取该事务的GTID并将该值写入到```gtid_next```系统变量中。这就告诉了slave下一个要记录到日志的事务所采用的GTID
+<pre>
+说明： slave在会话上下文中设置gtid_next
+</pre>
+
+* 3) slave会通过其自身的binlog检查并确保该GTID并未被使用来记录事务。当且仅当该GTID未被使用，slave就会将该GTID写入到自己的binlog中并执行该事务。在处理事务之前，首先检查该事务对应的GTID，这样就可以保证该事务以前并未在slave上执行过，而且还可以确保并没有其他的session读取了该事务。换句话说，多个客户端不允许并发执行同一个事务。
+
+* 4） 因为gtid_next不为空(empty)，因此slave本身并不会尝试为该事务产生一个GTID。
+
+### 4.2 使用GTID来建立主从复制
+本节会描述一下如何配置和启动```GTID-based```复制。这里介绍的是```cold start```情形下的相应步骤。所谓```cold start```就是指第一次启动replication master（也包括停止后的重新启动）。对于一个在运行过程中的master，如果要启动基于GTID的复制，请参看下一节```使用GTID来进行系统恢复及水平扩展```。
+
+如下介绍最简单的基于GTID复制场景（即只有一个master和一个slave）下的相关步骤：
+
+1) 假如replication当前已经运行，我们可以将master与slave都设置为只读状态，通过这样来完成主从之间的同步；
+
+2） 停止master与slave服务器
+
+3） 重新启动master与slave服务器，并同时开启GTID、binlog、以及```slave update logging```功能，禁用带GTID的```statement-based```复制功能。另外，master与slave服务器都只能以```read-only```模式启动，并且不要开启slave的SQL线程和IO线程。在本章后面的例子中我们会描述```mysqld```启动时的一些必要选项。
+
+4） 为slave指定master作为其复制源，并且使用```auto-position```模式。在本节的后面我们也会给出相应的例子
+
+5） 建立一个新的备份。原先旧的不带GTID功能的binlog在开启GTID功能后并不能被使用了，因此在这里我们需要重新建立备份。
+
+6） 启动slave，然后在master与slave上禁用```read-only```模式，这样就可以使得它们可以被更新
+
+<br />
+在如下的例子中，我们已经采用```经典```的```file-based```复制协议（statement-based、row-based、mix-based都是基于文件的复制协议）建立起了主从。注： 下面的操作大部分都需要```SUPER```权限，因此建议使用root权限来进行操作
+
+**1）同步服务器**
+
+首先使master与slave都处于```read-only```状态，我们可以通过在master与slave上执行如下命令： 
+{% highlight string %}
+mysql> SET @@global.read_only = ON;ze
+{% endhighlight %}
+然后等待所有处于```ongoing```状态的事务进行提交或回滚。然后，等待slave同步上master。这里```确保```我们在进行下一步操作之前完成MySQL slave对master的同步。
+
+假如你采用binlog来做除replication之外的其他的事情，例如用来做某个点的即时备份或恢复，请等待所有这些不带```GTID```的binlog都处理完成。
+<pre>
+注意：对于具有不带GTID功能事务功能的binlog日志，我们并不能将这些日志用在带GTID功能的服务器上。因此，在处理之前，必须
+确保在主从复制拓扑结构的任何地方都没有这种日志。
+</pre>
+
+**2） 停止master与slave服务器**
+
+使用```mysqladmin```工具停止master与slave服务器：
+<pre>
+# mysqladmin -uusername -p shutdown
+</pre>
+
+**3) 重启master与slave服务器，同时启用GTIDs功能** 
+
+为了使binlog拥有```global transaction identifiers```(gtid)，我们需要在启动master与slave时：使用GTID模式，启用binlog功能，启用slave update logging功能，禁用不安全的statement-based复制功能。另外，你需要以```read-only```模式来启动，以防止相应的服务器再做更新操作。这就意味着在启动mysql时至少需要包含如下选项：
+{% highlight string %}
+//master
+# mysqld_safe --gtid_mode=ON --log-bin --log-slave-updates --enforce-gtid-consistency &
+
+//slave
+# mysqld_safe --gtid_mode=ON --log-bin --log-slave-updates --enforce-gtid-consistency --skip-slave-start &
+{% endhighlight %}
+
+
+
+
+
+
+
+
+
 
 
 
