@@ -370,6 +370,8 @@ http
 
 2. [Nginx 服务器安装及配置文件详解](https://www.cnblogs.com/bluestorm/p/4574688.html)
 
+3. [nginx服务器安装及配置文件详解](http://seanlook.com/2015/05/17/nginx-install-and-config/)
+
 <br />
 <br />
 <br />
