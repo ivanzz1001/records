@@ -176,8 +176,126 @@ Systemd并不是一个命令，而是一组命令，涉及到系统管理的方�
 
 ```systemctl list-units```命令可以查看当前系统的所有unit:
 <pre>
+//列出正在运行的unit
+# systemctl list-units
+
+//列出所有unit，包括没有找到配置文件的或者启动失败的
+# systemctl list-units --all
+
+//列出所有没有运行的unit
+# systemctl list-units --all --state=inactive
+
+//列出所有加载失败的unit
+# systemctl list-units --failed
+
+//列出所有正在运行的类型为service 的unit
+# systemctl list-units --type=service
+</pre>
+
+
+### 3.2 Unit状态
+```systemctl status```命令用于查看系统状态和单个Unit的状态：
+<pre>
+//显示系统状态
+# systemctl status 
+
+//显示单个unit的状态
+# systemctl status bluetooth.service
+
+//显示远程主机的某个unit的状态
+# systemctl status -H root@rhel7.example.com status httpd.service
+</pre>
+
+此外，除了```status```命令，```systemctl```还提供了三个查询状态的简单方法，主要供脚本内部的判断语句使用。
+<pre>
+//显示某个unit服务是否正在运行
+# systemctl is-active application.service
+
+//显示某个unit服务是否处于启动失败状态
+# systemctl is-failed application.service
+
+//显示某个unit服务是否建立了启动链接
+# systemctl is-enabled application.service
+</pre>
+
+### 3.3 Unit管理
+对于用户来说，最常用的是下面这些命令，用于启动和停止Unit（主要是Service）：
+<pre>
+//立即启动一个服务
+# sudo systemctl start apache.service
+
+//立即停止一个服务
+# sudo systemctl stop apache.service
+
+//重启一个服务
+# sudo systemctl restart apache.service
+
+//杀死一个服务的所有子进程
+# suso systemctl kill apache.service
+
+//重新加载一个服务的配置文件
+# suso systemctl reload apache.service
+
+//重载所有修改过的配置文件
+# sudo systemctl daemon-reload
+
+//显示某个unit的所有底层参数
+# systemctl show httpd.service
+
+//显示某个unit的指定属性的值
+# systemctl show -p CPUShares httpd.service
+
+//设置某个unit的指定属性
+# systemctl set-property httpd.service CPUShares=500
+</pre>
+
+### 3.4 依赖关系
+Unit之间存在依赖关系： A依赖与B，就意味着Systemd在启动A的时候，同时会去启动B。
+
+```systemctl list-dependencies```命令列出一个unit的所有依赖：
+<pre>
+# systemctl list-dependencies nginx.service
+</pre>
+
+上面命令的输出结果之中，有些依赖是```Target```类型，默认并不会展开显示。如果要展开Target，就需要使用```--all```选项：
+<pre>
+# systemctl list-dependencies --all nginx.service
+</pre>
+
+## 4. Unit配置文件
+### 4.1 概述
+每一个Unit都有一个配置文件，告诉Systemd怎么启动这个Unit。```Systemd```默认从```/etc/systemd/system/```目录读取配置文件。但是，里面存放的大部分文件都是符号链接，指向目录```/usr/lib/systemd/system/```目录下的文件，因此真正的文件存放在那个目录下。
+
+```systemctl enable```命令用于在上面两个目录之间建立符号链接关系：
+<pre>
+# sudo systemctl enable clamd@scan.service
+
+//等价于
+# sudo ln -s /usr/lib/systemd/system/clamd@scan.service /etc/systemd/system/clamd@scan.service
+</pre>
+
+如果配置文件里面设置了开机启动，```systemctl enable```就相当于激活开机启动。与之对应的，```systemctl disable```命令用于在两个目录之间撤销符号链接关系，相当于撤销开机启动：
+<pre>
+# sudo systemctl disable clamd@scan.service
+</pre>
+
+配置文件名称的后缀，就是该```Unit```的种类，比如```sshd.socket```。如果省略，Systemd默认后缀名为```.service```。所以```sshd```会被理解成```sshd.service```。
+
+### 4.2 配置文件的状态
+```systemctl list-unit-files```命令用于列出所有配置文件：
+<pre>
 
 </pre>
+
+
+
+
+
+
+
+
+
+
 
 
 
