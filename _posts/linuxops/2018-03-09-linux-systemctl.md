@@ -57,6 +57,127 @@ Systemd并不是一个命令，而是一组命令，涉及到系统管理的方�
 | 停止某服务         | service httpd stop                   | systemctl stop httpd.service              |
 | 重启某服务         | service httpd restart                | systemctl restart httpd.service           |
 
+下面我们列出一些常用的```systemctl```系统管理命令：
+<pre>
+// 重启系统
+# sudo systemctl reboot
+
+//关闭系统，切断电源
+# sudo systemctl poweroff
+
+//cpu停止工作
+# sudo systemctl halt
+
+//暂停系统
+# sudo systemctl suspend
+
+//让系统进入冬眠状态
+# sudo systemctl hibernate
+
+//让系统进入交互式休眠状态
+# sudo systemctl hybrid-sleep
+
+//启动进入救援状态（单用户状态)
+# sudo systemctl rescue
+</pre>
+
+### 2.2 systemd-analyze
+```systemd-analyze```命令用于查看系统启动耗时：
+<pre>
+//查看系统启动耗时
+# systemd-analyze
+
+//查看每个服务的启动耗时
+# systemd-analyze blame
+
+//显示瀑布状的启动过程流
+# systemd-analyze critical-chain
+
+//显示指定服务的启动流
+# systemd-analyze critical-chain atd.service
+</pre>
+
+### 2.3 hostnamectl
+```hostnamectl```命令用于查看当前主机的信息：
+<pre>
+//显示当前主机的信息
+# hostnamectl 
+
+//设置主机名
+# sudo hostnamectl set-hostname rhel7
+</pre>
+
+### 2.4 localectl
+```localectl```命令用于查看本地化设置：
+<pre>
+//查看本地化设置
+# localectl
+
+//设置本地化参数
+# sudo localectl set-locale LANG=en_GB.utf8
+# sudo localectl set-keymap en_GB
+</pre>
+
+### 2.4 timedatectl
+```timedatectl```命令用于查看当前时区设置：
+<pre>
+//查看当前时区设置
+# timedatectl
+
+//显示所有可用时区
+# timedatectl list-timezones
+
+//设置当前时区
+# sudo timedatectl set-timezone America/New_York
+# sudo timedatectl set-date YYYY-MM-DD
+# sudo timedatectl set-time HH:MM:SS
+</pre>
+
+### 2.5 loginctl
+```loginctl```命令用于查看当前登录的用户：
+<pre>
+//列出当前session
+# loginctl list-sessions
+
+//列出当前登录用户
+# loginctl list-users
+
+//显示指定用户的信息
+# loginctl show-user ruanyf
+</pre>
+
+## 3. Unit
+### 3.1 含义
+```Systemd```可以管理所有系统资源。不同的资源统称为```Unit```。Unit一共分为12种：
+
+* Service unit: 系统服务
+
+* Target unit: 多个unit构成一个组
+
+* Device unit: 硬件设备
+
+* Mount unit: 文件系统的挂载点
+
+* Automount unit: 自动挂载点
+
+* Path unit: 文件或路径
+
+* Scope unit: 不是由Systemd启动的外部进程
+
+* Slice unit: 进程组
+
+* Snapshot unit: Systemd快照，可以切回某个快照
+
+* Socket unit: 进程间通信的socket
+
+* Swap unit: swap文件
+
+* Timer unit: 定时器
+
+```systemctl list-units```命令可以查看当前系统的所有unit:
+<pre>
+
+</pre>
 
 
 
