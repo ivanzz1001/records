@@ -395,7 +395,130 @@ mysql> SET @@global.read_only = OFF;
 
 **2) 拷贝数据和事务到slave**
 
- 
+重新执行binlog中的所有事务的历史记录很可能是一个耗时的工作，这是在建立新的slave的主要瓶颈。为了解决需要同步整个历史记录这一问题，需要将master上的```数据快照```、binlog、以及```全局事务信息```导入到slave中。在slave开始正式进行同步之前(IO线程与SQL线程工作），slave会通过binlog处理完遗留的事务。
+
+此种方法有多种变体，这些变体之间的主要不同表现在: 数据dump方式、binlog中的事务传送到slave的方式。参看下表：
+
+![db-mysql](https://ivanzz1001.github.io/records/assets/img/db/db_mysql_gtid.jpg)
+
+该方法通常可以使得新的slave服务器马上就可以工作；只有那些在我们创建snapshot或者dump文件时提交的事务，slave才需要进行同步。这就意味着slave服务器的可用性也并不是瞬时连续的，而是需要一个相对短的时间来完成slave与master的同步。
+
+通常提前拷贝binlog文件到slave会比slave直接同步master的整个事务执行记录耗时更少。然而考虑到文件大小及其他一些方面的原因，通过这样移动文件到slave有时也并不是那么优雅。下面剩余的两种方法使用其他的一些方式来将master上的历史transaction传送到新的slave上。
+
+**3）注入空事务(empty transactions)**
+
+master的全局(global)变量```gtid_executed```包含了所有在master上执行过的事务集。这里我们不必像以前那样在添加新的slave服务器时需要创建data snapshot并且拷贝binlog文件，只需要用到master上```gtid_executed```的相关内容。在添加新的slave到复制链之前，我们获取到master的```gtid_executed```，然后需要在新添加的server上为```gtid_executed```集中的每一个GTID提交一个```空事务```(empty transaction)，例如：
+{% highlight string %}
+SET GTID_NEXT='aaa-bbb-ccc-ddd:N';
+BEGIN;
+COMMIT;
+SET GTID_NEXT='AUTOMATIC';
+{% endhighlight %}
+一旦所有的```事务标识```(GTID)都通过空事务被恢复，那么你必须```flush```并```purge```slave的binlog。例如：
+{% highlight string %}
+FLUSH LOGS;
+PURGE BINARY LOGS TO 'master-bin.00000N';
+{% endhighlight %}
+我们进行上面操作的主要目的是为了防止该新建的服务器在后序提升为master时产生错误的transaction，从而干扰整个复制流（这里```FLUSH LOGS```语句会强制创建一个新的binlog文件；```PURGE BINARY LOGS```会去除掉所有空事务,但是保留所对应的identifier）。
+
+该方法创建了一个新的服务器，本质上其实是一个snapshot，但是现在其已经可以成为master了，因为其binlog历史记录已经覆盖了master复制流（即其已经追上了master)，本方法其实有些类似于我们下面介绍的第4种方法。
+
+**4) 排除gtid_purged的事务**
+
+master的全局(global)```gtid_purged```变量包含了所有从master binlog中所```purged```事务。正如我们前面所讨论的(方法3： 注入空事务)，你可以获取```gtid_executed```相关内容。而与前面方法不同的是，这里我们并不需要提交空事务(empty transaction)或者执行```PURGE BINARY LOGS```，我们可以基于```gtid_executed```的值来直接设置slave的```gtid_purged```。
+<pre>
+注意： 在MySQL5.6.9之前，gtid_purged并不能被设置。
+</pre>
+
+如前面介绍的```注入空事务```那样，本方法所创建的server其实也是一个snapshot，但是现在其也可以成为master了，因为其binlog历史记录已经覆盖了master复制流（即其已经追上了master)。
+
+
+### 4.4 基于GTID复制的限制
+因为基于```GTID```的复制依赖于```transaction```，因此当使用该类型复制时MySQL的有一些特性是不支持的。本节主要会介绍一下基于```GTID```复制的一些限制。
+
+**1） 涉及到非事务存储引擎(nontransactional storage engines)的更新**
+
+当使用GTID时，对于那些非事务存储引擎表(例如MyISAM)的更新不能像事务存储引擎表(例如InnoDB)的更新那样来处理。限制主要是因为假如在同一个事务中更新```非事务存储引擎表```的同时夹杂了更新```事务存储引擎表```，这样就可能会导致针对同一个事务会有多个```GTID```被指定。这种情况还可能发生在master与slave对同一个表采用不同的存储引擎的情况下： 其中一个支持事务，而另一个不支持事务
+
+在前面提到的任何一种情况，GTID与transaction的一一对应关系遭到了破坏，因此```GTID-based```复制可能并不能正常的工作。
+
+**2） CREATE TABLE ... SELECT语句**
+
+对于```statement-based```复制来说，```CREATE TABLE ... SELECT```是不安全的。当使用```row-based```复制时 ，该语句实际上是会被记录为```两个```单独的事件： 一个是用于创建表，另一个用于将数据从原表中插入到新表。当该语句在一个事务中被执行时，在有一些情况下这两个事件可能会接收到同一个```transaction identifier```，这就意味着第一个插入事件会被slave忽略掉。因此，```CREATE TABLE ... SELECT```在使用```GTID-based```复制时是不支持的。
+
+**3） 临时表**
+
+当使用GTID时（即在MySQL启动时指定了```--enforce-gtid-consistency```选项）不支持```CREATE TEMPORARY TABLE```与```DROP TEMPORARY TABLE```处于一个事务中。但是假如在使用GTID的情况下，autocommit设置为1，并且不在事务中则可以使用这些语句。
+
+
+**4） 阻止执行不支持的语句**
+
+为了阻止执行那些会导致```GTID-based```复制失败的语句，当启用GTID时，所有的服务器都必须以```--enforce-gtid-consistency```选项启动。这会导致前面所介绍的一些不支持的语句在执行时产生错误。
+
+当使用GTID时，不支持```sql_slave_skip_counter```。假如你需要跳过事务，请使用master的```gtid_executed```值。
+
+**5) GTID模式与mysqldump**
+
+从MySQL5.6.9版本起，可以将mysqldump导出的dump文件导入到以```GTID```模式运行的MySQL Server中。
+
+
+**6） GTID模式以及mysql_upgrade**
+
+在```MySQL5.6.7```版本之前，```mysql_upgrade```在以```--write-binlog=OFF```选项运行时是不能够连接上一个正在以```GTID```模式运行的MySQL Server的。否则的话，MySQL Server必须要重启，并指定```--gtid-mode=OFF```选项（即关闭GTID功能），然后再以```--gtid_mode=ON```选项重启```mysql_upgrade```。而从```MySQL5.6.7```版本开始，```mysql_upgrade```默认是以```--write-binlog=OFF```启动。
+
+
+
+### 4.5 禁止GTID事务
+假如你想要从支持```GTID```功能的```MySQL5.6```版本降级到不支持```GTID```功能的其他MySQL版本，你必须在降级之前参照如下的步骤禁止```GTID```功能。在MySQL5.6版本中，为了禁止GTID，你必须使相应的server处于offline状态。
+
+
+**1)** 在所有slave上，通过运行如下的命令禁用auto-position
+{% highlight string %}
+mysql> STOP SLAVE;
+
+mysql> CHANGE MASTER TO MASTER_AUTO_POSITION = 0, MASTER_LOG_FILE = file, \
+MASTER_LOG_POS = position;
+
+mysql> START SLAVE;
+{% endhighlight %}
+
+**2)** 在所有服务器上（master及slave），通过运行如下的命令停止数据更新
+{% highlight string %}
+SET @@GLOBAL.READ_ONLY = ON;
+{% endhighlight %}
+
+**3)** 等待所有正在进行中的```事务```提交或回滚。然后，等待一段时间，确保任何存在于binlog中的事务都被复制到了所有的slave中。注意： 在进行下一步之前请确保所有的更新都已经处理完成。
+
+假如你使用binlog来做除```复制```(replication)以外的其他事情，例如用于备份或数据恢复，那么请等到所有这些任务完成以不再需要这些带有GTID的老的binlog时为止。理想状态下，等待服务器```purge```所有的binlog，以及所有的已存在的backup操作过期。
+<pre>
+注意： 对于那些包含GTID事务的binlog文件，其不能被用于GTID功能被禁用的服务器上。因此在处理之前，必须确保
+在整个拓扑结构中已经不存在GTID事务
+</pre>
+
+**4）** 在所有的server上，通过```mysqladmin```工具关闭MySQL
+<pre>
+# mysqladmin -uusername -p shutdown
+</pre>
+
+**5)** 在所有server的配置文件```my.cnf```中设置如下两个选项
+<pre>
+gtid-mode=OFF
+enforce_gtid_consistency=OFF
+</pre>
+
+**6)** 以```read-only```模式重启mysql（可以使用```mysqld_safe```或者```mysqld```启动脚本，并指定```--read_only=ON```选项）。以read-only模式启动server，以防止可能的更新操作。
+
+**7）** 此时，再重新备份数据库以供日后使用。以前已存在的带GTID功能的备份在当前禁用```GTID```功能的情况下是不能再使用了。例如，你可以创建备份的机器上执行```FLUSH LOGS```。然后你就可以显示的手动执行备份或者等待你配置的定时备份完成。
+
+**8）** 在每一个server上，通过运行如下语句重新启用```update```功能
+{% highlight string %}
+SET @@GLOBAL.READ_ONLY = OFF;
+{% endhighlight %}
+
+到此为止，假如你想要降级到更老版本MySQL，就可以采用通常的方法来开始降级了。
+
+
+
 
 
 
@@ -418,6 +541,8 @@ mysql> SET @@global.read_only = OFF;
 4. [MySQL主从复制(Master-Slave)实践](https://www.cnblogs.com/gl-developer/p/6170423.html)
 
 5. [MySQL 设置基于GTID的复制](http://blog.51cto.com/13540167/2086045)
+
+6. [MySQL 在线开启/关闭GTID](https://blog.csdn.net/jslink_l/article/details/54574066)
 
 
 <br />
