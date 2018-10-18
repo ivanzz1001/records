@@ -284,8 +284,155 @@ Unit之间存在依赖关系： A依赖与B，就意味着Systemd在启动A的�
 ### 4.2 配置文件的状态
 ```systemctl list-unit-files```命令用于列出所有配置文件：
 <pre>
+//列出所有配置文件
+# systemctl list-unit-files
+UNIT FILE                                   STATE   
+proc-sys-fs-binfmt_misc.automount           static  
+dev-hugepages.mount                         static  
+dev-mqueue.mount                            static  
+proc-fs-nfsd.mount                          static  
+proc-sys-fs-binfmt_misc.mount               static  
+sys-fs-fuse-connections.mount               static  
+sys-kernel-config.mount                     static  
+sys-kernel-debug.mount                      static  
+tmp.mount                                   disabled
+var-lib-nfs-rpc_pipefs.mount                static  
+brandbot.path                               disabled
+cups.path                                   enabled 
+
+//列出指定类型的配置文件
+# systemctl list-unit-files --type=service
+</pre>
+
+配置文件的状态有4种：
+<pre>
+enabled:  已建立启动链接
+disabled: 没建立启动链接
+static: 该配置文件没有[Install]部分（无法执行），只能作为其他配置文件的依赖
+masked: 该配置文件被禁止建立启动链接
+</pre>
+注意，从配置文件的状态无法看出，该Unit是否正在运行。这必须执行前面提到的```systemctl status```命令。
+<pre>
+# systemctl status bluetooth.service
+</pre>
+
+一旦修改配置文件，就要让```Systemd```重新加载配置文件，然后重新启动，否则修改不会生效。
+<pre>
+# sudo systemctl daemon reload
+# sudo systemctl restart httpd.service
+</pre>
+
+### 4.3 配置文件的格式
+配置文件就是普通的文本文件，可以用文本编辑器打开。```systemctl cat```命令可以查看配置文件的内容：
+{% highlight string %}
+[root@bogon ~]# systemctl cat mysqld
+# /usr/lib/systemd/system/mysqld.service
+# Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 2 of the License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
+#
+# systemd service file for MySQL forking server
+#
+
+[Unit]
+Description=MySQL Server
+Documentation=man:mysqld(8)
+Documentation=http://dev.mysql.com/doc/refman/en/using-systemd.html
+After=network.target
+After=syslog.target
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+User=mysql
+Group=mysql
+
+Type=forking
+
+PIDFile=/var/run/mysqld/mysqld.pid
+
+# Disable service start and stop timeout logic of systemd for mysqld service.
+TimeoutSec=0
+
+# Execute pre and post scripts as root
+PermissionsStartOnly=true
+
+# Needed to create system tables
+ExecStartPre=/usr/bin/mysqld_pre_systemd
+
+# Start main service
+ExecStart=/usr/sbin/mysqld --daemonize --pid-file=/var/run/mysqld/mysqld.pid $MYSQLD_OPTS
+
+# Use this to switch malloc implementation
+EnvironmentFile=-/etc/sysconfig/mysql
+
+# Sets open_files_limit
+LimitNOFILE = 5000
+
+Restart=on-failure
+
+RestartPreventExitStatus=1
+
+PrivateTmp=false
+{% endhighlight %}
+从上面的输出可以看到，配置文件分成几个区块。每个区块的第一行，使用方括号表示的区的名称，比如```[Unit]```。注意，配置文件的区块名和字段名都是```大小写敏感```的。
+
+每个区块内部是一些符号连接的键值对：
+<pre>
+[Section]
+Directive1=value
+Directive2=value
+...
+</pre>
+注意： 键值对的等号两侧不能有空格。
+
+### 4.4 配置文件的区块
+
+**1) Unit区块**
+
+```[Unit]```区块通常是配置文件的第一个区块，用来定义Unit的元数据，以及配置与```其他Unit```的关系。它的主要字段如下：
+
+<pre>
+Description: 简短描述
+
+Documentation: 文档地址
+
 
 </pre>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
