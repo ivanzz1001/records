@@ -409,13 +409,119 @@ Description: 简短描述
 
 Documentation: 文档地址
 
+Requires: 当前Unit依赖的其他Unit，如果它们没有运行，当前Unit会启动失败
 
+Wants: 与当前Unit配合的其他Unit，如果它们没有运行， 当前Unit不会启动失败
+
+BindsTo: 与Requires类似，它指定的Unit如果退出，会导致当前Unit停止运行
+
+Before： 如果该字段指定的Unit也要启动，那么必须在当前Unit之后启动
+
+After： 如果该字段指定的Unit也要启动，那么必须在当前Unit之前启动
+
+Conflicts： 这里指定的Unit不能与当前Unit同时运行
+
+Condition...: 当前Unit运行必须满足的条件，否则不会运行
+
+Assert...: 当前Unit运行必须满足的条件，否则会报启动失败 
 </pre>
 
+**2) Install区块**
+
+```[Install]```区块用来定义如何启动，以及是否开机启动。它的主要字段如下：
+<pre>
+WantedBy: 它的值是一个或多个Target，当前Unit激活时(enable)符号链接会放入/etc/systemd/system目录下面以
+          Target名 + .wants后缀构成的子目录中
+
+RequiredBy: 它的值是一个或多个Target，当前Unit激活时(enable)符号链接会放入/etc/systemd/system目录下面以
+          Target名 + .required后缀构成的子目录中
+
+Alias: 当前Unit可用于启动的别名
+
+Also: 当前Unit激活时(enable)，会被同时激活的其他Unit
+</pre>
+
+**3) Service区块**
+
+```[Service]```区块用来Service的配置，只有service类型的unit才有本区块。它的主要字段如下：
+<pre>
+Type: 定义启动时的进程行为。它有以下几种值：
+      1) Type=simple  默认值，执行ExecStart指定的命令，启动主进程
+      2) Type=forking  以fork方式从父进程创建子进程，创建后父进程会立即退出
+      3) Type=oneshot 一次性进程，Systemd会等待当前服务退出，再继续往下执行
+      4) Type=dbus  当前服务通过DBus启动
+      5) Type=notify  当前服务启动完毕，会通知Systemd，再继续往下执行
+      6) Type=idle 若有其他任务执行完毕，当前服务才会运行
+
+ExecStart: 启动当前服务的命令
+
+ExecStartPre: 启动当前服务之前执行的命令
+
+ExecStartPost: 启动当前服务之后执行的命令
+
+ExecReload: 重启当前服务执行时的命令
+
+ExecStop: 停止当前服务时执行的命令
+
+ExecStopPost: 停止当前服务之后执行的命令
+
+RestartSec: 自动重启当前服务间隔的秒数
+
+Restart: 定义何种情况下会自动重启当前服务，可能的值包括always(总是重启）、on-success、on-failure、on-abnormal、on-abort、on-watchdog
+
+TimeoutSec: 定义Systemd停止当前服务之前等待的秒数
+
+Environment: 指定环境变量
+</pre>
+
+Unit配置文件的完整清单，请参看[官方文档](https://www.freedesktop.org/software/systemd/man/systemd.unit.html)
 
 
+## 5. Target
+启动计算机的时候，需要启动大量的Unit。如果每一次启动，都要一一写明本次启动需要哪些Unit，显然非常不方便。Systemd的解决方案就是Target。简单说，Target就是一个Unit组，包含许多相关Unit。启动某个Target的时候，Systemd就会启动里面所有的Unit。从这个意义上说，Target这个概念类似于```状态点```，启动某个Target就好比启动到某种状态。
+
+传统```init```启动模式里面，有```RunLevel```的概念，跟Target的作用很类似。不同的是，RunLevel是互斥的，不可能多个RunLevel同时启动，但是多个Target可以同时启动。
+<pre>
+//查看当前系统的所有Target
+# systemctl list-unit-files --type=target
+
+//查看一个target所包含的所有Unit
+# systemctl list-dependencies multi-user.target
+
+//查看启动时的默认target
+# systemctl get-default
+
+//设置启动时的默认target
+# systemctl set-default multi-user.target
+
+//切换target时，默认不关闭前一个Target启动的进程。systemctl isolate命令改变这种行为，
+//关闭前一个Target里面所有不属于后一个Target的进程
+# sudo systemctl isolate multi-user.target
+</pre>
+
+Target与传统RunLevel的对应关系如下：
+{% highlight string %}
+Traditional runlevel      New target name     Symbolically linked to...
+
+Runlevel 0           |    runlevel0.target -> poweroff.target
+Runlevel 1           |    runlevel1.target -> rescue.target
+Runlevel 2           |    runlevel2.target -> multi-user.target
+Runlevel 3           |    runlevel3.target -> multi-user.target
+Runlevel 4           |    runlevel4.target -> multi-user.target
+Runlevel 5           |    runlevel5.target -> graphical.target
+Runlevel 6           |    runlevel6.target -> reboot.target
+{% endhighlight %}
+
+它与```init```进程的主要差别如下：
+
+* **默认的RunLevel**（在/etc/inittab文件设置)现在被默认的Target取代，位置是/etc/systemd/system/default.target，通常符号链接到```graphical.target```(图形界面）或者multi-user.target(多用户命令行)
+
+* **启动脚本的位置**： 以前是```/etc/init.d```目录，符号链接到不同的RunLevel目录（比如```/etc/rc3.d```、```/etc/rc5.d```等)，现在则存放在```/lib/systemd/system```和```/etc/systemd/system```目录。 
+
+* **配置文件的位置**: 以前init进程的配置文件是/etc/inittab，各种服务的配置文件存放在```/etc/sysconfig```目录。现在的配置文件主要存放在```/lib/systemd```目录，在```/etc/systemd```目录里面的修改可以覆盖原始设置。
 
 
+## 6. 日志管理
 
 
 
