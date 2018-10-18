@@ -523,6 +523,103 @@ Runlevel 6           |    runlevel6.target -> reboot.target
 
 ## 6. 日志管理
 
+Systemd统一管理所有Unit的启动日志。带来的好处就是，可以只用```journalctl```一个命令，查看所有日志（内核日志和应用日志）。日志的配置文件是```/etc/systemd/journald.conf```。
+
+
+```journalctl```功能强大，用法非常多：
+{% highlight string %}
+//查看所有日志（默认情况下，只保存本次启动的日志)
+# sudo journalctl
+
+//查看内核日志（不显示应用日志)
+# sudo journalctl -k
+
+//查看系统本次启动日志
+# sudo journalctl -b
+# sudo journalctl -b -0
+
+//查看上一次启动的日志(需要更改设置）
+# sudo journalctl -b -1
+
+//查看指定时间的日志
+# sudo journalctl --since="2012-10-30 18:17:16"
+# sudo journalctl --since "20 min ago"
+# sudo journalctl --since yesterday
+# sudo journalctl --since "2015-01-01" --until "2015-01-11 03:00"
+# sudo journalctl --since 09:00 --until "1 hour ago"
+
+//显示尾部的最新10行日志
+# sudo journalctl -n
+
+//显示尾部指定行数的日志
+# sudo journalctl -n 20
+
+
+//实时滚动显示最新日志
+# sudo journalctl -f
+
+//查看指定服务的日志
+# sudo journalctl /usr/lib/systemd/systemd
+
+//查看指定进程的日志
+# sudo journalctl _PID=1
+
+//查看某个路径的脚本的日志
+# sudo journalctl /usr/bin/bash
+
+//查看指定用户的日志
+# sudo journalctl _UID=33 --since today
+
+
+//查看某个Unit的日志
+# sudo journalctl -u nginx.service
+# sudo journalctl -u nginx.service --since today
+
+
+//实时滚动显示某个Unit的最新日志信息
+# sudo journalctl -u nginx.service -f
+
+
+
+//合并显示多个unit的日志
+# sudo journalctl -u nginx.service -u php-fpm.service --since today
+
+
+//查看指定优先级（及其以上级别）的日志，共有8级
+// 0: emerg
+// 1: alert
+// 2: crit
+// 3: err
+// 4: warning
+// 5: notice
+// 6: info
+// 7: debug
+# sudo journalctl -p err -b
+
+
+//日志默认分页输出， --no-pager 改为正常标准输出
+# sudo journalctl --no-pager
+
+//以Json格式（当行）输出
+# sudo journalctl -b -u nginx.service -o json
+
+
+//以Json格式（多行）输出，可读性更好
+# sudo journalctl -b -u nginx.service -o json-pretty
+
+
+//显示日志占据的硬盘空间
+# sudo journalctl --disk-usage
+
+// 指定日志文件占据的最大空间
+# sudo journalctl --vacuum-size=1G
+
+
+//指定日志文件保存多久
+# sudo journalctl --vacuum-time=1years
+{% endhighlight %}
+
+注： 默认情况下,Systemd将日志保存在```/run/log/journal```中，系统重启就会清除。通过新建```/var/log/journal```目录，日志会自动记录到这个目录中，并永久存储。
 
 
 
@@ -549,8 +646,7 @@ Runlevel 6           |    runlevel6.target -> reboot.target
 
 
 
-
-
+<br />
 
 
 **[参看]:**
@@ -562,6 +658,14 @@ Runlevel 6           |    runlevel6.target -> reboot.target
 3. [Systemd 入门教程：命令篇](http://www.ruanyifeng.com/blog/2016/03/systemd-tutorial-commands.html)
 
 4. [systemd](http://blog.51cto.com/12550795/1948348)
+
+5. [centos7启动过程及systemd详细说明](https://www.aliyun.com/jiaocheng/126034.html)
+
+6. [走进Linux之systemd启动过程](https://blog.csdn.net/yuzhihui_no1/article/details/52228763)
+
+7. [Systemd Boot Process a Close Look in Linux](https://linoxide.com/linux-how-to/systemd-boot-process/)
+
+8. [Linux 开机引导和启动过程详解](https://blog.csdn.net/qq_26819733/article/details/77624141)
 <br />
 <br />
 <br />
