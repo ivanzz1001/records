@@ -259,6 +259,36 @@ CREATE TABLE `course` (
 6”#”民法”#”1006
 7”#”民法”#”1001
 {% endhighlight %}
+因为上面指定的字段分隔符```--fields-terminated-by```为```#```，因此这里我们看到是以```#```来做分割。
+
+要加载```delimited-text```文件的话，可以使用```LOAD DATA INFILE```或者```mysqlimport```。
+
+### 2.4 通过binlog来制作增量备份文件
+MySQL支持增量备份： 你必须在系统启动时指定```--log-bin```选项以启用binlog功能。binlog可以提供从你创建备份时刻起MySQL数据库所做的更改信息。在你需要进行增量备份的时候，你应该使用```FLUSH LOGS```以开启一个新的binlog日志。在这一步完成之后，你需要拷贝从上一次全量备份时到当前为止的所有binlog(除最后一个FLUSH LOGS产生的binlog外)到备份目录中。这些binlog就是增量备份；关于增量备份的恢复，我们后面会继续进行讲解。当下一次你再做全量备份时，你还是需要使用```FLUSH LOGS```来重新生成新的binlog。
+
+
+### 2.5 使用Replication Slaves来备份
+假如在通过master进行备份时会产生性能问题，其中一种策略就是建立复制从机(replication slave)，并使用复制从机来进行备份。当你使用复制从机来进行备份时，你需要备份slave数据库的```master info```目录以及```relay log info```目录。在你需要恢复slave数据的时候，你需要所有这些文件信息。假如slave正在复制```LOAD DATA INFILE```语句时，则你还需备份存在于目录中的任何```SQL_LOAD-*```文件。slave需要通过这些文件来恢复任何中断的```LOAD DATA INFILE```操作。这些文件存放的目录是通过```--slave-load-tmpdir```选项来指定的。假如MySQL Server在启动时并未指定该选项，在采用MySQL系统变量的```tmpdir```。
+
+### 2.6 恢复损坏的表
+
+假如你必须恢复已经损坏的```MyISAM```表，首先尝试使用```REPAIR TABLE```或者```myisamchk -r```。通常在99.9%的情况下都能修复好。
+
+### 2.7 使用文件系统snapshot来创建备份
+假如你使用```Veritas```文件系统的话，你可以通过如下方式来创建备份：
+
+1） 从客户端执行```FLUSH TABLES WITH READ LOCK;```
+
+2) 从另一个shell执行```mount vxfs snapshot```
+
+3) 从第一个客户端执行```UNLOCK TABLES;```
+
+4) 从snapshot拷贝文件
+
+5) umount该snapshot
+
+对于其他的文件系统，例如```LVM```或者```ZFS```也可以采用类似的方法。
+
 
 
 
@@ -276,6 +306,9 @@ CREATE TABLE `course` (
 **[参看]**:
 
 1. [学会用各种姿势备份MySQL数据库](http://www.cnblogs.com/liangshaoye/p/5464794.html)
+
+2. [Mysql Binlog三种格式介绍及分析](https://www.cnblogs.com/itcomputer/articles/5005602.html)
+
 
 
 
