@@ -290,8 +290,106 @@ MySQL支持增量备份： 你必须在系统启动时指定```--log-bin```选�
 对于其他的文件系统，例如```LVM```或者```ZFS```也可以采用类似的方法。
 
 
+## 3. 复制和备份策略示例
+本章主要会介绍一下制作备份的步骤，并在遇到如下情况时如何通过备份来对数据进行恢复：
+
+* 操作系统崩溃
+
+* 电源断电
+
+* 文件系统损坏
+
+* 硬件故障（包括硬件驱动、主板损坏等等）
+
+这里假设数据采用的存储引擎是```InnoDB```，该存储引擎支持```事务```与自动崩溃恢复。这里同时假设在崩溃的时候，MySQL正处于```工作负`载```的情况下，否则并不需要对MySQL进行恢复。
+
+对于操作系统崩溃或电源断电这种情况，我们可以假设MySQL的硬盘数据在系统重启之后是可用的。这时候```InnoDB```数据文件由于系统崩溃或断电处于不一致的状态，但是InnoDB会通过读取日志文件，并且在日志文件中找到处于```pending commited```和```noncommited```状态还没来得及flush到数据文件的事务。之后InnoDB就会自动的回滚这些尚未提交的事务，并且flush那些已经提交的事务到数据文件中。关于恢复进程执行情况，我们可以通过MySQL的错误日志来进行查看。如下就是一个示例日志的摘要：
+{% highlight string %}
+InnoDB: Database was not shut down normally.
+InnoDB: Starting recovery from log files...
+InnoDB: Starting log scan based on checkpoint at
+InnoDB: log sequence number 0 13674004
+InnoDB: Doing recovery: scanned up to log sequence number 0 13739520
+InnoDB: Doing recovery: scanned up to log sequence number 0 13805056
+InnoDB: Doing recovery: scanned up to log sequence number 0 13870592
+InnoDB: Doing recovery: scanned up to log sequence number 0 13936128
+...
+InnoDB: Doing recovery: scanned up to log sequence number 0 20555264
+InnoDB: Doing recovery: scanned up to log sequence number 0 20620800
+InnoDB: Doing recovery: scanned up to log sequence number 0 20664692
+InnoDB: 1 uncommitted transaction(s) which must be rolled back
+InnoDB: Starting rollback of uncommitted transactions
+InnoDB: Rolling back trx no 16745
+InnoDB: Rolling back of trx no 16745 completed
+InnoDB: Rollback of uncommitted transactions completed
+InnoDB: Starting an apply batch of log records to the database...
+InnoDB: Apply batch completed
+InnoDB: Started
+mysqld: ready for connections
+{% endhighlight %}
+对于```文件系统崩溃```或者硬件问题，我们假设在系统重启之后MySQL硬盘数据处于不可用状态。这就意味着并不能成功的进行重启操作，因为当前硬盘数据的其中一些块并不能进行读取了。在这种情况下，可能需要重新格式化硬盘、重新安装操作系统、或者还需要修复其他的底层问题。然后使用备份来恢复MySQL数据，这就意味着我们前期已经制作了备份。要处理这种情况，就意味着我们要设计并实现一个备份策略。
+
+### 3.1 建立备份策略
+建立MySQL数据库备份计划是很有用的。通常我们可以采用多种方法来建立一个全量备份(在某一个时间点的数据快照）。例如，```MySQL Enterprise Backup```就可以对整个MySQL实例进行物理备份，并可以在备份```InnoDB```数据文件时对MySQL服务造成中断或过重的负载。可以使用mysqldump来进行逻辑备份。在这里我们使用的是```mysqldump```>
+
+如下假设我们对MySQL所有数据库的所有InnoDB表做一个全量的备份，备份日期为星期天的下午1点：
+{% highlight string %}
+# mysqldump -uroot -ptestAa@123 --all-databases --master-data --single-transaction > backup_sun_1_PM.sql
+{% endhighlight %}
+上面产生的```.sql```文件包含了一系列的SQL ```INSERT```语句，后续我们可以使用这些语句来对dump出来的表进行恢复。
+
+该备份操作在开始备份之前需要在所有的表上增加一把全局的读锁（可以使用```FLUSH TABLES WITH READ LOCK```来创建读锁）。一旦获取到了读锁，就会读取到binlog的位置，然后执行完上面的```mysqldump```语句后锁就会被释放。假如在前面```FLUSH```语句执行时，有一个长更新语句正在执行，那么备份操作就可以能会停止直到这些更新语句执行完成。在mysqldump完成之后，MySQL Server就又可以进行正常的读和写操作了。
+
+我们前面执行备份时假设了备份的MySQL表存储引擎是```InnoDB```，因此使用```--single-transaction```来进行一致性读(consistent read)，并保证mysqldump所看见的数据都不会被更改（对于其他客户端对InnoDB表的修改,对mysqldump处理进程来说都是不可见的）。假如备份操作也包含其他```非事务性```表，则这个一致性需要保证在备份期间数据不会发生修改。例如对于mysql数据库中的```MyISAM```表来说，必须在备份期间保证不对MySQL账户进行修改。
+
+全量备份是很有必要的，但是可能通常情况下创建全量备份并不是很方便，因为全量备份会产生大量的备份文件，并耗时很长一段时间。因此可能在有一些情况下全量备份并不是一个最优选择。我们可以先创建一个初始的全量备份，后续再创建增量备份。增量备份会比全量备份更小且耗时更短。之后在进行恢复时，就必须通过初始全量备份与后续的增量备份来共同完成。
+
+要制作增量备份的话，我们需要保存数据增量的修改。在MySQL中，这些修改都会被保存在binlog中，因此MySQL中应该在启动的时候通过```--log-bin```选项启用binlog功能。在binlog启动之后，当数据更新时，MySQL就会将相应的更改写入到对应的日志文件中。通常我们可以在MySQL的数据目录找到```--log-bin```选项所指定的日志文件：
+<pre>
+-rw-rw---- 1 guilhem guilhem 1277324 Nov 10 23:59 gbichot2-bin.000001
+-rw-rw---- 1 guilhem guilhem 4 Nov 10 23:59 gbichot2-bin.000002
+-rw-rw---- 1 guilhem guilhem 79 Nov 11 11:06 gbichot2-bin.000003
+-rw-rw---- 1 guilhem guilhem 508 Nov 11 11:08 gbichot2-bin.000004
+-rw-rw---- 1 guilhem guilhem 220047446 Nov 12 16:47 gbichot2-bin.000005
+-rw-rw---- 1 guilhem guilhem 998412 Nov 14 10:08 gbichot2-bin.000006
+-rw-rw---- 1 guilhem guilhem 361 Nov 14 10:07 gbichot2-bin.index
+</pre>
+在每一次MySQL重启启动的时候，都会使用接下来的一个序号来创建一个新的binlog文件。当MySQL Server正在运行时，也可以通过手动执行```FLUSH LOGS```或者```mysqladmin flush-logs```命令来关闭当前的binlog文件并重新开启一个新的binlog。同样```mysqldump```也有相应的选项来flush日志文件。数据目录中的```.index```文件包含了所有对应目录中的binlog文件列表。
+
+在进行MySQL恢复时，binlog文件是很重要的，因为这些binlog保存的是MySQL数据库的增量备份数据。假如你在执行全量备份的时候，确保了fush日志的话，则之后的binlog文件包含了从该时刻起后续所有MySQL数据的更改。我们可以通过修改前面的```mysqldump```命令使得在进行全量备份的时候```FLUSH```日志，并且在导出的文件中包含当前新的binlog文件名：
+{% highlight string %}
+# mysqldump -uroot -ptestAa@123 --single-transaction --flush-logs --master-data=2 \
+--all-databases > backup_sunday_1_PM.sql
+{% endhighlight %}
+
+在执行完上述命令之后，在MySQL数据目录会包含一个新的binlog文件```gbichot2-bin.000007```,这是因为```--flush-logs```选项会导致服务器刷新日志。而```--master-data```选项会导致mysqldump将binlog信息写到输出中，因此我们可以在导出的```.sql```文件中找到类似于如下：
+{% highlight string %}
+-- Position to start replication or point-in-time recovery from
+-- CHANGE MASTER TO MASTER_LOG_FILE='gbichot2-bin.000007',MASTER_LOG_POS=4;
+{% endhighlight %}
+
+因为mysqldump命令是用于制作一个全量备份，因此上面两行代表着：
+
+* 该dump文件包含了所有在```gbichot2-bin.000007```之前发生过改变的数据；
+
+* 在备份之后所做的改变都只存在于```gbichot-bin.000007```及之后的binlog文件中
+
+然后在第二天的13:00(Monday 1 p.m.)，我们可以通过刷新日志来再做一个增量备份。例如，执行```mysqladmin flush-logs```命令以创建一个新的日志文件```gbichot2-bin.000008```,则所有在Sunday 1 p.m.到Monday 1 p.m.之间发生改变的数据都会被记录到```gbichot2-bin.000007```这个日志文件中。该增量备份时很重要的，我们可以将其拷贝到一个安全的地方（例如将其拷贝到磁带、DVD、或者另外一台主机上）。在Tuesday 1 p.m.，可以再执行```mysqladmin flush-logs```命令，则在Monday 1 p.m.到Tuesday 1 p.m.这段时间所做的修改保存在```gbichot2-bin.000009```文件中（我们也应该将该备份拷贝到其他一个安全的环境中）。
 
 
+MySQL binlog会占用大量的硬盘空间。如果要释放这些空间的话，需要适时的不断purge这些日志，其中一种方法就是通过删除那些已经不再需要的日志文件，比如说当我们在进行一个全量备份时就可以把全量备份之前的binlog日志删掉：
+{% highlight string %}
+# mysqldump -uroot -ptestAa@123 --single-transaction --flush-logs --master-data=2 \
+--all-databases --delete-master-logs > backup_sunday_1_PM.sql
+{% endhighlight %}
+这里注意，假如你当前的MySQL Server是一个replication master的话，那么通过```mysqldump --delete-master-logs```删除binlog是很危险的，这是因为slave也许还没有处理完master的binlog日志。
+
+
+<pre>
+说明：在上面我们用到了mysqldump的--master-data选项，该选项将binlog的便宜位置和文件名追加到输出
+文件中。如果值为1，将会输出CHANGE MASTER命令； 如果值为2，输出的CHANGE MASTER命令前添加注释信
+息。该选项将打开--lock-all-tables选项，除非--single-transaction也被指定。
+</pre>
 
 
 
