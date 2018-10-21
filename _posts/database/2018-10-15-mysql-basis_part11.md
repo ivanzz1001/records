@@ -386,13 +386,54 @@ MySQL binlog会占用大量的硬盘空间。如果要释放这些空间的话�
 
 
 <pre>
-说明：在上面我们用到了mysqldump的--master-data选项，该选项将binlog的便宜位置和文件名追加到输出
-文件中。如果值为1，将会输出CHANGE MASTER命令； 如果值为2，输出的CHANGE MASTER命令前添加注释信
-息。该选项将打开--lock-all-tables选项，除非--single-transaction也被指定。
+说明：
+
+1） --master-data选项
+
+在上面我们用到了mysqldump的--master-data选项，该选项将binlog的偏移位置和文件名追加到输出文件中。
+如果值为1，将会输出CHANGE MASTER命令； 如果值为2，输出的CHANGE MASTER命令前添加注释信息。该选项将打开
+--lock-all-tables选项，除非--single-transaction也被指定（在这种情况下，将会在开始执行dump时的很短一段
+时间内获得一把读锁，请参看下面对--single-transaction的说明）。在所有情况下，在执行dump时都会引发对日志
+的相关操作。本选项会自动的关闭--lock-tables
+
+2) --single-transaction选项
+
+在一个事务中，通过dump所有的数据表来创建一个一致性的snapshot。一般只工作于那些支持事务的存储引擎表（例如InnoDB存
+储引擎），在使用mysqldump时本选项对于其他的存储引擎并不能保证一致性。当一个--single-transaction dump正在执行
+时，为了保证导出一个有效的dump文件（即正确的table内容以及binlog偏移位置），任何其他的客户端都不应该使用下述SQL
+语句： ALTER TABLE, DROP TABLE, RENAME TABLE, TRUNCATE TABLE，这是因为产生一致性dump文件时并没有对这些操作
+进行隔离。本选项会自动的关闭--lock-tables
 </pre>
 
 
+### 3.2 使用备份来进行恢复
+现在假设在```星期三```的早上8点(Wensday 8 a.m.)有一个灾难性的崩溃，我们需要使用备份来进行恢复。为了恢复，首先我们需要使用在```Sunday 1 p.m.```建立的全量备份来完成。该全量备份是一系列的SQL 语句，因此我们可以很容易的进行恢复：
+{% highlight string %}
+# mysql -uroot -ptestAa@123 < backup_sunday_1_PM.sql
+{% endhighlight %}
 
+执行完上面步骤之后数据就可以恢复到```Sunday 1 p.m.```。然后，为了恢复之后数据的更改，我们必须使用增量备份来进行恢复，即使用```gbichot2-bin.000007```及```gbichot2-bin.000008```日志文件来进行恢复。这里我们可以从某个备份位置获取到这些文件，然后通过类似于如下的命令来进行处理：
+{% highlight string %}
+# mysqlbinlog gbichot2-bin.000007 gbichot2-bin.000008 | mysql -uroot -ptestAa@123
+{% endhighlight %}
+
+到此为止，我们已经将数据恢复到了```Tuesday 1 p.m.```这一时刻，但是仍然丢失了从该时刻起到系统崩溃这一段时间的数据。为了避免这一部分数据的丢失，我们必须要有存放于其他安全为止的binlog(例如RAID硬盘或SAN硬盘等)文件（这就是为什么我们启动时会用```--log-bin```选项指定一个不同于MySQL数据目录的其他物理硬盘位置。因为这样做，我们可以即使在MySQL主数据目录丢失的情况下，仍能在一个安全的地方保存日志文件）。假如我们在安全的地方建立了相应的binlog，则我们会有```gbichot2-bin.000009```这样一个文件（或者其他后续的binlog文件），然后我们就可以通过使用```mysqlbinlog```和```mysql```来将数据恢复到崩溃前的最新时刻：
+{% highlight string %}
+# mysqlbinlog gbichot2-bin.000009 ... | mysql -uroot -ptestAa@123
+{% endhighlight %}
+更多关于使用```mysqlbinlog```来处理binlog文件的信息，请参看后面一章```使用binlog来做基于时间点的增量恢复```.
+
+
+
+
+### 3.3 备份策略总结
+在操作系统崩溃或者电源断电的情况下，```InnoDB```可以通过它自身来进行数据的恢复。但是为了确保数据不被丢失，一般你还是需要：
+
+* 在运行MySQL Server时，总是开启```--log-bin```选项，甚至是```--log-bin=log_name```,这里log_name可能是某一个安全的媒体介质。假如你有这样一个安全的媒体存储介质，该技术也是一种很要的硬盘负载均衡的方法。
+
+* 周期性的建立全量备份。请参看```3.1 建立备份策略```介绍的在线非阻塞备份
+
+* 通过执行```FLUSH LOGS```或者```mysqladmin flush-logs```来刷新日志，周期性的进行增量备份
 
 
 
