@@ -347,8 +347,56 @@ mysqldump的```--no-data```选项用于指示不要dump出表的数据，这样�
 ## 2. 使用binlog来做基于时间点的增量恢复
 ```Point-in-time```恢复涉及到将数据恢复到某一个指定的时间点。一般情况下是在我们做完全量恢复之后，然后再做本类型的恢复（全量备份有多种方法，请参看上一章```数据库备份方法```）。基于时间点的恢复使得我们在做完全量恢复之后，可以再对后续的更改进行恢复。
 <pre>
-注意： 
+注意： 这里的很多例子都是用'mysql'客户端来处理'mysqlbinlog'产生bin log输出。假如你的binlog包含了'\0'(NULL)字符的话，则该
+输出并不能被mysql进行解析，除非指定了'--binary-mode'选项。
 </pre>
+
+```Point-in-time```恢复是基于如下规则的：
+
+* 基于时间点的恢复所需要的源信息是```全量备份数据```及全量备份所做的增量备份binlog文件。因此MySQL在启动时必须要指定```--bin-log```选项以启用binlog功能。
+
+为了从binlog恢复数据，首先必须要知道当前binlog文件的名称及存放位置。默认情况下，MySQL Server会在数据目录创建binlog文件，但是也可以通过使用```--bin-log```选项来指定一个不同的位置。要查看所有的binlog文件，可以使用如下的语句：
+{% highlight string %}
+mysql> SHOW BINARY LOGS;
+{% endhighlight %}
+
+要获得当前binlog文件的名称，执行如下的语句：
+{% highlight string %}
+mysql> SHOW MASTER STATUS;
+{% endhighlight %}
+
+* mysqlbinlog工具会将二进制格式的binlog文件中的事件转换成文本形式，这些文本可以被执行及查看。```mysqlbinlog```有一些选项，可以基于事件发生的```次数```或者事件在binlog中的位置来选择binlog中的某一些sections.
+
+* 执行binlog中的事件可以导致数据的修改被重做一次。这就使得可以恢复数据在某一个时间段内的修改。要执行binlog中的事务，我们可以使用mysql来处理```mysqlbinlog```的输出
+{% highlight string %}
+# mysqlbinlog binlog_files | mysql -u root -ptestAa@123
+{% endhighlight %}
+
+* 当你需要查看事件发生的次数或者在binlog中的偏移，并以此来决定执行binlog中的部分事件时，能够方便的查看binlog是很重要的。要查看binlog中的事件，我们可以通过如下的命令来完成
+{% highlight string %}
+# mysqlbinlog binlog_files | more
+{% endhighlight %}
+
+另外，如果要将输出保存到文件中，然后在一个文本编辑器中查看到额话：
+{% highlight string %}
+# mysqlbinlog binlog_files > tmpfile
+# ... edit tmpfile ...
+{% endhighlight %}
+
+
+* 将mysqlbinlog处理后的输出保存到一个文件中通常是很有用的，我们可以预先对对一些事件进行处理，例如删除里面的```DROP DATABASE```语句。也可以删除任何你不想执行的语句。在修改完成之后，执行如下语句
+{% highlight string %}
+# mysql -uroot -ptestAa@123 < tmpfile
+{% endhighlight %}
+
+
+<br />
+假如你有超过一个binlog文件要在MySQL Server上执行的话，安全的方法是只使用一个连接来处理所有的这些binlog。下面展示的一个例子就不是很安全：
+{% highlight string %}
+# mysqlbinlog binlog.000001 | mysql -u root -p # DANGER!!
+# mysqlbinlog binlog.000002 | mysql -u root -p # DANGER!!
+{% endhighlight %}
+
 
 
 
