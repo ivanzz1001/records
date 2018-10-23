@@ -365,14 +365,14 @@ mysql> SHOW BINARY LOGS;
 mysql> SHOW MASTER STATUS;
 {% endhighlight %}
 
-* mysqlbinlog工具会将二进制格式的binlog文件中的事件转换成文本形式，这些文本可以被执行及查看。```mysqlbinlog```有一些选项，可以基于事件发生的```次数```或者事件在binlog中的位置来选择binlog中的某一些sections.
+* mysqlbinlog工具会将二进制格式的binlog文件中的事件转换成文本形式，这些文本可以被执行及查看。```mysqlbinlog```有一些选项，可以基于事件发生的```时间```或者事件在binlog中的位置来选择binlog中的某一些sections.
 
 * 执行binlog中的事件可以导致数据的修改被重做一次。这就使得可以恢复数据在某一个时间段内的修改。要执行binlog中的事务，我们可以使用mysql来处理```mysqlbinlog```的输出
 {% highlight string %}
 # mysqlbinlog binlog_files | mysql -u root -ptestAa@123
 {% endhighlight %}
 
-* 当你需要查看事件发生的次数或者在binlog中的偏移，并以此来决定执行binlog中的部分事件时，能够方便的查看binlog是很重要的。要查看binlog中的事件，我们可以通过如下的命令来完成
+* 当你需要查看事件发生的时间或者在binlog中的偏移，并以此来决定执行binlog中的部分事件时，能够方便的查看binlog是很重要的。要查看binlog中的事件，我们可以通过如下的命令来完成
 {% highlight string %}
 # mysqlbinlog binlog_files | more
 {% endhighlight %}
@@ -397,6 +397,41 @@ mysql> SHOW MASTER STATUS;
 # mysqlbinlog binlog.000002 | mysql -u root -p # DANGER!!
 {% endhighlight %}
 
+以上面的方法通过使用连接到MySQL Server的不同连接来处理binlog可能会产生一些问题： 假如第一个log文件包含了```CREATE TEMPORARY TABLE```语句，而第一个binlog包含了使用该临时表的语句。当第一个binlog由mysql处理完成之后，MySQL Server会删除掉该临时表； 而当MySQL处理第二个binlog时尝试使用该临时表，则MySQL 服务器会报```unknown table```这样的错误。
+
+要避免这样的问题，使用一个连接来执行所有你想处理的binlog文件。例如：
+{% highlight string %}
+# mysqlbinlog binlog.000001 binlog.000002 | mysql -u root -ptestAa@123
+{% endhighlight %}
+另外一种处理方法就是将所有的日志写入到一个单独的文件，然后再处理该文件：
+{% highlight string %}
+# mysqlbinlog binlog.000001 > /tmp/statements.sql
+# mysqlbinlog binlog.000002 >> /tmp/statements.sql
+# mysql -u root -ptestAa@123 -e "source /tmp/statements.sql"
+{% endhighlight %}
+
+当使用```mysqlbinlog```导出一个包含有GTIDs的binlog文件时，请添加```--skip-gtids```选项。例如：
+{% highlight string %}
+# mysqlbinlog --skip-gtids binlog.000001 > /tmp/dump.sql
+# mysqlbinlog --skip-gtids binlog.000002 >> /tmp/dump.sql
+# mysql -u root -ptestAa@123 -e "source /tmp/dump.sql"
+{% endhighlight %}
+
+
+### 2.1 使用Event时间来做Point-in-Time恢复
+为了指明恢复的开始时间与结束时间，可以为```mysqlbinlog```指定```--start-datetime```和```--stop-datetime```选项（格式为DATETIME)。例如，假设在2005年4月20日10:00 a.m.执行了一条SQL语句用于将一个表删除，为了恢复表和数据，可以先恢复前一天晚上的全量备份，然后再执行如下的命令做增量恢复：
+{% highlight string %}
+# mysqlbinlog --stop-datetime="2005-04-20 9:59:59" \
+/var/log/mysql/bin.123456 | mysql -u root -ptestAa@123
+{% endhighlight %}
+
+该命令会将数据恢复到```--stop-datetime```所指定的时刻。假如在几小时之后你并未检测到相应的错误，那么你可能会想要继续恢复后续被改变的数据。基于此，我们可以再次运行```mysqlbinlog```,并指定从哪个时间点开始恢复：
+{% highlight string %}
+# mysqlbinlog --start-datetime="2005-04-20 10:01:00" \
+/var/log/mysql/bin.123456 | mysql -u root -ptestAa@123
+{% endhighlight %}
+
+在上面的语句中，从10:01 a.m.之后所记录的SQL语句都会被重复执行。这样我们通过一次全量恢复，两次增量恢复就将数据恢复到```[-, 2005-04-20 9:59:59] ∪ [2005-04-20 10:01:00,-]```。
 
 
 
