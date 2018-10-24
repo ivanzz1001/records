@@ -433,18 +433,204 @@ mysql> SHOW MASTER STATUS;
 
 在上面的语句中，从10:01 a.m.之后所记录的SQL语句都会被重复执行。这样我们通过一次全量恢复，两次增量恢复就将数据恢复到```[-, 2005-04-20 9:59:59] ∪ [2005-04-20 10:01:00,-]```。
 
+使用这种方法可以做基于时间点的恢复，因此你首先必须要确定某一个事件发生的确切时间点。如果只想查看binlog的内容，而并不需要执行，可以使用如下的命令：
+{% highlight string %}
+# mysqlbinlog /var/log/mysql/bin.123456 > /tmp/mysql_restore.sql
+{% endhighlight %}
+然后我们可以通过检查```mysql_restore.sql```来找出相应的信息。
+
+<pre>
+说明： 假如在某一个时间点同时有多个事件发生，则mysqlbinlog并不能通过时间点来将某个事件排除。
+</pre>
+
+
+### 2.2 使用事件偏移来做基于时间点的恢复
+我们可以通过指定```--start-position```与```--stop-position```来做基于log位置的恢复。这与```基于Event时间的恢复```类似，只是这里指定的是```日志的偏移位置```而不是```日期```。使用偏移位置使得你可以更精确的指定恢复日志的哪一部分，特别是当有很多的事务发生在同一时刻这样一种情况。为了查找到当前binlog中我们不想执行的某个事务的偏移位置，我们可以在该事务发生的时间点附近多次执行如下命令，从而确切的查找到该事务的偏移：
+{% highlight string %}
+# mysqlbinlog --start-datetime="2005-04-20 9:55:00" \
+--stop-datetime="2005-04-20 10:05:00" \
+/var/log/mysql/bin.123456 > /tmp/mysql_restore.sql
+{% endhighlight %}
+该命令会在```/tmp```目录创建一个小的文本文件，其包含了在```执行删除```附近的SQL语句。打开该文件，找出我们并不想执行的那条语句（删除语句），然后再找出该语句在binlog中的偏移，之后在我们恢复时就可以将该值指定为```--stop-position```选项的值。通常位置偏移是在```log_pos```标签后的一个值。在做完前面的全量恢复之后，我们就可以再做基于```偏移位置```的增量恢复。例如：
+{% highlight string %}
+# mysqlbinlog --stop-position=368312 /var/log/mysql/bin.123456 \
+| mysql -u root -ptestAa@123
+
+# mysqlbinlog --start-position=368315 /var/log/mysql/bin.123456 \
+| mysql -u root -ptestAa@123
+{% endhighlight %}
+上面第一条命令会恢复所有的事务，直到给定```stop position```。第二个命令会恢复从```start position```开始直到binlog结尾的所有事务。因为```mysqlbinlog```的输出会在每条SQL语句之前包含```SET TIMESTAMP```语句，因此恢复的数据及相关的MySQL日志将会反映每一个事务的原始执行时刻。
 
 
 
+## 3. MyISAM表的维护及崩溃恢复
+本节主要会介绍如何使用```myisamchk```工具来检查或修复```MyISAM```表（```.MYD```用于存储MyISAM表的数据，```.MYI```用于存储MyISAM表数据的相关索引）。你可以使用```myisamck```来进行检查、修复或优化数据库表。下面的一些章节将会描述如何进行这些操作，以及如何建立数据库表的维护计划。
+
+尽管使用```myisamck```来修复数据库表是很安全的，但在实际进行修复或任何维护操作之前最好还是做好备份，因为这可能会导致对表做很大的改变。
+
+影响索引的```myisamck```操作可能会导致```MyISAM FULLTEXT```索引被重建，而使用```full-text```参数重建后的索引可能与MySQL Server当前的值不兼容。为了避免这个问题，请参看```myisamck常用选项```。
+
+MyISAM表的维护也可以通过直接使用SQL语句来完成，这与使用```myisamchk```是相似的：
+
+* 要检查```MyISAM```表，使用CHECK TABLE;
+
+* 要修复```MyISAM```表，使用REPAIR TABLE;
+
+* 要优化```MyISAM```表，使用OPTIMIZE TABLE;
+
+* 要分析```MyISAM```表，使用ANALYZE TABLE;
+
+这些语句可以被直接的使用，也可以通过```mysqlcheck```客户端程序来使用。```myisamck```可以通过自动的执行这些语句来完成工作。在使用```myisamck```时，你必须确该表当前并未在使用，这样就不会出现在表修复期间再夹杂其他的干扰操作。
+
+### 3.1 使用myisamck来进行崩溃恢复
+
+假如你使用```禁止外部锁```模式（这是默认情况）运行mysqld，那么当mysqld正在使用同一个Table时你并不能依赖使用```myisamck```来检查该表。假如你能够确保在运行```myisamchk```时并没有人会通过mysqld来访问该表时，你只需要在对表进行检查之前执行```mysqladmin flush-tables```。假如你并不能保证无人访问，那么在你对表进行检查时，必须首先关闭掉```mysqld```。假如你使用```myisamchk```来检查当前```mysqld```正在更新的表，那么你可能会收到```表被损坏```这样的警告信息，而实际上很可能没有被损坏。
+
+假如MySQL Server在运行时启用了```外部锁```，则你可以使用```myisamck```在任何时间对表进行检查。在这种情况下，假如MySQL服务器尝试修改一个当前正被```myisamchk```使用的表，则服务器将会等待```myisamck```处理完成之后才继续。
+
+假如你使用```myisamchk```来修复或者优化表，则你必须时刻确保```mysqld```服务并未使用该表。假如你并未停止```mysqld```，则你必须至少要执行```mysqladmin flush-tables```, 然后才能执行```myisamchk```。假如```myisamchk```以及```mysqld```同时访问该表时，可能会损坏该表。
+
+当在进行崩溃恢复时，很重要的一点就是理解数据库中每一个```MyISAM```表```tbl_name```都对应着数据库目录下的三个文件：
+
+|      FILE     |        Purpose                                                  | 
+|:-------------:|:----------------------------------------------------------------|
+| tbl_name.frm  |Definition (format) File                                         |
+| tbl_name.MYD  |Data file                                                        |
+| tbl_name.MYI  |Index file                                                       |
+
+如上三种文件的每一种都可能会遇到很多不同类型的损坏，但是通常问题是发生在```data file```以及```index file```。
+
+```myisamchk```在修复时会通过一行一行的创建```.MYD```数据文件的拷贝来进行的。在修复完成之后，其就会删除原来老的```.MYD```文件，并将新创建的文件命名回原来老文件的名称。假如在使用```myisamck```时指定了```--quick```选项，则并不会创建一个临时的```.MYD```文件，而是直接假定原来的```.MYD```文件是完好的，然后只会重新再产生一个新的索引文件。这通常是安全的，因为```myisam```会自动的检测```.MYD```文件是否被损坏，假如被损坏的话则直接退出。你也可以在执行```myisamchk```时指定两次```--quick```选项。在这种情况下，```myisamchk```在遇到一些错误时（例如```duplicate-key```错误)就不会直接退出，而是通过尝试修改```.MYD```数据文件来解决这些问题。通常情况下，指定两次```--quick```选项只会在当你只剩下少量空闲硬盘空间的情况下才会使用。但是在运行```myisamck```之前最好还是需要做好备份。
+
+
+### 3.2 如何检查MyISAM表的错误
+要检查一个```MyISAM```表，可以使用如下的命令：
+
+* ```myisamchk tbl_name```: 这通常可以找出```99.99%```的错误。但是其并不能找出只涉及到数据文件损坏的错误(极低概率发生）。假如你想要检查一个数据库表，通常情况你可以在运行```myisamchk```不指定任何选项，或者只指定一个```-s```选项。
+
+* ```myisamchk -m tbl_name```:  这通常可以找出```99.999%```的错误。首先会检查所有的索引入口以找出相应的错误，然后再通过索引入口读取所有的行数据。```myisamchk```会计算所有行的```key```值的checksum，然后与索引中的key的checksum进行比较。
+
+* ```myisamchk -e tbl_name```: 会执行一个完全的数据检查（```-e```表示```extended check```)。```myisamchk```会检查索引中的每一个key，然后看其是否确实指向正确的行数据。这在检查一些大表且具有多个索引的情况下，可能会耗费比较长一段时间。通常,```myisamchk```在检测到第一个错误的时候就会停止退出。假如你想要获得更多的信息，可以加上```-v```(verbose)选项。这会导致```myisamchk```继续进行检测，知道检测到多达20个错误为止。
+
+
+* ```myisamchk -e -i tbl_name```: 类似于前一个命令，只是这里的```-i```选项会告诉```myisamchk```以打印一些额外的统计信息。
+
+<br />
+在大多数情况下，一个简单的```myisamchk```命令（不添加任何启动选项）就足以检查一个表了。
+
+### 3.3 如何修复MyISAM表
+在本节会讨论如何使用```myisamchk```来修复```MyISAM```表（扩展名为```.MYI```和```.MYD```)。当然你也可以使用```CHECK TABLE```和```REPAIR TABLE```这样的SQL语句来检测和修复```MyISAM```表。
+
+```MyISAM```表受到损坏的征兆包括查询时异常崩溃，以及如下一些易观察到的错误：
+
+* ```tbl_name.frm``` is locked against change
+
+* 并不能找到```tbl_name.MYI```
+
+* Unexpected end of file
+
+* Record file is crashed
+
+* Got error ```nnn``` from table handler
+
+要想获得更多关于错误的详细信息，可以在命令行执行```perror nnn```,这里```nnn```表示的是错误编码。下面的例子显示了如何使用```perror```来找出一些经常用的错误号所指示的问题：
+{% highlight string %}
+# perror 126 127 132 134 135 136 141 144 145
+OS error code 126:  Required key not available
+MySQL error code 126: Index file is crashed
+OS error code 127:  Key has expired
+MySQL error code 127: Record file is crashed
+OS error code 132:  Operation not possible due to RF-kill
+MySQL error code 132: Old database file
+MySQL error code 134: Record was already deleted (or record file crashed)
+MySQL error code 135: No more room in record file
+MySQL error code 136: No more room in index file
+MySQL error code 141: Duplicate unique key or constraint on write or update
+MySQL error code 144: Table is crashed and last repair failed
+MySQL error code 145: Table was marked as crashed and should be repaired
+{% endhighlight %}
+```Error 135```(record文件并没有更多的空间）以及```Error 136```(index文件并没有更多的空间）一般并不能够通过简单的修复就可以好的。在这种情况下， 你必须使用```ALTER TABLE```来增加```MAX_ROWS```以及```AVG_ROW_LENGTH```这两个表选项的值：
+{% highlight string %}
+ALTER TABLE tbl_name MAX_ROWS=xxx AVG_ROW_LENGTH=yyy;
+{% endhighlight %}
+对于其他的错误，你必须对表进行修复。```myisamchk```通常可以检测并修复这些错误。
+
+```myisamchk```的修复过程涉及到4个步骤。首先在开始进行修复之前，进入到数据库数据的存放目录，并检查相应表文件的权限信息。在Unix上，请确保启动```mysqld```的用户具有读取这些文件的权限（并且你也需要具有访问这些文件的权限）。假如你需要对这些文件进行修改的话，还需要具有该文件的写权限。
+
+假如你想要通过命令行的方式来修复一个```MyISAM```表，则你必须首先停止```mysqld```服务器。需要注意的是，当你在远程执行```mysqladmin shutdown```命令时，```mysqld```在```mysqladmin```返回之后可能还会运行一小段时间，直到所有的SQL语句处理完成且所有的索引的修改已经flush到了硬盘。
+
+如下是修复的一个步骤：
+
+**1）检查MyISAM表**
+
+首先运行```myisamchk *.MYI```或者```myisamchk -e *.MYI```，假如想抑制一些非必要的信息，则可以使用```-s```选项。假如当前```mysqld```已经停止，你可以使用```--update-state```选项以告诉```myisamchk```将表标志为```checked```。
+
+你只需要对那些使用```myisamchk```检查时检测出错误的表进行修复。对于这些表，请执行下面的```步骤2```
+
+假如你在使用```myisamchk```进行检查时，遇到了一些```unexpected errors```（比如```out of memory```错误)，或者```myisamchk```崩溃，那么请执行下面的```步骤3```。
+
+**2) 简单安全修复(Easy safe repair)**
+
+首先尝试```myisamchk -r -q tbl_name```(这里```-r -q```表示```quick recover mode```)。该命令会尝试修复索引文件而并不会创建一个新的数据文件。假如```数据文件```包含了所有其该有的数据，并且删除链接指向了数据文件中的正确位置，则通过本命令一般可以完成对表的修复。假如通过此命令可以修复成功，那么接着可以继续修复下一个数据表； 否则，使用如下的步骤：
+
+2.1) 在继续进行下面的步骤之前，对数据进行备份
+
+2.2） 使用```myisamchk -r tbl_name```(这里```-r```表示```recover mode```)。该命令会从```数据文件中```移除那些不正确的行以及那些```已删除```的行，并重新创建索引
+
+2.3) 假如前面的步骤失败的话，使用```myisamchk --safe-recover tbl_name```。安全恢复模式会使用一种古老的恢复方法来处理一些```常用恢复方法```不处理的情况，但是一般较为耗时。
+
+<pre>
+假如你想要使修复过程更加快速，那么在运行myisamchk时可以设置'sort_buffer_size'与'key_buffer_size'变量的值为当前可用内存的25%左右
+</pre>
+
+假如在修复时仍遇到一些```unexpected error```（例如```out of memory```错误），或者```myisamchk```崩溃，那么请执行下面的```步骤3```
+
+**3) Difficult repair**
+
+一般来说，只有在索引文件的前```16KB```块都被损坏，或者包含了一些错误的信息，又或者索引文件丢失的情况下才会执行到此步骤。在这种情况下，就有必要创建一个新的索引文件。请执行如下步骤：
+
+3.1) 将数据移文件至一个安全的位置；
+
+3.2) 使用表描述文件来创建一个新的空(empty)数据文件和索引文件
+<pre>
+# mysql db_name
+</pre>
+
+{% highlight string %}
+mysql> SET autocommit=1;
+mysql> TRUNCATE TABLE tbl_name;
+mysql> quit
+{% endhighlight %}
+
+3.3) 拷贝原来老的数据文件到新创建的数据文件那里。然后再回到```步骤2）```，执行```myisamchk -r -q tbl_name```，然后一般就可以修复完成。
+
+<br />
+当然，你也可以使用```REPAIR TABLE tbl_name USE_FRM``` SQL语句来自动的完成整个修复过程。在进行表修复的过程中，不要执行任何其他可能产生干扰的操作。
+
+**4) Very difficult repair**
+
+一般只有在```.frm```描述文件也遭到破坏的情况下，你才会执行到本步骤。但是这种情况一般不会发生，因为表的描述文件在表创建之后是不会进行修改的：
+
+4.1） 重新从备份中加载描述文件，然后返回到```步骤3）```，你也可以重新加载索引未见，然后返回奥```步骤2)```。在后一种情况下，你应该使用```myisamchk -r```来进行恢复。
+
+4.2) 假如当前你并没有备份，但是知道该表是如何创建的，那么你可以在另外一个数据库中重新创建该表。然后从重新创建的表的存储目录拷贝```.frm```文件以及```.MYI```文件到当前崩溃的数据库目录中。这样就使得你重新获得了```表定义文件```以及```索引文件```（但是仍采用原来的```.MYD```文件)。然后再回到**步骤2)**尝试重新构造索引。
 
 
 
+### 3.4 MyISAM表的优化
+为了紧缩分散的行数据以及降低由于删除或更新行数据导致的空间浪费，可以以```recovery mode```来运行```myisamchk```:
+{% highlight string %}
+# myisamchk -r tbl_name
+{% endhighlight %}
+当然，你也可以使用```OPTIMIZE TABLE```这样的SQL语句来对表进行优化。```OPTIMIZE TABLE```会进行表的修复和key的分析，也会对索引树进行排序这样使得查看更快。在这里我们进行优化的时候，同样不要进行其他的操作以免干扰。
 
+```myisamchk```有一系列的其他选项，你可以用于提高相关的操作性能：
 
+* ```--analyze```或者```-a```: 进行key的分布分析。通过启用```join```优化器来提交```join```操作的性能
 
+* ```--sort-index```或者```-S```: 对索引块进行排序，这可以使得使用索引来进行```记录定位```或者扫描表时更加快速。
 
-
-
+* ```--sort-records=index_num```或者```-R index_num```: 根据一个给定的索引对数据行进行排序。这可以使得数据更加紧凑，并且在使用该索引做基于```范围```的```SELECT```或```ORDER BY```操作时会更加的快速。
 
 
 <br />
