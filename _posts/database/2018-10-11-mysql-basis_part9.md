@@ -216,7 +216,7 @@ mysql> select Host, User, Repl_slave_priv from mysql.user;
 mysql> FLUSH TABLES WITH READ LOCK;
 Query OK, 0 rows affected (0.00 sec)
 {% endhighlight %}
-注意在执行完上面的语句之后，并不要退出对应的客户端连接，这样read lock将会一直维持， 否则对应的lock就会释放。
+**注意**:在执行完上面的语句之后，并不要退出对应的客户端连接，这样read lock将会一直维持， 否则对应的lock就会释放。
 
 **2)** 在master另外一个session(即另一个客户端连接）上，使用```SHOW MASTER STATUS```语句来获得当前binlog文件的名称及位置(position)
 {% highlight string %}
@@ -262,6 +262,12 @@ ca-key.pem  client-key.pem   ib_logfile0     master-logbin.000001  mysql        
 ./master-logbin.000001
 ./master-logbin.000002
 {% endhighlight %}
+一般来说，在刚安装好MySQL后对应的数据目录如下：
+<pre>
+# ls /var/lib/mysql/
+auto.cnf    ca.pem           client-key.pem  ibdata1      ib_logfile1  mysql       mysql.sock.lock     private_key.pem  server-cert.pem  sys
+ca-key.pem  client-cert.pem  ib_buffer_pool  ib_logfile0  ibtmp1       mysql.sock  performance_schema  public_key.pem   server-key.pem
+</pre>
 
 
 ### 1.5 使用mysqldump创建数据快照
