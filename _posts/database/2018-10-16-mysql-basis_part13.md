@@ -8,7 +8,12 @@ description: MySQL数据库备份与恢复
 ---
 
 
-本章首先讲述一下数据库的导入与导出，然后再通过相应的示例讲述一下MySQL数据库的备份。
+本章首先讲述一下数据库的导入与导出，然后再通过相应的示例讲述一下MySQL数据库的备份。当前SQL版本为：
+{% highlight string %}
+mysql> status;
+--------------
+mysql  Ver 14.14 Distrib 5.7.22, for Linux (x86_64) using  EditLine wrapper
+{% endhighlight %}
 
 
 <!-- more -->
@@ -285,19 +290,357 @@ mysqlimport语句中使用```--columns```选项来设置列的顺序：
 如下我们创建测试表```t1```和```t2```:
 {% highlight string %}
 use test;
+
+DROP TABLE if EXISTS `t1`;
+
 CREATE TABLE `t1` (
   `i` int(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`i`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
- CREATE TABLE `t2` (
-  `i` int(15) NOT NULL,
+INSERT INTO t1(i) VALUES(100);
+
+
+DROP TABLE if EXISTS `t2`;
+CREATE TABLE `t2` (
+  `i` int(255) NOT NULL,
   PRIMARY KEY (`i`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+INSERT INTO t2(i) VALUES(1000);
+{% endhighlight %}
+执行以下语句进行导入：
+<pre>
+# mysql -uroot -ptestAa@123 < ./test.sql 
+mysql: [Warning] Using a password on the command line interface can be insecure.
+</pre>
+
+**2） 测试读锁**
+
+**Session 1**:
+{% highlight string %}
+mysql> lock table t1 read;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> select * from t1 limit 1;
++-----+
+| i   |
++-----+
+| 100 |
++-----+
+1 row in set (0.00 sec)
+
+
+mysql> INSERT INTO t1(i) VALUES(101);
+ERROR 1099 (HY000): Table 't1' was locked with a READ lock and can't be updated
+
+mysql> UPDATE t1 SET i=101 where i=100;
+ERROR 1099 (HY000): Table 't1' was locked with a READ lock and can't be updated
+{% endhighlight %}
+由上面可见，对于加了读锁的表，在执行加读锁的```session```中可进行读操作，但不能进行插入与更新，当然也不能进行删除。下面再对```t2```进行操作：
+{% highlight string %}
+mysql> select * from t2 limit 1;
+ERROR 1100 (HY000): Table 't2' was not locked with LOCK TABLES
+mysql> INSERT INTO t2(i) VALUES(1001);
+ERROR 1100 (HY000): Table 't2' was not locked with LOCK TABLES
+mysql> UPDATE t2 SET i=1001 where i=1000;
+ERROR 1100 (HY000): Table 't2' was not locked with LOCK TABLES
+{% endhighlight %}
+从上面可知，对于没有加锁的表，不能在执行加锁的session中对表进行访问（包括增删查改）。
+
+
+<br />
+
+**Session 2**:
+{% highlight string %}
+mysql> SELECT * FROM t1 LIMIT 1;
++-----+
+| i   |
++-----+
+| 100 |
++-----+
+1 row in set (0.00 sec)
+
+mysql> SELECT * FROM t2 LIMIT 1;
++------+
+| i    |
++------+
+| 1000 |
++------+
+1 row in set (0.00 sec)
+
+mysql> INSERT INTO t2(i) VALUES(1001);
+Query OK, 1 row affected (0.00 sec)
+
+mysql> INSERT INTO t1(i) VALUES(101);
+//卡死于此
+{% endhighlight %}
+由上面可见，加了读锁的表，在不同session中不可以进行插入操作（更新和删除同理）。但是可以对任一的表进行读取。
+
+<br />
+经实验验：
+
+* 如果我们执行```exit```退出```session1```，那么上面卡死在```session2```中插入就会马上被执行。
+
+* 我们在```session1```中执行```unlock table```，那么上面卡死在```session2```中的插入也会马上执行
+
+
+
+**3） 测试写锁**
+
+下面我们再来测试一下写锁（记得先在```session1```解锁刚刚被加锁的表）.
+
+**Session 1**:
+{% highlight string %}
+mysql> lock table t1 write;
+Query OK, 0 rows affected (0.01 sec)
+
+mysql> INSERT INTO t1(i) VALUES(102);
+Query OK, 1 row affected (0.01 sec)
+
+mysql> SELECT * FROM t1 LIMIT 3;
++-----+
+| i   |
++-----+
+| 100 |
+| 101 |
+| 102 |
++-----+
+3 rows in set (0.00 sec)
+
+mysql> SELECT * FROM t2 LIMIT 3;
+ERROR 1100 (HY000): Table 't2' was not locked with LOCK TABLES
+
+mysql> UPDATE t1 SET i=103 WHERE i=102;
+Query OK, 1 row affected (0.01 sec)
+Rows matched: 1  Changed: 1  Warnings: 0
+
+mysql> DELETE FROM t1 WHERE i=103;
+Query OK, 1 row affected (0.01 sec)
 {% endhighlight %}
 
 
-**2） 测试读锁**
+**Session 2**:
+{% highlight string %}
+mysql> select * from t2 limit 3;
++------+
+| i    |
++------+
+| 1000 |
+| 1001 |
++------+
+2 rows in set (0.01 sec)
+
+mysql> select * from t1 limit 3;
+//卡死于此
+{% endhighlight %}
+从上面可知，若```session```中对表加了写锁，则同一```session```中对该表可以进行增删查改操作。但其他```session```中对该表的读取和修改都会被阻塞，直至表锁被释放。
+
+**4） 在未执行完的query上加锁**
+
+接下来，我们了解下加锁前表上有尚未执行完成的```query```时会怎样？
+
+**Session 1**(记得先解锁刚刚被加锁的表):
+{% highlight string %}
+mysql> select i,sleep(60) from t1 limit 1;
++-----+-----------+
+| i   | sleep(60) |
++-----+-----------+
+| 100 |         0 |
++-----+-----------+
+1 row in set (1 min 7.08 sec)
+{% endhighlight %}
+
+**Session 2**:
+{% highlight string %}
+mysql> lock table t1 read;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> unlock table;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> lock table t1 write;
+Query OK, 0 rows affected (52.75 sec)
+{% endhighlight %}
+
+可见，表上有尚未完成的查询操作时可以加读锁，但加写锁会阻塞。
+
+<br />
+
+**Session 1**:
+{% highlight string %}
+mysql> begin;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> INSERT INTO t1(i) VALUES(105);
+Query OK, 1 row affected (0.00 sec)
+
+mysql> commit;							//等待session2执行获取读锁再提交
+Query OK, 0 rows affected (0.00 sec)
+{% endhighlight %}
+
+**Session 2**:
+{% highlight string %}
+mysql> lock table t1 read;
+Query OK, 0 rows affected (23.39 sec)
+{% endhighlight %}
+
+上面我们看到，表上有尚未提交的事务，获取读锁会阻塞。
+
+
+**5) FLUSH TABLES与锁**
+
+接下来，来了解下```FLUSH TABLES```时表上有尚未执行完成的查询会怎样？
+
+**Session 1**:
+{% highlight string %}
+mysql> select i,sleep(60) from t1 limit 1;
+{% endhighlight %}
+
+**Session 2**:
+{% highlight string %}
+mysql> flush tables t1;
+{% endhighlight %}
+可见，由于将要被```flush```的表上有查询尚未完成，因此```flush tables```操作被阻塞，直至所有表上的操作完成，```flush tables```操作才得以完成。
+
+**Session 3**:
+{% highlight string %}
+mysql> select * from t1 limit 1;
+{% endhighlight %}
+由于```flush tables```被阻塞，导致后续其他```session```中对该表的查询也会被阻塞。
+
+**Session 4**:
+{% highlight string %}
+mysql> use information_schema;
+Database changed
+mysql> select * from processlist where db='test';
++----+------+-----------+------+---------+------+-------------------------+------------------------------------+
+| ID | USER | HOST      | DB   | COMMAND | TIME | STATE                   | INFO                               |
++----+------+-----------+------+---------+------+-------------------------+------------------------------------+
+| 22 | root | localhost | test | Query   |   17 | Waiting for table flush | select * from t1 limit 1           |
+| 14 | root | localhost | test | Query   |   21 | Waiting for table flush | flush tables t1                    |
+| 19 | root | localhost | test | Query   |   24 | User sleep              | select i,sleep(60) from t1 limit 1 |
++----+------+-----------+------+---------+------+-------------------------+------------------------------------+
+3 rows in set (0.01 sec)
+{% endhighlight %}
+在另外一个session中，通过执行上面的查询(或```SHOW PROCESSLIST```)我们可以看到线程的状态。直至ID为```19```的线程执行完了SQL查询之后，```flush tables```动作才得以完成。继而后续的```select```操作才顺利完成。
+
+<br />
+
+从上面```Session 1/2/3/4```可见，执行```flush tables```操作或者隐含包含```flush tables```的操作时要小心谨慎。在上面所有步骤都执行完成之后，我们看到：
+{% highlight string %}
+mysql> select * from processlist where db='test';
++----+------+-----------+------+---------+------+-------+------+
+| ID | USER | HOST      | DB   | COMMAND | TIME | STATE | INFO |
++----+------+-----------+------+---------+------+-------+------+
+| 22 | root | localhost | test | Sleep   |  113 |       | NULL |
+| 14 | root | localhost | test | Sleep   |  117 |       | NULL |
+| 19 | root | localhost | test | Sleep   |  120 |       | NULL |
++----+------+-----------+------+---------+------+-------+------+
+{% endhighlight %}
+
+
+## 3. MySQL binlog基本配置与格式设定
+我们在前面已经较为详细的介绍了MySQL binlog的三种格式：```statement-based log```、```row-based log```以及```mix-based log```。这里我们只讲述一下```binlog```的基本配置与格式设定。
+
+### 3.1 基本配置
+mysql binlog日志格式可以在mysql的配置文件```my.cnf```中通过相应的属性来进行设置：
+<pre>
+[mysqld]
+# binlog的日志格式
+binlog_format=MIXED
+
+# 指定binlog日志名（一般存放于/var/lib/mysql目录下)
+log_bin=master-logbin
+
+# binlog过期清理时间
+expire_logs_days=7
+
+# binlog每一个日志文件大小
+max_binlog_size=100M
+</pre>
+
+### 3.2 mysql binlog日志分析
+当前我们MySQL的```my.cnf```配置如下：
+{% highlight string %}
+[mysqld]
+log-bin=master-logbin
+server-id=1921681001
+{% endhighlight %}
+
+下面我们来简单看一下MySQL的binlog文件：
+{% highlight string %}
+# cp /var/lib/mysql/master-logbin* ./
+
+# mysqlbinlog ./master-logbin.000002 | more
+/*!50530 SET @@SESSION.PSEUDO_SLAVE_MODE=1*/;
+/*!50003 SET @OLD_COMPLETION_TYPE=@@COMPLETION_TYPE,COMPLETION_TYPE=0*/;
+DELIMITER /*!*/;
+# at 4
+#181011 17:16:40 server id 1921681001  end_log_pos 123 CRC32 0x8fe8a193         Start: binlog v 4, server v 5.7.22-log created 181011 17:16:40 at startup
+ROLLBACK/*!*/;
+BINLOG '
++BS/Ww9phopydwAAAHsAAAAAAAQANS43LjIyLWxvZwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAD4FL9bEzgNAAgAEgAEBAQEEgAAXwAEGggAAAAICAgCAAAACgoKKioAEjQA
+AZOh6I8=
+'/*!*/;
+# at 123
+#181011 17:16:40 server id 1921681001  end_log_pos 154 CRC32 0x975f89ab         Previous-GTIDs
+# [empty]
+# at 154
+#181011 18:58:39 server id 1921681001  end_log_pos 219 CRC32 0x93411134         Anonymous_GTID  last_committed=0        sequence_number=1       rbr_only=no
+SET @@SESSION.GTID_NEXT= 'ANONYMOUS'/*!*/;
+# at 219
+#181011 18:58:39 server id 1921681001  end_log_pos 399 CRC32 0x79ae24eb         Query   thread_id=2     exec_time=0     error_code=0
+SET TIMESTAMP=1539255519/*!*/;
+SET @@session.pseudo_thread_id=2/*!*/;
+SET @@session.foreign_key_checks=1, @@session.sql_auto_is_null=0, @@session.unique_checks=1, @@session.autocommit=1/*!*/;
+SET @@session.sql_mode=1436549152/*!*/;
+SET @@session.auto_increment_increment=1, @@session.auto_increment_offset=1/*!*/;
+/*!\C utf8 *//*!*/;
+SET @@session.character_set_client=33,@@session.collation_connection=33,@@session.collation_server=8/*!*/;
+SET @@session.lc_time_names=0/*!*/;
+SET @@session.collation_database=DEFAULT/*!*/;
+CREATE USER 'repl'@'%' IDENTIFIED WITH 'mysql_native_password' AS '*3FFD6E04483514E561849FD8D866C05A69EFA570'
+/*!*/;
+# at 399
+#181011 18:58:51 server id 1921681001  end_log_pos 464 CRC32 0x8ef7b206         Anonymous_GTID  last_committed=1        sequence_number=2       rbr_only=no
+SET @@SESSION.GTID_NEXT= 'ANONYMOUS'/*!*/;
+# at 464
+#181011 18:58:51 server id 1921681001  end_log_pos 595 CRC32 0xfc5ae713         Query   thread_id=2     exec_time=0     error_code=0
+SET TIMESTAMP=1539255531/*!*/;
+GRANT REPLICATION SLAVE ON *.* TO 'repl'@'%'
+/*!*/;
+# at 595
+#181011 18:59:09 server id 1921681001  end_log_pos 660 CRC32 0x2c95c9cb         Anonymous_GTID  last_committed=2        sequence_number=3       rbr_only=no
+SET @@SESSION.GTID_NEXT= 'ANONYMOUS'/*!*/;
+# at 660
+#181011 18:59:09 server id 1921681001  end_log_pos 747 CRC32 0x7046e9a5         Query   thread_id=2     exec_time=0     error_code=0
+SET TIMESTAMP=1539255549/*!*/;
+SET @@session.time_zone='SYSTEM'/*!*/;
+FLUSH PRIVILEGES
+{% endhighlight %}
+
+这里我们主要是需要注意一下```server id```以及```end_log_pos```这两个字段。
+
+### 4. MySQL 数据备份实战
+MySQL数据的备份类型根据自身的特性主要分为以下几组：
+
+* 完全备份： 是备份整个数据集(即整个数据库)
+
+* 部分备份: 备份部分数据集（例如，只备份一个表）。而部分备份又可以分为```增量备份```和```差异备份```。
+<pre>
+增量备份： 备份自上一次备份以来（增量或完全）变化的数据。 优点是节约空间，但是还原较为麻烦
+
+差异备份： 备份自上一次完全备份以来变化的数据。优点是还原比增量备份简单，缺点是浪费空间。
+</pre>
+
+![db-backup](https://ivanzz1001.github.io/records/assets/img/db/db_increment_backup.jpg)
+
+
+
+
+
 
 
 
