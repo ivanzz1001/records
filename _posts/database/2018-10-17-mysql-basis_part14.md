@@ -174,6 +174,9 @@ Query OK, 0 rows affected (0.00 sec)
 
 然后新创建一个```数据库```及```表```，并向表中插入一些数据：
 {% highlight string %}
+mysql> CREATE DATABASE test2;
+mysql> use test2;
+
 mysql> CREATE TABLE person(
     ->  id INT(11) PRIMARY KEY AUTO_INCREMENT,
     ->  name char(64) NOT NULL,
@@ -356,7 +359,7 @@ Oct 26 14:44:01 bogon systemd[1]: Started Session 3689 of user root.
 # setenforce 0
 # getenforce 
 </pre>
-上面指示临时关闭```SeLinux```，如果要永久修改，则可以：
+上面只是临时关闭```SeLinux```，如果要永久修改，则可以：
 <pre>
 # cat /etc/selinux/config 
 
@@ -484,6 +487,311 @@ mysql> select * from person;
 +----+----------+------+
 2 rows in set (0.00 sec)
 {% endhighlight %}
+
+
+### 2.2 逻辑全量备份+增量备份
+
+我们当前数据库状态：
+{% highlight string %}
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| app                |
+| mysql              |
+| performance_schema |
+| sys                |
+| test               |
++--------------------+
+6 rows in set (0.01 sec)
+
+mysql> use test;
+Database changed
+mysql> show tables;
++----------------+
+| Tables_in_test |
++----------------+
+| course         |
+| runoob_tbl     |
+| student        |
++----------------+
+3 rows in set (0.00 sec)
+{% endhighlight %}
+并且当前我们已经开启了binlog日志：
+{% highlight string %}
+mysql> SHOW VARIABLES LIKE 'sql_log_bin';
++---------------+-------+
+| Variable_name | Value |
++---------------+-------+
+| sql_log_bin   | ON    |
++---------------+-------+
+1 row in set (0.00 sec)
+{% endhighlight %}
+
+
+**1） 全量备份MySQL数据库**
+{% highlight string %}
+# ls /var/lib/mysql/
+app/                  client-key.pem        ibtmp1                master-logbin.000005  mysql.sock.lock         server-key.pem           
+auto.cnf              ib_buffer_pool        master-logbin.000001  master-logbin.000006  performance_schema/     sys/         
+ca-key.pem            ibdata1               master-logbin.000002  master-logbin.index   private_key.pem         test/         
+ca.pem                ib_logfile0           master-logbin.000003  mysql/                public_key.pem                  
+client-cert.pem       ib_logfile1           master-logbin.000004  mysql.sock            server-cert.pem   
+  
+# mysqldump -uroot -ptestAa@123 --single-transaction --flush-logs --master-data=2 \
+--all-databases > backup_sunday_1_PM.sql
+{% endhighlight %}
+导出后，我们查看```backup_sunday_1_PM.sql```:
+{% highlight string %}
+# more ./backup_sunday_1_PM.sql 
+-- MySQL dump 10.13  Distrib 5.7.22, for Linux (x86_64)
+--
+-- Host: localhost    Database: 
+-- ------------------------------------------------------
+-- Server version       5.7.22-log
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Position to start replication or point-in-time recovery from
+--
+
+-- CHANGE MASTER TO MASTER_LOG_FILE='master-logbin.000007', MASTER_LOG_POS=154;
+{% endhighlight %}
+可以看到我们当前拷贝时的binlog偏移是```master-logbin.000007, position=154```。
+
+然后我们再查看MySQL数据目录```/var/lib/mysql```:
+<pre>
+# ls /var/lib/mysql
+app         client-cert.pem  ib_logfile0           master-logbin.000002  master-logbin.000006  mysql.sock          public_key.pem   test
+auto.cnf    client-key.pem   ib_logfile1           master-logbin.000003  master-logbin.000007  mysql.sock.lock     server-cert.pem
+ca-key.pem  ib_buffer_pool   ibtmp1                master-logbin.000004  master-logbin.index   performance_schema  server-key.pem
+ca.pem      ibdata1          master-logbin.000001  master-logbin.000005  mysql                 private_key.pem     sys
+</pre>
+可以看到日志已经刷新到了```master-logbin.000007```。
+
+
+**2) 修改数据，进行增量备份**
+
+
+如下我们修改数据，并产生相应的日志来模拟增量备份：
+{% highlight string %}
+mysql> CREATE DATABASE test2;
+Query OK, 1 row affected (0.00 sec)
+
+mysql> use test2;
+Database changed
+mysql> CREATE TABLE person(
+    -> id INT(11) PRIMARY KEY AUTO_INCREMENT,
+    -> name char(64) NOT NULL,
+    -> age int
+    -> )ENGINE=InnoDB DEFAULT CHARSET=utf8;
+Query OK, 0 rows affected (0.02 sec)
+
+mysql> INSERT INTO person(name,age) VALUES("ivan1001",20);
+Query OK, 1 row affected (0.00 sec)
+
+mysql> INSERT INTO person(name, age) VALUES("scarllet",18);
+Query OK, 1 row affected (0.00 sec)
+{% endhighlight %}
+
+**3) 增量备份**
+
+首先将表锁住，并获取到当前的日志偏移：
+{% highlight string %}
+mysql> FLUSH TABLES WITH READ LOCK;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> SHOW MASTER STATUS;
++----------------------+----------+--------------+------------------+-------------------+
+| File                 | Position | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set |
++----------------------+----------+--------------+------------------+-------------------+
+| master-logbin.000007 |     1136 |              |                  |                   |
++----------------------+----------+--------------+------------------+-------------------+
+1 row in set (0.01 sec)
+{% endhighlight %}
+
+备份增量日志数据：
+<pre>
+# cp /var/lib/mysql/master-logbin.000007 ./increment_bakup/
+</pre>
+
+
+**4) 停止MySQL，并模拟数据丢失**
+{% highlight string %}
+# mysqladmin -uroot -ptestAa@123 shutdown 
+# rm -rf /var/lib/mysql/*
+{% endhighlight %}
+
+**5) 重新启动数据库**
+{% highlight string %}
+# systemctl start mysqld
+# systemctl status mysqld
+● mysqld.service - MySQL Server
+   Loaded: loaded (/usr/lib/systemd/system/mysqld.service; enabled; vendor preset: disabled)
+   Active: active (running) since Fri 2018-10-26 20:24:10 CST; 9s ago
+     Docs: man:mysqld(8)
+           http://dev.mysql.com/doc/refman/en/using-systemd.html
+  Process: 61878 ExecStart=/usr/sbin/mysqld --daemonize --pid-file=/var/run/mysqld/mysqld.pid $MYSQLD_OPTS (code=exited, status=0/SUCCESS)
+  Process: 61798 ExecStartPre=/usr/bin/mysqld_pre_systemd (code=exited, status=0/SUCCESS)
+ Main PID: 61881 (mysqld)
+   Memory: 320.3M
+   CGroup: /system.slice/mysqld.service
+           └─61881 /usr/sbin/mysqld --daemonize --pid-file=/var/run/mysqld/mysqld.pid
+
+Oct 26 20:24:04 bogon mysqld_pre_systemd[61798]: Full path required for exclude: net:[4026533041].
+Oct 26 20:24:04 bogon mysqld_pre_systemd[61798]: Full path required for exclude: net:[4026532849].
+Oct 26 20:24:05 bogon mysqld_pre_systemd[61798]: Full path required for exclude: net:[4026532945].
+Oct 26 20:24:05 bogon mysqld_pre_systemd[61798]: Full path required for exclude: net:[4026533137].
+Oct 26 20:24:05 bogon mysqld_pre_systemd[61798]: Full path required for exclude: net:[4026532753].
+Oct 26 20:24:05 bogon mysqld_pre_systemd[61798]: Full path required for exclude: net:[4026533329].
+Oct 26 20:24:05 bogon mysqld_pre_systemd[61798]: Full path required for exclude: net:[4026533233].
+Oct 26 20:24:05 bogon mysqld_pre_systemd[61798]: Full path required for exclude: net:[4026533041].
+Oct 26 20:24:05 bogon mysqld_pre_systemd[61798]: Full path required for exclude: net:[4026532849].
+Oct 26 20:24:10 bogon systemd[1]: Started MySQL Server.
+{% endhighlight %}
+```注意```： 启动MySQL, 如果是编译安装的应该不能启动(需重新初始化), 如果rpm安装则会重新初始化数据库。
+
+接下来我们登录数据库查看一下：
+{% highlight string %}
+# mysql -uroot -ptestAa@123
+mysql: [Warning] Using a password on the command line interface can be insecure.
+ERROR 1045 (28000): Access denied for user 'root'@'localhost' (using password: YES)
+{% endhighlight %}
+我们看到因为所有数据都已经丢失，我们目前已经无法登录数据库了。本次MySQL数据库启动，是MySQL重新初始化的数据库，可以通过如下方式找到初始登录密码：
+<pre>
+# grep "password" /var/log/mysqld.log 
+2018-10-26T06:12:18.237980Z 1 [Note] A temporary password is generated for root@localhost: wx_B:;sUk4?;
+2018-10-26T06:16:39.369163Z 2 [Note] Access denied for user 'root'@'localhost' (using password: YES)
+</pre>
+因此如下我们先使用密码```wx_B:;sUk4?;```以登录查看：
+{% highlight string %}
+# mysql -uroot -p
+
+//登录后必须首先修改密码才能再进行操作
+mysql> show databases;
+ERROR 1820 (HY000): You must reset your password using ALTER USER statement before executing this statement.
+mysql> ALTER USER 'root'@'localhost' IDENTIFIED BY 'testAa@123';
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> flush privileges;
+Query OK, 0 rows affected (0.01 sec)
+
+
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| sys                |
++--------------------+
+4 rows in set (0.00 sec)
+{% endhighlight %}
+上面我们看到原来的数据全部丢失了。
+
+**6) 全量恢复数据库**
+
+首先暂时关闭二进制日志：
+{% highlight string %}
+mysql> SET sql_log_bin=OFF;
+Query OK, 0 rows affected (0.01 sec)
+{% endhighlight %}
+
+然后再全量恢复数据：
+{% highlight string %}
+mysql> source /root/mysql_bakup/backup_sunday_1_PM.sql
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| app                |
+| mysql              |
+| performance_schema |
+| sys                |
+| test               |
++--------------------+
+6 rows in set (0.00 sec)
+
+mysql> use test;
+Database changed
+mysql> select * from course;
++----+-------------------------+-------+
+| id | coursename              | stuid |
++----+-------------------------+-------+
+|  1 | MySQL从入门到精通       |  1001 |
+|  2 | 爱情与婚姻              |  1002 |
+|  3 | Java从入门到放弃        |  1003 |
+|  4 | 商务礼仪                |  1004 |
+|  5 | 表演的艺术              |  1005 |
+|  6 | 民法                    |  1006 |
+|  7 | 民法                    |  1001 |
++----+-------------------------+-------+
+7 rows in set (0.00 sec)
+{% endhighlight %}
+可以看到当前全量数据已经恢复。
+
+我们在此再开启二进制日志：
+{% highlight string %}
+mysql> SET sql_log_bin=ON;
+Query OK, 0 rows affected (0.00 sec)
+{% endhighlight %}
+
+**7) 恢复增量数据**
+
+这里我们使用binlog来做增量恢复。上面我们备份了增量日志文件```master-logbin.000007```，并且知道了position。因此我们可以来进行增量恢复：
+{% highlight string %}
+# mysqlbinlog --start-position=154 --stop-position=1136 ./master-logbin.000007 | mysql -uroot -ptestAa@123
+mysql: [Warning] Using a password on the command line interface can be insecure.
+{% endhighlight %}
+
+增量恢复完成后，我们登录查看：
+{% highlight string %}
+# mysql -uroot -ptestAa@123
+
+mysql> use test2;
+Reading table information for completion of table and column names
+You can turn off this feature to get a quicker startup with -A
+
+Database changed
+mysql> show tables;
++-----------------+
+| Tables_in_test2 |
++-----------------+
+| person          |
++-----------------+
+1 row in set (0.00 sec)
+
+mysql> select * from person;
++----+----------+------+
+| id | name     | age  |
++----+----------+------+
+|  1 | ivan1001 |   20 |
+|  2 | scarllet |   18 |
++----+----------+------+
+2 rows in set (0.00 sec)
+{% endhighlight %}
+
+我们看到数据已经完全恢复。
+
+
+## 3. binlog日志瘦身
+
+
+
+
 
 
 
