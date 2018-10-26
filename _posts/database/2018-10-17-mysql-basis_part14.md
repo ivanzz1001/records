@@ -226,7 +226,7 @@ mysql> SHOW MASTER STATUS;
 我们通过如下方式来模拟数据丢失：
 {% highlight string %}
 # mysqladmin -uroot -ptestAa@123 shutdown
-# rm -rf /var/lib/mysql
+# rm -rf /var/lib/mysql/*
 {% endhighlight %}
 
 **6) 重新启动MySQL**
@@ -312,6 +312,7 @@ mysql> show databases;
 # mkdir -p /var/lib/mysql
 # chown -R mysql:mysql /var/lib/mysql
 # cp -ar full_bakup/* /var/lib/mysql/
+# chown -R mysql:mysql /var/lib/mysql
 </pre>
 接着重启mysql数据库：
 {% highlight string %}
@@ -379,7 +380,41 @@ SELINUXTYPE=targeted
 
 * 配置使得允许访问```/var/lib/mysql```目录
 {% highlight string %}
+# semanage fcontext --list | grep mysql
+/etc/mysql(/.*)?                                   all files          system_u:object_r:mysqld_etc_t:s0 
+/etc/my\.cnf\.d(/.*)?                              all files          system_u:object_r:mysqld_etc_t:s0 
+/var/log/mysql.*                                   regular file       system_u:object_r:mysqld_log_t:s0 
+/var/lib/mysql(/.*)?                               all files          system_u:object_r:mysqld_db_t:s0 
+/var/run/mysqld(/.*)?                              all files          system_u:object_r:mysqld_var_run_t:s0 
+/var/log/mariadb(/.*)?                             all files          system_u:object_r:mysqld_log_t:s0 
+/var/run/mariadb(/.*)?                             all files          system_u:object_r:mysqld_var_run_t:s0 
+/usr/sbin/mysqld(-max)?                            regular file       system_u:object_r:mysqld_exec_t:s0 
+/var/run/mysqld/mysqlmanager.*                     regular file       system_u:object_r:mysqlmanagerd_var_run_t:s0 
+/usr/lib/systemd/system/mysqld.*                   regular file       system_u:object_r:mysqld_unit_file_t:s0 
+/usr/share/munin/plugins/mysql_.*                  regular file       system_u:object_r:services_munin_plugin_exec_t:s0 
+/usr/lib/systemd/system/mariadb.*                  regular file       system_u:object_r:mysqld_unit_file_t:s0 
+/etc/my\.cnf                                       regular file       system_u:object_r:mysqld_etc_t:s0 
+/root/\.my\.cnf                                    regular file       system_u:object_r:mysqld_home_t:s0 
+/usr/sbin/ndbd                                     regular file       system_u:object_r:mysqld_exec_t:s0 
+/usr/libexec/mysqld                                regular file       system_u:object_r:mysqld_exec_t:s0 
+/usr/bin/mysqld_safe                               regular file       system_u:object_r:mysqld_safe_exec_t:s0 
+/usr/bin/mysql_upgrade                             regular file       system_u:object_r:mysqld_exec_t:s0 
+/usr/sbin/mysqlmanager                             regular file       system_u:object_r:mysqlmanagerd_exec_t:s0 
+/etc/rc\.d/init\.d/mysqld                          regular file       system_u:object_r:mysqld_initrc_exec_t:s0 
+/var/lib/mysql/mysql\.sock                         socket             system_u:object_r:mysqld_var_run_t:s0 
+/usr/sbin/zabbix_proxy_mysql                       regular file       system_u:object_r:zabbix_exec_t:s0 
+/etc/rc\.d/init\.d/mysqlmanager                    regular file       system_u:object_r:mysqlmanagerd_initrc_exec_t:s0 
+/usr/sbin/zabbix_server_mysql                      regular file       system_u:object_r:zabbix_exec_t:s0 
+/usr/libexec/mysqld_safe-scl-helper                regular file       system_u:object_r:mysqld_safe_exec_t:s0 
+/usr/lib/nagios/plugins/check_mysql                regular file       system_u:object_r:nagios_services_plugin_exec_t:s0 
+/usr/lib/nagios/plugins/check_mysql_query          regular file       system_u:object_r:nagios_services_plugin_exec_t:s0 
+/var/lib/mysql-files = /var/lib/mysql
+/var/lib/mysql-keyring = /var/lib/mysql
+
+//因为上面已经存在mysqle_db_t，因此如下一条语句可以不用执行
 # semanage fcontext -a -t mysqld_db_t "/var/lib/mysql(/.*)?"
+
+
 # chcon -Rv -u system_u -r object_r -t mysqld_db_t /var/lib/mysql
 # restorecon -Rv /var/lib/mysql/
 # ls -Z /var/lib/mysql
@@ -789,7 +824,43 @@ mysql> select * from person;
 
 ## 3. binlog日志瘦身
 
+一般经过一段时间之后，MySQL就会有很多binlog日志了:
+<pre>
+# ls /var/lib/mysql/ 
+app         client-cert.pem  ib_logfile0           master-logbin.000002  master-logbin.000006  mysql.sock          public_key.pem   test
+auto.cnf    client-key.pem   ib_logfile1           master-logbin.000003  master-logbin.000007  mysql.sock.lock     server-cert.pem  test2
+ca-key.pem  ib_buffer_pool   ibtmp1                master-logbin.000004  master-logbin.index   performance_schema  server-key.pem
+ca.pem      ibdata1          master-logbin.000001  master-logbin.000005  mysql                 private_key.pem     sys
 
+# cat /var/lib/mysql/master-logbin.index 
+./master-logbin.000001
+./master-logbin.000002
+./master-logbin.000003
+./master-logbin.000004
+./master-logbin.000005
+./master-logbin.000006
+./master-logbin.000007
+</pre>
+
+我们可以定时的对这些日志进行清理，例如：
+<pre>
+mysql> PURGE BINARY LOGS TO 'master-logbin.000006';
+Query OK, 0 rows affected (0.01 sec)
+</pre>
+清理完成之后，我们看到：
+<pre>
+# ls /var/lib/mysql/
+app         ca.pem           ib_buffer_pool  ib_logfile1           master-logbin.000007  mysql.sock          private_key.pem  server-key.pem  test2
+auto.cnf    client-cert.pem  ibdata1         ibtmp1                master-logbin.index   mysql.sock.lock     public_key.pem   sys
+ca-key.pem  client-key.pem   ib_logfile0     master-logbin.000006  mysql                 performance_schema  server-cert.pem  test
+
+# cat /var/lib/mysql/master-logbin.index 
+./master-logbin.000006
+./master-logbin.000007
+</pre>
+
+
+更多关于清理binlog日志的说明，请参看[mysql数据库基础（八）](https://ivanzz1001.github.io/records/post/database/2018/10/01/mysql-basis_part8)
 
 
 
