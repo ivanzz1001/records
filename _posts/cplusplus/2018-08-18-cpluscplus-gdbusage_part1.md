@@ -190,14 +190,289 @@ Try "help target" or "continue".
 
 * 参数(arguments)： 为可执行程序指定参数，并将此作为```run```命令的参数。
 
-* 环境(environment):
+* 环境(environment): 通常你所运行的程序会从GDB继承相应的```environment```，但是你也可以使用GDB命令```set environment```和```unset environment```来更改部分对你所运行程序有影响的环境变量（请参```2.4 程序的环境变量```)。
 
-* 工作目录(working directory):
+* 工作目录(working directory): 你所运行的程序会从GDB那里继承其工作目录(working dir)，你可以通过在GDB中使用```cd```命令来修改GDB的工作目录(参看```2.5 程序的工作目录```)
 
-* 标准输入输出(standard input and output):
+* 标准输入输出(standard input and output): 通常你所运行的程序会使用与GDB相同的标准输入/输出。你可以通过```run```命令来重定向输入/输出，也可以通过```tty```命令来为程序设置一个不同的输入/输出设备。（参看```2.6 程序的输入/输出```) ```注意```: 当输入/输出被重定向之后，你将不能使用管道(pipe)来你所调试程序的输出再传递到另一个程序；假如你尝试这样做的话，gdb则可能会出现异常，变成调试另外一个错误的程序。
 
 
+当你使用```run```命令时，你所调试的程序将会马上被执行。对于如何```stop and continue```，我们后续会进行介绍。而一旦你所调试的程序暂停下来，你就可以使用```print```或者```call```命令。
 
+假如你所调试程序的符号表的```mtime```(修改时间）已经发生了改变，则GDB会丢弃原来所读取到的符号表，再重新读取。在这一过程中，gdb仍然会尝试保留当前的```断点```(breakpoints).
+
+* **start**: 对于不同的语言，主调用过程（main procedure)的名称也可能会不同。对于C/C++而言，主调用过程（main procedure)的名称始终为```main```，但是对于如Ada这样的一些其他语言，其并不需要为主调用过程(main procedure)指定一个特别的名字。因此，GDB提供了一种很方便的方法来启动程序的执行，并在主调用过程(main procedure)开始位置暂停下来。
+
+```start```命令等价于在主调用过程(main procedure)的起始位置设置一个临时的断点，然后再调用run命令。对于有一些程序来说，在主调用过程(main procedure)执行之前，还会先执行一段启动代码(startup code)。这通常取决于你所编写的程序所使用的编程语言。例如，对于C++来说，静态对象(static object)与全局对象(global object)的构造函数会在调用main()函数之前就被调用。因此存在着这样一种可能： 在调试程序时，debugger会在到达```main procedure```之前就暂停在某处。然而，在后续到达临时breakpoints时仍然还会继续暂停程序的执行。
+
+
+另外，你可以在执行```start```命令时指定相应的参数，这些参数将会作为后续```run```命令的参数。值得注意的是，假如你后续再重新执行```start```或者```run```命令时，并未再指定参数，那么其会继承上一次执行该命令时所采用的参数。例如：
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+
+
+int main(int argc,char *argv[])
+{
+        int i;
+
+        for(i = 0;i<argc; i++)
+                printf("%s\n", argv[i]);
+
+        return 0x0;
+}
+{% endhighlight %}
+编译并进行调试：
+{% highlight string %}
+# gcc -c -g test.c
+# gcc -o test test.o
+
+# gdb --silent ./test 
+Reading symbols from /root/workspace/test...(no debugging symbols found)...done.
+(gdb) start 1 2 3 4 5
+Temporary breakpoint 1 at 0x400531
+Starting program: /root/workspace/./test 1 2 3 4 5
+
+Temporary breakpoint 1, 0x0000000000400531 in main ()
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) c
+Continuing.
+/root/workspace/./test
+1
+2
+3
+4
+5
+[Inferior 1 (process 3332) exited normally]
+(gdb) r
+Starting program: /root/workspace/./test 1 2 3 4 5
+/root/workspace/./test
+1
+2
+3
+4
+5
+[Inferior 1 (process 3336) exited normally]
+{% endhighlight %}
+上面我们可以看到，我们通过```start```直接传递参数，后续通过```continue```执行时就把相应的参数打印出来了。
+
+
+有时候，我们想要在```elaboration```期间(即在进入主调用过程之前）就调试程序。在这种情况下，我们使用```start```则可能会使得暂停在过晚的位置，因为这时程序已经完成了```elaboration phase```。因此，我们可以在运行程序之前，在```elaboration```代码处先插入断点(breakpoints)。
+
+* **set exec-wrapper wrapper / show exec-wrapper / unset exec-wrapper**: 当```exec-wrapper```被设置之后，则在启动调试程序的时候指定的```wrapper```就会被使用。GDB会以```exec wrapper program```这样的shell命令格式启动可执行程序（说明： exec并不会启动一个新的shell来执行程序，因此program会继承wrapper的执行环境）。在启动时，会对```program```及参数加上双引号，但是对于wrapper则不会自动加上，因此适当的情况下，你可能需要对wrapper自己加上双引号。wrapper会在你运行程序的时候执行，之后才把控制权交给GDB。
+
+你可以使用任何程序```wrapper```(甚至是```execve```)。有多个标准的```unix```工具可作为wrapper(例如```env```和```nohup```)。例如，你可以使用```env```来向调试程序传递环境变量，这样你就可以不用在shell环境中设置这些变量：
+<pre>
+(gdb) set exec-wrapper env 'LD_PRELOAD=libtest.so'
+(gdb) run
+</pre>
+上述命令在大多数平台上调试本地程序时都是有效的，除了```DJGPP```、```Cygwin```、```MS Windows```以及```QNX Neutrino```之外。
+
+* **set startup-with-shell / set startup-with-shell on / set startup-with-shell off / show set startup-with-shell**: 在Unix系统上，默认情况下，假如对应的target有可用的shell的话，GDB都会使用该Shell来启动程序。GDB的```run```命令会将参数传递给shell，然后shell可能会做```变量替换```(variable substitution)、扩展通配字符并进行IO重定向。然而在有一些情况下，我们可能需要禁止shell做这样的替换，例如，当调试shell本身或者诊断一些启动错误时：
+<pre>
+(gdb) run
+Starting program: ./a.out
+During startup program terminated with signal SIGSEGV, Segmentation fault.
+</pre>
+上面显示shell或者通过```exec-wrapper```指定的wrapper崩溃了，而不是你所运行的程序出了问题。在大多数情况下，这可能是由于你的shell初始化文件出了写问题，比如C-shell的```.cshrc```、Z-shell的```.zshenv```、BASH的```BASH_ENV```环境变量指定的文件出了问题。
+
+
+* **set auto-connect-native-target / set auto-connect-native-target on / set auto-connect-native-target off / show auto-connect-native-target**
+
+* **set disable-randomization / set disable-randomization on / set disable-randomization off** : 通常情况下GDB会在一个随机的虚拟地址启动程序。我们编译生成的程序也最好通过```gcc -fPIE -pie```这样的选项来生成位置独立的可执行程序。
+
+
+### 2.3 程序运行参数
+要想为你所调试的程序指定运行参数的话，你可以在执行```run```命令时附加相应的参数。这些参数会被传递给shell，然后shell会对相应的通配符进行展开并进行IO重定向，处理完成之后才会被传递给可执行程序。GDB所使用的shell是受```SHELL```环境变量(假如存在的话）控制的，假如当前并未定义```SHELL```环境变量，则Unix上默认为```/bin/sh```。
+
+在一些非Unix系统上，程序通常是由GDB直接来调用的，这样GDB会通过适当的系统调用来模拟IO重定向，并且通配字符会由程序的启动代码所展开。
+
+当```run```命令在执行时并未指定参数，那么其会沿用上一次```run```执行时所采用的参数。
+
+* **set args**: 指定下一次你的程序运行时所使用的参数。假如```set args```并未指定参数，则在下一次使用```run```来运行程序时也不会携带参数。一旦你已经使用过参数来运行程序，那么在下一次使用```run```命令运行程序之前只能通过```set args```来取消参数。
+
+
+* **show args**: 用于显示你给可执行程序所传递的参数
+
+### 2.4 程序的执行环境
+```environment```是由一系列的```环境变量```及```值```组成。环境变量通常用于记录```用户名```、```home目录```、```终端类型```、```可执行程序的搜索路径```等。通常你使用shell来建立环境变量，并且所有你运行的其他程序都会继承这些环境变量。当进行调试的时候，我们可能需要在不重启GDB的情况下修改程序执行时的环境变量。
+
+* **path directory**: 在```PATH```环境变量(用于指定可执行文件的搜索路径)之前添加```directory```， 并将相应的值传递给你所调试的程序。GDB所使用的```PATH```并不会发生改变。你可以通过本命令指定多个目录名称，以空格或者是```system-dependent```字符来分割（在Unix系统上一般用```:```来分割； 在MS-DOS上一般用```;```来分割）。假如```directory```当前已经在path中，则会移动到前面，这样就可以加速搜索。
+
+你可以使用```$cwd```来引用当前的工作目录，以作为GDB的搜索路径。假如你使用```.```的话，则其所引用的是你执行path命令时所在的目录。例如：
+{% highlight string %}
+# gdb --silent ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) show paths
+Executable and object file path: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin
+(gdb) path .
+Executable and object file path: /root/workspace:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin
+{% endhighlight %}
+
+* **show paths**: 打印出可执行文件的搜索路径（
+
+* **show environment [varname]**: 打印出环境变量```varname```的值。假如你并未指定```varname```的话，则打印出所有传递给所调试程序的环境变量及值。这里```environment```可以简写为```env```。
+
+* **set environment varname [=value]**: 用于设置环境变量```varname```的值为```value```。这只是改变传递给你所调试的程序的环境变量的值，而并不是改变GDB其本身的环境变量。例如：
+<pre>
+set env USER = foo
+</pre>
+上面命令用于告诉调试程序，当在后续执行```run```命令时，其所对应的用户时```foo```。
+
+值得注意的是在Unix系统上，GDB是通过shell来执行你所调试的程序，其也会继承使用```set environment```命令设定的环境变量。假如有必要的话，你也可以通过使用```exec-wrapper```来替代本命令。
+
+* **unset environment varname**: 用于从环境中移除该命令。
+
+
+### 2.5 程序的工作目录
+每一次你使用```run```命令启动程序的时候，程序的工作目录都继承于当前GDB的工作目录。而GDB的工作目录初始状态下会继承自其父进程（一般是shell)，但是你也可以在GDB中通过```cd```命令来指定一个新的工作目录。
+
+GDB的工作目录也作为GDB的其他命令所操作文件的默认目录。
+
+* **cd [directory]**: 用于将GDB的工作目录设置为```directory```，假如并未指定```directory```，则```directory```默认为```~```。
+
+* **pwd**: 打印GDB的工作目录
+
+通常情况下，我们并不能找到所调试进程的```当前工作目录```（因为在程序运行过程中，程序可能会更改其工作目录）。但是假如你所使用的系统上，GDB被配置为支持```/proc```的话，那么你可以通过使用```info proc```命令来找出所调试程序的当前工作目录。
+
+
+### 2.6 程序的输入/输出
+默认情况下，在GDB下所运行的程序的输入/输出与GDB使用同一个终端。GDB会切换到其自己的终端模式与外界进行交互，但是它会记录调试程序所使用的终端模式，以在你继续运行程序的时候来使用。
+
+* **info terminal**: 用于打印当前GDB所记录到的执行程序所使用的终端模式。你可以在执行```run```命令时通过使用shell重定向来改变程序的输入/输出。例如：
+{% highlight string %}
+run > outfile
+{% endhighlight %}
+这样可以将输出重定向到```outfile```。
+
+另一种方式指定调试程序的输入/输出就是使用```tty```命令。该命令可以接受一个```文件名```作为参数，并且会使得该文件作为后续执行```run```命令的默认输入/输出。另外，其也会重置后续通过```run```命令所运行程序的子进程的控制终端。例如：
+<pre>
+tty /dev/ttyb
+</pre>
+
+上面命令会使得后续执行```run```命令时将```/dev/ttyb```作为默认的输入/输出，并且作为该运行程序的控制终端。
+
+在执行```run```命令时显示的重定向会覆盖```tty```命令所指定的输入/输出，但是并不会影响到控制终端。
+
+当你使用```tty```命令或者```run```命令来重定向输入的时候，只有你所调试的程序的输入会受到影响。而对于GDB其本身的输入仍来自于你先前的终端。```tty```命令是```set inferior-tty```的别名。你也可以使用```show inferior-tty```命令打印出后续你索要执行程序所采用的终端。
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+
+
+int main(int argc,char *argv[])
+{
+        int i;
+
+        for(i = 0;i<argc; i++)
+                printf("%s\n", argv[i]);
+
+        return 0x0;
+}
+{% endhighlight %}
+编译运行：
+{% highlight string %}
+# gcc -c -g test.c
+# gcc -o test test.o
+
+# gdb --silent ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) info terminal
+No saved terminal information.
+(gdb) run 1 2 3 4 5 > output.txt
+Starting program: /root/workspace/./test 1 2 3 4 5 > output.txt
+[Inferior 1 (process 9082) exited normally]
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) shell cat output.txt
+/root/workspace/./test
+1
+2
+3
+4
+5
+(gdb) 
+{% endhighlight %}
+
+### 2.7 调试已经在运行的进程
+
+* **attach process-id**: 该命令用于attach到一个正在运行的进程，一个在GDB外启动的进程。（可以通过```info files```来显示该active targets)。本命令接受一个```process ID```作为参数。在Unix系统中，查找进程ID的方法通产是使用```ps```工具，或者使用```jobs -l```shell命令。跟一般命令不同的是，```attach```命令执行后，你按```RET```按键，该命令并不会重复执行。
+
+要使用```attach```，那么你的程序必须要运行在支持进程的环境中；例如，attach命令在没有操作系统的主板上则不能正常工作。另外，你还必须有权限向进程发送相应的信号(signal)。
+
+当你使用```attach```时，debugger首先会在当前工作目录来查找该正在运行的进程，若没有找到，则使用```源文件查找路径```(source file search path)来查找。你也可以使用```file```命令来加载该程序。
+
+GDB要调试该指定的进程的第一步就是要```暂停```进程的执行。你可以使用GDB在执行```run```命令后可用的所有命令来检查和修改一个```attached```的进程。你可以插入断点```breakpoints```; 也可以执行```step```和```continue```命令；也可以修改其中的内存值。假如你想要进程继续执行的话，那么在GDB ```attach```到该进程之后，你可以执行continue命令。
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+int main(int argc,char *argv[])
+{
+        int i, sum = 0;
+
+        for(i = 0; i< 1000; i++)
+        {
+                sum += i;
+                sleep(1);
+        }
+
+        return 0x0;
+}
+{% endhighlight %}
+编译运行并调试：
+{% highlight string %}
+# gcc -c -g test.c
+# gcc -o test test.o -lrt
+# ./test &
+
+
+# ps -ef | grep test
+root       9607   2548  0 06:24 pts/0    00:00:00 ./test
+
+# gdb --silent
+(gdb) attach 9607
+Attaching to process 9607
+Reading symbols from /root/workspace/test...done.
+Reading symbols from /lib64/librt.so.1...(no debugging symbols found)...done.
+Loaded symbols for /lib64/librt.so.1
+Reading symbols from /lib64/libc.so.6...(no debugging symbols found)...done.
+Loaded symbols for /lib64/libc.so.6
+Reading symbols from /lib64/libpthread.so.0...(no debugging symbols found)...done.
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib64/libthread_db.so.1".
+Loaded symbols for /lib64/libpthread.so.0
+Reading symbols from /lib64/ld-linux-x86-64.so.2...(no debugging symbols found)...done.
+Loaded symbols for /lib64/ld-linux-x86-64.so.2
+0x00007efebe956650 in __nanosleep_nocancel () from /lib64/libc.so.6
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) b test.c:11
+Breakpoint 1 at 0x4005fc: file test.c, line 11.
+(gdb) c
+Continuing.
+
+Breakpoint 1, main (argc=1, argv=0x7fff02163f68) at test.c:11
+11                      sum += i;
+(gdb) p i
+$1 = 89
+(gdb) s
+12                      sleep(1);
+(gdb) n
+9               for(i = 0; i< 1000; i++)
+(gdb) n
+
+Breakpoint 1, main (argc=1, argv=0x7fff02163f68) at test.c:11
+11                      sum += i;
+(gdb) p i
+$2 = 90
+{% endhighlight %}
+
+* **detach**: 当你已经调试完所```attach```的进程，你就可以使用```detach```命令来释放GDB的对其的控制。```Detaching```会使得进程继续执行。在```detach```命令执行后，则该进程和GDB又变成各自独立的了，此时你可以attach到另一个进程，或者使用```run```方法来启动调试程序。注意： 在执行```detach```命令之后，按```RET```按键该命令(detach)并不会重复执行。
+
+
+假如你在```attach```一个进程之后就退出了GDB，那么则会自动```detach```该进程。假如你使用```run```命令的话，则会杀死该进程。针对此情形，在默认情况下，假如你要退出GDB或者执行```run```命令，GDB都会要你进行再次的确认。
+
+### 2.8 Kill掉子进程
 
 
 
