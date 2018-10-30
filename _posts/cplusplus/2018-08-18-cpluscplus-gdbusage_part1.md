@@ -473,6 +473,237 @@ $2 = 90
 假如你在```attach```一个进程之后就退出了GDB，那么则会自动```detach```该进程。假如你使用```run```命令的话，则会杀死该进程。针对此情形，在默认情况下，假如你要退出GDB或者执行```run```命令，GDB都会要你进行再次的确认。
 
 ### 2.8 Kill掉子进程
+* **kill**: kill掉在GDB下运行的某一个程序的子进程
+
+该命令在你想要调试一个coredump，而不是一个运行的进程的情况下是很有用的。假如程序正在运行的情况下，GDB会忽略任何coredump文件。
+
+此外在有一些操作系统上，假如该可执行程序在GDB中被设置了断点，那么该可执行文件将不能在GDB外执行。这种情况下，你可以在GDB中kill掉该子进程以允许可执行文件在GDB外被执行。
+
+假如你想要重新编译和链接程序的话，那么你可以使用GDB的```kill```命令将该调试程序先杀死，因为对于很多系统来说在可以执行程序正在运行的过程中是不允许对该```可执行文件```进行修改的。在重新编译及链接之后，之后你可以继续执行```run```命令，这时GDB会通知你可执行文件已经发生了改变，然后GDB就会再重新读取符号表（但是会尝试保留当前的breakpoints设置）
+
+### 2.9 Debugging Multiple Inferiors and Programs
+
+**1) inferior基本概念**
+ 
+GDB可以让你在一个session中运行和调试多个程序。另外，在有些系统上GDB允许你同时运行多个程序（否则你可能需要先退出GDB，然后才能再开始调试一个新的程序）。更一般的情况是，你有多个可执行文件同时运行，每一个可执行文件运行时会产生多个进程，而每一个进程又可能有多个线程。
+
+GDB会使用一个名叫```inferior```的对象来代表每一个程序执行时的状态。典型情况下，一个```inferior```对应一个进程，更一般的情况也适用于那些没有进程概念的```targets```。```Inferiors```可能会在进程运行之前就被创建，并且可能在进程退出之后仍会被保留。每个```inferior```有与对应进程ID不同的唯一标识号。通常情况下，每一个```inferior```也有其自身独立的地址空间，尽管对于一些嵌入式```targets```来说可能会存在多个不同的```inferior```运行在同一个地址空间中。每一个```inferior```中也可能会有多个线程在运行。
+
+如果要找出当前存在哪些```inferiors```，可以使用```info inferiors```命令：
+
+* **info inferiors**: 用于打印GDB当前所管理的所有```inferiors```。GDB会按如下顺序来打印每一个```inferior```
+{% highlight string %}
+1) 由GDB所指定的inferior
+
+2) 目标系统的inferior标识
+
+3) 该inferior所对应的可执行文件的名称
+
+（注： 其中GDB inferior number前面的'*'标识当前正在使用的inferior
+{% endhighlight %}
+例如：
+<pre>
+(gdb) info inferiors
+Num Description Executable
+2 process 2307 hello
+* 1 process 3401 goodbye
+</pre>
+
+要想切换到另一个```inferior```，可以使用```inferior```命令。
+
+* **inferior infno**: 将指定```infno```的inferior设置为```current inferior```。参数```infno```是由GDB所指定的```inferior```编号。
+
+**2) 使用示例**
+
+这里，在介绍具体的示例之前，我们先简单说明一下如下两个指令：
+<pre>
+1) set detach-on-fork off: 该指令用于告诉GDB在fork之后不要与子进程分离，这就意味着GDB会暂停子进程，并允许你之后再切换到该
+   子进程上；
+
+2） detach inferior ID: 与指定的inferior分离，这可以使得该inferior可以完全的执行
+</pre>
+
+我们通过如下的示例来展示```multi-inferior```调试：
+{% highlight string %}
+#include <stdio.h>
+#include <unistd.h>
+
+
+int main(int argc,char *argv[])
+{
+        pid_t pid = fork();
+        
+        printf("Hello\n");
+
+        return 0x0;
+}
+{% endhighlight %}
+编译调试。这里首先会在```printf```语句那里设置一个断点：
+{% highlight string %}
+# gcc -g -c test.c
+# gcc -o test test.o
+
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) list
+1       #include <stdio.h>
+2       #include <unistd.h>
+3
+4
+5       int main(int argc,char *argv[])
+6       {
+7               pid_t pid = fork();
+8
+9               printf("Hello\n");
+10
+(gdb) b test.c:9
+Breakpoint 1 at 0x400594: file test.c, line 9.
+{% endhighlight %}
+
+接着设置```detach-on-fork```值为```off```，并执行```run```命令：
+{% highlight string %}
+(gdb) set detach-on-fork off
+(gdb) run
+Starting program: /root/workspace/./test 
+[New process 21332]
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+
+Breakpoint 1, main (argc=1, argv=0x7fffffffe638) at test.c:9
+9               printf("Hello\n");
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+{% endhighlight %}
+
+下面我们列出所有的```inferiors```:
+{% highlight string %}
+(gdb) info inferiors
+  Num  Description       Executable        
+  2    process 21332     /root/workspace/./test 
+* 1    process 21328     /root/workspace/./test 
+(gdb) shell ps -ef | grep "test"
+root       9607   2548  0 06:24 pts/0    00:00:00 ./test
+root      21309   2548  0 23:31 pts/0    00:00:00 gdb -q ./test
+root      21328  21309  0 23:33 pts/0    00:00:00 /root/workspace/./test
+root      21332  21328  0 23:33 pts/0    00:00:00 /root/workspace/./test
+root      21436  21309  0 23:40 pts/0    00:00:00 bash -c ps -ef | grep "test"
+root      21438  21436  0 23:40 pts/0    00:00:00 grep test
+{% endhighlight %}
+
+上面的```*```指示当前GDB正在检视父进程。
+
+如下我们可以通过```inferior```命令切换到子进程，然后让其继续运行：
+{% highlight string %}
+(gdb) inferior 2
+[Switching to inferior 2 [process 21332] (/root/workspace/./test)]
+[Switching to thread 2 (process 21332)] 
+#0  0x00007ffff7ada74c in fork () from /lib64/libc.so.6
+(gdb) c
+Continuing.
+
+Breakpoint 1, main (argc=1, argv=0x7fffffffe638) at test.c:9
+9               printf("Hello\n");
+{% endhighlight %}
+
+如下我们执行```n```命令，以step over到下一行，然后通过```detach```命令与该```inferior 2```分离，使其可以完全的执行：
+{% highlight string %}
+(gdb) n
+Hello
+11              return 0x0;
+(gdb) detach inferior 2
+Detaching from program: /root/workspace/./test, process 21332
+(gdb) shell ps -ef | grep test
+root      21309   2548  0 23:31 pts/0    00:00:00 gdb -q ./test
+root      21328  21309  0 23:33 pts/0    00:00:00 /root/workspace/./test
+root      21332  21328  0 23:33 pts/0    00:00:00 [test] <defunct>
+root      21531  21309  0 23:51 pts/0    00:00:00 bash -c ps -ef | grep test
+root      21533  21531  0 23:51 pts/0    00:00:00 grep test
+(gdb) info inferiors
+  Num  Description       Executable        
+* 2    <null>            /root/workspace/./test 
+  1    process 21328     /root/workspace/./test 
+{% endhighlight %}
+上面我们可以看到子进程已经执行完成，并退出，但仍处于```defunct```僵尸状态，这是因为父进程并未处理子进程的退出信号。
+
+此时，我们在切回到```inferior 1```,然后让其完成运行：
+{% highlight string %}
+(gdb) inferior 1
+[Switching to inferior 1 [process 21328] (/root/workspace/./test)]
+[Switching to thread 1 (process 21328)] 
+#0  main (argc=1, argv=0x7fffffffe638) at test.c:9
+9               printf("Hello\n");
+(gdb) c
+Continuing.
+Hello
+[Inferior 1 (process 21328) exited normally]
+(gdb) info inferiors
+  Num  Description       Executable        
+* 1    <null>            /root/workspace/./test 
+(gdb) shell ps -ef | grep test
+root      21309   2548  0 23:31 pts/0    00:00:00 gdb -q ./test
+root      21617  21309  0 23:56 pts/0    00:00:00 bash -c ps -ef | grep test
+root      21619  21617  0 23:56 pts/0    00:00:00 grep test
+{% endhighlight %}
+到此为止，父进程与子进程都已经退出。
+
+**3） inferior相关的其他命令**
+
+在一个```debug session```中，你可以通过```add-inferior```和```clone-inferior```命令获得多个```executables```。在有一些系统上，通过调用```fork()```或```exec()```可以自动的添加```inferior```到一个```debug session```中（如上面我们给出的例子）。如果要从一个```debug session```移除```inferior```，那么可以使用```remove inferiors```命令。
+
+* **add-inferior [ -copies n ] [ -exec executable ]**: 使用```executable```向一个debug session中添加```n```个inferior； ```n```在默认情况下的值为1。假如并未指定```executable```，那么该新添加的```inferiors```将会为empty，并不包含任何程序。后续你仍可以通过使用```file```命令指定或更改该```inferior```所指向的程序。
+{% highlight string %}
+]# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) info inferiors
+  Num  Description       Executable        
+* 1    <null>            /root/workspace/./test 
+(gdb) add-inferior -copies 3
+Added inferior 2
+Added inferior 3
+Added inferior 4
+(gdb) info inferiors
+  Num  Description       Executable        
+  4    <null>                              
+  3    <null>                              
+  2    <null>                              
+* 1    <null>            /root/workspace/./test 
+(gdb) inferior 3
+[Switching to inferior 3 [<null>] (<noexec>)]
+(gdb) file ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) info inferiors
+  Num  Description       Executable        
+  4    <null>                              
+* 3    <null>            /root/workspace/./test 
+  2    <null>                              
+  1    <null>            /root/workspace/./test 
+{% endhighlight %}
+
+* **clone-inferior [-copies n] [ infno ]**: 拷贝标识号为```infno```的```inferior```。默认情况下，```n```的值为1， ```infno```的值为```current inferior```的标识号。假如你想运行一个```inferior```的另一个实例，那么使用本命令就可以很容易的做到
+{% highlight string %}
+(gdb) info inferiors
+Num Description Executable
+* 1 process 29964 helloworld
+(gdb) clone-inferior
+Added inferior 2.
+1 inferiors added.
+(gdb) info inferiors
+Num Description Executable
+2 <null> helloworld
+* 1 process 29964 helloworld
+{% endhighlight %}
+现在你就可以将```focus```切换到```inferior 2```上面来运行。
+
+* **remove-inferiors infno...**: 移除指定的```inferior```。注意通过本命令并不能移除一个正在运行的```inferior```。如果要移除当前正在运行的```inferior```，那么需要首先执行```kill inferiors```或者```detach inferior```命令。
+
+
+<br />
+要想退出调试正处于运行状态非```current inferior```的```inferiors```，你可以使用```detach inferior```命令（这样使的该进程不受gdb的控制，自由独立的运行），或者使用```kill inferiors```命令：
+
+* **detach inferior infno...**: 使GDB与指定的```inferior(s)```处于分离状态，这样这些```inferior```就不受GDB的控制，可以自由完全的执行。注意： 那些处于分离状态的```inferior```仍然会显示在```info inferiors```列表中，但是其描述将会被显示为NULL
+
+* **kill inferiors infno...**: kill掉指定的```inferior(s)```。注意： 那些kill掉的inferior仍然会显示在```info inferiors```列表中，但是其描述将会被显示为NULL
+
+
+ 
 
 
 
@@ -486,6 +717,7 @@ $2 = 90
 **[参看]**
 
 
+1. [GDB Inferior Tutorial](http://moss.cs.iit.edu/cs351/gdb-inferiors.html)
 
 
 
