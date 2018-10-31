@@ -213,11 +213,226 @@ Id Target Id Frame
 
 ### 1.3 多线程调试示例
 
-**1） 调试程序源代码**
+* **示例源代码**
 
 如下是我们所采用的调试示例源代码```test.c```:
 {% highlight string %}
+#include <stdio.h>
+#include <unistd.h>
+#include <pthread.h>
+
+int a = 0;
+int b = 0;
+
+static void * pthread_run1(void *arg)
+{
+        int runflag = 1;
+
+        while(runflag)
+        {
+                a++;
+                sleep(1);
+        }
+
+        pthread_exit((void *)a);
+
+        return NULL;
+} 
+
+static void * pthread_run2(void *arg)
+{
+        int runflag = 1;
+
+        while(runflag)
+        {
+                b++;
+                sleep(1);
+        }
+
+        pthread_exit((void *)b);
+
+        return NULL;
+}
+
+int main(int argc,char *argv[])
+{
+        pthread_t tid1, tid2;
+        int retval_1, retval_2;
+
+        pthread_create(&tid1, NULL, pthread_run1, NULL);
+        pthread_create(&tid2, NULL, pthread_run2, NULL);
+
+        pthread_join(tid1,(void *)&retval_1);
+        pthread_join(tid2,(void *)&retval_2);
+
+        printf("retval_1: %d\n", retval_1);
+        printf("retval_2: %d\n", retval_2);
+
+        return 0x0;
+}
 {% endhighlight %}
+
+
+
+* **编译运行**
+<pre>
+# gcc -c -g test.c gcc -c -g test.c -Wno-int-to-pointer-cast
+# gcc -o test test.o -lpthread
+
+# ps -aL | grep test
+ 40900  40900 pts/0    00:00:00 test
+ 40900  40901 pts/0    00:00:00 test
+ 40900  40902 pts/0    00:00:00 test
+</pre>
+
+然后我们再通过如下命令查看主线程和两个子线程之间的关系：
+<pre>
+# pstree -p 40900
+test(40900)─┬─{test}(40901)
+            └─{test}(40902)
+
+</pre>
+
+再接着通过```pstack```来查看线程栈结构：
+<pre>
+# pstack 40900
+Thread 3 (Thread 0x7fd44f426700 (LWP 40901)):
+#0  0x00007fd44f4e566d in nanosleep () from /lib64/libc.so.6
+#1  0x00007fd44f4e5504 in sleep () from /lib64/libc.so.6
+#2  0x0000000000400757 in pthread_run1 (arg=0x0) at test.c:14
+#3  0x00007fd44f7efdc5 in start_thread () from /lib64/libpthread.so.0
+#4  0x00007fd44f51e73d in clone () from /lib64/libc.so.6
+Thread 2 (Thread 0x7fd44ec25700 (LWP 40902)):
+#0  0x00007fd44f4e566d in nanosleep () from /lib64/libc.so.6
+#1  0x00007fd44f4e5504 in sleep () from /lib64/libc.so.6
+#2  0x0000000000400794 in pthread_run2 (arg=0x0) at test.c:30
+#3  0x00007fd44f7efdc5 in start_thread () from /lib64/libpthread.so.0
+#4  0x00007fd44f51e73d in clone () from /lib64/libc.so.6
+Thread 1 (Thread 0x7fd44fc0c740 (LWP 40900)):
+#0  0x00007fd44f7f0ef7 in pthread_join () from /lib64/libpthread.so.0
+#1  0x00000000004007ff in main (argc=1, argv=0x7ffdbfa69a38) at test.c:46
+</pre>
+
+
+* **GDB调试多线程程序**
+
+1） 启动gdb调试，并在上述代码```a++```处加上断点
+<pre>
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) b test.c:14 
+Breakpoint 1 at 0x400749: file test.c, line 13.
+</pre>
+
+
+
+2） 运行并查看inferiors及threads信息 
+<pre>
+(gdb) r
+Starting program: /root/workspace/./test 
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib64/libthread_db.so.1".
+[New Thread 0x7ffff77ff700 (LWP 41362)]
+[Switching to Thread 0x7ffff77ff700 (LWP 41362)]
+
+Breakpoint 1, pthread_run1 (arg=0x0) at test.c:13
+13                      a++;
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) info inferiors
+  Num  Description       Executable        
+* 1    process 41788     /root/workspace/./test 
+(gdb) info threads
+  Id   Target Id         Frame 
+  3    Thread 0x7ffff6ffe700 (LWP 41793) "test" 0x00007ffff7835480 in sigprocmask () from /lib64/libc.so.6
+* 2    Thread 0x7ffff77ff700 (LWP 41792) "test" pthread_run1 (arg=0x0) at test.c:14
+  1    Thread 0x7ffff7fe3740 (LWP 41788) "test" 0x00007ffff7bc9ef7 in pthread_join () from /lib64/libpthread.so.0
+</pre>
+从上面我们看到当前停在我们设置的断点处。
+
+接着我们执行如下：
+<pre>
+(gdb) s
+15                      sleep(1);
+(gdb) s
+12              while(runflag)
+(gdb) s
+
+Breakpoint 1, pthread_run1 (arg=0x0) at test.c:14
+14                      a++;
+(gdb) s
+15                      sleep(1);
+(gdb) s
+12              while(runflag)
+(gdb) p b
+$1 = 4
+</pre>
+上面我们看到当我们在单步调试```pthread_run1```的时候，```pthread_run2```也在执行。但是当我们暂停在断点处时，```pthread_run2```是不在执行的。
+
+如果我们想在调试一个线程时，其他线程暂停执行，那么可以使用```set scheduler-locking on```来锁定。例如：
+<pre>
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) b test.c:14
+Breakpoint 1 at 0x400742: file test.c, line 14.
+(gdb) r
+Starting program: /root/workspace/./test 
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib64/libthread_db.so.1".
+[New Thread 0x7ffff77ff700 (LWP 41951)]
+[Switching to Thread 0x7ffff77ff700 (LWP 41951)]
+
+Breakpoint 1, pthread_run1 (arg=0x0) at test.c:14
+14                      a++;
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) set scheduler-locking on
+(gdb) p b
+$1 = 0
+(gdb) s
+15                      sleep(1);
+(gdb) s
+s
+12              while(runflag)
+(gdb) s
+
+Breakpoint 1, pthread_run1 (arg=0x0) at test.c:14
+14                      a++;
+(gdb) s
+15                      sleep(1);
+(gdb) s
+12              while(runflag)
+(gdb) s
+
+Breakpoint 1, pthread_run1 (arg=0x0) at test.c:14
+14                      a++;
+(gdb) s
+15                      sleep(1);
+(gdb) s
+12              while(runflag)
+(gdb) s
+
+Breakpoint 1, pthread_run1 (arg=0x0) at test.c:14
+14                      a++;
+(gdb) s
+15                      sleep(1);
+(gdb) s
+12              while(runflag)
+(gdb) p b
+$2 = 0
+(gdb)
+</pre>
+
+
+## 2. 调试多进程
+
+在大多数系统上，GDB对于通过```fork()```函数创建的子进程的调试都没有专门的支持。当一个程序fork()之后，GDB会继续调试父进程，而子进程仍会畅通无阻的运行。假如你在代码的某个部分设置了断点，然后子进程执行到该位置时，则子进程会受到一个```SIGTRAP```信号并导致子进程退出（除非子进程catch了该信号）。
+
+然而，假如你想要调试子进程的话，也有一种相对简单的取巧方法。就是在执行完fork之后，在进入子进程代码时调用```sleep()```方法。这里可以根据某个环境变量是否设置或者某个文件是否存在来决定是否进入```sleep()```，这样就可以使得我们在非调试状态下避免休眠。当子进程进入sleep状态时，我们就可以通过```ps```命令查看到子进程的进程ID。接着可以通过使用GDB并attach到该子进程，然后就可以像调试普通程序一样进行调试了。
+
+在有一些系统上，GDB对使用```fork()```或```vfork()```函数创建的子进程的调试提供了支持。在GNU/Linux平台上，从内核```2.5.46```版本开始该特性就被支持。
+
+默认情况下，当一个程序forks之后，GDB会继续调试父进程，而对子进程没有任何的影响。
+
+
 
 
 
