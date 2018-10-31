@@ -432,6 +432,16 @@ $2 = 0
 
 默认情况下，当一个程序forks之后，GDB会继续调试父进程，而对子进程没有任何的影响。
 
+假如你想要跟随子进程而不是父进程，那么可以使用```set follow-fork-mode```命令：
+
+* **set follow-fork-mode mode**: 设置GDB调试器如何对```fork```或者```vfork```进行响应。参数```mode```的取值可以为
+<pre>
+parent: 表示跟随父进程。这是默认情况
+
+child: 表示跟随子进程
+</pre>
+
+* **show follow-fork-mode**: 显示当前的跟随模式
 
 
 
