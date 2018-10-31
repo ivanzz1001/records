@@ -1,6 +1,6 @@
 ---
 layout: post
-title: GDB调试调试多线程及多进程(part 1)
+title: GDB调试多线程及多进程(part 1)
 tags:
 - cplusplus
 categories: cplusplus
@@ -49,12 +49,14 @@ GDB提供了如下的一些```facilities```来用于支持多线程的调试：
 在你创建第二个```inferior```之前，GDB并不会在```thread IDs```部分显示```inferior number```。
 
 有一些命令接受以空格分割的```thread ID```列表作为参数，一个列表元素可以是：
+<pre>
+1) 'info threads' 命令显示的'thread ID'可能包含inferior标识符，也可能不包括。例如： '2.1'或者'1'
 
-* ```info threads```命令显示的```thread ID```可能包含```inferior```标识符，也可能不包括。例如： ```2.1```或者```1```
+2) 指定线程数范围，格式为 'inf.thr1-thr2' 或者 'thr1-thr2'。例如： '1.2-4'或'2-4'
 
-* 指定线程数范围，格式为```inf.thr1-thr2```或者```thr1-thr2```。例如： ```1.2-4```或```2-4```
-
-* 一个```inferior```中的所有线程，可以通过```*```通配符来指定。格式为```inf.*```或者```*```。前者指定某个```inferior```中的所有线程； 后者指定当前```inferior```中的所有线程
+3) 一个 'inferior'中的所有线程，可以通过'*'通配符来指定。格式为 'inf.*'或者 '*'。前者指定某个inferior中的所有线程；
+  后者指定当前inferior中的所有线程
+</pre>
 
 例如，假如当前的```inferior```是1，```inferior 7```有一个线程，其ID为```7.1```，则线程列表```1 2-3 4.5 6.7-9 7.*```表示```inferior 1```中的线程1至线程3，```inferior 4```中的线程5，```inferior 6```中的线程7至线程9， 以及```inferior 7```中的所有线程。
 
@@ -158,7 +160,44 @@ Id GId Target Id Frame
 </pre>
 类似于在创建线程时打印出的```[New ...]```这样的消息，```Switching to```后面的消息打印也依赖于你所使用的系统
 
-* 
+* **thread apply [thread-id-list | all [-ascending]] command**: 本命令允许你在一个或多个线程上应用指定的```command```。如果要在所有线程上按降序的方式应用某个```command```，那么使用 'thread apply all command'; 如果要在所有线程上按升序的方式应用某个```command```，那么使用'thread apply all -ascending command';
+
+* **thread name [name]**: 本命令用于为当前线程指定一个名称。假如并未指定参数的话，那么任何已存在的由用户指定的名称都将被移除。命名后线程的名称会出现在```info threads```的显示信息中。
+
+* **thread find [regexp]**: 用于查询名称或```systag```匹配查询表达式的线程。例如：
+<pre>
+(gdb) thread find 26688
+Thread 4 has target id ’Thread 0x41e02940 (LWP 26688)’
+(gdb) info thread 4
+Id Target Id Frame
+4 Thread 0x41e02940 (LWP 26688) 0x00000031ca6cd372 in select ()
+</pre>
+
+* **set libthread-db-search-path [path]**: 假如本变量被设置，那么GDB将会使用所设置的路径(路径目录之间以':'分割)来查找```libthread_db```。假如执行此命令时，并不指定path，那么将会被重置为默认值（在GNU/Linux及Solaris系统下默认值为```$sdir:$pdir```，即系统路径和当前进程所加载线程库的路径)。而在内部，默认值来自于```LIBTHREAD_DB_SEARCH_PATH```宏定义。
+
+在GNU/Linux以及Solaris操作系统上，GDB使用该辅助```libthread_db```库来获取inferior中线程的信息。GDB会使用'libthread-db-search-path'来搜索```libthread_db```。假如'set auto-load libthread-db'被启用的话，GDB首先会搜索该inferior所加载的线程调试库。
+
+<pre>
+在使用libthread-db-search-path搜索libthread_db时，有两个特定的路径： $sydir、$pdir
+
+1) $sdir: 搜索共享库的默认的系统路径。本路径是唯一不需要通过'set auto-load libthread_db'命令来启用的
+
+2） $pdir: 指示inferior process加载libpthread库的位置
+</pre>
+
+假如在上述目录中找到了```libpthread_db```库，那么GDB就会尝试用当前inferior process来初始化。假如初始化失败的话（一般在libpthread_db与libpthread版本不匹配的情况），GDB就会卸载该libpthread_db，然后尝试继续从下一个路径搜索libpthread_db。假如最后都没有找到适合的版本，GDB会打印相应的警告信息，接着线程调试将会被禁止。
+
+注意： 本命令只在一些特定的平台上可用。
+
+
+* **show libpthread-db-search-path**: 用于显示当前```libpthread_db```的搜索路径
+
+* **set debug libpthread-db / show debug libpthread-db**: 用于启用或关闭```libpthread-db```相关的事件信息的打印。1为启用， 0为关闭。
+
+
+### 1.3 多线程调试示例
+
+
 
 
 
