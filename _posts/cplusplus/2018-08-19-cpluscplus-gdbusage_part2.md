@@ -195,8 +195,29 @@ Id Target Id Frame
 * **set debug libpthread-db / show debug libpthread-db**: 用于启用或关闭```libpthread-db```相关的事件信息的打印。1为启用， 0为关闭。
 
 
+* **set scheduler-locking mode**: 用于设置```锁定线程的模式```(scheduler locking mode)。其适用于程序正常执行、record mode以及重放模式。
+<pre>
+1) mode为off时，则不锁定任何线程，即所有线程在任何时间都可以被执行； 
+
+2) mode为on时，则锁定其他线程，只有当前线程执行； 
+
+3) mode为step时,则当在进行单步调试(single-stepping)时只有当前线程会运行，其他的线程将不会获得运行的机会，这样就可以使得调试的焦点
+   只集中于当前线程。但是假如执行的时'continue'、'until'、'finish'这样的非单步调试命令的话，则其他的线程也会运行。
+
+一般来说，除非一个线程在其运行时间片内遇到断点(breakpoint)，否则GDB一般并不会从当前调试线程切换到该线程。
+</pre>
+
+
+* **show scheduler-locking**: 用于显示当前的锁定模式
+
+
 ### 1.3 多线程调试示例
 
+**1） 调试程序源代码**
+
+如下是我们所采用的调试示例源代码```test.c```:
+{% highlight string %}
+{% endhighlight %}
 
 
 
@@ -210,6 +231,8 @@ Id Target Id Frame
 1. [GDB Inferior Tutorial](http://moss.cs.iit.edu/cs351/gdb-inferiors.html)
 
 2. [gdb调试多进程与多线程](https://blog.csdn.net/snow_5288/article/details/72982594)
+
+3. [100个gdb小技巧](https://www.kancloud.cn/wizardforcel/gdb-tips-100/146771)
 
 
 <br />
