@@ -1,6 +1,6 @@
 ---
 layout: post
-title: GDB调试多线程及多进程(part 1)
+title: GDB调试多线程及多进程
 tags:
 - cplusplus
 categories: cplusplus
@@ -597,11 +597,126 @@ hello,world!
 
 1） 示例源码
 {% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
 
+int main(int argc, char *argv[])
+{
+    pid_t pid;
+
+    pid = fork();
+    if (pid < 0)
+    {
+        exit(1);
+    }
+    else if (pid > 0)
+    {
+        printf("Parent\n");
+        exit(0);
+    }
+    printf("Child\n");
+    return 0;
+}
 {% endhighlight %}
 
 
+2) 调试步骤
 
+首先通过执行下面的命令执行编译：
+<pre>
+# gcc -g -c test.c
+# gcc -o test test.o
+</pre>
+
+从前面我们知道，GDB默认情况下只会追踪父进程的运行，而子进程会独立运行，GDB不会控制。
+
+如果同时调试父进程和子进程，可以使用```set detach-on-fork off```(默认值是on)命令，这样GDB就能同时调试父子进程，并且在调试一个进程时，另一个进程处于挂起状态。例如：
+{% highlight string %}
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) show detach-on-fork
+Whether gdb will detach the child of a fork is on.
+(gdb) set detach-on-fork off
+(gdb) start
+Temporary breakpoint 1 at 0x4005cc: file test.c, line 8.
+Starting program: /root/workspace/./test 
+
+Temporary breakpoint 1, main (argc=1, argv=0x7fffffffe638) at test.c:8
+8           pid = fork();
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) n
+[New process 53415]
+9           if (pid < 0)
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) info inferiors
+  Num  Description       Executable        
+  2    process 53415     /root/workspace/./test 
+* 1    process 52646     /root/workspace/./test 
+(gdb) n
+13          else if (pid > 0)
+(gdb) n
+15              printf("Parent\n");
+(gdb) n
+Parent
+16              exit(0);
+(gdb) n
+[Inferior 1 (process 52646) exited normally]
+(gdb) n
+The program is not being run.
+(gdb) info inferiors
+  Num  Description       Executable        
+  2    process 53415     /root/workspace/./test 
+* 1    <null>            /root/workspace/./test 
+(gdb) inferior 2
+[Switching to inferior 2 [process 53415] (/root/workspace/./test)]
+[Switching to thread 2 (process 53415)] 
+#0  0x00007ffff7ada74c in fork () from /lib64/libc.so.6
+(gdb) bt
+#0  0x00007ffff7ada74c in fork () from /lib64/libc.so.6
+#1  0x00000000004005d1 in main (argc=1, argv=0x7fffffffe638) at test.c:8
+(gdb) n
+Single stepping until exit from function fork,
+which has no line number information.
+main (argc=1, argv=0x7fffffffe638) at test.c:9
+9           if (pid < 0)
+(gdb) n
+13          else if (pid > 0)
+(gdb) n
+18          printf("Child\n");
+(gdb) n
+Child
+19          return 0;
+(gdb) 
+{% endhighlight %}
+
+上面在使用```set detach-on-fork off```命令之后，使用```info inferiors```命令查看进程状态，可以看到父进程处在被GDB调试的状态（前面显示```*```表示正在被调试）。当父进程退出后，用```inferior infno```切换到子进程去调试。
+
+此外，如果想让父子进程同时运行，可以使用```set schedule-multiple on```(默认值为off)命令，仍以上述代码为例：
+{% highlight string %}
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) set detach-on-fork off
+(gdb) set schedule-multiple on
+(gdb) start
+Temporary breakpoint 1 at 0x4005cc: file test.c, line 8.
+Starting program: /root/workspace/./test 
+
+Temporary breakpoint 1, main (argc=1, argv=0x7fffffffe638) at test.c:8
+8           pid = fork();
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) n
+[New process 54810]
+Child
+[process 54810 exited]
+9           if (pid < 0)
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb)
+{% endhighlight %}
+可以看到打印出了```Child```，证明子进程也在运行了。
+
+
+## 3. 设置用于返回的书签
+在许多操作系统上，GDB能够将程序的运行状态保存为snapshot，这被称为```checkpoint```，后续我们就可以通过相应的命令返回到该checkpoint。
 
 
 
@@ -619,6 +734,9 @@ hello,world!
 
 3. [100个gdb小技巧](https://www.kancloud.cn/wizardforcel/gdb-tips-100/146771)
 
+4. [gdb 调试入门，大牛写的高质量指南](http://blog.jobbole.com/107759/)
+
+5. [GDB技巧：使用checkpoint解决难以复现的Bug](http://blog.chinaunix.net/uid-23629988-id-2943273.html)
 
 <br />
 <br />
