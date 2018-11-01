@@ -424,6 +424,7 @@ $2 = 0
 
 ## 2. 调试多进程
 
+### 2.1 基本概念
 在大多数系统上，GDB对于通过```fork()```函数创建的子进程的调试都没有专门的支持。当一个程序fork()之后，GDB会继续调试父进程，而子进程仍会畅通无阻的运行。假如你在代码的某个部分设置了断点，然后子进程执行到该位置时，则子进程会受到一个```SIGTRAP```信号并导致子进程退出（除非子进程catch了该信号）。
 
 然而，假如你想要调试子进程的话，也有一种相对简单的取巧方法。就是在执行完fork之后，在进入子进程代码时调用```sleep()```方法。这里可以根据某个环境变量是否设置或者某个文件是否存在来决定是否进入```sleep()```，这样就可以使得我们在非调试状态下避免休眠。当子进程进入sleep状态时，我们就可以通过```ps```命令查看到子进程的进程ID。接着可以通过使用GDB并attach到该子进程，然后就可以像调试普通程序一样进行调试了。
@@ -442,6 +443,165 @@ child: 表示跟随子进程
 </pre>
 
 * **show follow-fork-mode**: 显示当前的跟随模式
+
+在Linux上，假如```parent```进程与```child```进程都想要调试的话，那么可以使用```set detach-on-fork```命令。
+
+* **set detach-on-fork mode**: 用于告诉GDB在fork()之后是否分离其中的一个进程，或者同时保持对他们的控制。mode可取值为
+<pre>
+on: 子进程或者父进程将会被分离（取决于follow-fork-mode),使得该进程可以独立的运行。这是默认值
+
+off: 子进程和父进程都会在GDB的控制之下。其中一个进程（取决于follow-fork-mode)可以像平常那样进行调试，而另一个进程处于挂起状态
+</pre>
+
+* **show detach-on-fork**: 用于显示```detach-on-fork```模式的值
+
+<br />
+假如你选择设置```detach-on-fork```的值为off，那么GDB将会将会保持对所有fork进程的控制（也包括内部fork)。你可以通过使用```info inferiors```命令来查看当前处于GDB控制之下的进程，并使用```inferior```命令来进行切换。
+
+如果要退出对其中一个fork进程的调试，你可以通过使用```detach inferiors```命令来使得该进程独立的运行，或者通过```kill inferiors```命令来将该进程杀死。
+
+假如你使用GDB来调试子进程，并且是在执行完```vfork```再调用```exec```，那么GDB会调试该新的target直到遇到第一个breakpoint。另外，假如你在orginal program的main函数中设置了断点，那么在子进程的main函数中也会保持有该断点。
+
+在有一些系统上，当子进程是通过```vfork()```函数产生的，那么在完成```exec```调用之前，你将不能对父进程或子进程进行调试。
+
+假如在执行完```exec```调用之后，你通过运行```run```命令，那么该新的```target```将会重启。如果要重启父进程的话，使用```file```命令并将参数设置为```parent executable name```。默认情况下，当一个exec执行完成之后，GDB会丢弃前一个可执行镜像的符号表。你可以通过```set follow-exec-mode```命令来改变这一行为：
+
+* **set follow-exec-mode mode**: 当程序调用```exec```之后，GDB相应的行为。```exec```调用会替换一个进程的镜像。mode取值可以为：
+ 
+1） new: GDB会创建一个新的inferior，并将该进程重新绑定到新的inferior。在执行```exec```之前的所运行的程序可以通过重启原先的inferior(original inferior)来进行 重启。例如：
+{% highlight string %}
+(gdb) info inferiors
+(gdb) info inferior
+Id Description Executable
+* 1 <null> prog1
+(gdb) run
+process 12020 is executing new program: prog2
+Program exited normally.
+(gdb) info inferiors
+Id Description Executable
+1 <null> prog1
+* 2 <null> prog2
+{% endhighlight %}
+
+2) same: GDB会将exec之后的新镜像加载到同一个```inferior```中,以替换原来的镜像。在执行exec之后如果要重启该inferior，那么可以通过运行```run```命令。这是默认模式。例如：
+{% highlight string %}
+(gdb) info inferiors
+Id Description Executable
+* 1 <null> prog1
+(gdb) run
+process 12020 is executing new program: prog2
+Program exited normally.
+(gdb) info inferiors
+Id Description Executable
+* 1 <null> prog2
+{% endhighlight %}
+
+
+### 2.2 调试示例
+
+* 调试子进程
+
+1） 示例源码
+{% highlight string %}
+#include <stdio.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+
+int main(int argc,char *argv[])
+{
+        pid_t pid;
+
+        pid = fork();
+
+        if(pid < 0)
+        {
+                return -1;
+        }
+        else if(pid > 0)
+        {
+                return 1;
+        }
+        printf("hello,world!\n");
+
+        return 0x0;
+}
+{% endhighlight %}
+
+2) 调试步骤
+
+首先执行下面的命令进行编译：
+<pre>
+# gcc -g -c test.c
+# gcc -o test test.o
+</pre>
+
+在调试多进程程序时，GDB默认会追踪处理父进程。例如：
+{% highlight string %}
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) start
+Temporary breakpoint 1 at 0x40058c: file test.c, line 10.
+Starting program: /root/workspace/./test 
+
+Temporary breakpoint 1, main (argc=1, argv=0x7fffffffe638) at test.c:10
+10              pid = fork();
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) n
+Detaching after fork from child process 52320.
+hello,world!
+12              if(pid < 0)
+(gdb) n
+16              else if(pid > 0)
+(gdb) n
+18                      return 1;
+(gdb) n
+23      }
+(gdb) n
+0x00007ffff7a3db35 in __libc_start_main () from /lib64/libc.so.6
+{% endhighlight %}
+上面我们看到，子进程很快就打印出了```hello,world!```,说明GDB并没有控制住子进程。而在父进程中，我们通过单步执行到第18行的return，然后父进程返回退出。
+
+如果要调试子进程，要使用如下的命令: ```set follow-fork-mode child```。例如：
+{% highlight string %}
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) start
+Temporary breakpoint 1 at 0x40058c: file test.c, line 10.
+Starting program: /root/workspace/./test 
+
+Temporary breakpoint 1, main (argc=1, argv=0x7fffffffe638) at test.c:10
+10              pid = fork();
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) set follow-fork-mode child
+(gdb) show follow-fork-mode
+Debugger response to a program call of fork or vfork is "child".
+(gdb) n
+[New process 52457]
+[Switching to process 52457]
+12              if(pid < 0)
+(gdb) n
+16              else if(pid > 0)
+(gdb) n
+20              printf("hello,world!\n");
+(gdb) n
+hello,world!
+22              return 0x0;
+(gdb) n
+23      }
+{% endhighlight %}
+上面我们看到程序执行到第20行： 子进程打印出```hello,world!```.
+
+
+* 同时调试父进程和子进程
+
+1） 示例源码
+{% highlight string %}
+
+{% endhighlight %}
+
+
+
 
 
 
