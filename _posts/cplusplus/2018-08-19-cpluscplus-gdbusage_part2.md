@@ -499,7 +499,7 @@ Id Description Executable
 
 ### 2.2 调试示例
 
-* 调试子进程
+* **调试子进程**
 
 1） 示例源码
 {% highlight string %}
@@ -593,7 +593,7 @@ hello,world!
 上面我们看到程序执行到第20行： 子进程打印出```hello,world!```.
 
 
-* 同时调试父进程和子进程
+* **同时调试父进程和子进程**
 
 1） 示例源码
 {% highlight string %}
@@ -717,6 +717,145 @@ Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
 
 ## 3. 设置用于返回的书签
 在许多操作系统上，GDB能够将程序的运行状态保存为snapshot，这被称为```checkpoint```，后续我们就可以通过相应的命令返回到该checkpoint。
+
+回退到一个```checkpoint```，会使得所有发生在该checkpoint之后的操作都会被做undo。这包括内存的修改、寄存器的修改、甚至是系统的状态（有一些限制）。事实上，类似于回到保存checkpoint的时间点。
+
+因此，当你在单步调试程序，并且认为快接近有错误的代码点时，你就可以先保存一个checkpoint。然后，你继续进行调试，假如碰巧错过了该关键代码段，这时你就可以回退到该checkpoint并从该位置继续进行调试，而不用完全从头开始来调试整个程序。
+
+要使用```checkpoint/restart```方法来进行调试的话，需要用到如下命令：
+
+* **checkpoint**: 将调试程序的当前执行状态保存为一个snapshot。本命令不携带任何参数，但是其实GDB内部对于每一个checkpoint都会指定一个整数ID，这有些类似于breakpoint ID.
+
+* **info checkpoints**: 列出当前调试session所保存的checkpoints。对于每一个checkpoint，都会有如下信息被列出
+<pre>
+Checkpoint ID
+Process ID
+Code Address
+Source line, or label
+</pre>
+
+* **restart checkpoint-id**: 重新装载```checkpoint-id```位置的程序状态。所有的程序变量、寄存器、栈帧等都会被恢复为在保存该checkpoint时的状态。实际上，GDB类似于将时间拨回到保存该checkpoint的时间点。
+
+注意，对于breakpoints、GDB variables、command history等，在执行恢复到某个checkpoint时并不会受到影响。一般来说，checkpoint只存储调试程序的信息，而并不存储调试器本身的信息。
+
+* **delete checkpoint checkpoint-id**: 删除以前保存的某个checkpoint
+
+<br />
+返回到前一个保存的checkpoint时，将会恢复该调试程序的用户状态，也会恢复一部分的操作系统状态，包括文件指针。恢复时，并不会对一个文件中的数据执行```un-write```操作，但是会将文件指针恢复到原来的位置，因此之前所写的数据可以被```overwritten```。对于那些以读模式打开的文件，文件指针将会恢复到原来所读的位置。
+
+当然，对于那些已经发送到打印机（或其他外部设备）的字符将不能够```snatched back```，而对于从外部设备（例如串口设备）接收到字符则从内部程序缓冲中移除，但是并不能```push back```回串行设备的pipeline中。相似的，对于文件的数据发生了实质性的更改这一情况，也是不能进行恢复。
+
+然而，即使有上面的这些限制，你还是可以返回到checkpoint处开始进行调试，此时可能还可以调试一条不同的执行路径。
+
+最后，当你回退到checkpoint时，程序会回退到上次保存时的状态，但是进程ID会发生改变。每一个checkpoint都会有一个唯一的进程ID，并且会与原来程序的进程ID不同。假如你所调试的程序在本地保存了进程ID的话，则可能会出现一些潜在的问题。
+
+### 3.1 使用checkpoint的潜在优势
+在有一些系统上，比如GNU/Linux，通常情况下由于安全原因每一个新进程的地址空间都是随机的。这就使得几乎不太可能在一个绝对的地址上设置一个breakpoint或者watchpoint，因为在程序下一次重启时，程序中symbol的绝对路径可能发生改变。
+
+然而一个checkpoint，等价于一个进程拷贝。因此假如你在main的开始就创建一个checkpoint，后续返回到该checkpoint而不是重启程序，这就可以避免受到重启程序地址随机这一情况的影响。通过返回checkpoint，可以使得程序的```symbols```仍保持在原来的位置
+
+
+### 3.2 checkpoint使用示例
+
+**1） 示例程序**
+{% highlight string %}
+#include <stdlib.h>
+#include <stdio.h>
+
+static int func()
+{
+    static int i = 0;
+    ++i;
+
+    if (i == 2) {
+        return 1;
+    }
+    return 0;
+}
+
+static int func3()
+{
+    return func();
+}
+
+static int func2()
+{
+    return func();
+}
+
+static int func1()
+{
+    return func();
+}
+
+int main()
+{
+    int ret = 0;
+
+    ret += func1();
+    ret += func2();
+    ret += func3();
+
+    return ret;
+}
+{% endhighlight %}
+
+**2) 调试技巧**
+
+首先采用如下的命令编译程序：
+<pre>
+# gcc -g -c test.c
+# gcc -o test test.o
+</pre>
+
+下面我们进行调试，在```ret += func1()```前保存一个checkpoint:
+{% highlight string %}
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) start
+Temporary breakpoint 1 at 0x400551: file test.c, line 32.
+Starting program: /root/workspace/./test 
+
+Temporary breakpoint 1, main () at test.c:32
+32          int ret = 0;
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) n
+34          ret += func1();
+(gdb) checkpoint
+checkpoint: fork returned pid 68595.
+(gdb) info checkpoints
+  1 process 68595 at 0x400558, file test.c, line 34
+* 0 process 68591 (main process) at 0x400558, file test.c, line 34
+{% endhighlight %}
+
+然后使用```next```步进，并每次调用完毕，打印ret的值：
+{% highlight string %}
+(gdb) n
+35          ret += func2();
+(gdb) p ret
+$1 = 0
+(gdb) n
+36          ret += func3();
+(gdb) p ret
+$2 = 1
+{% endhighlight %}
+结果发现，在调用```func2()```后，ret的值变为了1。可是此时，我们已经错过了调试```fun2()```的机会。如果没有```checkpoint```，就需要再次从头调试了。对于这个问题从头调试很容易，但是对于很难复现的bug可能就会比较困难了。
+
+下面我们使用checkpoint恢复：
+{% highlight string %}
+(gdb) info checkpoints
+  1 process 68595 at 0x400558, file test.c, line 34
+* 0 process 68591 (main process) at 0x400572, file test.c, line 36
+(gdb) restart 1
+Switching to process 68595
+#0  main () at test.c:34
+34          ret += func1();
+{% endhighlight %}
+
+
+上面我们看到，GDB恢复到了保存checkpoint时的状态了。上面```restart 1```中1为checkpoint的ID号。
+
+从上面我们看出checkpoint的用法很简单，但是很有用。就是在平时的简单的bug修复中，也可以加快我们的调试速度，毕竟减少了不必要的重现bug的时间。
 
 
 
