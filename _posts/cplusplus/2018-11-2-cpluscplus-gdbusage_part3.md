@@ -137,7 +137,36 @@ $1 = 5050
 
 * Enabled or Disabled: 用于指示该checkpoint当前是```enable```状态还是```disable```状态；
 
+* Address: 断点设置在内存中的位置。对于一个挂起(pending)的断点来说，我们并不知道其位置，因此会显示为```<PENDING>```。
 
+* What： 断点在所在的源代码文件的名称及行号。对于一个挂起的断点，假如当前相应的共享库文件并未加载，那么其将会显示设置该断点时候的命令，而等到后续对应的共享库加载之后，就会显示文件名及行号。
+
+
+<br />
+一个断点有可能会对应程序中多个不同的location，比如如下情景：
+
+* 程序中有多个函数拥有相同的名称。
+
+* 对于C++构造函数，GCC编译器会产生不同版本的实例；
+
+* 对于C++模板函数，函数中指定的一行可以对应任意数量的实例；
+
+* 对于inline函数，指定的source line可能会对应多个不同的位置
+
+在所有上面这些情况下，在所有相关的位置GDB都会插入一个断点。
+
+
+对于一个breakpoint，如果指向多个位置的话，那么在```info breakpoint```时会采用多行来表示。例如：
+{% highlight string %}
+Num Type Disp Enb Address What
+1 breakpoint keep y <MULTIPLE>
+stop only if i==1
+breakpoint already hit 1 time
+1.1 y 0x080486a2 in void foo<int>() at t.cc:8
+1.2 y 0x080486ca in void foo<double>() at t.cc:8
+{% endhighlight %}
+
+对于上面例子所显示的breakpoint，每一个Location都可以单独的```enable```或者```disable```。但是却并不能单独的从列表中进行删除。
 
 
 
@@ -213,6 +242,7 @@ Does not include preprocessor macro info.
 
 1. [100个gdb小技巧](https://www.kancloud.cn/wizardforcel/gdb-tips-100/146771)
 
+2. [gdb调试动态链接库](https://blog.csdn.net/yasi_xi/article/details/18552871)
 
 
 <br />
