@@ -168,9 +168,125 @@ breakpoint already hit 1 time
 
 对于上面例子所显示的breakpoint，每一个Location都可以单独的```enable```或者```disable```。但是却并不能单独的从列表中进行删除。
 
+<br />
+
+此外，在共享库中设置断点也是很常见的一种情况。当程序运行的时候，共享库可以显示的加载和卸载。为了支持这种用例，当共享库在加载或卸载时，GDB都会更新断点的位置。典型情况下，你会在程序调试会话的开始在共享库中设置一个断点，而这时共享链接库可能还没有加载或者共享库中的符号仍不可用。当你尝试设置一个断点时，GDB会询问你是否设置一个```pending breakpoint```（即那些地址仍未知的breakpoint）。
+
+在程序运行之后，当一个新的共享链接库被加载时，GDB都会重新评估所有的breakpoints。当该新加载的动态链接库包含了相应的symbol或者某一行被pending breakpoint所引用的话，该breakpoint就算完成解析并成为一个普通的breakpoint。而当该共享链接库卸载时，所有引用其符号及源文件行的breakpoints又会变成pending状态。
 
 
 
+
+
+
+
+
+
+
+
+### 1.2 pending breakpoint 示例
+如下我们给出一个pending breakpoint的示例。
+
+1） **生成动态链接库**
+
+头文件```get.h```:
+{% highlight string %}
+# cat get.h
+#ifndef __GET_H_
+#define __GET_H_
+
+
+#ifdef __cplusplus
+#if __cplusplus
+extern "C"
+{
+#endif
+#endif /* __cplusplus */
+
+
+
+int get();
+
+int set(int a);
+
+
+#ifdef __cplusplus
+#if __cplusplus
+}
+#endif
+#endif /* __cplusplus */
+
+
+#endif
+{% endhighlight %}
+
+源文件实现```get.c```:
+{% highlight string %}
+#include <stdio.h>
+#include "get.h"
+
+
+
+static int x = 0;
+
+int get()
+{
+        printf("get x=%d\n", x);
+        return x;
+}
+
+int set(int a)
+{
+        printf("set a=%d\n", a);
+        x = a;
+        return x;
+}
+{% endhighlight %}
+
+编译生成动态链接库：
+<pre>
+# gcc get.c -shared -g -fPIC -DDEBUG -o libggg.so 
+</pre>
+
+上面我们就准备好了动态链接库。
+
+
+**2） 测试源代码**
+
+如下是我们测试用源代码：
+{% highlight string %}
+#include <stdio.h>
+#include "get.h"
+
+
+int main(int argc,char *argv[])
+{
+        int a = 100;
+        int b = get();
+        int c = set(a);
+        int d = get();
+
+        printf ("a=%d,b=%d,c=%d,d=%d\n",a,b,c,d);
+
+        return 0;
+}
+{% endhighlight %}
+编译：
+<pre>
+# gcc -g -c test.c
+# gcc -o test test.o -L. -lggg
+</pre>
+
+**3) 调试技巧**
+{% highlight string %}
+]# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) b set
+Function "set" not defined.
+Make breakpoint pending on future shared library load? (y or [n]) y 
+Breakpoint 2 (set) pending.
+{% endhighlight %}
+注意本例子有时候可能事先就加载了，并不一定能看到上面的提示。
 
 
 
@@ -243,6 +359,8 @@ Does not include preprocessor macro info.
 1. [100个gdb小技巧](https://www.kancloud.cn/wizardforcel/gdb-tips-100/146771)
 
 2. [gdb调试动态链接库](https://blog.csdn.net/yasi_xi/article/details/18552871)
+
+3. [设置 GDB 代码搜索路径](https://blog.csdn.net/caspiansea/article/details/42447203)
 
 
 <br />
