@@ -575,9 +575,77 @@ thread1_func (p_arg=0x400790) at test.c:11
 {% endhighlight %}
 可以看到，使用```watch a thread 2```命令以后，只有```thread1_func```改变```a```的值才会让程序停下来。需要注意的是这种针对特定线程设置观察点方式只对硬件观察点有效。
 
-<br />
 
-1.5.3 
+
+1.5.3 **设置读观察点**
+
+1） 示例程序
+{% highlight string %}
+#include <stdio.h>
+#include <pthread.h>
+
+int a = 0;
+
+void *thread1_func(void *p_arg)
+{
+        while (1)
+        {
+                printf("%d\n", a);
+                sleep(10);
+        }
+}
+
+int main(void)
+{
+        pthread_t t1;
+
+        pthread_create(&t1, NULL, thread1_func, "Thread 1");
+
+        sleep(1000);
+        return;
+}
+{% endhighlight %}
+
+2) 调试技巧
+
+GDB可以使用```rwatch```命令设置读观察点， 也就是当发生读取变量行为时，程序就会暂停住。以上面程序为例：
+{% highlight string %}
+# gcc -g -c test.c
+# gcc -o test test.o -lpthread
+
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) start
+Temporary breakpoint 1 at 0x4006c9: file test.c, line 19.
+Starting program: /root/workspace/./test 
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib64/libthread_db.so.1".
+
+Temporary breakpoint 1, main () at test.c:19
+19              pthread_create(&t1, NULL, thread1_func, "Thread 1");
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) rwatch a
+Hardware read watchpoint 2: a
+(gdb) c
+Continuing.
+[New Thread 0x7ffff77ff700 (LWP 3039)]
+[Switching to Thread 0x7ffff77ff700 (LWP 3039)]
+Hardware read watchpoint 2: a
+
+Value = 0
+0x000000000040069f in thread1_func (p_arg=0x400794) at test.c:10
+10                      printf("%d\n", a);
+(gdb) c
+Continuing.
+0
+Hardware read watchpoint 2: a
+
+Value = 0
+0x000000000040069f in thread1_func (p_arg=0x400794) at test.c:10
+10                      printf("%d\n", a);
+{% endhighlight %}
+
+上面可以看到，使用```rwatch a```命令以后，每次访问```a```的值都会让程序停下来。需要注意的是```rwatch```命令只对硬件观察点才有效。
 
 
 
