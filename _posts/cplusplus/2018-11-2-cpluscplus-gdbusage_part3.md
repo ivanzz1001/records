@@ -336,7 +336,7 @@ int main(int argc,char *argv[])
 
 **3) 调试技巧**
 {% highlight string %}
-]# gdb -q ./test
+# gdb -q ./test
 Reading symbols from /root/workspace/test...done.
 (gdb) b set
 Function "set" not defined.
@@ -471,7 +471,7 @@ Hardware watchpoint num: expr
 
 我们可以使用```info watchpoints```命令来查看当前所设置的所有观察点：
 <pre>
-]# gdb -q ./test
+# gdb -q ./test
 Reading symbols from /root/workspace/test...done.
 (gdb) watch a
 Hardware watchpoint 1: a
