@@ -177,7 +177,30 @@ breakpoint already hit 1 time
 
 
 
+### 1.3 设置catchpoint
+你可以使用```catchpoint```来暂停一些情形下程序的执行，比如C++异常或者加载一个贡献链接库。我们使用```catch```命令来进行设置catchpoint:
 
+1) **catch event **
+
+当event发生时，就会暂停程序的执行。event可以是如下一些：
+
+* throw [regexp] | rethrow [regexp] | catch [regexp]
+
+* exception
+
+* assert
+
+* exec
+
+* syscall
+
+* fork
+
+* vfork
+
+* load [regexp] | unload [regexp]
+
+* signal [signal... | 'all']
 
 
 
@@ -426,6 +449,7 @@ Num     Type           Disp Enb Address    What
 
 
 
+<br />
 
 ## 2 指定断点位置
 
