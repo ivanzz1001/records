@@ -246,12 +246,77 @@ breakpoint already hit 1 time
 
 设置一个```catchpoint```，其有效性只有一次。在捕获第一次捕获到相应的事件之后，该```catchpoint```就会被删除。
 
+<br />
 
+### 1.4 删除breakpoints
+
+通常在一个breakpoint、watchpoint、catchpoint完成其工作之后，我们就会将其删除以使得后续程序的执行不会在该位置暂停。
+
+我们使用```clear```命令来删除当前栈帧中的下一条指令处的breakpoints，使用```delete```命令来删除各独立的breakpoints、watchpoints以及catchpoints。
+
+通常情况下我们并没有必要删除那些已经执行完代码处的breakpoint。当你从头再一次执行程序的时候，GDB会自动的忽略这些breakpoints。下面给出相应的命令介绍：
+
+1) **clear**
+
+删除所选择栈帧中的下一条指令处的breakpoint。我们一般可以通过此命令移除当前的breakpoint.
+
+2) **clear location**
+
+删除所指定位置的任何breakpoints。有很多种不同形式的位置指定方法，最常见的有如下：
+
+* clear function / clear filename:function: 删除指定函数入口处的breakpoints
+
+* clear linenum / clear filename:linenum: 删除设置在指定代码行处的breakpoints
+
+
+3) **delete [breakpoints] [list...]**
+
+删除列表中所指定的breakpoints、watchpoints或者catchpoints。假如并未指定列表参数的话，那么会删除所有的breakpoints(删除时，GDB会进行相应的提示）
+
+
+
+### 1.5 禁止breakpoints
+
+除了删除一个breakpoint、watchpoint或者watchpoint之外，你也可以禁用它。禁用之后程序在执行到该breakpoint处时将不会暂停，但与删除不同的是，后续你还可以再次enable该断点。
+
+可以使用```enable```命令或者```disable```命令。一个breakpoint、watchpoint、catchpoint有多种不同的enable状态：
+
+* Enabled: 该breakpoint会暂停程序的执行。这通常是使用```break```命令设置的断点初始状态
+
+* Disabled： 该breakpoint当前并不会影响程序的执行
+
+* Enabled once: 在breakpoint会暂停程序的执行，之后就会变成disabled状态
+
+* Enabled for a count: 该breakpoint会在后续暂停N次程序的执行，之后就会变成disabled状态
+
+* Enabled for deletion: 该breakpoint会暂停程序的执行，之后就会永久性的删除。这通常是使用```tbreak```命令设置断点的初始状态
+
+如下是一些用于启用、禁用breakpoints、watchpoints、和catchpoints的命令：
+
+1) **disable [breakpoints] [list...]**
+
+当指定了禁用列表的话，则会禁用该列表中的breakpoints， 否则会禁用所有的breakpoints。
+
+2） **enable [breakpoints] [list...]**
+
+当指定了启用列表的话，则会启用该列表中的breakpoints，否则会启用所有的breakpoints。
+
+3） **enable [breakpoints] once list...**
+
+临时启用所指定的breakpoints。当该breakpoint暂停一次程序执行之后，就又马上会被禁用。
+
+4) **enable [breakpoints] count list...**
+
+临时启用所指定breakpoints。当该breakpoint暂停count次程序执行之后，就会马上被禁用
+
+5) **enable [breakpoints] delete list**
+
+启用所指定的breakpoints，当该breakpoints工作一次之后马上就会被删除。
 
 
 <br />
 
-### 1.4 pending breakpoint 示例
+### 1.6 pending breakpoint 示例
 如下我们给出一个pending breakpoint的示例。
 
 1） **生成动态链接库**
@@ -356,9 +421,9 @@ Breakpoint 2 (set) pending.
 注意本例子有时候可能事先就加载了，并不一定能看到上面的提示。
 
 
-### 1.5 watchpoint示例
+### 1.7 watchpoint示例
 
-1.5.1 **设置观察点**
+1.7.1 **设置观察点**
 
 1） 示例程序
 {% highlight string %}
@@ -491,7 +556,7 @@ Num     Type           Disp Enb Address    What
 </pre> 
 
 <br />
-1.5.2 **设置观察点只对特定线程有效**
+1.7.2 **设置观察点只对特定线程有效**
 
 1) 示例程序
 {% highlight string %}
@@ -585,7 +650,7 @@ thread1_func (p_arg=0x400790) at test.c:11
 
 
 
-1.5.3 **设置读观察点**
+1.7.3 **设置读观察点**
 
 1） 示例程序
 {% highlight string %}
@@ -656,7 +721,7 @@ Value = 0
 上面可以看到，使用```rwatch a```命令以后，每次访问```a```的值都会让程序停下来。需要注意的是```rwatch```命令只对硬件观察点才有效。
 
 
-1.5.4 **设置读写观察点**
+1.7.4 **设置读写观察点**
 
 1) 示例程序
 {% highlight string %}
@@ -750,9 +815,9 @@ Value = 1
 <br />
 
 
-### 1.6 catchpoint示例
+### 1.8 catchpoint示例
 
-1.6.1 **让catchpoint只触发一次**
+1.8.1 **让catchpoint只触发一次**
 
 1) 示例程序
 {% highlight string %}
@@ -816,7 +881,7 @@ hello world
 可以看到，当程序只在第一次调用fork时暂停。
 
 
-1.6.2 **为系统调用设置catchpoint**
+1.8.2 **为系统调用设置catchpoint**
 
 1) 调试程序
 {% highlight string %}
