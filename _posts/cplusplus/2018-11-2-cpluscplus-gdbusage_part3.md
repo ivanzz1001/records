@@ -482,7 +482,7 @@ Num     Type           Disp Enb Address    What
 1       hw watchpoint  keep y              a
 </pre> 
 
-
+<br />
 1.5.2 **设置观察点只对特定线程有效**
 
 
