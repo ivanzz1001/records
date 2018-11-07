@@ -242,6 +242,14 @@ breakpoint already hit 1 time
 * signal [signal... / 'all']
 
 
+2) **tcatch event**
+
+设置一个```catchpoint```，其有效性只有一次。在捕获第一次捕获到相应的事件之后，该```catchpoint```就会被删除。
+
+
+
+
+<br />
 
 ### 1.4 pending breakpoint 示例
 如下我们给出一个pending breakpoint的示例。
@@ -348,7 +356,7 @@ Breakpoint 2 (set) pending.
 注意本例子有时候可能事先就加载了，并不一定能看到上面的提示。
 
 
-### 1.5 catchpoint示例
+### 1.5 watchpoint示例
 
 1.5.1 **设置观察点**
 
@@ -742,8 +750,116 @@ Value = 1
 <br />
 
 
+### 1.6 catchpoint示例
+
+1.6.1 **让catchpoint只触发一次**
+
+1) 示例程序
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+int main(int argc, char *argv[]) 
+{
+    pid_t pid;
+    int i = 0;
+
+    for (i = 0; i < 2; i++)
+    {
+            pid = fork();
+            if (pid < 0)
+            {
+                exit(1);
+            }
+            else if (pid == 0)
+            {
+                exit(0);
+            }
+    }
+    printf("hello world\n");
+    return 0;
+}
+{% endhighlight %}
+
+2) 调试技巧
+
+使用GDB调试程序时，可以用```tcatch```命令设置```catchpoint```，只触发一次。以上面程序为例：
+{% highlight string %}
+# gcc -g -c test.c
+# gcc -o test test.o
+
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) tcatch fork
+Catchpoint 1 (fork)
+(gdb) start
+Temporary breakpoint 2 at 0x4005cc: file test.c, line 9.
+Starting program: /root/workspace/./test 
+
+Temporary breakpoint 2, main (argc=1, argv=0x7fffffffe638) at test.c:9
+9           int i = 0;
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) c
+Continuing.
+
+Temporary catchpoint 1 (forked process 4344), 0x00007ffff7ada74c in fork () from /lib64/libc.so.6
+(gdb) c
+Continuing.
+Detaching after fork from child process 4344.
+Detaching after fork from child process 4346.
+hello world
+[Inferior 1 (process 4340) exited normally]
+(gdb) 
+{% endhighlight %}
+可以看到，当程序只在第一次调用fork时暂停。
 
 
+1.6.2 **为系统调用设置catchpoint**
+
+1) 调试程序
+{% highlight string %}
+#include <stdio.h>
+
+int main(int argc,char *argv[])
+{
+    char p1[] = "Sam";
+    char *p2 = "Bob";
+
+    printf("p1 is %s, p2 is %s\n", p1, p2);
+    return 0;
+}
+{% endhighlight %}
+
+2) 调试技巧
+
+使用GDB调试程序时，可以使用```catch syscall [name | number]```为关注的系统调用设置```catchpoint```，以上面程序为例：
+{% highlight string %}
+# gcc -g -c test.c
+# gcc -o test test.o
+
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) catch syscall mmap
+Catchpoint 1 (syscall 'mmap' [9])
+(gdb) start
+Temporary breakpoint 2 at 0x40053c: file test.c, line 5.
+Starting program: /root/workspace/./test 
+
+Catchpoint 1 (call to syscall mmap), 0x00007ffff7df582a in mmap64 () from /lib64/ld-linux-x86-64.so.2
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) c
+Continuing.
+
+Catchpoint 1 (returned from syscall mmap), 0x00007ffff7df582a in mmap64 () from /lib64/ld-linux-x86-64.so.2
+(gdb) c
+Continuing.
+
+Catchpoint 1 (call to syscall mmap), 0x00007ffff7df582a in mmap64 () from /lib64/ld-linux-x86-64.so.2
+(gdb) 
+{% endhighlight %}
+可以看到，当```mmap```调用发生后，GDB会暂停程序的运行。
 
 
 ## 2 指定断点位置
