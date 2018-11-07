@@ -648,9 +648,103 @@ Value = 0
 上面可以看到，使用```rwatch a```命令以后，每次访问```a```的值都会让程序停下来。需要注意的是```rwatch```命令只对硬件观察点才有效。
 
 
+1.5.4 **设置读写观察点**
+
+1) 示例程序
+{% highlight string %}
+#include <stdio.h>
+#include <pthread.h>
+
+int a = 0;
+
+void *thread1_func(void *p_arg)
+{
+        while (1)
+        {
+                        a++;
+                        sleep(10);
+        }
+}
+
+void *thread2_func(void *p_arg)
+{
+        while (1)
+        {
+                        printf("%d\n", a);
+                        sleep(10);
+        }
+}
+
+int main(void)
+{
+        pthread_t t1, t2;
+
+        pthread_create(&t1, NULL, thread1_func, "Thread 1");
+        pthread_create(&t2, NULL, thread2_func, "Thread 2");
+
+        sleep(1000);
+        return;
+}
+{% endhighlight %}
+
+
+2) 调试技巧
+
+GDB可以使用```awatch```命令设置读写观察点，也就是当发生读取或者改变变量值的行为时，程序就会暂停住。以上面程序为例：
+{% highlight string %}
+# gcc -g -c test.c
+# gcc -o test test.o -lpthread
+
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) awatch a
+Hardware access (read/write) watchpoint 1: a
+(gdb) start
+Temporary breakpoint 2 at 0x4006f5: file test.c, line 28.
+Starting program: /root/workspace/./test 
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib64/libthread_db.so.1".
+
+Temporary breakpoint 2, main () at test.c:28
+28              pthread_create(&t1, NULL, thread1_func, "Thread 1");
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) c
+Continuing.
+[New Thread 0x7ffff77ff700 (LWP 3237)]
+[Switching to Thread 0x7ffff77ff700 (LWP 3237)]
+Hardware access (read/write) watchpoint 1: a
+
+Value = 0
+0x000000000040069f in thread1_func (p_arg=0x4007d4) at test.c:10
+10                              a++;
+(gdb) c
+Continuing.
+Hardware access (read/write) watchpoint 1: a
+
+Old value = 0
+New value = 1
+thread1_func (p_arg=0x4007d4) at test.c:11
+11                              sleep(10);
+(gdb) c
+Continuing.
+[New Thread 0x7ffff6ffe700 (LWP 3238)]
+[Switching to Thread 0x7ffff6ffe700 (LWP 3238)]
+Hardware access (read/write) watchpoint 1: a
+
+Value = 1
+0x00000000004006cb in thread2_func (p_arg=0x4007dd) at test.c:19
+19                              printf("%d\n", a);
+{% endhighlight %}
+
+可以看到，使用```awatch a```命令以后，每次读取或者改变a的值都会让程序停下来。需要注意的是```awatch```命令只对硬件观察点才有效。
 
 
 <br />
+
+
+
+
+
 
 ## 2 指定断点位置
 
