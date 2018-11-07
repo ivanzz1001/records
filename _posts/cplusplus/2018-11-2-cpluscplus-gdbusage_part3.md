@@ -188,6 +188,15 @@ breakpoint already hit 1 time
 * 复杂的表达式。例如```a*b+c/d```。表达式可以使用任何该语言所支持的运算符
 
 
+下面是设置```watchpoints```的语法：
+
+1) **watch [-l / -location] expr [thread thread-id] [mask maskvalue]**
+
+为某一个表达式设置```watchpoint```。当该表达式的值被修改时，GDB就会暂停程序的执行。使用本命令最简单最常用的方式就是watch单个变量
+<pre>
+(gdb) watch foo
+</pre>
+假如该命令包含了```[thread thread-id]```参数的话，则只有指定线程修改表达式的值时GDB才会暂停程序的执行。假如其他的线程也修改了该表达式的值，GDB并不会暂停。值得注意的是这种限制为单个进程的工作方式只在**Hardware Watchpoints**有效。
 
 
 <br />
