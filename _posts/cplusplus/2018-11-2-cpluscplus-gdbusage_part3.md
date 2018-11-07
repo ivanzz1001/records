@@ -198,6 +198,20 @@ breakpoint already hit 1 time
 </pre>
 假如该命令包含了```[thread thread-id]```参数的话，则只有指定线程修改表达式的值时GDB才会暂停程序的执行。假如其他的线程也修改了该表达式的值，GDB并不会暂停。值得注意的是这种限制为单个进程的工作方式只在**Hardware Watchpoints**有效。
 
+通常情况下，watchpoint对应于```expr```变量层面。而```-location```选项用于告诉GDB监视```expr```所引用的地址。在这种情况下，GDB将会计算```expr```的值，然后监视该值所对应的内存是否发生改变。
+
+2） **rwatch [-l / -location] expr [thread thread-id] [mask maskvalue]**
+
+设置一个watchpoint,当所对应的表达式```expr```的值被程序读取的时候，GDB会暂停程序的执行。只能设置**hardware watchpoints**
+
+3) **awatch [-l / -location] expr [thread thread-id] [mask maskvalue]**
+
+设置一个watchpoint，当所对应的表达式```expr```被程序读取或写入时，GDB均会暂停程序的执行。只能设置**hardware watchpoints**
+
+
+4) **info watchpoints [list...]**
+
+用于打印watchpoints信息
 
 <br />
 
