@@ -176,15 +176,72 @@ breakpoint already hit 1 time
 
 
 
+### 1.2 设置Watchpoints
+你可以对某一个表达式设置```watchpoint```，当监测到该表达式的值发生了改变，程序就会暂停执行，而并不需要指定一个精确的位置（这有时候被称为data breakpoint）。表达式可以是一个很简单的变量，也可以是由运算符连接的多个变量。可能的情形有：
+
+* 引用一个单独的变量
+
+* 将地址转换成适当的数据类型。例如， ```*(int *)0x12345678```将会监视该地址处的4字节的内容
+
+* 复杂的表达式。例如```a*b+c/d```。表达式可以使用任何该语言所支持的运算符
+
+
+下面是设置```watchpoints```的语法：
+
+1) **watch [-l|-location] expr [thread thread-id] [mask maskvalue]**
+
+为某一个表达式设置```watchpoint```。当该表达式的值被修改时，GDB就会暂停程序的执行。使用本命令最简单最常用的方式就是watch单个变量
+<pre>
+(gdb) watch foo
+</pre>
+假如该命令包含了```[thread thread-id]```参数的话，则只有指定线程修改表达式的值时GDB才会暂停程序的执行。假如其他的线程也修改了该表达式的值，GDB并不会暂停。值得注意的是这种限制为单个进程的工作方式只在**Hardware Watchpoints**有效。
+
+通常情况下，watchpoint对应于```expr```变量层面。而```-location```选项用于告诉GDB监视```expr```所引用的地址。在这种情况下，GDB将会计算```expr```的值，然后监视该值所对应的内存是否发生改变。
+
+2） **rwatch [-l|-location] expr [thread thread-id] [mask maskvalue]**
+
+设置一个watchpoint,当所对应的表达式```expr```的值被程序读取的时候，GDB会暂停程序的执行。只能设置**hardware watchpoints**
+
+3) **awatch [-l|-location] expr [thread thread-id] [mask maskvalue]**
+
+设置一个watchpoint，当所对应的表达式```expr```被程序读取或写入时，GDB均会暂停程序的执行。只能设置**hardware watchpoints**
+
+
+4) **info watchpoints [list...]**
+
+用于打印watchpoints信息
+
+
+### 1.3 设置catchpoint
+你可以使用```catchpoint```来暂停一些情形下程序的执行，比如C++异常或者加载一个贡献链接库。我们使用```catch```命令来进行设置catchpoint:
+
+1) **catch event **
+
+当event发生时，就会暂停程序的执行。event可以是如下一些：
+
+* throw [regexp] | rethrow [regexp] | catch [regexp]
+
+* exception
+
+* assert
+
+* exec
+
+* syscall
+
+* fork
+
+* vfork
+
+* load [regexp] | unload [regexp]
+
+* signal [signal... | 'all']
 
 
 
 
 
-
-
-
-### 1.2 pending breakpoint 示例
+### 1.4 pending breakpoint 示例
 如下我们给出一个pending breakpoint的示例。
 
 1） **生成动态链接库**
@@ -287,6 +344,146 @@ Make breakpoint pending on future shared library load? (y or [n]) y
 Breakpoint 2 (set) pending.
 {% endhighlight %}
 注意本例子有时候可能事先就加载了，并不一定能看到上面的提示。
+
+
+### 1.5 catchpoint示例
+
+1.5.1 **设置观察点**
+
+1） 示例程序
+{% highlight string %}
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+int a = 0;
+
+void *thread1_func(void *p_arg)
+{
+        while (1)
+        {
+                a++;
+                sleep(10);
+        }
+}
+
+int main(int argc, char* argv[])
+{
+        pthread_t t1;
+
+        pthread_create(&t1, NULL, thread1_func, "Thread 1");
+		
+        sleep(1000);
+        return 0;
+}
+{% endhighlight %}
+
+
+2） 调试技巧
+
+GDB可以使用```watch```命令，也就是当一个变量值发生变化时，程序会停下来。以上面程序为例
+{% highlight string %}
+# gcc -c -g test.c
+# gcc -o test test.o -lpthread
+
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) watch a
+Hardware watchpoint 1: a
+(gdb) start
+Temporary breakpoint 2 at 0x400683: file test.c, line 19.
+Starting program: /root/workspace/./test 
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib64/libthread_db.so.1".
+
+Temporary breakpoint 2, main (argc=1, argv=0x7fffffffe5e8) at test.c:19
+19              pthread_create(&t1, NULL, thread1_func, "Thread 1");
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) c
+Continuing.
+[New Thread 0x7ffff77ff700 (LWP 12533)]
+[Switching to Thread 0x7ffff77ff700 (LWP 12533)]
+Hardware watchpoint 1: a
+
+Old value = 0
+New value = 1
+thread1_func (p_arg=0x400740) at test.c:11
+11                      sleep(10);
+(gdb) c
+Continuing.
+Hardware watchpoint 1: a
+
+Old value = 1
+New value = 2
+thread1_func (p_arg=0x400740) at test.c:11
+11                      sleep(10);
+(gdb) 
+{% endhighlight %}
+
+可以看到，使用```watch a```命令以后，当```a```的值变化： 由0变成1； 由1变成2，程序都会停下来。
+
+此外，也可以使用```watch *(data type)address```这样的命令，仍以上面程序为例：
+{% highlight string %}
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) start
+Temporary breakpoint 1 at 0x400683: file test.c, line 19.
+Starting program: /root/workspace/./test 
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library "/lib64/libthread_db.so.1".
+
+Temporary breakpoint 1, main (argc=1, argv=0x7fffffffe5e8) at test.c:19
+19              pthread_create(&t1, NULL, thread1_func, "Thread 1");
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) p &a
+$1 = (int *) 0x601040 <a>
+(gdb) watch *(int *)0x601040
+Hardware watchpoint 2: *(int *)0x601040
+(gdb) c
+Continuing.
+[New Thread 0x7ffff77ff700 (LWP 12596)]
+[Switching to Thread 0x7ffff77ff700 (LWP 12596)]
+Hardware watchpoint 2: *(int *)0x601040
+
+Old value = 0
+New value = 1
+thread1_func (p_arg=0x400740) at test.c:11
+11                      sleep(10);
+(gdb) c
+Continuing.
+Hardware watchpoint 2: *(int *)0x601040
+
+Old value = 1
+New value = 2
+thread1_func (p_arg=0x400740) at test.c:11
+11                      sleep(10);
+(gdb) 
+{% endhighlight %}
+
+上面我们先得到```a```的地址```0x601040```，接着用```watch *(int *)0x601040```设置观察点，可以看到同```watch a```命令效果一样。观察点可以通过软件或硬件的方式实现，取决于具体的系统。但是软件实现的观察点会导致程序运行很慢，使用时需注意。
+
+如果系统支持硬件观测的话，当设置观测点时会打印如下信息：
+<pre>
+Hardware watchpoint num: expr
+</pre>
+
+
+3） 查看观察点
+
+我们可以使用```info watchpoints```命令来查看当前所设置的所有观察点：
+<pre>
+]# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) watch a
+Hardware watchpoint 1: a
+(gdb) info watchpoints
+Num     Type           Disp Enb Address    What
+1       hw watchpoint  keep y              a
+</pre> 
+
+
+1.5.2 **设置观察点只对特定线程有效**
+
+
 
 
 
