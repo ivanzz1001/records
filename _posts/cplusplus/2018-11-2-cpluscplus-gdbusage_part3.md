@@ -176,66 +176,6 @@ breakpoint already hit 1 time
 
 
 
-### 1.2 设置Watchpoints
-你可以对某一个表达式设置```watchpoint```，当监测到该表达式的值发生了改变，程序就会暂停执行，而并不需要指定一个精确的位置（这有时候被称为data breakpoint）。表达式可以是一个很简单的变量，也可以是由运算符连接的多个变量。可能的情形有：
-
-* 引用一个单独的变量
-
-* 将地址转换成适当的数据类型。例如， ```*(int *)0x12345678```将会监视该地址处的4字节的内容
-
-* 复杂的表达式。例如```a*b+c/d```。表达式可以使用任何该语言所支持的运算符
-
-
-下面是设置```watchpoints```的语法：
-
-1) **watch [-l|-location] expr [thread thread-id] [mask maskvalue]**
-
-为某一个表达式设置```watchpoint```。当该表达式的值被修改时，GDB就会暂停程序的执行。使用本命令最简单最常用的方式就是watch单个变量
-<pre>
-(gdb) watch foo
-</pre>
-假如该命令包含了```[thread thread-id]```参数的话，则只有指定线程修改表达式的值时GDB才会暂停程序的执行。假如其他的线程也修改了该表达式的值，GDB并不会暂停。值得注意的是这种限制为单个进程的工作方式只在**Hardware Watchpoints**有效。
-
-通常情况下，watchpoint对应于```expr```变量层面。而```-location```选项用于告诉GDB监视```expr```所引用的地址。在这种情况下，GDB将会计算```expr```的值，然后监视该值所对应的内存是否发生改变。
-
-2） **rwatch [-l|-location] expr [thread thread-id] [mask maskvalue]**
-
-设置一个watchpoint,当所对应的表达式```expr```的值被程序读取的时候，GDB会暂停程序的执行。只能设置**hardware watchpoints**
-
-3) **awatch [-l|-location] expr [thread thread-id] [mask maskvalue]**
-
-设置一个watchpoint，当所对应的表达式```expr```被程序读取或写入时，GDB均会暂停程序的执行。只能设置**hardware watchpoints**
-
-
-4) **info watchpoints [list...]**
-
-用于打印watchpoints信息
-
-
-### 1.3 设置catchpoint
-你可以使用```catchpoint```来暂停一些情形下程序的执行，比如C++异常或者加载一个贡献链接库。我们使用```catch```命令来进行设置catchpoint:
-
-1) **catch event **
-
-当event发生时，就会暂停程序的执行。event可以是如下一些：
-
-* throw [regexp] | rethrow [regexp] | catch [regexp]
-
-* exception
-
-* assert
-
-* exec
-
-* syscall
-
-* fork
-
-* vfork
-
-* load [regexp] | unload [regexp]
-
-* signal [signal... | 'all']
 
 
 
