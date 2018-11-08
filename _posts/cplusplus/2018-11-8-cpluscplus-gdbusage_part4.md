@@ -409,6 +409,14 @@ Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
 
 
 
+## 2. 汇编
+
+### 2.1 设置汇编指令格式
+
+1) 示例程序
+{% highlight string %}
+{% endhighlight %}
+
 
 
 <br />
@@ -421,6 +429,7 @@ Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
 
 2. [设置 GDB 代码搜索路径](https://blog.csdn.net/caspiansea/article/details/42447203)
 
+3. [AT&T汇编格式与Intel汇编格式的比较](https://blog.csdn.net/samxx8/article/details/12613643)
 
 <br />
 <br />
