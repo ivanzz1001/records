@@ -337,6 +337,74 @@ Stack level 2, frame at 0x7fffffffe540:
 {% endhighlight %}
 使用```info frame```命令可以知道 0x7fffffffe518 是fun2()的函数栈帧地址，使用```frame 0x7fffffffe518```可以切换到fun2()的函数栈帧。
 
+<br />
+
+1.5.3 **向上或向下切换函数栈帧**
+
+1） 示例程序
+{% highlight string %}
+#include <stdio.h>
+
+int func1(int a)
+{
+        return 2 * a;
+}
+
+int func2(int a)
+{
+        int c = 0;
+        c = 2 * func1(a);
+        return c;
+}
+
+int func3(int a)
+{
+        int c = 0;
+        c = 2 * func2(a);
+        return c;
+}
+
+int main(int argc,char *argv[])
+{
+        printf("%d\n", func3(10));
+        return 0;
+}
+{% endhighlight %}
+
+
+2) 调试技巧
+
+用GDB调试程序时，当程序暂停后，可以用```up n```或者```down n```命令向上或向下选择函数栈帧，其中```n```是层数。以上面程序为例：
+{% highlight string %}
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) b test.c:5
+Breakpoint 1 at 0x400534: file test.c, line 5.
+(gdb) r
+Starting program: /root/workspace/./test 
+
+Breakpoint 1, func1 (a=10) at test.c:5
+5               return 2 * a;
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) bt
+#0  func1 (a=10) at test.c:5
+#1  0x0000000000400557 in func2 (a=10) at test.c:11
+#2  0x000000000040057d in func3 (a=10) at test.c:18
+#3  0x00000000004005a0 in main (argc=1, argv=0x7fffffffe638) at test.c:24
+(gdb) frame 2
+#2  0x000000000040057d in func3 (a=10) at test.c:18
+18              c = 2 * func2(a);
+(gdb) up 1
+#3  0x00000000004005a0 in main (argc=1, argv=0x7fffffffe638) at test.c:24
+24              printf("%d\n", func3(10));
+(gdb) down 2
+#1  0x0000000000400557 in func2 (a=10) at test.c:11
+11              c = 2 * func1(a);
+(gdb) 
+{% endhighlight %}
+可以看到程序断住后，先执行```frame 2```命令，切换到```fun3```函数。接着执行```up 1```命令，此时会切换到main函数，也就是会往外层的栈帧移动一层。反之，当执行```down 2```命令后，又会向内层栈帧移动两层。如果不指定```n```，则n默认为1。
+
+还有```up-silently  n```和```down-silently n```这两个命令，与```up n```和```down n```命令区别在于，切换栈帧后，不会打印信息。
 
 
 
