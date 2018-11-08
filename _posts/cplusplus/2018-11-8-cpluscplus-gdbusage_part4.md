@@ -415,8 +415,215 @@ Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
 
 1) 示例程序
 {% highlight string %}
+#include <stdio.h>
+int global_var;
+
+void change_var(){
+    global_var=100;
+}
+
+int main(int argc, char *argv[]){
+    change_var();
+    return 0;
+}
 {% endhighlight %}
 
+2) 调试技巧
+
+在```intel x86```处理器上，GDB默认显示汇编指令格式是```AT & T```格式。例如：
+{% highlight string %}
+# gcc -g -c test.c
+# gcc -o test test.o
+
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) disassemble change_var
+Dump of assembler code for function change_var:
+   0x00000000004004ed <+0>:     push   %rbp
+   0x00000000004004ee <+1>:     mov    %rsp,%rbp
+   0x00000000004004f1 <+4>:     movl   $0x64,0x200b35(%rip)        # 0x601030 <global_var>
+   0x00000000004004fb <+14>:    pop    %rbp
+   0x00000000004004fc <+15>:    retq   
+End of assembler dump.
+(gdb) disassemble main
+Dump of assembler code for function main:
+   0x00000000004004fd <+0>:     push   %rbp
+   0x00000000004004fe <+1>:     mov    %rsp,%rbp
+   0x0000000000400501 <+4>:     sub    $0x10,%rsp
+   0x0000000000400505 <+8>:     mov    %edi,-0x4(%rbp)
+   0x0000000000400508 <+11>:    mov    %rsi,-0x10(%rbp)
+   0x000000000040050c <+15>:    mov    $0x0,%eax
+   0x0000000000400511 <+20>:    callq  0x4004ed <change_var>
+   0x0000000000400516 <+25>:    mov    $0x0,%eax
+   0x000000000040051b <+30>:    leaveq 
+   0x000000000040051c <+31>:    retq   
+End of assembler dump.
+{% endhighlight %}
+
+可以使用```set disassembly-flavor```命令将格式改为```intel```格式：
+{% highlight string %}
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) set disassembly-flavor intel
+(gdb) disassemble change_var
+Dump of assembler code for function change_var:
+   0x00000000004004ed <+0>:     push   rbp
+   0x00000000004004ee <+1>:     mov    rbp,rsp
+   0x00000000004004f1 <+4>:     mov    DWORD PTR [rip+0x200b35],0x64        # 0x601030 <global_var>
+   0x00000000004004fb <+14>:    pop    rbp
+   0x00000000004004fc <+15>:    ret    
+End of assembler dump.
+(gdb) disassemble main
+Dump of assembler code for function main:
+   0x00000000004004fd <+0>:     push   rbp
+   0x00000000004004fe <+1>:     mov    rbp,rsp
+   0x0000000000400501 <+4>:     sub    rsp,0x10
+   0x0000000000400505 <+8>:     mov    DWORD PTR [rbp-0x4],edi
+   0x0000000000400508 <+11>:    mov    QWORD PTR [rbp-0x10],rsi
+   0x000000000040050c <+15>:    mov    eax,0x0
+   0x0000000000400511 <+20>:    call   0x4004ed <change_var>
+   0x0000000000400516 <+25>:    mov    eax,0x0
+   0x000000000040051b <+30>:    leave  
+   0x000000000040051c <+31>:    ret    
+End of assembler dump.
+{% endhighlight %}
+目前```set disassembly-flavor```命令只能用在```intel x86```处理器上，并且取值只有```intel```和```att```。
+
+3) 函数调用汇编分析
+
+从上面我们可以看到，通过使用```callq <address>```指令来调用一个函数。其中```address```为调用函数的入口地址。进入调用函数之后首先将```rbp```入栈，以保存上一个栈帧的基址。接着```rbp```保存了当前```rsp```的值。而在函数退出时，会从栈中恢复```rbp```的值。
+
+参看下图：
+
+![gdb-stack-frame](https://ivanzz1001.github.io/records/assets/img/cplusplus/gdb_stack_frame.jpg)
+
+
+
+4) 带参数和返回值的函数调用
+
+上面我们基本弄清楚了函数的调用流程，下面我们就简单来看一下带参数和返回值的函数调用：
+{% highlight string %}
+#include <stdio.h>
+
+int sum(int a, int b, int c, int d, int e, int f, int g, int h,int i,int j)
+{
+        int total;
+
+        total = a + b + c + d + e + f + g + h + i + j;
+
+        return total;
+}
+
+int main(int argc, char *argv[])
+{
+        int a, b, c, d, e, f, g, h, i,j, total;
+
+        a = 1;
+        b = 2;
+        c = 3;
+        d = 4;
+        e = 5;
+        f = 6;
+        g = 7;
+        h = 8;
+        i = 9;
+        j = 10;
+
+        total = sum(a, b, c, d, e, f, g, h, i,j);
+
+        printf("sum: %d\n", total);
+
+        return 0;
+}
+{% endhighlight %}
+
+
+如下我们编译调试:
+{% highlight string %}
+# gcc -g -c test.c
+# gcc -o test test.o
+
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) disassemble sum
+Dump of assembler code for function sum:
+   0x000000000040052d <+0>:     push   %rbp
+   0x000000000040052e <+1>:     mov    %rsp,%rbp
+   0x0000000000400531 <+4>:     mov    %edi,-0x14(%rbp)
+   0x0000000000400534 <+7>:     mov    %esi,-0x18(%rbp)
+   0x0000000000400537 <+10>:    mov    %edx,-0x1c(%rbp)
+   0x000000000040053a <+13>:    mov    %ecx,-0x20(%rbp)
+   0x000000000040053d <+16>:    mov    %r8d,-0x24(%rbp)
+   0x0000000000400541 <+20>:    mov    %r9d,-0x28(%rbp)
+   0x0000000000400545 <+24>:    mov    -0x18(%rbp),%eax
+   0x0000000000400548 <+27>:    mov    -0x14(%rbp),%edx
+   0x000000000040054b <+30>:    add    %eax,%edx
+   0x000000000040054d <+32>:    mov    -0x1c(%rbp),%eax
+   0x0000000000400550 <+35>:    add    %eax,%edx
+   0x0000000000400552 <+37>:    mov    -0x20(%rbp),%eax
+   0x0000000000400555 <+40>:    add    %eax,%edx
+   0x0000000000400557 <+42>:    mov    -0x24(%rbp),%eax
+   0x000000000040055a <+45>:    add    %eax,%edx
+   0x000000000040055c <+47>:    mov    -0x28(%rbp),%eax
+   0x000000000040055f <+50>:    add    %eax,%edx
+   0x0000000000400561 <+52>:    mov    0x10(%rbp),%eax
+   0x0000000000400564 <+55>:    add    %eax,%edx
+   0x0000000000400566 <+57>:    mov    0x18(%rbp),%eax
+   0x0000000000400569 <+60>:    add    %eax,%edx
+   0x000000000040056b <+62>:    mov    0x20(%rbp),%eax
+   0x000000000040056e <+65>:    add    %eax,%edx
+   0x0000000000400570 <+67>:    mov    0x28(%rbp),%eax
+   0x0000000000400573 <+70>:    add    %edx,%eax
+   0x0000000000400575 <+72>:    mov    %eax,-0x4(%rbp)
+   0x0000000000400578 <+75>:    mov    -0x4(%rbp),%eax
+   0x000000000040057b <+78>:    pop    %rbp
+   0x000000000040057c <+79>:    retq   
+End of assembler dump.
+(gdb) disassemble main
+Dump of assembler code for function main:
+   0x000000000040057d <+0>:     push   %rbp
+   0x000000000040057e <+1>:     mov    %rsp,%rbp
+   0x0000000000400581 <+4>:     sub    $0x60,%rsp
+   0x0000000000400585 <+8>:     mov    %edi,-0x34(%rbp)
+   0x0000000000400588 <+11>:    mov    %rsi,-0x40(%rbp)
+   0x000000000040058c <+15>:    movl   $0x1,-0x4(%rbp)
+   0x0000000000400593 <+22>:    movl   $0x2,-0x8(%rbp)
+   0x000000000040059a <+29>:    movl   $0x3,-0xc(%rbp)
+   0x00000000004005a1 <+36>:    movl   $0x4,-0x10(%rbp)
+   0x00000000004005a8 <+43>:    movl   $0x5,-0x14(%rbp)
+   0x00000000004005af <+50>:    movl   $0x6,-0x18(%rbp)
+   0x00000000004005b6 <+57>:    movl   $0x7,-0x1c(%rbp)
+   0x00000000004005bd <+64>:    movl   $0x8,-0x20(%rbp)
+   0x00000000004005c4 <+71>:    movl   $0x9,-0x24(%rbp)
+   0x00000000004005cb <+78>:    movl   $0xa,-0x28(%rbp)
+   0x00000000004005d2 <+85>:    mov    -0x18(%rbp),%r9d
+   0x00000000004005d6 <+89>:    mov    -0x14(%rbp),%r8d
+   0x00000000004005da <+93>:    mov    -0x10(%rbp),%ecx
+   0x00000000004005dd <+96>:    mov    -0xc(%rbp),%edx
+   0x00000000004005e0 <+99>:    mov    -0x8(%rbp),%esi
+   0x00000000004005e3 <+102>:   mov    -0x4(%rbp),%eax
+   0x00000000004005e6 <+105>:   mov    -0x28(%rbp),%edi
+   0x00000000004005e9 <+108>:   mov    %edi,0x18(%rsp)
+   0x00000000004005ed <+112>:   mov    -0x24(%rbp),%edi
+   0x00000000004005f0 <+115>:   mov    %edi,0x10(%rsp)
+   0x00000000004005f4 <+119>:   mov    -0x20(%rbp),%edi
+   0x00000000004005f7 <+122>:   mov    %edi,0x8(%rsp)
+   0x00000000004005fb <+126>:   mov    -0x1c(%rbp),%edi
+   0x00000000004005fe <+129>:   mov    %edi,(%rsp)
+   0x0000000000400601 <+132>:   mov    %eax,%edi
+   0x0000000000400603 <+134>:   callq  0x40052d <sum>
+   0x0000000000400608 <+139>:   mov    %eax,-0x2c(%rbp)
+   0x000000000040060b <+142>:   mov    -0x2c(%rbp),%eax
+   0x000000000040060e <+145>:   mov    %eax,%esi
+   0x0000000000400610 <+147>:   mov    $0x4006c0,%edi
+   0x0000000000400615 <+152>:   mov    $0x0,%eax
+   0x000000000040061a <+157>:   callq  0x400410 <printf@plt>
+   0x000000000040061f <+162>:   mov    $0x0,%eax
+   0x0000000000400624 <+167>:   leaveq 
+   0x0000000000400625 <+168>:   retq   
+End of assembler dump.
+(gdb) 
+{% endhighlight %}
 
 
 <br />
