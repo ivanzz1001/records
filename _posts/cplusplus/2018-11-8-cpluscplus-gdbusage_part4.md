@@ -625,6 +625,11 @@ End of assembler dump.
 (gdb) 
 {% endhighlight %}
 
+上面我们可以看到有一部分参数通过寄存器来进行传递，有一部分通过栈来进行传递。我们来看一下在调用栈：
+
+![gdb-stack-change](https://ivanzz1001.github.io/records/assets/img/cplusplus/gdb_stack_change.jpg)
+
+
 
 <br />
 <br />
@@ -637,6 +642,8 @@ End of assembler dump.
 2. [设置 GDB 代码搜索路径](https://blog.csdn.net/caspiansea/article/details/42447203)
 
 3. [AT&T汇编格式与Intel汇编格式的比较](https://blog.csdn.net/samxx8/article/details/12613643)
+
+4. [函数调用过程探究](http://www.cnblogs.com/bangerlee/archive/2012/05/22/2508772.html)
 
 <br />
 <br />
