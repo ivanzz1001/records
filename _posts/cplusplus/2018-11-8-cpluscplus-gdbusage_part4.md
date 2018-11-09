@@ -629,6 +629,92 @@ End of assembler dump.
 
 ![gdb-stack-change](https://ivanzz1001.github.io/records/assets/img/cplusplus/gdb_stack_change.jpg)
 
+这里注意， ```leaveq```会将当前栈清空，而```retq```会恢复rip寄存器。
+
+### 2.2 在函数的第一条汇编指令打断点
+
+1) 示例程序
+{% highlight string %}
+#include <stdio.h>
+
+int global_var;
+
+void change_var()
+{
+        global_var = 10;
+}
+
+int main(int argc, char *argv[])
+{
+        change_var();
+
+        return 0x0;
+}
+{% endhighlight %}
+
+
+2) 调试技巧
+
+通常给函数打断点的命令: ```b func```，不会把断点设置在汇编指令层次函数的开头。例如：
+{% highlight string %}
+# gcc -g -c test.c
+# gcc -o test test.o
+
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) b main
+Breakpoint 1 at 0x40050c: file test.c, line 12.
+(gdb) r
+Starting program: /root/workspace/./test 
+
+Breakpoint 1, main (argc=1, argv=0x7fffffffe638) at test.c:12
+12              change_var();
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) disassemble
+Dump of assembler code for function main:
+   0x00000000004004fd <+0>:     push   %rbp
+   0x00000000004004fe <+1>:     mov    %rsp,%rbp
+   0x0000000000400501 <+4>:     sub    $0x10,%rsp
+   0x0000000000400505 <+8>:     mov    %edi,-0x4(%rbp)
+   0x0000000000400508 <+11>:    mov    %rsi,-0x10(%rbp)
+=> 0x000000000040050c <+15>:    mov    $0x0,%eax
+   0x0000000000400511 <+20>:    callq  0x4004ed <change_var>
+   0x0000000000400516 <+25>:    mov    $0x0,%eax
+   0x000000000040051b <+30>:    leaveq 
+   0x000000000040051c <+31>:    retq   
+End of assembler dump
+{% endhighlight %}
+
+可以看到，程序停在了第六条汇编指令处（箭头所指位置）。如果要把断点设置在汇编指令层次函数的开头，要使用如下命令```b *func```，例如：
+{% highlight string %}
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) b *main
+Breakpoint 1 at 0x4004fd: file test.c, line 11.
+(gdb) r
+Starting program: /root/workspace/./test 
+
+Breakpoint 1, main (argc=0, argv=0x7fffffffe630) at test.c:11
+11      {
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) disassemble
+Dump of assembler code for function main:
+=> 0x00000000004004fd <+0>:     push   %rbp
+   0x00000000004004fe <+1>:     mov    %rsp,%rbp
+   0x0000000000400501 <+4>:     sub    $0x10,%rsp
+   0x0000000000400505 <+8>:     mov    %edi,-0x4(%rbp)
+   0x0000000000400508 <+11>:    mov    %rsi,-0x10(%rbp)
+   0x000000000040050c <+15>:    mov    $0x0,%eax
+   0x0000000000400511 <+20>:    callq  0x4004ed <change_var>
+   0x0000000000400516 <+25>:    mov    $0x0,%eax
+   0x000000000040051b <+30>:    leaveq 
+   0x000000000040051c <+31>:    retq   
+End of assembler dump.
+{% endhighlight %}
+
+可以看到，程序停在了第一条汇编指令处（箭头所指位置）。
+
+
 
 
 <br />
