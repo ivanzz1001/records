@@ -792,9 +792,264 @@ Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
 
 ### 2.4 将源程序和汇编指令映射起来
 
+1) 示例程序
+{% highlight string %}
+#include <stdio.h>
+
+typedef struct{
+        int a;
+        int b;
+        int c;
+        int d;
+}ex_st;
+
+int main(int argc, char *argv[])
+{
+        ex_st st = {1, 2, 3, 4};
+
+        printf("%d,%d,%d,%d\n", st.a, st.b, st.c, st.d);
+
+        return 0;
+}
+{% endhighlight %}
+
+2) 技巧1
+
+可以用```disassemble /m func```命令将函数代码和汇编指令映射起来，以上面代码为例：
+{% highlight string %}
+# gcc -g -c test.c
+# gcc -o test test.o
+
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) disassemble /m main
+Dump of assembler code for function main:
+11      {
+   0x000000000040052d <+0>:     push   %rbp
+   0x000000000040052e <+1>:     mov    %rsp,%rbp
+   0x0000000000400531 <+4>:     sub    $0x20,%rsp
+   0x0000000000400535 <+8>:     mov    %edi,-0x14(%rbp)
+   0x0000000000400538 <+11>:    mov    %rsi,-0x20(%rbp)
+
+12              ex_st st = {1, 2, 3, 4};
+   0x000000000040053c <+15>:    movl   $0x1,-0x10(%rbp)
+   0x0000000000400543 <+22>:    movl   $0x2,-0xc(%rbp)
+   0x000000000040054a <+29>:    movl   $0x3,-0x8(%rbp)
+   0x0000000000400551 <+36>:    movl   $0x4,-0x4(%rbp)
+
+13
+14              printf("%d,%d,%d,%d\n", st.a, st.b, st.c, st.d);
+   0x0000000000400558 <+43>:    mov    -0x4(%rbp),%esi
+   0x000000000040055b <+46>:    mov    -0x8(%rbp),%ecx
+   0x000000000040055e <+49>:    mov    -0xc(%rbp),%edx
+   0x0000000000400561 <+52>:    mov    -0x10(%rbp),%eax
+   0x0000000000400564 <+55>:    mov    %esi,%r8d
+   0x0000000000400567 <+58>:    mov    %eax,%esi
+   0x0000000000400569 <+60>:    mov    $0x400610,%edi
+   0x000000000040056e <+65>:    mov    $0x0,%eax
+   0x0000000000400573 <+70>:    callq  0x400410 <printf@plt>
+
+15
+16              return 0;
+   0x0000000000400578 <+75>:    mov    $0x0,%eax
+
+17      }
+   0x000000000040057d <+80>:    leaveq 
+   0x000000000040057e <+81>:    retq   
+
+End of assembler dump.
+(gdb)
+{% endhighlight %}
+
+可以看到，每一条C语句下面时对应的汇编代码。
+
+3） 技巧2
+
+如果只想查看某一行对应的地址范围，可以：
+{% highlight string %}
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) list
+3       typedef struct{
+4               int a;
+5               int b;
+6               int c;
+7               int d;
+8       }ex_st;
+9
+10      int main(int argc, char *argv[])
+11      {
+12              ex_st st = {1, 2, 3, 4};
+(gdb) 
+13
+14              printf("%d,%d,%d,%d\n", st.a, st.b, st.c, st.d);
+15
+16              return 0;
+17      }
+(gdb) info line 14
+Line 14 of "test.c" starts at address 0x400558 <main+43> and ends at 0x400578 <main+75>.
+{% endhighlight %}
+
+如果只想查看这一条语句对应的汇编代码，可以使用```disassemble [start], [end]```命令：
+{% highlight string %}
+(gdb) disassemble 0x400558, 0x400578
+Dump of assembler code from 0x400558 to 0x400578:
+   0x0000000000400558 <main+43>:        mov    -0x4(%rbp),%esi
+   0x000000000040055b <main+46>:        mov    -0x8(%rbp),%ecx
+   0x000000000040055e <main+49>:        mov    -0xc(%rbp),%edx
+   0x0000000000400561 <main+52>:        mov    -0x10(%rbp),%eax
+   0x0000000000400564 <main+55>:        mov    %esi,%r8d
+   0x0000000000400567 <main+58>:        mov    %eax,%esi
+   0x0000000000400569 <main+60>:        mov    $0x400610,%edi
+   0x000000000040056e <main+65>:        mov    $0x0,%eax
+   0x0000000000400573 <main+70>:        callq  0x400410 <printf@plt>
+End of assembler dump.
+{% endhighlight %}
 
 
+### 2.5 显示要执行的汇编指令
 
+1) 示例程序
+{% highlight string %}
+#include <stdio.h>
+
+int global_var;
+
+void change_var()
+{
+    global_var=100;
+}
+
+int main(int argc, char *argv[])
+{
+    change_var();
+
+    return 0;
+}
+{% endhighlight %}
+
+2） 调试技巧
+
+使用GDB调试汇编程序时，可以用```display /i $pc```命令显示当程序停止时，将要执行的汇编指令。以上面程序为例：
+{% highlight string %}
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) start
+Temporary breakpoint 1 at 0x40050c: file test.c, line 12.
+Starting program: /root/workspace/./test 
+
+Temporary breakpoint 1, main (argc=1, argv=0x7fffffffe638) at test.c:12
+12          change_var();
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) display /i $pc
+1: x/i $pc
+=> 0x40050c <main+15>:  mov    $0x0,%eax
+(gdb) si
+0x0000000000400511      12          change_var();
+1: x/i $pc
+=> 0x400511 <main+20>:  callq  0x4004ed <change_var>
+(gdb) si
+change_var () at test.c:6
+6       {
+1: x/i $pc
+=> 0x4004ed <change_var>:       push   %rbp
+{% endhighlight %}
+
+可以看到，打印出了将要执行的汇编指令。此外，也可以一次显示多条指令：
+{% highlight string %}
+(gdb) display /3i $pc
+2: x/3i $pc
+=> 0x4004ed <change_var>:       push   %rbp
+   0x4004ee <change_var+1>:     mov    %rsp,%rbp
+   0x4004f1 <change_var+4>:     movl   $0x64,0x200b35(%rip)        # 0x601030 <global_var>
+{% endhighlight %}
+可以看到，一次显示了3条指令。
+
+取消显示可以使用```undisplay```命令。
+
+
+### 2.6 打印寄存器的值
+
+用GDB调试程序时，如果想查看寄存器的值，可以使用```info registers```命令，例如：
+{% highlight string %}
+(gdb) info registers
+rax            0x4004fd 4195581
+rbx            0x0      0
+rcx            0x400520 4195616
+rdx            0x7fffffffe648   140737488348744
+rsi            0x7fffffffe638   140737488348728
+rdi            0x1      1
+rbp            0x7fffffffe550   0x7fffffffe550
+rsp            0x7fffffffe540   0x7fffffffe540
+r8             0x7ffff7dd7e80   140737351876224
+r9             0x0      0
+r10            0x7fffffffe3a0   140737488348064
+r11            0x7ffff7a3da40   140737348098624
+r12            0x400400 4195328
+r13            0x7fffffffe630   140737488348720
+r14            0x0      0
+r15            0x0      0
+rip            0x40050c 0x40050c <main+15>
+eflags         0x202    [ IF ]
+cs             0x33     51
+ss             0x2b     43
+ds             0x0      0
+es             0x0      0
+fs             0x0      0
+gs             0x0      0
+{% endhighlight %}
+
+以上输出不包括浮点寄存器和向量寄存器的内容。使用```info all-registers```命令，可以输出所有寄存器的内容：
+<pre>
+(gdb) info all-registers
+</pre>
+要打印单个寄存器的值，可以使用```info registers regname```或者```p $regname```，例如：
+{% highlight string %}
+(gdb) info registers rax
+rax            0x4004fd 4195581
+(gdb) p $rax
+$1 = 4195581
+{% endhighlight %}
+
+### 2.7 显示程序原始机器码
+
+1) 示例程序
+{% highlight string %}
+#include <stdio.h>
+
+
+int main(int argc, char *argv[])
+{
+        printf("hello,world!\n");
+
+        return 0x0;
+}
+{% endhighlight %}
+
+2) 调试技巧
+
+使用```disassemble /r```命令可以用16进制形式显示程序的原始机器码。以上面程序为例：
+{% highlight string %}
+# gcc -g -c test.c
+# gcc -o test test.o
+
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) disassemble /r main
+Dump of assembler code for function main:
+   0x000000000040052d <+0>:     55      push   %rbp
+   0x000000000040052e <+1>:     48 89 e5        mov    %rsp,%rbp
+   0x0000000000400531 <+4>:     48 83 ec 10     sub    $0x10,%rsp
+   0x0000000000400535 <+8>:     89 7d fc        mov    %edi,-0x4(%rbp)
+   0x0000000000400538 <+11>:    48 89 75 f0     mov    %rsi,-0x10(%rbp)
+   0x000000000040053c <+15>:    bf e0 05 40 00  mov    $0x4005e0,%edi
+   0x0000000000400541 <+20>:    e8 ca fe ff ff  callq  0x400410 <puts@plt>
+   0x0000000000400546 <+25>:    b8 00 00 00 00  mov    $0x0,%eax
+   0x000000000040054b <+30>:    c9      leaveq 
+   0x000000000040054c <+31>:    c3      retq   
+End of assembler dump.
+(gdb) 
+{% endhighlight %}
 
 
 <br />
