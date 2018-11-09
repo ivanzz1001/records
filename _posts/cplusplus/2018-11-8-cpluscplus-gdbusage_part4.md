@@ -715,6 +715,86 @@ End of assembler dump.
 可以看到，程序停在了第一条汇编指令处（箭头所指位置）。
 
 
+### 2.3 自动反汇编后面要执行的代码
+
+1） 示例程序
+{% highlight string %}
+#include <stdio.h>
+
+
+
+int sum(int a, int b)
+{
+        return a + b;
+}
+
+
+int main(int argc,char *argv[])
+{
+        int a, b, total;
+
+        a = 1;
+        b = 2;
+
+        total = sum(a, b);
+
+        printf("total: %d\n", total);
+        return 0x0;
+}
+{% endhighlight %}
+
+2) 反汇编演示
+{% highlight string %}
+# gcc -g -c test.c
+# gcc -o test test.o
+
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) set disassemble-next-line on
+(gdb) start
+Temporary breakpoint 1 at 0x400550: file test.c, line 15.
+Starting program: /root/workspace/./test 
+
+Temporary breakpoint 1, main (argc=1, argv=0x7fffffffe638) at test.c:15
+15              a = 1;
+=> 0x0000000000400550 <main+15>:        c7 45 fc 01 00 00 00    movl   $0x1,-0x4(%rbp)
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) si
+16              b = 2;
+=> 0x0000000000400557 <main+22>:        c7 45 f8 02 00 00 00    movl   $0x2,-0x8(%rbp)
+(gdb) si
+18              total = sum(a, b);
+=> 0x000000000040055e <main+29>:        8b 55 f8        mov    -0x8(%rbp),%edx
+   0x0000000000400561 <main+32>:        8b 45 fc        mov    -0x4(%rbp),%eax
+   0x0000000000400564 <main+35>:        89 d6   mov    %edx,%esi
+   0x0000000000400566 <main+37>:        89 c7   mov    %eax,%edi
+   0x0000000000400568 <main+39>:        e8 c0 ff ff ff  callq  0x40052d <sum>
+   0x000000000040056d <main+44>:        89 45 f4        mov    %eax,-0xc(%rbp)
+{% endhighlight %}
+上面可以看到，对于相应的指令已经反汇编出来了。
+
+3) 调试技巧
+
+如果要在任意情况下反汇编后面要执行的代码，则
+<pre>
+(gdb) set disassemble-next-line on
+</pre>
+
+如果要在后面的代码没有源码的情况下才反汇编后面要执行的代码，则
+<pre>
+(gdb) set disassemble-next-line auto
+</pre>
+关闭这个功能：
+<pre>
+(gdb) set disassemble-next-line off
+</pre>
+
+
+### 2.4 将源程序和汇编指令映射起来
+
+
+
+
 
 
 <br />
