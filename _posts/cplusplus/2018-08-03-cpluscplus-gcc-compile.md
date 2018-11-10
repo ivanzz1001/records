@@ -9,7 +9,22 @@ description: gcc程序的编译过程和链接原理
 
 
 
-本文主要讲述一下gcc程序的编译过程和链接原理。然后再会介绍一下gcc各组件模块及相关的使用方法。
+本文主要讲述一下gcc程序的编译过程和链接原理。然后再会介绍一下gcc各组件模块及相关的使用方法。当前的操作系统环境以及GCC版本如下：
+<pre>
+# lsb_release -a
+No LSB modules are available.
+Distributor ID: Ubuntu
+Description:    Ubuntu 16.04.3 LTS
+Release:        16.04
+Codename:       xenial
+
+# gcc --version
+gcc (Ubuntu 5.4.0-6ubuntu1~16.04.10) 5.4.0 20160609
+Copyright (C) 2015 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+</pre>
 
 <!-- more -->
 
@@ -253,7 +268,118 @@ not stripped
 
 ## 3. 链接的原理
 
+下面我们来看一下链接过程是怎样的：
+<pre>
+# gcc -c -o hello.o hello.c
 
+# gcc -v -o hello hello.o
+Using built-in specs.
+COLLECT_GCC=gcc
+COLLECT_LTO_WRAPPER=/usr/lib/gcc/i686-linux-gnu/5/lto-wrapper
+Target: i686-linux-gnu
+Configured with: ../src/configure -v --with-pkgversion='Ubuntu 5.4.0-6ubuntu1~16.04.10' \
+ --with-bugurl=file:///usr/share/doc/gcc-5/README.Bugs \
+ --enable-languages=c,ada,c++,java,go,d,fortran,objc,obj-c++ --prefix=/usr \
+ --program-suffix=-5 --enable-shared --enable-linker-build-id --libexecdir=/usr/lib \
+ --without-included-gettext --enable-threads=posix --libdir=/usr/lib --enable-nls \
+ --with-sysroot=/ --enable-clocale=gnu --enable-libstdcxx-debug --enable-libstdcxx-time=yes \
+ --with-default-libstdcxx-abi=new --enable-gnu-unique-object --disable-vtable-verify \
+ --enable-libmpx --enable-plugin --with-system-zlib --disable-browser-plugin \
+ --enable-java-awt=gtk --enable-gtk-cairo --with-java-home=/usr/lib/jvm/java-1.5.0-gcj-5-i386/jre \
+ --enable-java-home --with-jvm-root-dir=/usr/lib/jvm/java-1.5.0-gcj-5-i386 \
+ --with-jvm-jar-dir=/usr/lib/jvm-exports/java-1.5.0-gcj-5-i386 --with-arch-directory=i386 \
+ --with-ecj-jar=/usr/share/java/eclipse-ecj.jar --enable-objc-gc --enable-targets=all \
+ --enable-multiarch --disable-werror --with-arch-32=i686 --with-multilib-list=m32,m64,mx32 \
+ --enable-multilib --with-tune=generic --enable-checking=release --build=i686-linux-gnu \
+ --host=i686-linux-gnu --target=i686-linux-gnu
+Thread model: posix
+gcc version 5.4.0 20160609 (Ubuntu 5.4.0-6ubuntu1~16.04.10) 
+COMPILER_PATH=/usr/lib/gcc/i686-linux-gnu/5/:/usr/lib/gcc/i686-linux-gnu/5/: \
+/usr/lib/gcc/i686-linux-gnu/:/usr/lib/gcc/i686-linux-gnu/5/:/usr/lib/gcc/i686-linux-gnu/
+LIBRARY_PATH=/usr/lib/gcc/i686-linux-gnu/5/:/usr/lib/gcc/i686-linux-gnu/5/../../../i386-linux-gnu/: \
+/usr/lib/gcc/i686-linux-gnu/5/../../../../lib/:/lib/i386-linux-gnu/:/lib/../lib/:/usr/lib/i386-linux-gnu/: \
+/usr/lib/../lib/:/usr/lib/gcc/i686-linux-gnu/5/../../../:/lib/:/usr/lib/
+COLLECT_GCC_OPTIONS='-v' '-o' 'hello' '-mtune=generic' '-march=i686'
+ /usr/lib/gcc/i686-linux-gnu/5/collect2 -plugin /usr/lib/gcc/i686-linux-gnu/5/liblto_plugin.so \
+ -plugin-opt=/usr/lib/gcc/i686-linux-gnu/5/lto-wrapper -plugin-opt=-fresolution=/tmp/cc8i33Fi.res \
+ -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lc \
+ -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s --sysroot=/ --build-id \
+ --eh-frame-hdr -m elf_i386 --hash-style=gnu --as-needed -dynamic-linker /lib/ld-linux.so.2 -z relro \
+ -o hello /usr/lib/gcc/i686-linux-gnu/5/../../../i386-linux-gnu/crt1.o \
+ /usr/lib/gcc/i686-linux-gnu/5/../../../i386-linux-gnu/crti.o \
+ /usr/lib/gcc/i686-linux-gnu/5/crtbegin.o -L/usr/lib/gcc/i686-linux-gnu/5 \
+ -L/usr/lib/gcc/i686-linux-gnu/5/../../../i386-linux-gnu \
+ -L/usr/lib/gcc/i686-linux-gnu/5/../../../../lib -L/lib/i386-linux-gnu \
+ -L/lib/../lib -L/usr/lib/i386-linux-gnu -L/usr/lib/../lib \
+ -L/usr/lib/gcc/i686-linux-gnu/5/../../.. hello.o -lgcc --as-needed -lgcc_s \
+ --no-as-needed -lc -lgcc --as-needed -lgcc_s --no-as-needed \
+ /usr/lib/gcc/i686-linux-gnu/5/crtend.o /usr/lib/gcc/i686-linux-gnu/5/../../../i386-linux-gnu/crtn.o
+</pre>
+
+* crt1.o、crti.o、crtbegin.o、crtend.o、crtn.o是gcc加入的系统标准启动文件，对于一般应用程序，这些启动是必需的。
+
+* -lc：链接libc库文件，其中libc库文件中就实现了printf等函数。
+
+1) **动态链接**
+
+动态链接使用动态链接库进行链接，生成的程序在执行的时候需要加载所必需的动态库才能运行。动态链接生成的程序体积较小，但是必需依赖所需的动态库，否则无法执行。
+
+默认情况下是使用动态链接：
+<pre>
+# gcc -o hello_shared hello.o
+# file hello_shared 
+hello_shared: ELF 32-bit LSB executable, Intel 80386, version 1 (SYSV), dynamically linked, 
+interpreter /lib/ld-linux.so.2, for GNU/Linux 2.6.32, BuildID[sha1]=ecbd660b7657c508631d316cc33dd147fdd0f43b,
+ not stripped
+
+# ls -al hello_shared 
+-rwxr-xr-x 1 root root 7388 Nov 10 20:42 hello_shared
+</pre>
+
+2) **静态链接**
+
+静态链接使用静态库进行链接，生成的程序包含程序运行所需要的全部库，可以直接运行，不过静态链接生成的程序体积较大。
+<pre>
+# gcc -static -o hello_static hello.o
+# file hello_static 
+hello_static: ELF 32-bit LSB executable, Intel 80386, version 1 (GNU/Linux), statically linked,
+ for GNU/Linux 2.6.32, BuildID[sha1]=69a0bf1ccdde6358bdc3cd8b59d950828586ef9a, not stripped
+
+# ls -al hello_static 
+-rwxr-xr-x 1 root root 728340 Nov 10 20:45 hello_static
+</pre>
+
+3) **```-nostartfiles```选项**
+
+不链接系统标准启动文件，而标准库文件仍然正常使用：
+<pre>
+# gcc -v -nostartfiles -o hello hello.o
+# ./hello
+Hello World 
+MAX = 20,MIN = 10,MAX + MIN = 30
+SetBit(5) = 32,SetBit(6) = 64
+SetBit( SetBit(2) ) = 16
+Segmentation fault (core dumped)
+</pre>
+
+可以看到可以正常打印相关内容，但是在系统退出时出现了崩溃。
+
+4) **```-nostdlib```选项**
+
+不链接系统标准启动文件和标准库文件：
+<pre>
+# gcc -v -nostdlib -o hello hello.o
+...
+/lib/gcc/i686-linux-gnu/5/../../.. hello.o
+/usr/bin/ld: warning: cannot find entry symbol _start; defaulting to 00000000080480d8
+hello.o: In function `main':
+hello.c:(.text+0x1a): undefined reference to `puts'
+hello.c:(.text+0x2d): undefined reference to `printf'
+hello.c:(.text+0x41): undefined reference to `printf'
+hello.c:(.text+0x53): undefined reference to `printf'
+collect2: error: ld returned 1 exit status
+</pre>
+可以看到，会提示因为没有链接系统标准启动文件和标准库文件，从而导致链接失败。对于```-nostdlib```选项常用语裸机/bootloader、Linux内核等程序，因为它们不需要启动文件、标准库文件。
 
 
 <br />
