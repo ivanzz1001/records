@@ -36,6 +36,10 @@ description: 数据段、代码段、堆栈段、BSS段的区别
 
 6. [Linux内存管理（text、rodata、data、bss、stack&heap）](https://www.cnblogs.com/annie-fun/p/6633531.html?utm_source=itdadao&utm_medium=referral)
 
+7. [linux汇编语法](https://blog.csdn.net/darennet/article/details/41126621)
+
+8. [带点的(一般都是ARM GNU伪汇编指令)](https://blog.csdn.net/qqliyunpeng/article/details/45116615)
+
 <br />
 <br />
 <br />
