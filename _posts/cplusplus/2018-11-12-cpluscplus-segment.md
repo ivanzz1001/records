@@ -159,6 +159,8 @@ Idx Name          Size      VMA       LMA       File off  Algn
 ![cpp-lma-vma](https://ivanzz1001.github.io/records/assets/img/cplusplus/
 cpp_lma_vma.jpg)
 
+其实这里我们看到尽管bss段长度为```0x00000018```，但是我们看到```.bss```段和```.comment```段在文件中的偏移是一样的，这就说明bss段数据是不用包含在可执行程序中的。
+
 ### 2.3 汇编文件test.s分析
 {% highlight string %}
 # cat test.s
@@ -324,6 +326,159 @@ main:
         .section        .note.GNU-stack,"",@progbits
 {% endhighlight %}
 
+在讲解各变量存放位置之前，我们先简要介绍一下```.comm```和```.lcomm```:
+
+* **.comm**: 声明为未初始化的通用内存区域；
+
+* **.lcomm**: 声明为未初始化的本地内存区域；
+
+其实上述两个均是属于bss段，不过作用域范围有些不同。```.lcomm```是为不会从本地汇编代码之外进行访问的数据保留的。两者使用的格式为：
+<pre>
+.comm symbol, length
+.lcomm symbol, length
+</pre>
+
+例如：
+{% highlight string %}
+.section .bss
+.lcomm buffer, 1000
+{% endhighlight %}
+
+该语句把1000字节的内存地址赋予标签buffer，在声明本地通用内存区域的程序之外的函数是不能访问他们的。
+
+在bss段声明的好处是，数据不包含在可执行文件中。在数据段中定义数据时，它必须被包含在可执行程序中，因为必须使用特定值初始化它。因为不使用数据初始化bss段中声明的数据区域，所以内存区域被保留在运行时使用，并且不必包含在最终的程序中。
+
+
+下面我们就简要分析一下各变量：
+
+* **变量a_test**
+<pre>
+.comm   a_test,4,4
+</pre>
+我们可以看到是存放在bss段的通用内存区域的。
+
+* **变量b_test**
+<pre>
+        .globl  b_test
+        .section        .rodata
+        .align 4
+        .type   b_test, @object
+        .size   b_test, 4
+b_test:
+        .long   2
+</pre>
+我们看到是存放在```.rodata```段的一个全局变量，值为2
+
+* **变量c_test**
+<pre>
+        .data
+        .align 4
+        .type   c_test, @object
+        .size   c_test, 4
+c_test:
+        .long   3
+</pre>
+
+可以看到是存放在data段的非全局变量，值为3.
+
+* **变量d_test**
+<pre>
+        .local  d_test
+        .comm   d_test,4,4
+</pre>
+我们可以看到是存放在bss段的一个局部变量，占用4个字节，且4字节对齐。
+
+* **变量e_test**
+<pre>
+        .bss
+        .align 4
+        .type   e_test, @object
+        .size   e_test, 4
+e_test:
+        .zero   4
+</pre>
+我们看到是存放在bss段的一个全局变量。
+
+* **变量p_test**
+<pre>
+        .globl  p_test
+        .section        .rodata
+.LC0:
+        .string "hello,world"
+        .data
+        .align 4
+        .type   p_test, @object
+        .size   p_test, 4
+p_test:
+        .long   .LC0
+</pre>
+我们看到```hello,world```本身是处于```.rodata```段的，而变量```p_test```是存放在全局data段的。因此可以在全局的范围内使用```p_test```并使其指向不同的位置，然而如果要改变其当前指向位置的值，那么程序将会崩溃，因为其当前执行位置为```.rodata```段。
+
+* **变量q_test**
+<pre>
+        .globl  q_test
+        .section        .rodata
+.LC1:
+        .string "good"
+        .data
+        .align 4
+        .type   q_test, @object
+        .size   q_test, 4
+q_test:
+        .long   .LC1
+</pre>
+从生成的汇编代码来看，其与```p_test```是一样的。
+
+* **其他.rodata**段数据
+<pre>
+        .section        .rodata
+.LC2:
+        .string "just for test"
+.LC3:
+        .string "a: %d\n"
+.LC4:
+        .string "b: %d\n"
+.LC5:
+        .string "c: %d\n"
+.LC6:
+        .string "d: %d\n"
+.LC7:
+        .string "e: %d\n"
+.LC8:
+        .string "p: %s\n"
+.LC9:
+        .string "q: %s\n"
+.LC10:
+        .string "m: %d\n"
+.LC11:
+        .string "n: %d\n"
+.LC12:
+        .string "s: %s\n"
+</pre>
+我们看到一些常量字符串都放在```.rodata```段中。
+
+* **变量m_test**
+<pre>
+        .local  m_test.1942
+        .comm   m_test.1942,4,4
+</pre>
+我们可以看到是在main()作用域范围内的一个本地bss数据。
+
+* **变量n_test**
+<pre>
+        .local  n_test.1943
+        .comm   n_test.1943,4,4
+</pre>
+与```m_test```一致。
+
+* **变量s_test**： 这里我们并未在汇编中找到该变量，其直接在被使用的地方优化成了一个立即数。
+
+
+说明：如果我们在main()函数中定义如下
+<pre>
+char r_test[] = "are you ok";
+</pre>
+该变量及值都是在被处理后放入到栈中的。
 
 
 
