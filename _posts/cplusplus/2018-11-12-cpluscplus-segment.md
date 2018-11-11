@@ -20,7 +20,7 @@ description: 数据段、代码段、堆栈段、BSS段的区别
 
 ## 2. 示例
 
-1） **示例代码**
+## 2.1 示例代码
 {% highlight string %}
 #include <stdio.h>
 
@@ -77,7 +77,8 @@ int main(int argc, char *argv[])
 test  test.c  test.o  test.s
 </pre>
 
-2) **查看test可执行文件布局**
+
+### 2.2 查看test可执行文件布局
 <pre>
 # objdump -h test
 
@@ -141,6 +142,188 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   CONTENTS, READONLY
 </pre>
 
+1） **VMA和LMA**
+
+我们先简要介绍一下```VMA```和```LMA```这两个字段：
+
+* ```VMA```(virtual memory address): 程序区段在执行时期的地址
+
+* ```LMA```(load memory address): 某程序区段加载时的地址。因为我们知道程序运行前要经过：编译、链接、装载、运行等过程。装载到哪里呢？ 没错，就是LMA对应的地址里。
+
+一般情况下，```LMA```和```VMA```都是相等的，不等的情况主要发生在一些嵌入式系统上。
+
+2） **segment布局**
+
+如下我们简要的画出各区段的一个布局：
+
+![cpp-lma-vma](https://ivanzz1001.github.io/records/assets/img/cplusplus/
+cpp_lma_vma.jpg)
+
+### 2.3 汇编文件test.s分析
+{% highlight string %}
+# cat test.s
+        .file   "test.c"
+        .comm   a_test,4,4
+        .globl  b_test
+        .section        .rodata
+        .align 4
+        .type   b_test, @object
+        .size   b_test, 4
+b_test:
+        .long   2
+        .data
+        .align 4
+        .type   c_test, @object
+        .size   c_test, 4
+c_test:
+        .long   3
+        .local  d_test
+        .comm   d_test,4,4
+        .globl  e_test
+        .bss
+        .align 4
+        .type   e_test, @object
+        .size   e_test, 4
+e_test:
+        .zero   4
+        .globl  p_test
+        .section        .rodata
+.LC0:
+        .string "hello,world"
+        .data
+        .align 4
+        .type   p_test, @object
+        .size   p_test, 4
+p_test:
+        .long   .LC0
+        .globl  q_test
+        .section        .rodata
+.LC1:
+        .string "good"
+        .data
+        .align 4
+        .type   q_test, @object
+        .size   q_test, 4
+q_test:
+        .long   .LC1
+        .section        .rodata
+.LC2:
+        .string "just for test"
+.LC3:
+        .string "a: %d\n"
+.LC4:
+        .string "b: %d\n"
+.LC5:
+        .string "c: %d\n"
+.LC6:
+        .string "d: %d\n"
+.LC7:
+        .string "e: %d\n"
+.LC8:
+        .string "p: %s\n"
+.LC9:
+        .string "q: %s\n"
+.LC10:
+        .string "m: %d\n"
+.LC11:
+        .string "n: %d\n"
+.LC12:
+        .string "s: %s\n"
+        .text
+        .globl  main
+        .type   main, @function
+main:
+.LFB0:
+        .cfi_startproc
+        leal    4(%esp), %ecx
+        .cfi_def_cfa 1, 0
+        andl    $-16, %esp
+        pushl   -4(%ecx)
+        pushl   %ebp
+        .cfi_escape 0x10,0x5,0x2,0x75,0
+        movl    %esp, %ebp
+        pushl   %ecx
+        .cfi_escape 0xf,0x3,0x75,0x7c,0x6
+        subl    $20, %esp
+        movl    $.LC2, -12(%ebp)
+        movl    a_test, %eax
+        subl    $8, %esp
+        pushl   %eax
+        pushl   $.LC3
+        call    printf
+        addl    $16, %esp
+        movl    $2, %eax
+        subl    $8, %esp
+        pushl   %eax
+        pushl   $.LC4
+        call    printf
+        addl    $16, %esp
+        movl    c_test, %eax
+        subl    $8, %esp
+        pushl   %eax
+        pushl   $.LC5
+        call    printf
+        addl    $16, %esp
+        movl    d_test, %eax
+        subl    $8, %esp
+        pushl   %eax
+        pushl   $.LC6
+        call    printf
+        addl    $16, %esp
+        movl    e_test, %eax
+        subl    $8, %esp
+        pushl   %eax
+        pushl   $.LC7
+        call    printf
+        addl    $16, %esp
+        movl    p_test, %eax
+        subl    $8, %esp
+        pushl   %eax
+        pushl   $.LC8
+        call    printf
+        addl    $16, %esp
+        movl    q_test, %eax
+        subl    $8, %esp
+        pushl   %eax
+        pushl   $.LC9
+        call    printf
+        addl    $16, %esp
+        movl    m_test.1942, %eax
+        subl    $8, %esp
+        pushl   %eax
+        pushl   $.LC10
+        call    printf
+        addl    $16, %esp
+        movl    n_test.1943, %eax
+        subl    $8, %esp
+        pushl   %eax
+        pushl   $.LC11
+        call    printf
+        addl    $16, %esp
+        subl    $8, %esp
+        pushl   -12(%ebp)
+        pushl   $.LC12
+        call    printf
+        addl    $16, %esp
+        movl    $0, %eax
+        movl    -4(%ebp), %ecx
+        .cfi_def_cfa 1, 0
+        leave
+        .cfi_restore 5
+        leal    -4(%ecx), %esp
+        .cfi_def_cfa 4, 4
+        ret
+        .cfi_endproc
+.LFE0:
+        .size   main, .-main
+        .local  m_test.1942
+        .comm   m_test.1942,4,4
+        .local  n_test.1943
+        .comm   n_test.1943,4,4
+        .ident  "GCC: (Ubuntu 5.4.0-6ubuntu1~16.04.10) 5.4.0 20160609"
+        .section        .note.GNU-stack,"",@progbits
+{% endhighlight %}
+
 
 
 
@@ -159,11 +342,13 @@ Idx Name          Size      VMA       LMA       File off  Algn
 
 5. [linux 目标文件(*.o) bss,data,text,rodata,堆,栈](https://blog.csdn.net/sunny04/article/details/40627311)
 
-6. [Linux内存管理（text、rodata、data、bss、stack&heap）](https://www.cnblogs.com/annie-fun/p/6633531.html?utm_source=itdadao&utm_medium=referral)
+6. [u-boot链接分析](http://emb.hqyj.com/Column/Column345.htm)
 
 7. [linux汇编语法](https://blog.csdn.net/darennet/article/details/41126621)
 
 8. [带点的(一般都是ARM GNU伪汇编指令)](https://blog.csdn.net/qqliyunpeng/article/details/45116615)
+
+9. [U-Boot学习笔记(四):TEXT_BASE的理解](https://blog.csdn.net/sdsh1880gm/article/details/53487535)
 
 <br />
 <br />
