@@ -594,8 +594,17 @@ You win $3000!
 
 例如，假设一个可执行文件引用了文件```/usr/src/foo-1.0/lib/foo.c```，我们当前的source path是```/mnt/cross```。则GDB首先会按字面量(/usr/src/foo-1.0/lib/foo.c)来进行查找；假如查找失败，则会尝试**'/mnt/cross/usr/src/foo-1.0/lib/foo.c'**来进行查找；假如仍失败，在会尝试**'/mnt/cross/foo.c'**；假如还是失败的话，则会打印相应的错误消息。GDB并不会查找源文件名称的某一个部分，例如不会查找**'/mnt/cross/src/foo-1.0/lib/foo.c'**。相似的，也不会查找source path下的子目录： 假如source path是**'/mnt/cross'**，可执行文件引用的是```foo.c```，那么GDB不会查找其是否在**'/mnt/cross/usr/src/foo-1.0/lib**目录下。
 
+对于```Plain file names```，相对目录前缀的文件名等都会按上面描述的方式来进行处理。例如，假如source path是**'/mnt/cross'**，并且源文件名被记录为**'../lib/foo.c'**，那么GDB首先会查找**'../lib/foo.c'**，接着查找**'/mnt/cross/../lib/foo.c'**，再接着查找**'/mnt/cross/foo.c'**。
 
+值得注意的是，可执行文件的查找路径并不会被用于定位源文件。
 
+无论什么时候```reset```或者```rearrange``` source path，GDB都会清除其所缓存的任何信息： 源文件是在什么目录查找的、里面的某个信息在源文件的哪一行。
+
+当你启动GDB的时候，其source path只包括```cdir```和```cwd```,并按前后顺序排列。要添加其他的目录，我们必须使用```directory```命令。
+<pre>
+$cdir : compilation directory
+$cwd : current working directory
+</pre>
 
 
 
