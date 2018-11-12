@@ -127,7 +127,7 @@ ceph osd crush reweight osd.47 0.1
 </pre>
 一般生产环境设置为```noout```，当然不设置也可以，那就交给程序去控制节点的```out```，默认是在进程停止后的五分钟，总之这个地方如果有```out```触发，不管是人为触发，还是自动触发数据流是一定的，我们这里为了便于测试，使用的是人为触发，上面提到的预制环境就是设置的```noout```。
 
-1） 获取原始pg分布
+1） **获取原始pg分布**
 
 开始测试之前，我们首先获取最原始的PG分布：
 {% highlight string %}
@@ -135,11 +135,81 @@ ceph osd crush reweight osd.47 0.1
 {% endhighlight %}
 上面获取当前的PG分布，保存到文件```pg1.txt```，这个PG分布记录的是PG所在的OSD。这里记录下来，方便后面进行比较，从而得出需要迁移的数据。
 
-2) 停止指定的OSD进程
+2) **停止指定的OSD进程**
 <pre>
 # systemctl stop ceph-osd@15
 </pre>
 停止进程并不会触发迁移，只会引起PG状态的变化，比如原来主PG在停止的OSD上，那么停止掉OSD以后，原来的副本的那个PG就会升级为主PG了。
+
+
+3) **out掉一个OSD**
+<pre>
+# ceph osd out 15
+</pre>
+在触发```out```以前，当前的PG状态应该有```active+undersized+degraded```，触发out以后，所有的PG的状态应该会慢慢变成```active+clean```，等待集群正常以后，再次查询当前的PG分布状态。
+{% highlight string %}
+# ceph pg dump pgs|awk '{print $1,$15}'|grep -v pg > pg2.txt
+{% endhighlight %}
+
+保存当前的PG分布为```pg2.txt```。
+
+
+比较out前后的PG变化情况，下面是比较具体的变化情况，只列出变化的部分：
+<pre>
+# diff -y -W 100 pg1.txt pg2.txt  --suppress-common-lines
+</pre>
+这里我们关心的是变动的数目，只统计变动的PG数目：
+<pre>
+# diff -y -W 100 pg1.txt pg2.txt  --suppress-common-lines | wc -l
+
+102
+</pre>
+第一次out以后，有102个PG的变动，记住这个数字，后面的统计会用到。
+
+4) **从crush里面删除OSD**
+<pre>
+# ceph osd crush remove osd.15
+</pre>
+crush删除以后同样会触发迁移，等待PG的均衡，也就是全部变成```active+clean```状态。
+
+通过以下的命令来获取当前PG分布的状态：
+{% highlight string %}
+# ceph pg dump pgs|awk '{print $1,$15}'|grep -v pg > pg3.txt
+{% endhighlight %}
+
+现在来比较```crush remove```前后的PG变动：
+<pre>
+# diff -y -W 100 pg2.txt pg3.txt  --suppress-common-lines | wc -l
+
+  137
+</pre>
+
+5) **重新添加OSD**
+
+如下我们重新添加OSD：
+<pre>
+# ceph-deploy osd prepare lab8107:/dev/sdi
+# ceph-deploy osd activate lab8107:/dev/sdi1
+</pre>
+加完以后，统计当前的新的PG状态：
+{% highlight string %}
+# ceph pg dump pgs|awk '{print $1,$15}'|grep -v pg > pg4.txt
+{% endhighlight %}
+
+比较前后的变化：
+<pre>
+# diff -y -W 100 pg3.txt pg4.txt  --suppress-common-lines | wc -l
+
+  167
+</pre>
+	
+到这里整个替换流程完毕，统计上面PG总的变动：
+<pre>
+102 + 137 + 167 = 406
+</pre>
+
+也就是说按这个方法的变动PG为406个，因为是只有双主机，里面可能存在某些放大问题，这里不做深入讨论，因为我们三组测试环境都是一样的情况，只做横向比较，原理相通，这里是用数据来分析出差别。
+
 
 
 
