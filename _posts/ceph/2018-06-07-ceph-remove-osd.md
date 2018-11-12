@@ -50,7 +50,29 @@ description: 删除osd节点
 <pre>
 # ceph osd rm osd.47
 </pre>
-这个是从集群里面删除这个节点的记录。
+这个是从集群里面删除这个节点的记录，即从OSD map中移除中移除这个节点的记录。
+
+5) 删除节点认证（不删除编号会占住）
+<pre>
+# ceph auth del osd.47
+</pre>
+这个是从认证当中去删除这个节点的信息。
+
+如上方式移除OSD，其实会触发两次迁移，一次是在节点osd out以后，一次是在crush remove之后，两次迁移对于集群来说是不好的，其实通过调整步骤是可以避免二次迁移的。
+
+## 1.2 方式2
+
+1） 调整osd的crush weight
+<pre>
+ceph osd crush reweight osd.47 0.1
+</pre>
+说明：这个地方如果想慢慢的调整就分几次将crush的weight减低至0，这个过程实际上是让数据不分布在这个节点上，让数据慢慢分布到其他节点上，直至最终不分布到该OSD，并且迁移完成数据。
+
+这个地方不光调整了osd的crush weight，实际上同时调整了host的weight，这样会调整集群的整体crush分布，在osd的crush为0后，再对这个osd的任何删除相关操作都不会影响到集群的数据分布。
+
+2) 停止osd进程
+
+
 
 
 
@@ -72,6 +94,8 @@ description: 删除osd节点
 3. [Ceph osd weight与osd crush weight之间的区别](http://hustcat.github.io/difference_between_osd_weight_and_osd_crush_weight/)
 
 4. [Difference Between ‘Ceph Osd Reweight’ and ‘Ceph Osd Crush Reweight’](https://ceph.com/geen-categorie/difference-between-ceph-osd-reweight-and-ceph-osd-crush-reweight/)
+
+5. [ceph中获取osdmap和monmap的方式](http://www.it610.com/article/5023564.htm)
 
 <br />
 <br />
