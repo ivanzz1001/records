@@ -106,7 +106,40 @@ ceph osd crush reweight osd.47 0.1
 经过验证，第二种方式只触发了一次迁移，虽然只是一个步骤先后顺序上的调整，但是对于生产环境的集群来说，迁移的量要少一次，实际生产环境当中节点是有自动out的功能，这个可以考虑自己去控制，只是监控的密度需要加大，毕竟这是一个需要监控的集群，完全让其自己处理数据的迁移是不可能的，带来的故障只会更多。
 
 
+## 2. 替换OSD操作的优化与分析
+我们在上面介绍了```删除OSD的正确方式```，里面只是简单的讲了一下删除的方式怎样能减少迁移量。下面我们讲述一下ceph运维过程当中经常出现的坏盘然后换盘的步骤的优化。
 
+这里我们操作的环境是：两台主机，每一台主机8个OSD，总共16个OSD，副本设置为2， PG数设置为800，计算下来平均每一个OSD上的PG数目为100个，下面我们将通过数据来分析不同的处理方法的差别。
+
+开始测试前我们先把环境设置为```noout```，然后通过停止OSD来模拟OSD出现了异常，之后进行不同处理方法。
+
+
+### 2.1 方式1
+这里我们首先out一个OSD，然后剔除OSD，接着增加OSD：
+<pre>
+1. 停止指定OSD进程
+
+2. out指定OSD
+
+3. crush remove指定OSD
+
+4. 增加一个新的OSD
+</pre>
+一般生产环境设置为```noout```，当然不设置也可以，那就交给程序去控制节点的```out```，默认是在进程停止后的五分钟，总之这个地方如果有```out```触发，不管是人为触发，还是自动触发数据流是一定的，我们这里为了便于测试，使用的是人为触发，上面提到的预制环境就是设置的```noout```。
+
+1） 获取原始pg分布
+
+开始测试之前，我们首先获取最原始的PG分布：
+{% highlight string %}
+# ceph pg dump pgs|awk '{print $1,$15}'|grep -v pg > pg1.txt
+{% endhighlight %}
+上面获取当前的PG分布，保存到文件```pg1.txt```，这个PG分布记录的是PG所在的OSD。这里记录下来，方便后面进行比较，从而得出需要迁移的数据。
+
+2) 停止指定的OSD进程
+<pre>
+# systemctl stop ceph-osd@15
+</pre>
+停止进程并不会触发迁移，只会引起PG状态的变化，比如原来主PG在停止的OSD上，那么停止掉OSD以后，原来的副本的那个PG就会升级为主PG了。
 
 
 
@@ -127,6 +160,8 @@ ceph osd crush reweight osd.47 0.1
 4. [Difference Between ‘Ceph Osd Reweight’ and ‘Ceph Osd Crush Reweight’](https://ceph.com/geen-categorie/difference-between-ceph-osd-reweight-and-ceph-osd-crush-reweight/)
 
 5. [ceph中获取osdmap和monmap的方式](http://www.it610.com/article/5023564.htm)
+
+6. [OSDMAPTOOL – CEPH OSD CLUSTER MAP MANIPULATION TOOL](http://docs.ceph.com/docs/master/man/8/osdmaptool/)
 
 <br />
 <br />
