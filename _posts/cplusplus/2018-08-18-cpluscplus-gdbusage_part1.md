@@ -309,7 +309,7 @@ Executable and object file path: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/b
 Executable and object file path: /root/workspace:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin
 {% endhighlight %}
 
-* **show paths**: 打印出可执行文件的搜索路径（
+* **show paths**: 打印出可执行文件的搜索路径
 
 * **show environment [varname]**: 打印出环境变量```varname```的值。假如你并未指定```varname```的话，则打印出所有传递给所调试程序的环境变量及值。这里```environment```可以简写为```env```。
 
