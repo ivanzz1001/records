@@ -88,7 +88,7 @@ $1 = 4
 ## 2. 打印大数组中的内容
 
 1) 示例程序
-{% highlihgt string %}
+{% highlight string %}
 int main(int argc, char *argv)
 {
 	int array[201];
@@ -325,6 +325,11 @@ Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
 (gdb) info locals
 a = 0
 {% endhighlight %}
+
+
+
+
+
 
 
 
