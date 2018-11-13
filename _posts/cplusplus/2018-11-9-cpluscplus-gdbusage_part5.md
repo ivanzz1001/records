@@ -614,8 +614,193 @@ $cwd : current working directory
 注： 这里为了避免产生一些异常的替换情况，一般只限制在完全匹配的前缀替换。
 </pre>
 
+在很多情况下，你可以使用```directory```命令来获得一样的效果。然而```set substitute-path```在处理复杂的目录结构时会更加方便。通过使用```directory```命令，你需要添加工程中每一个子目录。假如你在保持内部目录不变的情况下将整个目录树移动到别的地方，那么```set substitute-path```一条命令就可以告诉GDB所有的资源新路径。
+
+### 2.1 相关命令介绍
+
+1) **directory dirname ... / dir dirname ...**
+
+添加目录```dirname```到source path的最前面。本命令可以同时指定多个目录，目录之间以```:```分割（Windows上一般是以```;```分割）或者以空格分割。你也可以指定一个当前已存在于```source path```的目录，这样就会使得该目录会前移，从而加速GDB的搜索速度。
+
+你可以使用```$cdir```来引用编译目录，使用```$cwd```来引用当前工作目录。注意```$cwd```是不用于```.```的，其中前者可能会在GDB Session中发生改变，而后者是在你添加一个路径到source path时的那一刻所在的路径。
+
+2) **directory**
+
+此命令用于将source path重置回```$cdir```和```$cwd```。
+
+3） **set directories path-list**
+
+将source path设置为```path-list```，假如路径中没有```$cdir```和```$cwd```的话，则也会被添加。
+
+4) **show directories**
+
+用于显示当前的source path。
+
+5） **set substitute-path from to**
+
+此命令用于定义一条source path替换规则，并且将其添加到当前已存在的规则列表的末尾。假如当前规则列表中有一条规则的```from```与当前要添加的规则的```from```相同，则该旧的规则将会被删除。
+
+举一个例子，假如文件 **'/foo/bar/baz.c'**被移动到了 **'/mnt/cross/baz.c'**目录下，那么你可以执行如下命令：
+<pre>
+(gdb) set substitute-path /foo/bar /mnt/cross
+</pre>
+
+上面的命令将会用 **'/mnt/cross'**替换 **'/foo/bar'**，这样就使得GDB能够查找的移动有的```baz.c```文件。
 
 
+6） **unset substitute-path [path]**
+
+此命令用于删除删除某条替换规则。假如```[path]```未指定的话，将会删除所有替换规则。
+
+7) **show substitute-path [path]**
+
+用于打印某条替换规则。假如```[path]```未指定的话，将会打印所有替换规则。
+
+<br />
+
+另外，也可以在GDB启动时通过```-d```选项来事先指定查找目录。例如：
+<pre>
+# gdb `find srcdir -type d -printf '-d %p '` -q prog
+
+# gdb -q `find ../P2P_SDK/ -type d -printf '-d %p '` ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) show directories
+Source directories searched: /root/workspace/../P2P_SDK/headers:/root/workspace/../P2P_SDK/doc:/root/workspace/../P2P_SDK/linux-example/signal_server ...
+(gdb) 
+</pre>
+
+### 2.2 示例1： 设置源文件查找路径
+
+1) 程序示例
+{% highlight string %}
+#include <stdio.h>
+#include <time.h>
+
+int main(int argc, char *argv[])
+{
+	time_t now = time(NULL);
+	struct tm local = {0};
+	struct tm gmt = {0};
+	
+	localtime_r(&now, &local);
+	gmtime_r(&now, &gmt);
+	
+	return 0;
+}
+{% endhighlight %}
+
+2) 调试技巧
+
+有时GDB不能准确地定位到源文件的位置（比如文件被移走了，等等），此时可以用```directory```命令设置查找源文件的路径。以上面程序为例：
+<pre>
+# gcc -g -c -o test.o test.c
+# gcc -o test test.o
+
+# mkdir -p src/moved
+# mv ./test src/moved/
+</pre>
+上面我们编译之后，然后将相应的源文件移走。然后再执行如下命令进行调试:
+{% highlight string %}
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) start
+Temporary breakpoint 1 at 0x4005e5: file test.c, line 6.
+Starting program: /root/workspace/./test 
+
+Temporary breakpoint 1, main (argc=1, argv=0x7fffffffe638) at test.c:6
+6       test.c: No such file or directory.
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) directory ./src/moved/
+Source directories searched: /root/workspace/./src/moved:$cdir:$cwd
+(gdb) n
+7               struct tm local = {0};
+(gdb) n
+8               struct tm gmt = {0};
+(gdb) n
+10              localtime_r(&now, &local);
+(gdb) n
+11              gmtime_r(&now, &gmt);
+(gdb)
+{% endhighlight %}
+
+可以看到，使用```directory```(或```dir```)命令设置源文件的查找目录后，GDB就可以正常的解析源代码了。
+
+如果希望在GDB启动时，加载code的位置，避免每次在GDB中再次输入命令，可以使用gdb的```-d```参数：
+{% highlight string %}
+# gdb -q `find ./ -type d printf '-d %p '` ./test
+find: paths must precede expression: printf
+Usage: find [-H] [-L] [-P] [-Olevel] [-D help|tree|search|stat|rates|opt|exec] [path...] [expression]
+Reading symbols from /root/workspace/test...done.
+(gdb) show directories
+Source directories searched: $cdir:$cwd
+(gdb) q
+[root@bogon workspace]# gdb -q `find ./ -type d -printf '-d %p '` ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) show directories
+Source directories searched: /root/workspace/./src/moved:/root/workspace/./src:/root/workspace:$cdir:$cwd
+(gdb) start
+Temporary breakpoint 1 at 0x4005e5: file test.c, line 6.
+Starting program: /root/workspace/./test 
+
+Temporary breakpoint 1, main (argc=1, argv=0x7fffffffe638) at test.c:6
+6               time_t now = time(NULL);
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) n
+7               struct tm local = {0};
+(gdb) 
+{% endhighlight %}
+
+### 2.3 替换查找源文件的目录
+1) 示例程序
+{% highlight string %}
+#include <stdio.h>
+#include <time.h>
+
+int main(int argc, char *argv[])
+{
+	time_t now = time(NULL);
+	struct tm local = {0};
+	struct tm gmt = {0};
+	
+	localtime_r(&now, &local);
+	gmtime_r(&now, &gmt);
+	
+	return 0;
+}
+{% endhighlight %}
+
+2) 调试技巧
+
+有时调试程序时，源代码文件可能已经移动到其他文件夹了。此时可以用```set substitute-path from to```命令设置新的文件夹to目录来替换旧的from。以上述程序为例：
+<pre>
+# gcc -g -c -o test.o test.c
+# gcc -o test test.o
+
+# mkdir -p src/moved
+# mv ./test src/moved/
+</pre>
+上面我们编译之后，然后将相应的源文件移走。然后再执行如下命令进行调试:
+{% highlight string %}
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) start
+Temporary breakpoint 1 at 0x4005e5: file test.c, line 6.
+Starting program: /root/workspace/./test 
+
+Temporary breakpoint 1, main (argc=1, argv=0x7fffffffe638) at test.c:6
+6       test.c: No such file or directory.
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) set substitute /root/workspace /root/workspace/src/moved
+(gdb) n
+7               struct tm local = {0};
+(gdb) n
+8               struct tm gmt = {0};
+(gdb) n
+10              localtime_r(&now, &local);
+(gdb) 
+{% endhighlight %}
+
+可以看到，刚开始找不到相应的源文件，替换之后就能够正常找到了。
 
 
 
@@ -629,9 +814,7 @@ $cwd : current working directory
 
 2. [设置 GDB 代码搜索路径](https://blog.csdn.net/caspiansea/article/details/42447203)
 
-3. [AT&T汇编格式与Intel汇编格式的比较](https://blog.csdn.net/samxx8/article/details/12613643)
 
-4. [函数调用过程探究](http://www.cnblogs.com/bangerlee/archive/2012/05/22/2508772.html)
 
 <br />
 <br />
