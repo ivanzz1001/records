@@ -390,7 +390,86 @@ Local exec file:
     0xfef666a8 - 0xfef680dc is .bss in /usr/lib/libc.so.1
 {% endhighlight %}
 
+## 6. 打印变量的类型和所在文件
 
+1) 示例程序
+{% highlight string %}
+#include <stdio.h>
+
+struct child {
+  char name[10];
+  enum { boy, girl } gender;
+};
+
+struct child he = { "Tom", boy };
+
+int main(int argc, char *argv[])
+{
+	static struct child she = { "Jerry", girl };
+	printf ("Hello %s %s.\n", he.gender == boy ? "boy" : "girl", he.name);
+	printf ("Hello %s %s.\n", she.gender == boy ? "boy" : "girl", she.name);
+	
+	return 0;
+}
+{% endhighlight %}
+
+
+2) 调试技巧
+
+在gdb中，可以使用如下命令查看变量的类型：
+{% highlight string %}
+# gcc -g -c -o test.o test.c
+# gcc -o test test.o
+
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) start
+Temporary breakpoint 1 at 0x40053c: file test.c, line 13.
+Starting program: /root/workspace/./test 
+
+Temporary breakpoint 1, main (argc=1, argv=0x7fffffffe638) at test.c:13
+13              printf ("Hello %s %s.\n", he.gender == boy ? "boy" : "girl", he.name);
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) whatis he
+type = struct child
+{% endhighlight %}
+如果想查看详细的类型信息：
+{% highlight string %}
+(gdb) ptype he
+type = struct child {
+    char name[10];
+    enum {boy, girl} gender;
+}
+{% endhighlight %}
+如果想查看定义该变量的文件：
+{% highlight string %}
+(gdb) info variables he
+All variables matching regular expression "he":
+
+File test.c:
+struct child he;
+
+Non-debugging symbols:
+0x0000000000601050  she.2187
+0x00007ffff7ffe070  cachesize
+0x00007ffff7ffe078  cache_new
+{% endhighlight %}
+
+上面我们看到， GDB会显示所有包含（匹配）该表达式的变量。如果只想查看完全匹配给定名字的变量，则：
+{% highlight string %}
+(gdb) i variables ^he$
+All variables matching regular expression "^he$":
+
+File test.c:
+struct child he;
+{% endhighlight %}
+
+注意： ```info variables```不会显示局部变量，即使是static的也没有太多的信息。
+
+
+## 7. 打印内存的值
+
+1) 示例程序
 
 
 
