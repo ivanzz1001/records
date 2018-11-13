@@ -592,19 +592,29 @@ You win $3000!
 ## 2. 源文件查找
 可执行程序有时候并不会记录它们是用哪一个目录的源文件来进行编译的，它们通常只记住一个文件名。即使在编译时会记住相应的目录，但在编译后调试程序之前也可能会将目录移动。GDB有一系列的目录以用于查找源文件；这被称为```source path```。任何时候，GDB需要一个源文件时，其都会尝试```source path```列表中的所有目录。注意这里是按照列表中的目录出现的先后顺序来进行查找，直到找到所期望的文件名。
 
-例如，假设一个可执行文件引用了文件```/usr/src/foo-1.0/lib/foo.c```，我们当前的source path是```/mnt/cross```。则GDB首先会按字面量(/usr/src/foo-1.0/lib/foo.c)来进行查找；假如查找失败，则会尝试**'/mnt/cross/usr/src/foo-1.0/lib/foo.c'**来进行查找；假如仍失败，在会尝试**'/mnt/cross/foo.c'**；假如还是失败的话，则会打印相应的错误消息。GDB并不会查找源文件名称的某一个部分，例如不会查找**'/mnt/cross/src/foo-1.0/lib/foo.c'**。相似的，也不会查找source path下的子目录： 假如source path是**'/mnt/cross'**，可执行文件引用的是```foo.c```，那么GDB不会查找其是否在**'/mnt/cross/usr/src/foo-1.0/lib**目录下。
+例如，假设一个可执行文件引用了文件```/usr/src/foo-1.0/lib/foo.c```，我们当前的source path是```/mnt/cross```。则GDB首先会按字面量(**/usr/src/foo-1.0/lib/foo.c**)来进行查找；假如查找失败，则会尝试**'/mnt/cross/usr/src/foo-1.0/lib/foo.c'**来进行查找；假如仍失败，在会尝试 **'/mnt/cross/foo.c'**；假如还是失败的话，则会打印相应的错误消息。GDB并不会查找源文件名称的某一个部分，例如不会查找 **'/mnt/cross/src/foo-1.0/lib/foo.c'**。相似的，也不会查找source path下的子目录： 假如source path是 **'/mnt/cross'**，可执行文件引用的是```foo.c```，那么GDB不会查找其是否在 **'/mnt/cross/usr/src/foo-1.0/lib**目录下。
 
-对于```Plain file names```，相对目录前缀的文件名等都会按上面描述的方式来进行处理。例如，假如source path是**'/mnt/cross'**，并且源文件名被记录为**'../lib/foo.c'**，那么GDB首先会查找**'../lib/foo.c'**，接着查找**'/mnt/cross/../lib/foo.c'**，再接着查找**'/mnt/cross/foo.c'**。
+对于```Plain file names```，相对目录前缀的文件名等都会按上面描述的方式来进行处理。例如，假如source path是 **'/mnt/cross'**，并且源文件名被记录为 **'../lib/foo.c'**，那么GDB首先会查找**'../lib/foo.c'**，接着查找 **'/mnt/cross/../lib/foo.c'**，再接着查找 **'/mnt/cross/foo.c'**。
 
 值得注意的是，可执行文件的查找路径并不会被用于定位源文件。
 
 无论什么时候```reset```或者```rearrange``` source path，GDB都会清除其所缓存的任何信息： 源文件是在什么目录查找的、里面的某个信息在源文件的哪一行。
 
-当你启动GDB的时候，其source path只包括```cdir```和```cwd```,并按前后顺序排列。要添加其他的目录，我们必须使用```directory```命令。
+当你启动GDB的时候，其source path只包括```cdir```和```cwd```,并按前后顺序排列。要添加其他的目录，我们必须使用```directory```命令。关于```cdir```与```cwd```，我们这里简单说明一下：
 <pre>
 $cdir : compilation directory
 $cwd : current working directory
 </pre>
+
+
+另外，对于```source path```，GDB提供了一系列的命令来管理众多的source path替换规则(substitution rule)。当源文件在编译之后进行了移动，此时```替换规则```指明了如何重写(rewrite)存储在程序调试信息中的源文件目录。一条替换规则由两个字符串组成，其中第一个字符串指明需要重写的路径，第二个字符串指明其应该如何被重写，这里我们分别将这两个字符串命名为```from```和```to```。GDB会简单的使用```to```来替换```from```目录的开始部分，然后使用相应的结果来查找源文件。
+
+拿前一个例子来说，我们假设```foo-1.0```目录树已经从```/usr/src```移动到了```/mnt/cross```，那么你可以告诉GDB在所有路径名称当中使用```/mnt/cross```来替换```/usr/src```。因此，这里GDB首先就会从 **'/mnt/cross/foo-1.0/lib/foo.c'**查找，而不是从原路径 **'/usr/src/foo-1.0/lib/foo.c'**来进行查找。要定义一个源路径替换规则，可以使用我们后面介绍的**set substitute-path**命令。
+<pre>
+注： 这里为了避免产生一些异常的替换情况，一般只限制在完全匹配的前缀替换。
+<pre>
+
+
 
 
 
