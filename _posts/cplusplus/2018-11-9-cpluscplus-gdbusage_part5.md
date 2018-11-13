@@ -612,7 +612,7 @@ $cwd : current working directory
 拿前一个例子来说，我们假设```foo-1.0```目录树已经从```/usr/src```移动到了```/mnt/cross```，那么你可以告诉GDB在所有路径名称当中使用```/mnt/cross```来替换```/usr/src```。因此，这里GDB首先就会从 **'/mnt/cross/foo-1.0/lib/foo.c'**查找，而不是从原路径 **'/usr/src/foo-1.0/lib/foo.c'**来进行查找。要定义一个源路径替换规则，可以使用我们后面介绍的**set substitute-path**命令。
 <pre>
 注： 这里为了避免产生一些异常的替换情况，一般只限制在完全匹配的前缀替换。
-<pre>
+</pre>
 
 
 
