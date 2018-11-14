@@ -470,6 +470,513 @@ struct child he;
 ## 7. 打印内存的值
 
 1) 示例程序
+{% highlight string %}
+#include <stdio.h>
+
+int main(int argc, char *argv[])
+{
+	int i = 0;
+	char a[100];
+	
+	for(i = 0;i<sizeof(a); i++)
+		a[i]  = i;
+		
+	return 0x0;	
+}
+
+{% endhighlight %}
+
+2) 调试技巧
+
+GDB中使用```x```命令来打印内存的值，格式为```x/nfu addr```。含义为以```f```格式打印从addr开始的```n```个长度单元为```u```的内存在。参数具体含义如下：
+<pre>
+n: 输出单元的个数；
+f: 是输出格式。比如x是以16进制形式输出，o是以8进制形式输出，等等；
+u: 标明一个单元的长度。b是一个byte， h是2个byte(halfword)，w是4个byte(word)，g是8个byte(giant word);
+</pre>
+以上面程序为例：
+
+* 以16进制格式打印数组a的前16个byte的值
+{% highlight string %}
+# gcc -g -c -o test.o test.c
+# gcc -o test test.o
+
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) b 11
+Breakpoint 1 at 0x400526: file test.c, line 11.
+(gdb) r
+Starting program: /root/workspace/./test 
+
+Breakpoint 1, main (argc=1, argv=0x7fffffffe638) at test.c:11
+11              return 0x0;
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) x/16xb a
+0x7fffffffe4e0: 0x00    0x01    0x02    0x03    0x04    0x05    0x06    0x07
+0x7fffffffe4e8: 0x08    0x09    0x0a    0x0b    0x0c    0x0d    0x0e    0x0f
+(gdb
+{% endhighlight %}
+
+* 以无符号10进制格式打印数组a的前16个byte的值
+{% highlight string %}
+(gdb) x/16ub a
+0x7fffffffe4e0: 0       1       2       3       4       5       6       7
+0x7fffffffe4e8: 8       9       10      11      12      13      14      15
+{% endhighlight %}
+
+* 以二进制格式打印数组a的前16个byte的值
+{% highlight string %}
+(gdb) x/16tb a
+0x7fffffffe4e0: 00000000        00000001        00000010        00000011        00000100        00000101        00000110        00000111
+0x7fffffffe4e8: 00001000        00001001        00001010        00001011        00001100        00001101        00001110        00001111
+{% endhighlight %}
+
+* 以16进制格式打印数组a的前16个word(4个byte)的值
+{% highlight string %}
+(gdb) x/16xw a
+0x7fffffffe4e0: 0x03020100      0x07060504      0x0b0a0908      0x0f0e0d0c
+0x7fffffffe4f0: 0x13121110      0x17161514      0x1b1a1918      0x1f1e1d1c
+0x7fffffffe500: 0x23222120      0x27262524      0x2b2a2928      0x2f2e2d2c
+0x7fffffffe510: 0x33323130      0x37363534      0x3b3a3938      0x3f3e3d3c
+{% endhighlight %}
+
+
+## 8. 打印源代码行
+
+1) 示例程序
+{% highlight string %}
+#include <stdio.h>
+
+void fun_a(void)
+{
+	int a = 0;
+	printf("%d\n", a);
+}
+
+void fun_b(void)
+{
+	int b = 1;
+	fun_a();
+	printf("%d\n", b);
+}
+
+void fun_c(void)
+{
+	int c = 2;
+	fun_b();
+	printf("%d\n", c);
+}
+
+void fun_d(void)
+{
+	int d = 3;
+	fun_c();
+	printf("%d\n", d);
+}
+
+int main(int argc, char *argv[])
+{
+	int var = -1;
+	fun_d();
+	return 0;
+}
+{% endhighlight %}
+
+2) 调试技巧
+
+在GDB中可以使用list命令来显示源代码以及行号。list命令可以指定行号、函数：
+{% highlight string %}
+# gcc -g -c -o test.o test.c
+# gcc -o test test.o
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) list 10
+5               int a = 0;
+6               printf("%d\n", a);
+7       }
+8
+9       void fun_b(void)
+10      {
+11              int b = 1;
+12              fun_a();
+13              printf("%d\n", b);
+14      }
+(gdb) list fun_d
+19              fun_b();
+20              printf("%d\n", c);
+21      }
+22
+23      void fun_d(void)
+24      {
+25              int d = 3;
+26              fun_c();
+27              printf("%d\n", d);
+28      }
+(gdb)
+{% endhighlight %}
+
+还可以指定向前或向后打印:
+{% highlight string %}
+(gdb) list +
+29
+30      int main(int argc, char *argv[])
+31      {
+32              int var = -1;
+33              fun_d();
+34              return 0;
+35      }
+(gdb) list -
+19              fun_b();
+20              printf("%d\n", c);
+21      }
+22
+23      void fun_d(void)
+24      {
+25              int d = 3;
+26              fun_c();
+27              printf("%d\n", d);
+28      }
+(gdb) 
+{% endhighlight %}
+
+还可以指定打印范围：
+{% highlight string %}
+(gdb) list 10,20
+10      {
+11              int b = 1;
+12              fun_a();
+13              printf("%d\n", b);
+14      }
+15
+16      void fun_c(void)
+17      {
+18              int c = 2;
+19              fun_b();
+20              printf("%d\n", c);
+(gdb)
+{% endhighlight %}
+
+## 9. 每行打印一个结构体成员
+
+1) 示例程序
+{% highlight string %}
+#include <pthread.h>
+
+
+typedef struct{
+        int a;
+        int b;
+        int c;
+        int d;
+        pthread_mutex_t mutex;
+}ex_st;
+
+int main(int argc, char *argv[])
+{
+        ex_st st = {1, 2, 3, 4, PTHREAD_MUTEX_INITIALIZER};
+        printf("%d,%d,%d,%d\n", st.a, st.b, st.c, st.d);
+
+        return 0;
+}
+{% endhighlight %}
+
+
+2) 调试技巧
+
+默认情况下，GDB是以一种```紧凑```的方式打印结构体。以上面代码为例：
+{% highlight string %}
+# gcc -g -c -o test.o test.c
+# gcc -o test test.o
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) start
+Temporary breakpoint 1 at 0x40053c: file test.c, line 15.
+Starting program: /root/workspace/./test 
+
+Temporary breakpoint 1, main (argc=1, argv=0x7fffffffe638) at test.c:15
+15              ex_st st = {1, 2, 3, 4, PTHREAD_MUTEX_INITIALIZER};
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) n
+16              printf("%d,%d,%d,%d\n", st.a, st.b, st.c, st.d);
+(gdb) p st
+$1 = {a = 1, b = 2, c = 3, d = 4, mutex = {__data = {__lock = 0, __count = 0, __owner = 0, __nusers = 0, __kind = 0, __spins = 0, __list = {__prev = 0x0, __next = 0x0}}, 
+    __size = '\000' <repeats 39 times>, __align = 0}}
+{% endhighlight %}
+
+可以看到结构体显示很混乱，尤其是结构体里还嵌套着其他结构体时。
+
+可以执行```set print pretty on```命令，这样每行只会显示结构体的一名成员，而且还会根据成员的定义层次进行缩进：
+{% highlight string %}
+(gdb) set print pretty on
+(gdb) p st
+$2 = {
+  a = 1, 
+  b = 2, 
+  c = 3, 
+  d = 4, 
+  mutex = {
+    __data = {
+      __lock = 0, 
+      __count = 0, 
+      __owner = 0, 
+      __nusers = 0, 
+      __kind = 0, 
+      __spins = 0, 
+      __list = {
+        __prev = 0x0, 
+        __next = 0x0
+      }
+    }, 
+    __size = '\000' <repeats 39 times>, 
+    __align = 0
+  }
+}
+(gdb)
+{% endhighlight %}
+
+## 10. 按照派生类型打印对象
+
+1) 示例程序
+{% highlight string %}
+#include <iostream>
+using namespace std;
+
+class Shape 
+{
+public:
+	virtual void draw () {}
+};
+
+class Circle : public Shape 
+{
+	int radius;
+public:
+	Circle () { radius = 1; }
+	void draw () { cout << "drawing a circle...\n"; }
+};
+
+class Square : public Shape 
+{
+	int height;
+public:
+	Square () { height = 2; }
+	void draw () { cout << "drawing a square...\n"; }
+};
+
+void drawShape (class Shape &p)
+{
+	p.draw ();
+}
+
+int main(int argc, char *argv[])
+{
+	Circle a;
+	Square b;
+	drawShape (a);
+	drawShape (b);
+	
+	return 0;
+}
+{% endhighlight %}
+
+2) 调试技巧
+
+在GDB中，当打印一个对象时，缺省是按照声明的类型进行打印：
+{% highlight string %}
+# gcc -g -c -o test.o test.cpp
+# gcc -o test test.o -lstdc++
+
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) list drawShape
+22              Square () { height = 2; }
+23              void draw () { cout << "drawing a square...\n"; }
+24      };
+25
+26      void drawShape (class Shape &p)
+27      {
+28              p.draw ();
+29      }
+30
+31      int main(int argc, char *argv[])
+(gdb) b 28
+Breakpoint 1 at 0x400869: file test.cpp, line 28.
+(gdb) r
+Starting program: /root/workspace/./test 
+
+Breakpoint 1, drawShape (p=...) at test.cpp:28
+28              p.draw ();
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64 libgcc-4.8.5-28.el7_5.1.x86_64 libstdc++-4.8.5-28.el7_5.1.x86_64
+(gdb) frame
+#0  drawShape (p=...) at test.cpp:28
+28              p.draw ();
+(gdb) p p
+$1 = (Shape &) @0x7fffffffe540: {_vptr.Shape = 0x400ad0 <vtable for Circle+16>}
+{% endhighlight %}
+
+在这个例子中，p虽然声明为```class Shape```，但它实际的派生类型可能为```class Circle```和```class Square```。如果要缺省按照派生类型进行打印，则可以通过如下命令进行设置：
+{% highlight string %}
+(gdb) set print object on
+(gdb) p p
+$2 = (Circle *) 0x7fffffffe540
+{% endhighlight %}
+
+当打印对象类型信息时，该设置也会起作用:
+{% highlight string %}
+(gdb) whatis p
+type = Shape &
+(gdb) ptype p
+type = class Shape {
+  public:
+    virtual void draw(void);
+} &
+(gdb) set print object on
+(gdb) whatis p
+type = /* real type = Circle & */
+Shape &
+(gdb) ptype p
+type = /* real type = Circle & */
+class Shape {
+  public:
+    virtual void draw(void);
+} &
+(gdb) 
+{% endhighlight %}
+
+
+## 11. 指定程序的输入输出设备
+
+1) 示例程序
+{% highlight string %}
+#include <stdio.h>
+
+int main(int argc, char *argv[])
+{
+        int i;
+
+        for (i = 0; i < 100; i++)
+        {
+                printf("i = %d\n", i);
+        }
+
+        return 0;
+}
+{% endhighlight %}
+
+2) 调试技巧
+
+在GDB中，缺省情况下程序的输入输出是和GDB使用同一个终端。你也可以为程序指定一个单独的输入输出终端。首先我们查看当前终端设备文件名：
+<pre>
+# tty
+/dev/pts/0
+</pre>
+
+然后，打开一个新终端，使用如下命令获得设备文件名：
+<pre>
+# tty
+/dev/pts/1
+</pre>
+
+接着，我们在```/dev/pts/0```终端下启动程序，通过命令行选项指定程序的输入输出设备：
+{% highlight string %}
+# gcc -g -c -o test.o test.c
+# gcc -o test test.o
+
+# gdb -q -tty /dev/pts/1 ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) r
+Starting program: /root/workspace/./test 
+[Inferior 1 (process 116521) exited normally]
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb)
+{% endhighlight %}
+这时，我们可以看到在```/dev/pts/1```终端下输出了打印值。
+
+另外，我们也可以在GDB中通过使用如下命令来切换终端：
+<pre>
+(gdb) tty /dev/pts/1
+</pre>
+
+## 12. 打印调用栈帧中的变量值
+
+1) 示例程序
+{% highlight string %}
+#include <stdio.h>
+
+int func1(int a)
+{
+	int b = 1;
+	return b * a;
+}
+
+int func2(int a)
+{
+	int b = 2;
+	return b * func1(a);
+}
+
+int func3(int a)
+{
+	int b = 3;
+	return b * func2(a);
+}
+
+int main(int argc, char *argv[])
+{
+	printf("%d\n", func3(10));
+	return 0;
+}
+{% endhighlight %} 
+
+
+2) 调试技巧
+
+在GDB中，如果想查看调用栈帧中的变量，可以先切换到该栈帧中，然后打印：
+{% highlight string %}
+# gcc -g -c -o test.o test.c
+# gcc -o test test.o
+
+# gdb -q ./test
+Reading symbols from /root/workspace/test...done.
+(gdb) b func1
+Breakpoint 1 at 0x400534: file test.c, line 5.
+(gdb) r
+Starting program: /root/workspace/./test 
+
+Breakpoint 1, func1 (a=10) at test.c:5
+5               int b = 1;
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-157.el7.x86_64
+(gdb) bt
+#0  func1 (a=10) at test.c:5
+#1  0x0000000000400560 in func2 (a=10) at test.c:12
+#2  0x0000000000400582 in func3 (a=10) at test.c:18
+#3  0x00000000004005a1 in main (argc=1, argv=0x7fffffffe638) at test.c:23
+(gdb) frame 1
+#1  0x0000000000400560 in func2 (a=10) at test.c:12
+12              return b * func1(a);
+(gdb) p b
+$1 = 2
+(gdb) frame 2
+#2  0x0000000000400582 in func3 (a=10) at test.c:18
+18              return b * func2(a);
+(gdb) p b
+$2 = 3
+(gdb) 
+{% endhighlight %}
+
+也可以不进行切换，直接打印：
+{% highlight string %}
+(gdb) p func2::b
+$3 = 2
+(gdb) p func3::b
+$4 = 3
+(gdb) 
+{% endhighlight %}
+
+同样，对于C++的函数名，需要使用单引号括起来，比如：
+{% highlight string %}
+(gdb) p '(anonymous namespace)::SSAA::handleStore'::n->pi->inst->dump()
+{% endhighlight %}
 
 
 
