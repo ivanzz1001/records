@@ -459,7 +459,306 @@ int main(void)
 ==6376== For counts of detected and suppressed errors, rerun with: -v
 ==6376== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
 {% endhighlight %}
-上面显示检测到了内存泄露。
+上面显示检测到了内存泄露。这里如果我们加上一个```--leak-check=full```选项的话，则可以看到更为详细的细节。
+
+上面```LEAK SUMMARY```会打印5种不同的类型，这里我们简单介绍一下：
+
+* **definitely lost**: 明确丢失的内存。程序中存在内存泄露，应尽快修复。当程序结束时如果一块动态分配的内存没有被释放并且通过程序内的指针变量均无法访问这块内存则会报这个错误；
+
+* **indirectly lost**: 间接丢失。当使用了含有指针成员的类或结构体时可能会报这个错误。这类错误无需直接修复，它们总是与```definitely lost```一起出现，只要修复```definitely lost```即可。
+
+* **possibly lost**: 可能丢失。大多数情况下应视为与```definitely lost```一样需要尽快修复，除非你的程序让一个指针指向一块动态分配的内存（但不是这块内存的起始地址），然后通过运算得到这块内存的起始地址，再释放它。当程序结束时如果一块动态分配的内存没有被释放并且通过程序内的指针变量均无法访问这块内存的起始地址，但可以访问其中的某一部分数据，则会报这个错误。
+
+* **stil reachable**: 可以访问，未丢失但也未释放。如果程序是正常结束的，那么它可能不会造成程序崩溃，但长时间运行有可能耗尽系统资源。
+
+
+### 2.5 不匹配的使用malloc/free、new/delete、new[]/delete[]
+
+1) 示例代码
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include<iostream> 
+
+int main(int argc, char *argv[])
+{
+	char *p = (char *)malloc(1);
+	*p = 'a';
+	
+	char c = *p;
+	
+	printf("\n [%c]\n", c);
+	
+	delete p;
+	
+	return 0x0;
+}
+{% endhighlight %}
+上面的代码中，我们使用了malloc()来分配内存，但是使用了delete操作符来删除内存。
+
+
+2) 调试技巧
+{% highlight string %}
+# gcc -g -c -o test.o test.cpp
+# gcc -o test test.o -lstdc++
+
+# valgrind --tool=memcheck ./test
+==15237== Memcheck, a memory error detector
+==15237== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
+==15237== Using Valgrind-3.14.0 and LibVEX; rerun with -h for copyright info
+==15237== Command: ./test
+==15237== 
+
+ [a]
+==15237== Mismatched free() / delete / delete []
+==15237==    at 0x4C2942D: operator delete(void*) (vg_replace_malloc.c:576)
+==15237==    by 0x4007EB: main (test.cpp:14)
+==15237==  Address 0x5a15040 is 0 bytes inside a block of size 1 alloc'd
+==15237==    at 0x4C27E83: malloc (vg_replace_malloc.c:299)
+==15237==    by 0x4007B5: main (test.cpp:7)
+==15237== 
+==15237== 
+==15237== HEAP SUMMARY:
+==15237==     in use at exit: 0 bytes in 0 blocks
+==15237==   total heap usage: 1 allocs, 1 frees, 1 bytes allocated
+==15237== 
+==15237== All heap blocks were freed -- no leaks are possible
+==15237== 
+==15237== For counts of detected and suppressed errors, rerun with: -v
+==15237== ERROR SUMMARY: 1 errors from 1 contexts (suppressed: 0 from 0)
+{% endhighlight %}
+
+从上面的输出可以看到，valgrind清楚的说明了 'Mismatched free() / delete / delete[] '
+
+
+## 2.6 多次释放内存
+
+1) 代码示例
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h> 
+
+int main(int argc, char *argv[])
+{
+	char *p = (char *)malloc(1);
+	*p = 'a'; 
+
+	char c = *p;
+	printf("\n [%c]\n",c);
+	free(p);
+	free(p);
+	return 0;
+}
+{% endhighlight %}
+
+2) 调试技巧
+
+在上面的代码中，我们两次释放了```p```指向的内存，现在让我们运行memcheck:
+{% highlight string %}
+# gcc -g -c -o test.o test.c
+# gcc -o test test.o
+
+# valgrind --tool=memcheck ./test
+==15354== Memcheck, a memory error detector
+==15354== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
+==15354== Using Valgrind-3.14.0 and LibVEX; rerun with -h for copyright info
+==15354== Command: ./test
+==15354== 
+
+ [a]
+==15354== Invalid free() / delete / delete[] / realloc()
+==15354==    at 0x4C28F7D: free (vg_replace_malloc.c:530)
+==15354==    by 0x400617: main (test.c:12)
+==15354==  Address 0x51f6040 is 0 bytes inside a block of size 1 free'd
+==15354==    at 0x4C28F7D: free (vg_replace_malloc.c:530)
+==15354==    by 0x40060B: main (test.c:11)
+==15354==  Block was alloc'd at
+==15354==    at 0x4C27E83: malloc (vg_replace_malloc.c:299)
+==15354==    by 0x4005D5: main (test.c:6)
+==15354== 
+==15354== 
+==15354== HEAP SUMMARY:
+==15354==     in use at exit: 0 bytes in 0 blocks
+==15354==   total heap usage: 1 allocs, 2 frees, 1 bytes allocated
+==15354== 
+==15354== All heap blocks were freed -- no leaks are possible
+==15354== 
+==15354== For counts of detected and suppressed errors, rerun with: -v
+==15354== ERROR SUMMARY: 1 errors from 1 contexts (suppressed: 0 from 0)
+{% endhighlight %}
+从上面的输出可以看到，该功能检测到我们对同一个指针调用了两次释放内存操作。
+
+### 2.7 memcheck综合示例
+
+1) 示例程序
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h> 
+ 
+class c1
+{
+private:
+	char *m_pcData;
+ 
+ 
+public:
+	c1();
+	~c1();
+};
+ 
+ 
+c1::c1()
+{
+	m_pcData=(char*)malloc(10);
+}
+ 
+ 
+c1::~c1()
+{
+	if(m_pcData) delete m_pcData;
+}
+ 
+char *Fun1()//definitely lost
+{
+	char *pcTemp;
+ 
+ 
+	pcTemp=(char*)malloc(10);
+	return pcTemp;
+}
+ 
+ 
+char *Fun2()//still reachable
+{
+	static char *s_pcTemp=NULL;
+ 
+ 
+	if(s_pcTemp==NULL) s_pcTemp=(char*)malloc(10);
+ 
+ 
+	return NULL;
+}
+ 
+ 
+char *Fun3()//possibly lost
+{
+	static char *s_pcTemp;
+	char *pcData;
+ 
+ 
+	pcData=(char*)malloc(10);
+	s_pcTemp=pcData+1;
+ 
+ 
+	return NULL;
+}
+ 
+ 
+int Fun4()//definitely and indirectly lost
+{
+	c1 *pobjTest;
+ 
+ 
+	pobjTest=new c1();
+ 
+ 
+	return 0;
+}
+ 
+ 
+char *Fun5()//possibly lost but no need of repair,repair the breakdown then no memory leak
+{
+	char *pcData;
+	int i,*piTemp=NULL;
+ 
+ 
+	pcData=(char*)malloc(10);
+	pcData+=10;
+	for(i=0;i<10;i++)
+	{
+		pcData--;
+		*pcData=0;
+	
+		if(i==5) *piTemp=1;//create a breakdown
+	}
+	free(pcData);
+ 
+ 
+	return NULL;
+}
+ 
+ 
+int main(int argc, char *argv[])
+{
+	printf("This program will create various memory leak,use valgrind to observe it.\n");
+	printf("Following functions are bad codes,don\'t imitate.\n");
+	printf("Fun1\n");
+	Fun1();
+	printf("Fun2\n");
+	Fun2();
+	printf("Fun3\n");
+	Fun3();
+	printf("Fun4\n");
+	Fun4();
+	printf("Fun5\n");
+	Fun5();
+	printf("end\n");
+ 
+ 
+	return 0;
+}
+
+{% endhighlight %}
+
+2) 调试技巧
+{% highlight string %}
+# gcc -g -c -o test.o test.cpp
+# gcc -o test test.o -lstdc++
+# valgrind --tool=memcheck ./test
+==15596== Memcheck, a memory error detector
+==15596== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
+==15596== Using Valgrind-3.14.0 and LibVEX; rerun with -h for copyright info
+==15596== Command: ./test
+==15596== 
+This program will create various memory leak,use valgrind to observe it.
+Following functions are bad codes,don't imitate.
+Fun1
+Fun2
+Fun3
+Fun4
+Fun5
+==15596== Invalid write of size 4
+==15596==    at 0x400859: Fun5() (test.cpp:88)
+==15596==    by 0x4008E9: main (test.cpp:110)
+==15596==  Address 0x0 is not stack'd, malloc'd or (recently) free'd
+==15596== 
+==15596== 
+==15596== Process terminating with default action of signal 11 (SIGSEGV)
+==15596==  Access not within mapped region at address 0x0
+==15596==    at 0x400859: Fun5() (test.cpp:88)
+==15596==    by 0x4008E9: main (test.cpp:110)
+==15596==  If you believe this happened as a result of a stack
+==15596==  overflow in your program's main thread (unlikely but
+==15596==  possible), you can try to increase the size of the
+==15596==  main thread stack using the --main-stacksize= flag.
+==15596==  The main thread stack size used in this run was 8388608.
+==15596== 
+==15596== HEAP SUMMARY:
+==15596==     in use at exit: 58 bytes in 6 blocks
+==15596==   total heap usage: 6 allocs, 0 frees, 58 bytes allocated
+==15596== 
+==15596== LEAK SUMMARY:
+==15596==    definitely lost: 18 bytes in 2 blocks
+==15596==    indirectly lost: 10 bytes in 1 blocks
+==15596==      possibly lost: 20 bytes in 2 blocks
+==15596==    still reachable: 10 bytes in 1 blocks
+==15596==         suppressed: 0 bytes in 0 blocks
+==15596== Rerun with --leak-check=full to see details of leaked memory
+==15596== 
+==15596== For counts of detected and suppressed errors, rerun with: -v
+==15596== ERROR SUMMARY: 1 errors from 1 contexts (suppressed: 0 from 0)
+Segmentation fault (core dumped)
+{% endhighlight %}
 
 
 
