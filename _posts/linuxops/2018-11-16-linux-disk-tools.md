@@ -83,6 +83,11 @@ Error: The backup GPT table is corrupt, but the primary appears OK, so that will
 
 **[参看]**
 
+1. [Linux下的parted工具的使用 GPT分区安装系统](http://blog.51cto.com/tlinux/1739407)
+
+2. [parted分区和挂载及非交互式操作](https://www.cnblogs.com/kaishirenshi/p/7850247.html)
+
+3. [GPT和parted命令详解(原创)](http://czmmiao.iteye.com/blog/1751408)
 
 <br />
 <br />
