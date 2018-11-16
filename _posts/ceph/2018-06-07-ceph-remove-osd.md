@@ -199,8 +199,7 @@ crush删除以后同样会触发迁移，等待PG的均衡，也就是全部变�
 比较前后的变化：
 <pre>
 # diff -y -W 100 pg3.txt pg4.txt  --suppress-common-lines | wc -l
-
-  167
+167
 </pre>
 	
 到这里整个替换流程完毕，统计上面PG总的变动：
@@ -249,6 +248,130 @@ dumped pgs in format plain
 # ceph osd crush remove osd.16
 removed item id 16 name 'osd.16' from crush map
 </pre>
+这个地方因为上面crush weight已经是0了，所以删除也不会引起PG变动。然后直接 'ceph osd rm osd.16' 同样没有PG变动。
+
+**4） 增加新的OSD**
+<pre>
+# ceph-deploy osd prepare lab8107:/dev/sdi
+# ceph-deploy osd activate lab8107:/dev/sdi1
+</pre>
+
+等待平衡以后获取当前的PG分布：
+{% highlight string %}
+# ceph pg dump pgs | awk '{print $1,$15}' | grep -v pg > 2pg3.txt
+{% endhighlight %}
+
+现在来比较前后的变化情况：
+<pre>
+# diff -y -W 100 2pg2.txt 2pg3.txt --suppress-common-lines | wc -l
+159
+</pre>
+
+到这里整个替换流程完毕，统计上面PG总的变动：
+<pre>
+166 + 159 = 325
+</pre>
+
+
+### 2.3 方式3
+这里我们： 先做norebalance，然后做crush remove，接着再做添加OSD操作
+
+1） **获取原始pg分布**
+
+开始测试之前，我们首先获取最原始的PG分布：
+{% highlight string %}
+# ceph pg dump pgs | awk '{print $1,$15}' | grep -v pg > 3pg1.txt
+dumped pgs in format plain
+{% endhighlight %}
+
+
+上面获取当前的PG分布，保存到文件```3pg1.txt```，这个PG分布记录的是PG所在的OSD。这里记录下来，方便后面进行比较，从而得出需要迁移的数据。
+
+2) **给集群做多种标记，防止迁移**
+
+设置为 norebalance，nobackfill，norecover,后面是有地方会解除这些设置的：
+<pre>
+# ceph osd set norebalance
+set norebalance
+
+# ceph osd set nobackfill
+set nobackfill
+
+# ceph osd set norecover
+set norecover
+</pre>
+
+3) **crush reweight指定OSD**
+<pre>
+# ceph osd crush reweight osd.15 0
+reweighted item id 15 name 'osd.15' to 0 in crush map
+</pre>
+
+这个地方因为已经做了上面的标记，所以只会出现状态变化，而没有真正的迁移，我们也先统计一下：
+{% highlight string %}
+# ceph pg dump pgs | awk '{print $1,$15}' | grep -v pg > 3pg2.txt
+
+# diff -y -W 100 3pg1.txt 3pg2.txt --suppress-common-lines | wc -l
+158
+{% endhighlight %}
+注意这里只是计算了，并没有真正的数据变动，可以通过监控两台主机的网络流量来判断。所以这里的变动并不用计算到需要迁移的PG数据当中。
+
+
+4) **crush remove指定的OSD**
+<pre>
+# ceph osd crush remove osd.15
+</pre>
+
+5) **删除指定的OSD**
+
+删除以后同样是没有PG的变动：
+<pre>
+# ceph osd rm osd.15
+</pre>
+这里有个小地方需要注意一下，不做 'ceph auth del osd.15'，把15的编号留着，这样号判断前后PG的变化情况，不然相同的编号，就无法判断是不是做了迁移了。
+
+6） **增加新的OSD**
+<pre>
+#ceph-deploy osd prepare lab8107:/dev/sdi
+#ceph-deploy osd activate lab8107:/dev/sdi1
+</pre>
+我的环境下，新增的OSD编号为16了。
+
+
+7) **解除各种标记**
+<pre>
+# ceph osd unset norebalance
+unset norebalance
+
+# ceph osd unset nobackfill
+unset nobackfill
+
+# ceph osd unset norecover
+unset norecover
+</pre>
+
+设置完了后数据才真正开始变动了，可以通过观察网卡流量看到，来看下最终PG变化：
+{% highlight string %}
+# ceph pg dump pgs | awk '{print $1,$15}' | grep -v pg > 3pg3.txt
+dumped pgs in format plain
+
+# diff -y -W 100 3pg1.txt 3pg3.txt --suppress-common-lines | wc -l
+195
+{% endhighlight %}
+这里我们只需要跟最开始的PG分布状况进行比较就可以了，因为中间的状态实际上都没有做数据的迁移，所以不需要统计进去，可以看到这个地方变动了195个PG。因此总的PG迁移量为195。
+
+
+### 2.4 数据汇总
+
+现在通过表格来对比下三种方法的迁移量（括号内为迁移PG数目）：
+
+![ceph-pg-migrate](https://ivanzz1001.github.io/records/assets/img/ceph/ceph-pg-migrate.jpg)
+
+可以很清楚的看到三种不同的方法，最终触发的迁移量是不同的，处理的好的话，能减少差不多一半的数据迁移量，这个对于生产环境来说还是很重要的。关于这个建议先在测试环境上进行测试，然后再操作，上面的操作只要不对磁盘进行格式化，操作都是可逆的。也就是可以比较放心的做，记住所做的操作，每一步做完都去检查PG的状态是否是正常的。
+
+
+
+
 
 
 
@@ -264,6 +387,10 @@ removed item id 16 name 'osd.16' from crush map
 3. [ceph中获取osdmap和monmap的方式](http://www.it610.com/article/5023564.htm)
 
 4. [OSDMAPTOOL – CEPH OSD CLUSTER MAP MANIPULATION TOOL](http://docs.ceph.com/docs/master/man/8/osdmaptool/)
+
+5. [查看osdmap命令](https://www.cnblogs.com/sisimi/p/7737177.html)
+
+6. [ceph osd节点删除／添加](http://blog.itpub.net/27181165/viewspace-2150647/)
 
 <br />
 <br />
