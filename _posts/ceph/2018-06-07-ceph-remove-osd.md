@@ -64,7 +64,7 @@ description: 删除osd节点
 
 1） 调整osd的crush weight
 <pre>
-ceph osd crush reweight osd.47 0.1
+# ceph osd crush reweight osd.47 0.1
 </pre>
 说明：这个地方如果想慢慢的调整就分几次将crush的weight减低至0，这个过程实际上是让数据不分布在这个节点上，让数据慢慢分布到其他节点上，直至最终不分布到该OSD，并且迁移完成数据。
 
@@ -148,7 +148,7 @@ ceph osd crush reweight osd.47 0.1
 </pre>
 在触发```out```以前，当前的PG状态应该有```active+undersized+degraded```，触发out以后，所有的PG的状态应该会慢慢变成```active+clean```，等待集群正常以后，再次查询当前的PG分布状态。
 {% highlight string %}
-# ceph pg dump pgs|awk '{print $1,$15}'|grep -v pg > pg2.txt
+# ceph pg dump pgs | awk '{print $1,$15}' | grep -v pg > pg2.txt
 {% endhighlight %}
 
 保存当前的PG分布为```pg2.txt```。
@@ -156,11 +156,11 @@ ceph osd crush reweight osd.47 0.1
 
 比较out前后的PG变化情况，下面是比较具体的变化情况，只列出变化的部分：
 <pre>
-# diff -y -W 100 pg1.txt pg2.txt  --suppress-common-lines
+# diff -y -W 100 pg1.txt pg2.txt --suppress-common-lines
 </pre>
 这里我们关心的是变动的数目，只统计变动的PG数目：
 <pre>
-# diff -y -W 100 pg1.txt pg2.txt  --suppress-common-lines | wc -l
+# diff -y -W 100 pg1.txt pg2.txt --suppress-common-lines | wc -l
 
 102
 </pre>
@@ -174,14 +174,13 @@ crush删除以后同样会触发迁移，等待PG的均衡，也就是全部变�
 
 通过以下的命令来获取当前PG分布的状态：
 {% highlight string %}
-# ceph pg dump pgs|awk '{print $1,$15}'|grep -v pg > pg3.txt
+# ceph pg dump pgs | awk '{print $1,$15}' | grep -v pg > pg3.txt
 {% endhighlight %}
 
 现在来比较```crush remove```前后的PG变动：
 <pre>
-# diff -y -W 100 pg2.txt pg3.txt  --suppress-common-lines | wc -l
-
-  137
+# diff -y -W 100 pg2.txt pg3.txt --suppress-common-lines | wc -l
+137
 </pre>
 
 5) **重新添加OSD**
@@ -193,12 +192,12 @@ crush删除以后同样会触发迁移，等待PG的均衡，也就是全部变�
 </pre>
 加完以后，统计当前的新的PG状态：
 {% highlight string %}
-# ceph pg dump pgs|awk '{print $1,$15}'|grep -v pg > pg4.txt
+# ceph pg dump pgs | awk '{print $1,$15}' | grep -v pg > pg4.txt
 {% endhighlight %}
 
 比较前后的变化：
 <pre>
-# diff -y -W 100 pg3.txt pg4.txt  --suppress-common-lines | wc -l
+# diff -y -W 100 pg3.txt pg4.txt --suppress-common-lines | wc -l
 167
 </pre>
 	
@@ -217,7 +216,7 @@ crush删除以后同样会触发迁移，等待PG的均衡，也就是全部变�
 
 开始测试之前，我们首先获取最原始的PG分布：
 {% highlight string %}
-# ceph pg dump pgs|awk '{print $1,$15}'|grep -v pg > 2pg1.txt
+# ceph pg dump pgs | awk '{print $1,$15}' | grep -v pg > 2pg1.txt
 {% endhighlight %}
 
 上面获取当前的PG分布，保存到文件```2pg1.txt```，这个PG分布记录的是PG所在的OSD。这里记录下来，方便后面进行比较，从而得出需要迁移的数据。
@@ -332,8 +331,8 @@ reweighted item id 15 name 'osd.15' to 0 in crush map
 
 6） **增加新的OSD**
 <pre>
-#ceph-deploy osd prepare lab8107:/dev/sdi
-#ceph-deploy osd activate lab8107:/dev/sdi1
+# ceph-deploy osd prepare lab8107:/dev/sdi
+# ceph-deploy osd activate lab8107:/dev/sdi1
 </pre>
 我的环境下，新增的OSD编号为16了。
 
