@@ -132,7 +132,7 @@ Destination    Gateway       Genmask        Flags    Metric    Ref     Use    If
 Destination    Gateway       Genmask    Flags     Metric    Ref    Use    Iface
 -----------    -------       -------    -----    ------     ---    ---    -----
 default       192.168.1.1    0.0.0.0    UG        0         0      0      eth0
-<pre>
+</pre>
 
 ### 1.3 配置静态路由
 
