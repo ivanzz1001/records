@@ -375,14 +375,14 @@ nameserver 202.131.80.5
 1) 配置网卡地址
 <pre>
 # vi /etc/sysconfig/network-scripts/ifcfg-eth0 
-DEVICE=eth0 					#物理设备名
+DEVICE=eth0						#物理设备名
 IPADDR=192.168.1.10 			#IP地址
 NETMASK=255.255.255.0 			#掩码值
-NETWORK=192.168.1.0 			#网络地址(可不要)
-BROADCAST=192.168.1.255 		#广播地址（可不要）
-GATEWAY=192.168.1.1 			#网关地址
-ONBOOT=yes 						# [yes|no]（引导时是否激活设备）
-USERCTL=no 						#[yes|no]（非root用户是否可以控制该设备）
+NETWORK=192.168.1.0				#网络地址(可不要)
+BROADCAST=192.168.1.255			#广播地址（可不要）
+GATEWAY=192.168.1.1				#网关地址
+ONBOOT=yes 						#[yes|no]（引导时是否激活设备）
+USERCTL=no						#[yes|no]（非root用户是否可以控制该设备）
 BOOTPROTO=static				#[none|static|bootp|dhcp]（引导时不使用协议|静态分配|BOOTP协议|DHCP协议）
 </pre>
 
