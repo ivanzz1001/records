@@ -97,6 +97,8 @@ ID WEIGHT   TYPE NAME                  UP/DOWN REWEIGHT PRIMARY-AFFINITY
 
 3. [Difference Between ‘Ceph Osd Reweight’ and ‘Ceph Osd Crush Reweight’](https://ceph.com/geen-categorie/difference-between-ceph-osd-reweight-and-ceph-osd-crush-reweight/)
 
+4. [Ceph Primary Affinity](https://ceph.com/geen-categorie/ceph-primary-affinity/)
+
 <br />
 <br />
 <br />
