@@ -60,7 +60,7 @@ description: 删除osd节点
 
 如上方式移除OSD，其实会触发两次迁移，一次是在节点osd out以后，一次是在crush remove之后，两次迁移对于集群来说是不好的，其实通过调整步骤是可以避免二次迁移的。
 
-## 1.2 方式2
+### 1.2 方式2
 
 1） 调整osd的crush weight
 <pre>
@@ -106,6 +106,9 @@ description: 删除osd节点
 这个是从认证当中去删除这个节点的信息。
 
 经过验证，第二种方式只触发了一次迁移，虽然只是一个步骤先后顺序上的调整，但是对于生产环境的集群来说，迁移的量要少一次，实际生产环境当中节点是有自动out的功能，这个可以考虑自己去控制，只是监控的密度需要加大，毕竟这是一个需要监控的集群，完全让其自己处理数据的迁移是不可能的，带来的故障只会更多。
+
+
+
 
 
 ## 2. 替换OSD操作的优化与分析
@@ -371,9 +374,81 @@ dumped pgs in format plain
 可以很清楚的看到三种不同的方法，最终触发的迁移量是不同的，处理的好的话，能减少差不多一半的数据迁移量，这个对于生产环境来说还是很重要的。关于这个建议先在测试环境上进行测试，然后再操作，上面的操作只要不对磁盘进行格式化，操作都是可逆的。也就是可以比较放心的做，记住所做的操作，每一步做完都去检查PG的状态是否是正常的。
 
 
+## 3. 一次换盘实操
 
+在生产环境中，我们遇到```osd.47```硬盘损坏的情况，这时需要换盘。
 
+1） **保存该损坏osd的fsid以及ID**
 
+如果在硬盘没有损坏的情况下，我们可以通过在 '/var/lib/ceph/osd/ceph-47' 目录下的```fsid```文件和```whoami```文件中找到其对应的值。然而，当前我们硬盘已经损坏，所以要想通过此方法来找出已经不可能了。这时我们可以通过如下命令来获得：
+<pre>
+# ceph osd dump >> cluster_osddump.txt
+
+</pre>
+
+接着查看导出的cluster_osddump.txt，大体可以找到对应的fsid:
+<pre>
+# cat cluster_osddump.txt
+...
+osd.47 down out weight 0 primary_affinity 0 up_from 22470 up_thru 22472 down_at 22474 last_clean_interval [22360,22469) 10.17.253.170:6804/1032571 10.17.254.170:6824/16032571 10.17.254.170:6825/16032571 10.17.253.170:6824/16032571 autoout,exists c457172c-d5b0-45e8-b6b3-7355f24f4109
+...
+</pre>
+上面```c457172c-d5b0-45e8-b6b3-7355f24f4109```即为对应的fsid值。而OSD.47的ID值是47.
+
+2) **调整osd的crush weight**
+<pre>
+# ceph osd crush reweight osd.47 1.8
+# ceph osd crush reweight osd.47 0.9
+# ceph osd crush reweight osd.47 0
+</pre>
+具体含义请参看前面介绍。
+
+3) 停止osd进程
+<pre>
+# systemctl stop ceph-osd@47
+
+# systemctl status ceph-osd@4
+</pre>
+
+4) 将节点状态标记为out
+<pre>
+# ceph osd out osd.47
+</pre>
+
+5) 删除节点
+<pre>
+# ceph osd rm osd.47
+</pre>
+
+这里注意，我们并不会将osd.47从crush map中移除，因为我们后面重新添加OSD时，会生产一个新的osd.47，那时我们就不需要再修改crush map了。
+
+6)  删除节点认证(不删除编号会占住）
+<pre>
+# ceph auth del osd.47
+</pre>
+
+7) 产生新的OSD
+<pre>
+# ceph osd create c457172c-d5b0-45e8-b6b3-7355f24f4109 47
+# ceph-osd -i 47 --mkfs --mkkey --osd-uuid c457172c-d5b0-45e8-b6b3-7355f24f4109
+# ceph auth add osd.47 osd 'allow *' mon 'allow rwx' -i /var/lib/ceph/osd/ceph-47/keyring
+</pre>
+
+8) 启动OSD
+<pre>
+# systemctl start ceph-osd@47
+# systemctl status ceph-osd@47
+# ps -ef | grep osd
+</pre>
+
+9) 调整osd的crush weight
+<pre>
+# ceph osd crush reweight osd.47 0.6
+# ceph osd crush reweight osd.47 1.2
+# ceph osd crush reweight osd.47 1.8
+</pre>
+
+说明： 上面只是列出了一个整体的步骤，关于一些细节部分暂为列出。
 
 
 <br />
