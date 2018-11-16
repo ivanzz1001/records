@@ -225,13 +225,9 @@ crush删除以后同样会触发迁移，等待PG的均衡，也就是全部变�
 
 2. [ADDING/REMOVING OSDS](http://docs.ceph.com/docs/master/rados/operations/add-or-rm-osds/)
 
-3. [Ceph osd weight与osd crush weight之间的区别](http://hustcat.github.io/difference_between_osd_weight_and_osd_crush_weight/)
+3. [ceph中获取osdmap和monmap的方式](http://www.it610.com/article/5023564.htm)
 
-4. [Difference Between ‘Ceph Osd Reweight’ and ‘Ceph Osd Crush Reweight’](https://ceph.com/geen-categorie/difference-between-ceph-osd-reweight-and-ceph-osd-crush-reweight/)
-
-5. [ceph中获取osdmap和monmap的方式](http://www.it610.com/article/5023564.htm)
-
-6. [OSDMAPTOOL – CEPH OSD CLUSTER MAP MANIPULATION TOOL](http://docs.ceph.com/docs/master/man/8/osdmaptool/)
+4. [OSDMAPTOOL – CEPH OSD CLUSTER MAP MANIPULATION TOOL](http://docs.ceph.com/docs/master/man/8/osdmaptool/)
 
 <br />
 <br />

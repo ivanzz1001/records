@@ -93,7 +93,9 @@ ID WEIGHT  TYPE NAME                  UP/DOWN REWEIGHT PRIMARY-AFFINITY
 
 1. [ceph weight 和 reweight的区别](https://blog.csdn.net/changtao381/article/details/49073631)
 
+2. [Ceph osd weight与osd crush weight之间的区别](http://hustcat.github.io/difference_between_osd_weight_and_osd_crush_weight/)
 
+3. [Difference Between ‘Ceph Osd Reweight’ and ‘Ceph Osd Crush Reweight’](https://ceph.com/geen-categorie/difference-between-ceph-osd-reweight-and-ceph-osd-crush-reweight/)
 
 <br />
 <br />
