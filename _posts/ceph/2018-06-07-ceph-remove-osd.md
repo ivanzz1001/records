@@ -64,7 +64,9 @@ description: 删除osd节点
 
 1） 调整osd的crush weight
 <pre>
-# ceph osd crush reweight osd.47 0.1
+# ceph osd crush reweight osd.47 1.8
+# ceph osd crush reweight osd.47 0.9
+# ceph osd crush reweight osd.47 0
 </pre>
 说明：这个地方如果想慢慢的调整就分几次将crush的weight减低至0，这个过程实际上是让数据不分布在这个节点上，让数据慢慢分布到其他节点上，直至最终不分布到该OSD，并且迁移完成数据。
 
