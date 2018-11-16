@@ -800,10 +800,13 @@ vde  253:64   0  15G  0 disk
 # mkfs -t xfs -f -i size=2048 /dev/vdb
 # mkfs -t xfs -f -i size=2048 /dev/vdc
 # mkfs -t xfs -f -i size=2048 /dev/vdd
+
 # parted -s /dev/vde mklabel gpt
 # parted -s /dev/vde mkpart primary 0% 33%
 # parted -s /dev/vde mkpart primary 33% 67%
 # parted -s /dev/vde mkpart primary 67% 100%
+
+# parted /dev/vde mklabel gpt mkpart 1 primary 0% 33%
 
 
 //说明： parted也可以使用如下方式来分区
