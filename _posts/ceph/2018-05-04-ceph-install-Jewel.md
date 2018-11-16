@@ -811,6 +811,8 @@ vde  253:64   0  15G  0 disk
 # parted -s /dev/sda mkpart primary 10GiB 100%
 {% endhighlight %}
 
+注： 这里```GiB```的单位是1024， 而```GB```的单位是1000.
+
 查看分区后的状态(注：在实际挂载之前需要先进行格式化)：
 <pre>
 [root@ceph001-node1 build]# lsblk -a 
