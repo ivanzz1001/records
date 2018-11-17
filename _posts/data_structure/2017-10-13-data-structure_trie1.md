@@ -45,12 +45,13 @@ presentation of prefix tree, see compact prefix tree.
 
 1. [数据结构之Trie](http://blog.csdn.net/qq_33583069/article/details/51942534)
 
-2. [ Trie实践：一种比哈希表更快的数据结构](http://blog.csdn.net/stevenkylelee/article/details/38343985)
-
+2. [Trie实践：一种比哈希表更快的数据结构](http://blog.csdn.net/stevenkylelee/article/details/38343985)
 
 3. [AVL树](https://baike.baidu.com/item/AVL%E6%A0%91/10986648?fr=aladdin)
 
 4. [字典树](https://baike.baidu.com/item/%E5%AD%97%E5%85%B8%E6%A0%91/9825209?fr=aladdin&fromid=517527&fromtitle=Trie%E6%A0%91)
+
+5. [Trie/Radix Tree/Suffix Tree](https://www.cnblogs.com/zemliu/p/4396297.html)
 <br />
 <br />
 <br />
