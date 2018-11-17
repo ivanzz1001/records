@@ -242,7 +242,7 @@ struct ngx_cached_open_file_s {
 #endif
 </pre>
 
-* ```count```: 用于指示该缓存文件被成功打开使用的次数
+* ```count```: 是文件的引用计数，表示现在文件被几个请求使用中
 
 * ```close```: 用于指示是否需要真正被关闭
 
