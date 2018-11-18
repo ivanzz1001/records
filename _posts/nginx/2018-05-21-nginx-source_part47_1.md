@@ -83,7 +83,7 @@ typedef struct {
 } ngx_open_file_info_t;
 {% endhighlight %}
 
-```ngx_open_file_info_t```用于nginx中描述一个打开的额缓存文件， 下面我们简要分析一下各字段的含义：
+```ngx_open_file_info_t```用于nginx中描述一个打开的缓存文件， 下面我们简要分析一下各字段的含义：
 
 * ```fd```: 该文件所对应的文件句柄
 
@@ -259,6 +259,13 @@ struct ngx_cached_open_file_s {
 * ```is_directio```: 主要用于指示此文件是否已经开启了directio
 
 * ```event```: 该打开的缓存文件所关联的事件
+
+注意：
+<pre>
+结构体ngx_open_file_info_t与ngx_cached_open_file_t的不同主要表现在：前者用于描述一个打开
+的缓存文件；而后者用于描述一个需要打开的缓冲文件，因此其要存储文件名等相关信息。
+
+</pre>
 
 
 ## 3. ngx_open_file_cache_t结构
