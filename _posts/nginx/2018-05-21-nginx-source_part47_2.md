@@ -636,6 +636,556 @@ failed:
 }
 {% endhighlight %}
 
+nginx静态文件缓存的主要代码都包含在本函数中。下面我们详细介绍一下：
+
+1） **处理cache为NULL时的特殊情况**
+{% highlight string %}
+ngx_int_t
+ngx_open_cached_file(ngx_open_file_cache_t *cache, ngx_str_t *name,
+    ngx_open_file_info_t *of, ngx_pool_t *pool)
+{
+	...
+	if (cache == NULL) {
+
+        if (of->test_only) {
+
+            if (ngx_file_info_wrapper(name, of, &fi, pool->log)
+                == NGX_FILE_ERROR)
+            {
+                return NGX_ERROR;
+            }
+
+            of->uniq = ngx_file_uniq(&fi);
+            of->mtime = ngx_file_mtime(&fi);
+            of->size = ngx_file_size(&fi);
+            of->fs_size = ngx_file_fs_size(&fi);
+            of->is_dir = ngx_is_dir(&fi);
+            of->is_file = ngx_is_file(&fi);
+            of->is_link = ngx_is_link(&fi);
+            of->is_exec = ngx_is_exec(&fi);
+
+            return NGX_OK;
+        }
+
+        cln = ngx_pool_cleanup_add(pool, sizeof(ngx_pool_cleanup_file_t));
+        if (cln == NULL) {
+            return NGX_ERROR;
+        }
+
+        rc = ngx_open_and_stat_file(name, of, pool->log);
+
+        if (rc == NGX_OK && !of->is_dir) {
+            cln->handler = ngx_pool_cleanup_file;
+            clnf = cln->data;
+
+            clnf->fd = of->fd;
+            clnf->name = name->data;
+            clnf->log = pool->log;
+        }
+
+        return rc;
+    }
+	...
+}
+{% endhighlight %}
+一般只有在临时情况下传递的cache参数才会为NULL，这种情况通常只是简单获取```ngx_open_file_info_t```信息。此种情况下我们看到也会从pool池中申请一块小内存来管理打开文件的清除操作，但是注意这里绑定的handler也只是单个文件的关闭，与上面我们介绍的 **'清除cache中的所有打开的缓存文件'**是不同的。
+
+
+2) **查找文件**
+{% highlight string %}
+ngx_int_t
+ngx_open_cached_file(ngx_open_file_cache_t *cache, ngx_str_t *name,
+    ngx_open_file_info_t *of, ngx_pool_t *pool)
+{
+	...
+	cln = ngx_pool_cleanup_add(pool, sizeof(ngx_open_file_cache_cleanup_t));
+    if (cln == NULL) {
+        return NGX_ERROR;
+    }
+
+    now = ngx_time();
+
+    hash = ngx_crc32_long(name->data, name->len);
+
+    file = ngx_open_file_lookup(cache, name, hash);
+
+	...
+}
+{% endhighlight %}
+这里首先会从池中申请一小块```ngx_open_file_cache_cleanup_t```空间，用于清除单个打开的文件，我们可以从后边所绑定的handler看出其中的不同。接着通过要打开的文件名```name```来从红黑树中查找相应的缓存。这里我们注意到，是对文件名做crc32之后，来进行查找的，也即是说红黑树中所存储信息的key是crc32(file_name)。
+
+3) **缓存文件查找成功**
+{% highlight string %}
+ngx_int_t
+ngx_open_cached_file(ngx_open_file_cache_t *cache, ngx_str_t *name,
+    ngx_open_file_info_t *of, ngx_pool_t *pool)
+{
+	...
+	    if (file) {
+
+        file->uses++;
+
+        ngx_queue_remove(&file->queue);
+
+        if (file->fd == NGX_INVALID_FILE && file->err == 0 && !file->is_dir) {
+
+            /* file was not used often enough to keep open */
+
+            rc = ngx_open_and_stat_file(name, of, pool->log);
+
+            if (rc != NGX_OK && (of->err == 0 || !of->errors)) {
+                goto failed;
+            }
+
+            goto add_event;
+        }
+
+        if (file->use_event
+            || (file->event == NULL
+                && (of->uniq == 0 || of->uniq == file->uniq)
+                && now - file->created < of->valid
+#if (NGX_HAVE_OPENAT)
+                && of->disable_symlinks == file->disable_symlinks
+                && of->disable_symlinks_from == file->disable_symlinks_from
+#endif
+            ))
+        {
+            if (file->err == 0) {
+
+                of->fd = file->fd;
+                of->uniq = file->uniq;
+                of->mtime = file->mtime;
+                of->size = file->size;
+
+                of->is_dir = file->is_dir;
+                of->is_file = file->is_file;
+                of->is_link = file->is_link;
+                of->is_exec = file->is_exec;
+                of->is_directio = file->is_directio;
+
+                if (!file->is_dir) {
+                    file->count++;
+                    ngx_open_file_add_event(cache, file, of, pool->log);
+                }
+
+            } else {
+                of->err = file->err;
+#if (NGX_HAVE_OPENAT)
+                of->failed = file->disable_symlinks ? ngx_openat_file_n
+                                                    : ngx_open_file_n;
+#else
+                of->failed = ngx_open_file_n;
+#endif
+            }
+
+            goto found;
+        }
+
+        ngx_log_debug4(NGX_LOG_DEBUG_CORE, pool->log, 0,
+                       "retest open file: %s, fd:%d, c:%d, e:%d",
+                       file->name, file->fd, file->count, file->err);
+
+        if (file->is_dir) {
+
+            /*
+             * chances that directory became file are very small
+             * so test_dir flag allows to use a single syscall
+             * in ngx_file_info() instead of three syscalls
+             */
+
+            of->test_dir = 1;
+        }
+
+        of->fd = file->fd;
+        of->uniq = file->uniq;
+
+        rc = ngx_open_and_stat_file(name, of, pool->log);
+
+        if (rc != NGX_OK && (of->err == 0 || !of->errors)) {
+            goto failed;
+        }
+
+        if (of->is_dir) {
+
+            if (file->is_dir || file->err) {
+                goto update;
+            }
+
+            /* file became directory */
+
+        } else if (of->err == 0) {  /* file */
+
+            if (file->is_dir || file->err) {
+                goto add_event;
+            }
+
+            if (of->uniq == file->uniq) {
+
+                if (file->event) {
+                    file->use_event = 1;
+                }
+
+                of->is_directio = file->is_directio;
+
+                goto update;
+            }
+
+            /* file was changed */
+
+        } else { /* error to cache */
+
+            if (file->err || file->is_dir) {
+                goto update;
+            }
+
+            /* file was removed, etc. */
+        }
+
+        if (file->count == 0) {
+
+            ngx_open_file_del_event(file);
+
+            if (ngx_close_file(file->fd) == NGX_FILE_ERROR) {
+                ngx_log_error(NGX_LOG_ALERT, pool->log, ngx_errno,
+                              ngx_close_file_n " \"%V\" failed", name);
+            }
+
+            goto add_event;
+        }
+
+        ngx_rbtree_delete(&cache->rbtree, &file->node);
+
+        cache->current--;
+
+        file->close = 1;
+
+        goto create;
+    }
+	...
+}
+{% endhighlight %}
+在第2）步中，我们会从红黑树中查找文件。如果查找成功，那么使用对应的fd来获取文件的最新信息，然后更新缓存并返回。另外：
+{% highlight string %}
+if (file->use_event
+            || (file->event == NULL
+                && (of->uniq == 0 || of->uniq == file->uniq)
+                && now - file->created < of->valid
+#if (NGX_HAVE_OPENAT)
+                && of->disable_symlinks == file->disable_symlinks
+                && of->disable_symlinks_from == file->disable_symlinks_from
+#endif
+            ))
+{
+	//处理支持文件事件的情况，即VNODE事件
+	goto found;
+}
+
+
+//不支持文件事件，则根据需要打开文件以获得相应的信息
+rc = ngx_open_and_stat_file(name, of, pool->log);
+{% endhighlight %}
+
+
+**4） cache中文件未找到**
+{% highlight string %}
+ngx_int_t
+ngx_open_cached_file(ngx_open_file_cache_t *cache, ngx_str_t *name,
+    ngx_open_file_info_t *of, ngx_pool_t *pool)
+{
+	...
+	    /* not found */
+
+    rc = ngx_open_and_stat_file(name, of, pool->log);
+
+    if (rc != NGX_OK && (of->err == 0 || !of->errors)) {
+        goto failed;
+    }
+
+create:
+
+    if (cache->current >= cache->max) {
+        ngx_expire_old_cached_files(cache, 0, pool->log);
+    }
+
+    file = ngx_alloc(sizeof(ngx_cached_open_file_t), pool->log);
+
+    if (file == NULL) {
+        goto failed;
+    }
+
+    file->name = ngx_alloc(name->len + 1, pool->log);
+
+    if (file->name == NULL) {
+        ngx_free(file);
+        file = NULL;
+        goto failed;
+    }
+
+    ngx_cpystrn(file->name, name->data, name->len + 1);
+
+    file->node.key = hash;
+
+    ngx_rbtree_insert(&cache->rbtree, &file->node);
+
+    cache->current++;
+
+    file->uses = 1;
+    file->count = 0;
+    file->use_event = 0;
+    file->event = NULL;
+	...
+}
+{% endhighlight %}
+此处，cache中未找到对应的缓存文件，那么Nginx就会打开该文件，然后将其存入缓存中。这里我们注意到```cache->current```达到了指定的最大值时，Nginx就会强制淘汰若干个（3个以下）文件。
+
+**5) 更新相应文件信息，并插入到超时队列**
+{% highlight string %}
+ngx_int_t
+ngx_open_cached_file(ngx_open_file_cache_t *cache, ngx_str_t *name,
+    ngx_open_file_info_t *of, ngx_pool_t *pool)
+{
+	...
+add_event:
+
+    ngx_open_file_add_event(cache, file, of, pool->log);
+
+update:
+
+    file->fd = of->fd;
+    file->err = of->err;
+#if (NGX_HAVE_OPENAT)
+    file->disable_symlinks = of->disable_symlinks;
+    file->disable_symlinks_from = of->disable_symlinks_from;
+#endif
+
+    if (of->err == 0) {
+        file->uniq = of->uniq;
+        file->mtime = of->mtime;
+        file->size = of->size;
+
+        file->close = 0;
+
+        file->is_dir = of->is_dir;
+        file->is_file = of->is_file;
+        file->is_link = of->is_link;
+        file->is_exec = of->is_exec;
+        file->is_directio = of->is_directio;
+
+        if (!of->is_dir) {
+            file->count++;
+        }
+    }
+
+    file->created = now;
+
+found:
+
+    file->accessed = now;
+
+    ngx_queue_insert_head(&cache->expire_queue, &file->queue);
+
+    ngx_log_debug5(NGX_LOG_DEBUG_CORE, pool->log, 0,
+                   "cached open file: %s, fd:%d, c:%d, e:%d, u:%d",
+                   file->name, file->fd, file->count, file->err, file->uses);
+
+    if (of->err == 0) {
+
+        if (!of->is_dir) {
+            cln->handler = ngx_open_file_cleanup;
+            ofcln = cln->data;
+
+            ofcln->cache = cache;
+            ofcln->file = file;
+            ofcln->min_uses = of->min_uses;
+            ofcln->log = pool->log;
+        }
+
+        return NGX_OK;
+    }
+
+    return NGX_ERROR;
+	...
+}
+{% endhighlight %}
+此处，更新前面获取到的文件信息到```file```变量，然后再插入到超时队列。值得注意的是，这里同样会为该打开的缓存文件绑定一个```缓存清除回调```函数。
+
+**6） 处理失败情况**
+{% highlight string %}
+ngx_int_t
+ngx_open_cached_file(ngx_open_file_cache_t *cache, ngx_str_t *name,
+    ngx_open_file_info_t *of, ngx_pool_t *pool)
+{
+	...
+failed:
+
+    if (file) {
+        ngx_rbtree_delete(&cache->rbtree, &file->node);
+
+        cache->current--;
+
+        if (file->count == 0) {
+
+            if (file->fd != NGX_INVALID_FILE) {
+                if (ngx_close_file(file->fd) == NGX_FILE_ERROR) {
+                    ngx_log_error(NGX_LOG_ALERT, pool->log, ngx_errno,
+                                  ngx_close_file_n " \"%s\" failed",
+                                  file->name);
+                }
+            }
+
+            ngx_free(file->name);
+            ngx_free(file);
+
+        } else {
+            file->close = 1;
+        }
+    }
+
+    if (of->fd != NGX_INVALID_FILE) {
+        if (ngx_close_file(of->fd) == NGX_FILE_ERROR) {
+            ngx_log_error(NGX_LOG_ALERT, pool->log, ngx_errno,
+                          ngx_close_file_n " \"%V\" failed", name);
+        }
+    }
+
+    return NGX_ERROR;
+	...
+}
+{% endhighlight %}
+处理失败时，从缓存中清除相应的缓存信息，并关闭对应的文件句柄。
+
+
+## 7. 函数
+{% highlight string %}
+#if (NGX_HAVE_OPENAT)
+static ngx_fd_t
+ngx_openat_file_owner(ngx_fd_t at_fd, const u_char *name,
+    ngx_int_t mode, ngx_int_t create, ngx_int_t access, ngx_log_t *log)
+{
+    ngx_fd_t         fd;
+    ngx_err_t        err;
+    ngx_file_info_t  fi, atfi;
+
+    /*
+     * To allow symlinks with the same owner, use openat() (followed
+     * by fstat()) and fstatat(AT_SYMLINK_NOFOLLOW), and then compare
+     * uids between fstat() and fstatat().
+     *
+     * As there is a race between openat() and fstatat() we don't
+     * know if openat() in fact opened symlink or not.  Therefore,
+     * we have to compare uids even if fstatat() reports the opened
+     * component isn't a symlink (as we don't know whether it was
+     * symlink during openat() or not).
+     */
+
+    fd = ngx_openat_file(at_fd, name, mode, create, access);
+
+    if (fd == NGX_INVALID_FILE) {
+        return NGX_INVALID_FILE;
+    }
+
+    if (ngx_file_at_info(at_fd, name, &atfi, AT_SYMLINK_NOFOLLOW)
+        == NGX_FILE_ERROR)
+    {
+        err = ngx_errno;
+        goto failed;
+    }
+
+#if (NGX_HAVE_O_PATH)
+    if (ngx_file_o_path_info(fd, &fi, log) == NGX_ERROR) {
+        err = ngx_errno;
+        goto failed;
+    }
+#else
+    if (ngx_fd_info(fd, &fi) == NGX_FILE_ERROR) {
+        err = ngx_errno;
+        goto failed;
+    }
+#endif
+
+    if (fi.st_uid != atfi.st_uid) {
+        err = NGX_ELOOP;
+        goto failed;
+    }
+
+    return fd;
+
+failed:
+
+    if (ngx_close_file(fd) == NGX_FILE_ERROR) {
+        ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
+                      ngx_close_file_n " \"%s\" failed", name);
+    }
+
+    ngx_set_errno(err);
+
+    return NGX_INVALID_FILE;
+}
+#endif
+{% endhighlight %}
+
+这里由于```openat()```并不能判断出所打开的文件是否是一个链接文件，因此必须要比较fstat()与fstatat()获取到的owner信息。
+
+## 8. 函数ngx_file_o_path_info()
+{% highlight string %}
+#if (NGX_HAVE_OPENAT)
+#if (NGX_HAVE_O_PATH)
+
+static ngx_int_t
+ngx_file_o_path_info(ngx_fd_t fd, ngx_file_info_t *fi, ngx_log_t *log)
+{
+    static ngx_uint_t  use_fstat = 1;
+
+    /*
+     * In Linux 2.6.39 the O_PATH flag was introduced that allows to obtain
+     * a descriptor without actually opening file or directory.  It requires
+     * less permissions for path components, but till Linux 3.6 fstat() returns
+     * EBADF on such descriptors, and fstatat() with the AT_EMPTY_PATH flag
+     * should be used instead.
+     *
+     * Three scenarios are handled in this function:
+     *
+     * 1) The kernel is newer than 3.6 or fstat() with O_PATH support was
+     *    backported by vendor.  Then fstat() is used.
+     *
+     * 2) The kernel is newer than 2.6.39 but older than 3.6.  In this case
+     *    the first call of fstat() returns EBADF and we fallback to fstatat()
+     *    with AT_EMPTY_PATH which was introduced at the same time as O_PATH.
+     *
+     * 3) The kernel is older than 2.6.39 but nginx was build with O_PATH
+     *    support.  Since descriptors are opened with O_PATH|O_RDONLY flags
+     *    and O_PATH is ignored by the kernel then the O_RDONLY flag is
+     *    actually used.  In this case fstat() just works.
+     */
+
+    if (use_fstat) {
+        if (ngx_fd_info(fd, fi) != NGX_FILE_ERROR) {
+            return NGX_OK;
+        }
+
+        if (ngx_errno != NGX_EBADF) {
+            return NGX_ERROR;
+        }
+
+        ngx_log_error(NGX_LOG_NOTICE, log, 0,
+                      "fstat(O_PATH) failed with EBADF, "
+                      "switching to fstatat(AT_EMPTY_PATH)");
+
+        use_fstat = 0;
+    }
+
+    if (ngx_file_at_info(fd, "", fi, AT_EMPTY_PATH) != NGX_FILE_ERROR) {
+        return NGX_OK;
+    }
+
+    return NGX_ERROR;
+}
+
+#endif
+
+#endif /* NGX_HAVE_OPENAT */
+{% endhighlight %}
+此函数也主要用于支持使用openat()函数来获取文件信息。
 
 
 
