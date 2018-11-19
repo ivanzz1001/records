@@ -54,7 +54,11 @@ open_file_cache_errors   on;
 
 Nginx中的Cache只是cache文件句柄，因为静态文件的发送，一般来说，Nginx都是尽量使用sendfile()来进行发送的。因此只需要cache文件句柄就足够了。
 
-所有的Cache对象包含在两个数据结构里面，整个机制最关键的也是这两个东西，一个是红黑树，另一个就是队列。其中红黑树是为了方便查找（能根据文件名迅速得到fd)，而队列是为了方便超时管理（按照读取顺序插入，在队列头的就是最近存取的文件），由于所有的句柄的超时时间都是一样的，因此每次只需要判断最后几个元素就够了，因为这个超时并不需要那么实时。
+所有的Cache对象包含在两个数据结构里面，整个机制最关键的也是这两个东西，一个是红黑树，另一个就是队列。其中红黑树是为了方便查找（能根据文件名迅速得到fd)，而队列是为了方便超时管理（按照读取顺序插入，在队列头的就是最近存取的文件），由于所有的句柄的超时时间都是一样的，因此每次只需要判断最后几个元素就够了，因为这个超时并不需要那么实时。如下画出cache存储结构的整体图景：
+
+![ngx-file-cache](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_file_cache.jpg)
+
+
 
 假如现在客户端的请求是```GET test.html HTTP/1.1```，则Nginx是这么处理的，如果test.html在cache中存在，则从cache中取得这个句柄，然后正常返回；如果test.html不存在，则是打开这个文件，然后插入到cache中。不过这里面有很多细节需要处理，比如超时，比如红黑树的插入等等。我们会在后面的章节来较为详细的介绍这些。
 
@@ -95,10 +99,7 @@ Nginx中的Cache只是cache文件句柄，因为静态文件的发送，一般�
 
 
 
-
-
-
-## 2. 相关静态函数声明
+## 3. 相关静态函数声明
 {% highlight string %}
 
 /*
@@ -123,35 +124,63 @@ Nginx中的Cache只是cache文件句柄，因为静态文件的发送，一般�
 #define NGX_MIN_READ_AHEAD  (128 * 1024)
 
 
+//用于清除超时队列中的所有
 static void ngx_open_file_cache_cleanup(void *data);
+
+
 #if (NGX_HAVE_OPENAT)
+//使用openat()来打开一个文件，因为openat()打开的文件并不能判定是不是链接文件，所以需要进一步判断
 static ngx_fd_t ngx_openat_file_owner(ngx_fd_t at_fd, const u_char *name,
     ngx_int_t mode, ngx_int_t create, ngx_int_t access, ngx_log_t *log);
 #if (NGX_HAVE_O_PATH)
+
+//使用O_PATH选项来打开一个文件或目录以获得相应的文件信息
 static ngx_int_t ngx_file_o_path_info(ngx_fd_t fd, ngx_file_info_t *fi,
     ngx_log_t *log);
 #endif
 #endif
+
+//打开一个文件，主要是封装了普通打开方式与openat()
 static ngx_fd_t ngx_open_file_wrapper(ngx_str_t *name,
     ngx_open_file_info_t *of, ngx_int_t mode, ngx_int_t create,
     ngx_int_t access, ngx_log_t *log);
+
+//获取文件信息
 static ngx_int_t ngx_file_info_wrapper(ngx_str_t *name,
     ngx_open_file_info_t *of, ngx_file_info_t *fi, ngx_log_t *log);
+
+//打开并stat一个文件
 static ngx_int_t ngx_open_and_stat_file(ngx_str_t *name,
     ngx_open_file_info_t *of, ngx_log_t *log);
+
+//打开一个文件并添加相应的事件
 static void ngx_open_file_add_event(ngx_open_file_cache_t *cache,
     ngx_cached_open_file_t *file, ngx_open_file_info_t *of, ngx_log_t *log);
+
+//清除一个打开的文件信息
 static void ngx_open_file_cleanup(void *data);
+
+//关闭缓存文件
 static void ngx_close_cached_file(ngx_open_file_cache_t *cache,
     ngx_cached_open_file_t *file, ngx_uint_t min_uses, ngx_log_t *log);
+
+//删除关联在文件上的事件
 static void ngx_open_file_del_event(ngx_cached_open_file_t *file);
+
+//淘汰超时的、老旧的缓存文件
 static void ngx_expire_old_cached_files(ngx_open_file_cache_t *cache,
     ngx_uint_t n, ngx_log_t *log);
+
+//将缓存文件信息插入到红黑树中
 static void ngx_open_file_cache_rbtree_insert_value(ngx_rbtree_node_t *temp,
     ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
+
+//从红黑树中查找文件
 static ngx_cached_open_file_t *
     ngx_open_file_lookup(ngx_open_file_cache_t *cache, ngx_str_t *name,
     uint32_t hash);
+
+//移除事件所关联的文件缓存信息
 static void ngx_open_file_cache_remove(ngx_event_t *ev);
 {% endhighlight %}
 
@@ -161,7 +190,7 @@ static void ngx_open_file_cache_remove(ngx_event_t *ev);
 
 2） 目录的stat()信息；
 
-3） 文件和目录的一些错误信息： not found、拒绝访问等等；
+3） 与文件查找相关的任何错误消息，例如```file not found```、```no read permission```
 
 
 
