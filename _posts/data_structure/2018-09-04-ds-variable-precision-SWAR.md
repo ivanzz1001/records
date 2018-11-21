@@ -4,7 +4,7 @@ title: variable precision SWAR算法
 tags:
 - data-structure
 categories: data-structure
-description:variable precision SWAR算法
+description: variable precision SWAR算法
 ---
 
 
