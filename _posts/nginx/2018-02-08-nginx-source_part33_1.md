@@ -194,13 +194,13 @@ struct ngx_output_chain_ctx_s {
 
 下面我们来简要介绍一下```ngx_output_chain_ctx_s```结构的各字段：
 
-* buf: 这个域就是我们拷贝数据的地方，我们一般输出的话都是从```in```(参看如下)直接copy相应的size大小的数据到buf中。
+* buf: 这个域就是我们拷贝数据的地方，我们一般输出的话都是从```in```(参看如下)直接copy相应的size大小的数据到buf中。一般作为发送时临时缓存使用
 
 * in: 这个就是我们保存那些需要发送数据的地方
 
 * free: 这个保存了一些空闲的buf，也就是说如果free存在，我们都会直接从free中取buf到前面的buf域。
 
-* busy： 这个保存了已经发送完毕的buf，也就是每次我们从in中将buf读取完毕后，确定数据已经取完，此时就会将这个chain拷贝到busy中，然后将比较老的busy buf拷贝到free中。
+* busy： 表示马上就要发送的chain。
 
 * sendfile: 用于指定是否使用sendfile
 
@@ -327,13 +327,15 @@ ngx_chain_t *ngx_chain_update_sent(ngx_chain_t *in, off_t sent);
 
 3. [Nginx关键数据结构分析（一） ngx_buf_t](https://segmentfault.com/a/1190000004014230)
 
-4. [Nginx开发从入门到精通](https://www.kancloud.cn/kancloud/master-nginx-develop/51880)
+4. [Nginx filter分析](https://blog.csdn.net/fengmo_q/article/details/12494781)
 
-5. [结合源码看nginx-1.4.0之nginx内存管理详解](https://www.cnblogs.com/didiaoxiong/p/nginx_memory.html)
+5. [Nginx开发从入门到精通](https://www.kancloud.cn/kancloud/master-nginx-develop/51880)
 
-6. [nginx的内存管理](http://simohayha.iteye.com/blog/545192)
+6. [结合源码看nginx-1.4.0之nginx内存管理详解](https://www.cnblogs.com/didiaoxiong/p/nginx_memory.html)
 
-7. [ngx_output_chain 函数分析](https://my.oschina.net/astute/blog/316954)
+7. [nginx的内存管理](http://simohayha.iteye.com/blog/545192)
+
+8. [ngx_output_chain 函数分析](https://my.oschina.net/astute/blog/316954)
 <br />
 <br />
 <br />
