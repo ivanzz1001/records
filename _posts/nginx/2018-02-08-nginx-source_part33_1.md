@@ -218,7 +218,7 @@ struct ngx_output_chain_ctx_s {
 
 * allocated： 每次从pool中重新alloc一个buf，这个值都会相应加1
 
-* tag: 这个用来标记当前哪个模块使用这个chain
+* tag: 模块标记，主要用于buf回收
 
 * output_filter: 输出回调函数
 
