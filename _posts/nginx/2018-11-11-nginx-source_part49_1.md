@@ -10,10 +10,106 @@ description: nginx源代码分析
 本章我们主要介绍一下ngx_palloc.h，其实现了Nginx中最基本的内存池操作。nginx中大多数的内存分配都是在pool中完成的，在pool中分配的内存在pool被销毁时会被自动的释放。这就使得可以获得很高的内存分配性能，并使得内存控制更加简单。
 
 一个pool在内部分配对象空间时都是在一个连续的内存块(block)来进行的。一旦一个block满了之后，就会分配一个新的block并添加到pool的block list中。当所请求分配的空间过大，而不能在一个单独的块中进行分配时，则该请求会被转换到使用操作系统的allocator，然后将其返回的内存指针存放到pool中，以方便后续通过pool来释放该内存块。
+
+Nginx里内存的使用大都十分有特色： 申请了永久保存，抑或伴随这请求的结束而全部释放，还有写满了缓冲再从头接着写，这么做的原因也主要取决于Web Server的特殊的场景，内存的分配和请求相关，一条请求处理完毕，即可释放其相关的内存池，降低了开发中对内存资源管理的复杂度，也减少了内存碎片的存在。
+
 <!-- more -->
 
 
-## 1. 
+## 1. 相关宏的定义
+{% highlight string %}
+ * Copyright (C) Nginx, Inc.
+ */
+
+
+#ifndef _NGX_PALLOC_H_INCLUDED_
+#define _NGX_PALLOC_H_INCLUDED_
+
+
+#include <ngx_config.h>
+#include <ngx_core.h>
+
+
+/*
+ * NGX_MAX_ALLOC_FROM_POOL should be (ngx_pagesize - 1), i.e. 4095 on x86.
+ * On Windows NT it decreases a number of locked pages in a kernel.
+ */
+#define NGX_MAX_ALLOC_FROM_POOL  (ngx_pagesize - 1)
+
+#define NGX_DEFAULT_POOL_SIZE    (16 * 1024)
+
+#define NGX_POOL_ALIGNMENT       16
+#define NGX_MIN_POOL_SIZE                                                     \
+    ngx_align((sizeof(ngx_pool_t) + 2 * sizeof(ngx_pool_large_t)),            \
+              NGX_POOL_ALIGNMENT)
+{% endhighlight %}
+
+这里定义了一些宏：
+
+* NGX_MAX_ALLOC_FROM_POOL: 用于定义内存池中数据块的最大值。一般在x86机器上为(4096-1)
+
+* NGX_DEFAULT_POOL_SIZE: 一个pool默认的总空间大小（注意这里包括```ngx_pool_t```结构体本身的大小）
+
+* NGX_POOL_ALIGNMENT: 内存池本身分配在以16字节对齐的空间上
+
+* NGX_MIN_POOL_SIZE： 内存池的最小空间大小。这里```ngx_pool_t```的大小为80，而```ngx_pool_large_t```的大小为16,因此算出内存池的最小空间大小为112字节。
+
+## 2. ngx_pool_cleanup_t数据结构 
+{% highlight string %}
+typedef void (*ngx_pool_cleanup_pt)(void *data);
+
+typedef struct ngx_pool_cleanup_s  ngx_pool_cleanup_t;
+
+struct ngx_pool_cleanup_s {
+    ngx_pool_cleanup_pt   handler;
+    void                 *data;
+    ngx_pool_cleanup_t   *next;
+};
+{% endhighlight %}
+本数据结构主要用于指示如何释放内存池资源：
+
+* handler: 释放内存池资源的回调函数
+
+* data: 指向要清除的数据
+
+* next: 指向下一个ngx_pool_cleanup_t结构。
+
+## 3. ngx_pool_large_t数据结构
+{% highlight string %}
+typedef struct ngx_pool_large_s  ngx_pool_large_t;
+
+struct ngx_pool_large_s {
+    ngx_pool_large_t     *next;
+    void                 *alloc;
+};
+{% endhighlight %}
+
+大内存块结构。当待分配空间已经超过了池子自身大小，nginx也没有别的好办法，只好按照你需要分配的大小，实际去调用malloc()函数去分配。例如池子大小是1K，而待分配大小是1M。实际上池子里只存储了ngx_pool_large_t结构，这个结构的alloc指针，指向被分配的内存，并把这个指针返回给系统使用。
+
+* next: 指向下一块大内存
+
+* alloc: 指向分配的大块内存
+
+## 4. ngx_pool_t数据结构
+{% highlight string %}
+typedef struct {
+    u_char               *last;
+    u_char               *end;
+    ngx_pool_t           *next;
+    ngx_uint_t            failed;
+} ngx_pool_data_t;
+
+
+struct ngx_pool_s {
+    ngx_pool_data_t       d;
+    size_t                max;
+    ngx_pool_t           *current;
+    ngx_chain_t          *chain;
+    ngx_pool_large_t     *large;
+    ngx_pool_cleanup_t   *cleanup;
+    ngx_log_t            *log;
+};
+{% endhighlight %}
 
 
 
