@@ -406,11 +406,9 @@ ngx_output_chain(ngx_output_chain_ctx_t *ctx, ngx_chain_t *in)
 	last = NGX_NONE;
 
 	for ( ;; ){
-
 		//开始遍历chain: 当ctx->in不为NULL，并且有足够的空闲buf的话，则不断将in拷贝到ctx->buf中
 		//(注意前面的步骤我们已经将'in' 中的数据拷贝到了ctx->in中）
 		while(ctx->in){
-
 			//获取当前buf的大小
 			bsize = ngx_buf_size(ctx->in->buf);	
 
@@ -422,10 +420,8 @@ ngx_output_chain(ngx_output_chain_ctx_t *ctx, ngx_chain_t *in)
 
 			//判断是否需要复制buf
 			if (ngx_output_chain_as_is(ctx, ctx->in->buf)) {
-
-			//不需要复制，直接将当前ctx->in追加到out链的末尾，同时ctx->in = ctx->in->next;
-
-			continue;
+				//不需要复制，直接将当前ctx->in追加到out链的末尾，同时ctx->in = ctx->in->next;
+				continue;
 			}
 
 			/*
@@ -434,7 +430,6 @@ ngx_output_chain(ngx_output_chain_ctx_t *ctx, ngx_chain_t *in)
 
 			//因为ctx->buf是属于一个临时用的buf，所以大多数情况下ctx->buf均为NULL
 			if(ctx->buf == NULL){
-		 
 				/*
 				 * 此函数用于处理文件buf(file buf), 因为有些发送函数可能有对齐要求。
 				 * 一般来说，如果没有开启directio的话，这个函数都会返回NGX_DECLINED
@@ -499,11 +494,9 @@ ngx_output_chain(ngx_output_chain_ctx_t *ctx, ngx_chain_t *in)
 
 		//继续处理上次没有完成的数据
 		if (out == NULL && last != NGX_NONE) {
-		
 			if (ctx->in) {
 				return NGX_AGAIN;
 			}
-		
 			return last;
 		}
 
@@ -518,11 +511,604 @@ ngx_output_chain(ngx_output_chain_ctx_t *ctx, ngx_chain_t *in)
 		
 		ngx_chain_update_chains(ctx->pool, &ctx->free, &ctx->busy, &out,ctx->tag);
 		last_out = &out;
-
 	}
 }
 {% endhighlight %}
 
+## 3. 函数ngx_output_chain_as_is()
+{% highlight string %}
+static ngx_inline ngx_int_t
+ngx_output_chain_as_is(ngx_output_chain_ctx_t *ctx, ngx_buf_t *buf)
+{
+    ngx_uint_t  sendfile;
+
+    //1) 是否为特殊buf(special buf)，是的话返回1，表示不需要拷贝
+    if (ngx_buf_special(buf)) {
+        return 1;
+    }
+
+    //当期暂未定义NGX_THREADS宏
+#if (NGX_THREADS)
+    if (buf->in_file) {
+        buf->file->thread_handler = ctx->thread_handler;
+        buf->file->thread_ctx = ctx->filter_ctx;
+    }
+#endif
+
+    //2) 如果buf在文件中，并且使用了directio，那么返回0，表示需要拷贝（这是因为directio一般有对齐要求） 
+    if (buf->in_file && buf->file->directio) {
+        return 0;
+    }
+
+    // sendfile标记
+    sendfile = ctx->sendfile;
+
+#if (NGX_SENDFILE_LIMIT)
+
+    //如果file_pos大于sendfile的限制，设置标记为0（表示不能用sendfile来发送）
+    if (buf->in_file && buf->file_pos >= NGX_SENDFILE_LIMIT) {
+        sendfile = 0;
+    }
+
+#endif
+
+    if (!sendfile) {
+
+        //如果不走sendfile，而且buf不在内存中，则我们需要复制到内存一份
+        if (!ngx_buf_in_memory(buf)) {
+            return 0;
+        }
+
+        buf->in_file = 0;
+    }
+
+    //当前我们并不支持NGX_HAVE_AIO_SENDFILE宏定义
+#if (NGX_HAVE_AIO_SENDFILE)
+    if (ctx->aio_preload && buf->in_file) {
+        (void) ngx_output_chain_aio_setup(ctx, buf->file);
+    }
+#endif
+
+    //如果ctx要求需要在内存，而当前的buf又不在内存，则我们需要复制到内存一份
+    if (ctx->need_in_memory && !ngx_buf_in_memory(buf)) {
+        return 0;
+    }
+
+    //如果需要内存中有可修改的拷贝，并且buf存在于只读的内存或者mmap中，则返回0，表示需要复制到内存一份
+    if (ctx->need_in_temp && (buf->memory || buf->mmap)) {
+        return 0;
+    }
+
+    return 1;
+}
+{% endhighlight %}
+此函数主要用于判定是否需要复制buf。如果返回值为1，则说明不需要复制，否则说明需要复制。上面我们注意两个标记：
+
+* ctx->need_in_memory: 主要用于当使用sendfile的时候，Nginx并不会将请求文件拷贝到内存中，而有时需要操作文件的内容，此时就需要设置这个标记。然后后面的body filter就能操作内容了。
+
+* ctx->need_in_temp: 这个主要是用于把本来就存在于内存中的buf复制一份可修改的拷贝出来，这里有用到的模块有```charset```，也就是编码filter。
+
+
+## 4. 函数ngx_output_chain_aio_setup()
+{% highlight string %}
+#if (NGX_HAVE_AIO_SENDFILE)
+
+static ngx_int_t
+ngx_output_chain_aio_setup(ngx_output_chain_ctx_t *ctx, ngx_file_t *file)
+{
+    ngx_event_aio_t  *aio;
+
+    if (file->aio == NULL && ngx_file_aio_init(file, ctx->pool) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    aio = file->aio;
+
+    aio->data = ctx->filter_ctx;
+    aio->preload_handler = ctx->aio_preload;
+
+    return NGX_OK;
+}
+
+#endif
+{% endhighlight %}
+当前我们并不支持```NGX_HAVE_ASIO_SENDFILE```，这里不做介绍。
+
+## 5. 函数ngx_output_chain_add_copy()
+{% highlight string %}
+static ngx_int_t
+ngx_output_chain_add_copy(ngx_pool_t *pool, ngx_chain_t **chain,
+    ngx_chain_t *in)
+{
+    ngx_chain_t  *cl, **ll;
+#if (NGX_SENDFILE_LIMIT)
+    ngx_buf_t    *b, *buf;
+#endif
+
+    ll = chain;
+
+    for (cl = *chain; cl; cl = cl->next) {
+        ll = &cl->next;
+    }
+
+    while (in) {
+
+        cl = ngx_alloc_chain_link(pool);
+        if (cl == NULL) {
+            return NGX_ERROR;
+        }
+
+#if (NGX_SENDFILE_LIMIT)
+
+        buf = in->buf;
+
+        if (buf->in_file
+            && buf->file_pos < NGX_SENDFILE_LIMIT
+            && buf->file_last > NGX_SENDFILE_LIMIT)
+        {
+            /* split a file buf on two bufs by the sendfile limit */
+
+            b = ngx_calloc_buf(pool);
+            if (b == NULL) {
+                return NGX_ERROR;
+            }
+
+            ngx_memcpy(b, buf, sizeof(ngx_buf_t));
+
+            if (ngx_buf_in_memory(buf)) {
+                buf->pos += (ssize_t) (NGX_SENDFILE_LIMIT - buf->file_pos);
+                b->last = buf->pos;
+            }
+
+            buf->file_pos = NGX_SENDFILE_LIMIT;
+            b->file_last = NGX_SENDFILE_LIMIT;
+
+            cl->buf = b;
+
+        } else {
+            cl->buf = buf;
+            in = in->next;
+        }
+
+#else
+        cl->buf = in->buf;
+        in = in->next;
+
+#endif
+
+        cl->next = NULL;
+        *ll = cl;
+        ll = &cl->next;
+    }
+
+    return NGX_OK;
+}
+{% endhighlight %}
+本函数用于将```in```中的数据拷贝到```chain```中。下面我们简要分析一下本函数：
+{% highlight string %}
+static ngx_int_t
+ngx_output_chain_add_copy(ngx_pool_t *pool, ngx_chain_t **chain,
+    ngx_chain_t *in)
+{
+	ngx_chain_t  *cl, **ll;
+
+	1) 找到chain的末尾指针，保存到ll中
+
+	while(in)
+	{
+		//2) 分配一个空的ngx_chain_t结构
+		cl = ngx_alloc_chain_link(pool);
+
+		#if (NGX_SENDFILE_LIMIT)
+			//当前我们定义了NGX_SENDFILE_LIMIT宏，因此会走此分支
+
+			buf = in->buf;
+			
+			if (buf->in_file
+			  && buf->file_pos < NGX_SENDFILE_LIMIT
+			  && buf->file_last > NGX_SENDFILE_LIMIT)
+			{
+				//3） 当前的buf在文件中，并且内容横跨NGX_SENDFILE_LIMIT两侧，此时将其分割成两个buf
+                //其中： 变量b存放前半段， 变量buf存放后半段
+				//然后，将前半段b保存在上面分配的'ngx_chain_t'结构中，后半段buf留作while的下一次循环进行处理（这里我们看到in=in->next)
+			}
+			else{
+				//4) 直接拷贝buf
+				cl->buf = buf;
+				in = in->next;
+			}
+		#else
+			//直接拷贝buf
+			cl->buf = in->buf;
+			in = in->next;
+		
+		#endif
+
+		//5) 将cl追加到chain的末尾
+	}	
+}
+{% endhighlight %}
+
+## 6. 函数ngx_output_chain_align_file_buf()
+{% highlight string %}
+static ngx_int_t
+ngx_output_chain_align_file_buf(ngx_output_chain_ctx_t *ctx, off_t bsize)
+{
+    size_t      size;
+    ngx_buf_t  *in;
+
+    in = ctx->in->buf;
+
+    if (in->file == NULL || !in->file->directio) {
+        return NGX_DECLINED;
+    }
+
+    ctx->directio = 1;
+
+    size = (size_t) (in->file_pos - (in->file_pos & ~(ctx->alignment - 1)));
+
+    if (size == 0) {
+
+        if (bsize >= (off_t) ctx->bufs.size) {
+            return NGX_DECLINED;
+        }
+
+        size = (size_t) bsize;
+
+    } else {
+        size = (size_t) ctx->alignment - size;
+
+        if ((off_t) size > bsize) {
+            size = (size_t) bsize;
+        }
+    }
+
+    ctx->buf = ngx_create_temp_buf(ctx->pool, size);
+    if (ctx->buf == NULL) {
+        return NGX_ERROR;
+    }
+
+    /*
+     * we do not set ctx->buf->tag, because we do not want
+     * to reuse the buf via ctx->free list
+     */
+
+#if (NGX_HAVE_ALIGNED_DIRECTIO)
+    ctx->unaligned = 1;
+#endif
+
+    return NGX_OK;
+}
+{% endhighlight %}
+
+本函数用于对齐file buf，因为使用directio发送file buf时，会有对齐方面的要求。下面我们简单分析下本函数的实现：
+{% highlight string %}
+static ngx_int_t
+ngx_output_chain_align_file_buf(ngx_output_chain_ctx_t *ctx, off_t bsize)
+{
+	in = ctx->in->buf;
+	
+	//1） 不是file buf或者不采用directio，则直接返回，不需要对齐
+	if (in->file == NULL || !in->file->directio) {
+		return NGX_DECLINED;
+	}
+
+	//2) 将ctx->directio设置为1，表示采用directio发送
+	ctx->directio = 1;
+	
+	size = (size_t) (in->file_pos - (in->file_pos & ~(ctx->alignment - 1)));
+
+	if (size == 0)
+	{
+		//3） 当前in->file_pos已经是ctx->alignment对齐了
+
+		//若当前ctx->in->buf的实际大小大于等于ctx事先分配的一个缓存大小，则直接返回相应错误
+		if (bsize >= (off_t) ctx->bufs.size) {
+			return NGX_DECLINED;
+		}
+		
+		//此处保存后面实际要分配的空间大小
+		size = (size_t) bsize;
+	}
+	else{
+		//4) 当前没有对齐，则先求出未对齐部分的大小
+		size = (size_t) ctx->alignment - size;
+		
+		if ((off_t) size > bsize) {
+
+			//此处保存后面实际要分配的空间大小
+			size = (size_t) bsize;
+		}
+	}
+
+	//5) 分配一块指定大小的缓存
+	
+	//6） 将当前ctx->unaligned标志设置为1（当前我们定义了NGX_HAVE_ALIGNED_DIRECTIO宏)
+#if (NGX_HAVE_ALIGNED_DIRECTIO)
+    ctx->unaligned = 1;
+#endif
+}
+{% endhighlight %}
+
+## 7. 函数ngx_output_chain_get_buf()
+{% highlight string %}
+static ngx_int_t
+ngx_output_chain_get_buf(ngx_output_chain_ctx_t *ctx, off_t bsize)
+{
+    size_t       size;
+    ngx_buf_t   *b, *in;
+    ngx_uint_t   recycled;
+
+    in = ctx->in->buf;
+    size = ctx->bufs.size;
+    recycled = 1;
+
+    if (in->last_in_chain) {
+
+        if (bsize < (off_t) size) {
+
+            /*
+             * allocate a small temp buf for a small last buf
+             * or its small last part
+             */
+
+            size = (size_t) bsize;
+            recycled = 0;
+
+        } else if (!ctx->directio
+                   && ctx->bufs.num == 1
+                   && (bsize < (off_t) (size + size / 4)))
+        {
+            /*
+             * allocate a temp buf that equals to a last buf,
+             * if there is no directio, the last buf size is lesser
+             * than 1.25 of bufs.size and the temp buf is single
+             */
+
+            size = (size_t) bsize;
+            recycled = 0;
+        }
+    }
+
+    b = ngx_calloc_buf(ctx->pool);
+    if (b == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (ctx->directio) {
+
+        /*
+         * allocate block aligned to a disk sector size to enable
+         * userland buffer direct usage conjunctly with directio
+         */
+
+        b->start = ngx_pmemalign(ctx->pool, size, (size_t) ctx->alignment);
+        if (b->start == NULL) {
+            return NGX_ERROR;
+        }
+
+    } else {
+        b->start = ngx_palloc(ctx->pool, size);
+        if (b->start == NULL) {
+            return NGX_ERROR;
+        }
+    }
+
+    b->pos = b->start;
+    b->last = b->start;
+    b->end = b->last + size;
+    b->temporary = 1;
+    b->tag = ctx->tag;
+    b->recycled = recycled;
+
+    ctx->buf = b;
+    ctx->allocated++;
+
+    return NGX_OK;
+}
+{% endhighlight %}
+本函数用于分配一块指定大小的空间给ctx->buf。下面简要分析一下本函数：
+{% highlight string %}
+static ngx_int_t
+ngx_output_chain_get_buf(ngx_output_chain_ctx_t *ctx, off_t bsize)
+{
+	in = ctx->in->buf; 	
+
+	/* 可以看到这里分配的buf，每个buf的大小是配置文件中设置的size */  
+	size = ctx->bufs.size;  
+
+	/*
+	 * 这里recycled标志表示当前的buf是否需要被回收。一般情况下Nginx(比如在非last_buf)会缓存一部分buf(默认是1460字节），然后再发送，
+	 * 而设置了recycled的话，就不会让它缓存buf，也就是尽量发送出去，然后以供回收使用。因此如果是最后一个buf,则不需要设置recycled域，
+	 * 否则的话，需要设置recycled域
+	 *
+	 * 这里默认设置为不需要缓存
+	 */
+	recycled = 1;
+
+	1) 当前buf是属于最后一个chain的时候，需要特殊处理
+	if (in->last_in_chain){
+
+		if (bsize < (off_t) size){
+			//实际要分配的缓存大小小于配置文件所设置的每块缓存大小
+			size = bsize;
+			recycled = 0;
+		}else if (!ctx->directio
+				&& ctx->bufs.num == 1
+				&& (bsize < (off_t) (size + size / 4)))
+		{
+			size = bsize;
+			recycled = 0;
+		}
+	}
+
+	//2) 分配一个ngx_buf_t结构
+	b = ngx_calloc_buf(ctx->pool);
+
+	//3) 为b分配实际的内存空间
+	
+	//4)将分配的空间赋值给ctx->buf
+	ctx->buf = b;
+	ctx->allocated++;
+}
+{% endhighlight %}
+
+
+## 8. 函数ngx_output_chain_copy_buf()
+{% highlight string %}
+static ngx_int_t
+ngx_output_chain_copy_buf(ngx_output_chain_ctx_t *ctx)
+{
+    off_t        size;
+    ssize_t      n;
+    ngx_buf_t   *src, *dst;
+    ngx_uint_t   sendfile;
+
+    src = ctx->in->buf;
+    dst = ctx->buf;
+
+    size = ngx_buf_size(src);
+    size = ngx_min(size, dst->end - dst->pos);
+
+    sendfile = ctx->sendfile & !ctx->directio;
+
+#if (NGX_SENDFILE_LIMIT)
+
+    if (src->in_file && src->file_pos >= NGX_SENDFILE_LIMIT) {
+        sendfile = 0;
+    }
+
+#endif
+
+    if (ngx_buf_in_memory(src)) {
+        ngx_memcpy(dst->pos, src->pos, (size_t) size);
+        src->pos += (size_t) size;
+        dst->last += (size_t) size;
+
+        if (src->in_file) {
+
+            if (sendfile) {
+                dst->in_file = 1;
+                dst->file = src->file;
+                dst->file_pos = src->file_pos;
+                dst->file_last = src->file_pos + size;
+
+            } else {
+                dst->in_file = 0;
+            }
+
+            src->file_pos += size;
+
+        } else {
+            dst->in_file = 0;
+        }
+
+        if (src->pos == src->last) {
+            dst->flush = src->flush;
+            dst->last_buf = src->last_buf;
+            dst->last_in_chain = src->last_in_chain;
+        }
+
+    } else {
+
+#if (NGX_HAVE_ALIGNED_DIRECTIO)
+
+        if (ctx->unaligned) {
+            if (ngx_directio_off(src->file->fd) == NGX_FILE_ERROR) {
+                ngx_log_error(NGX_LOG_ALERT, ctx->pool->log, ngx_errno,
+                              ngx_directio_off_n " \"%s\" failed",
+                              src->file->name.data);
+            }
+        }
+
+#endif
+
+#if (NGX_HAVE_FILE_AIO)
+        if (ctx->aio_handler) {
+            n = ngx_file_aio_read(src->file, dst->pos, (size_t) size,
+                                  src->file_pos, ctx->pool);
+            if (n == NGX_AGAIN) {
+                ctx->aio_handler(ctx, src->file);
+                return NGX_AGAIN;
+            }
+
+        } else
+#endif
+#if (NGX_THREADS)
+        if (ctx->thread_handler) {
+            src->file->thread_task = ctx->thread_task;
+            src->file->thread_handler = ctx->thread_handler;
+            src->file->thread_ctx = ctx->filter_ctx;
+
+            n = ngx_thread_read(src->file, dst->pos, (size_t) size,
+                                src->file_pos, ctx->pool);
+            if (n == NGX_AGAIN) {
+                ctx->thread_task = src->file->thread_task;
+                return NGX_AGAIN;
+            }
+
+        } else
+#endif
+        {
+            n = ngx_read_file(src->file, dst->pos, (size_t) size,
+                              src->file_pos);
+        }
+
+#if (NGX_HAVE_ALIGNED_DIRECTIO)
+
+        if (ctx->unaligned) {
+            ngx_err_t  err;
+
+            err = ngx_errno;
+
+            if (ngx_directio_on(src->file->fd) == NGX_FILE_ERROR) {
+                ngx_log_error(NGX_LOG_ALERT, ctx->pool->log, ngx_errno,
+                              ngx_directio_on_n " \"%s\" failed",
+                              src->file->name.data);
+            }
+
+            ngx_set_errno(err);
+
+            ctx->unaligned = 0;
+        }
+
+#endif
+
+        if (n == NGX_ERROR) {
+            return (ngx_int_t) n;
+        }
+
+        if (n != size) {
+            ngx_log_error(NGX_LOG_ALERT, ctx->pool->log, 0,
+                          ngx_read_file_n " read only %z of %O from \"%s\"",
+                          n, size, src->file->name.data);
+            return NGX_ERROR;
+        }
+
+        dst->last += n;
+
+        if (sendfile) {
+            dst->in_file = 1;
+            dst->file = src->file;
+            dst->file_pos = src->file_pos;
+            dst->file_last = src->file_pos + n;
+
+        } else {
+            dst->in_file = 0;
+        }
+
+        src->file_pos += n;
+
+        if (src->file_pos == src->file_last) {
+            dst->flush = src->flush;
+            dst->last_buf = src->last_buf;
+            dst->last_in_chain = src->last_in_chain;
+        }
+    }
+
+    return NGX_OK;
+}
+{% endhighlight %}
 
 
 <br />
