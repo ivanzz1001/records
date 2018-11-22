@@ -208,7 +208,7 @@ struct ngx_output_chain_ctx_s {
 
 * unaligned: 表明当前数据有没对齐
 
-* need_in_memory: 是否需要当前的数据处于内存中
+* need_in_memory: 是否需要当前的数据处于内存中(使用sendfile的话，内存中没有文件拷贝，而我们有时需要处理文件，此时就需要设置这个标记)
 
 * need_in_temp: 表明数据是否需要在用户创建的一个临时内存中（这就使得可以对这一部分数据进行变更）
 
