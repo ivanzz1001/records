@@ -1109,7 +1109,217 @@ ngx_output_chain_copy_buf(ngx_output_chain_ctx_t *ctx)
     return NGX_OK;
 }
 {% endhighlight %}
+本函数用于将```ctx->in```中的buf拷贝到```ctx->buf```这样一个临时缓存中进行处理。下面我们简要分析：
+{% highlight string %}
+static ngx_int_t
+ngx_output_chain_copy_buf(ngx_output_chain_ctx_t *ctx)
+{
+	src = ctx->in->buf;
+    dst = ctx->buf;
 
+    size = ngx_buf_size(src);
+    size = ngx_min(size, dst->end - dst->pos);
+
+	//是否真正的sendfile()文件的标志
+    sendfile = ctx->sendfile & !ctx->directio;
+
+	if (ngx_buf_in_memory(src)){
+		//1) src属于内存buf
+
+		//1.1) 调用ngx_memcpy()进行内存文件复制
+
+		//1.2) 假如src本身是属于文件（这里不冲突，因为内存buf有可能是通过mmap等映射而来的）
+		if(src->in_file)
+		{
+			// 处理文件发送情况
+		}else{
+			dst->in_file = 0;
+		}
+
+		
+
+	}else{
+		//2) 非内存buf
+
+		#if (NGX_HAVE_ALIGNED_DIRECTIO)
+			//当前我们定义了此宏
+			if (ctx->unaligned) {
+				//这里关闭主要是为了下面的read读取
+			}
+		#endif
+
+		#if(NGX_HAVE_FILE_AIO)
+			//当前我们暂时未定义此宏
+		#endif
+
+		#if(NGX_THREADS)
+			//当前也并未定义
+		#endif
+
+		//2.1) 读取文件到dst
+		n = ngx_read_file(src->file, dst->pos, (size_t) size,src->file_pos);
+
+		#if (NGX_HAVE_ALIGNED_DIRECTIO)
+			if (ctx->unaligned) {
+				//开启directio
+			}
+		#endif
+		
+		//2.2) 设置dst变量的相应标志值
+	}
+
+	return NGX_OK;
+}
+{% endhighlight %}
+
+
+## 9. 函数ngx_chain_writer()
+{% highlight string %}
+ngx_int_t
+ngx_chain_writer(void *data, ngx_chain_t *in)
+{
+    ngx_chain_writer_ctx_t *ctx = data;
+
+    off_t              size;
+    ngx_chain_t       *cl, *ln, *chain;
+    ngx_connection_t  *c;
+
+    c = ctx->connection;
+
+    for (size = 0; in; in = in->next) {
+
+#if 1
+        if (ngx_buf_size(in->buf) == 0 && !ngx_buf_special(in->buf)) {
+
+            ngx_log_error(NGX_LOG_ALERT, ctx->pool->log, 0,
+                          "zero size buf in chain writer "
+                          "t:%d r:%d f:%d %p %p-%p %p %O-%O",
+                          in->buf->temporary,
+                          in->buf->recycled,
+                          in->buf->in_file,
+                          in->buf->start,
+                          in->buf->pos,
+                          in->buf->last,
+                          in->buf->file,
+                          in->buf->file_pos,
+                          in->buf->file_last);
+
+            ngx_debug_point();
+
+            continue;
+        }
+#endif
+
+        size += ngx_buf_size(in->buf);
+
+        ngx_log_debug2(NGX_LOG_DEBUG_CORE, c->log, 0,
+                       "chain writer buf fl:%d s:%uO",
+                       in->buf->flush, ngx_buf_size(in->buf));
+
+        cl = ngx_alloc_chain_link(ctx->pool);
+        if (cl == NULL) {
+            return NGX_ERROR;
+        }
+
+        cl->buf = in->buf;
+        cl->next = NULL;
+        *ctx->last = cl;
+        ctx->last = &cl->next;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_CORE, c->log, 0,
+                   "chain writer in: %p", ctx->out);
+
+    for (cl = ctx->out; cl; cl = cl->next) {
+
+#if 1
+        if (ngx_buf_size(cl->buf) == 0 && !ngx_buf_special(cl->buf)) {
+
+            ngx_log_error(NGX_LOG_ALERT, ctx->pool->log, 0,
+                          "zero size buf in chain writer "
+                          "t:%d r:%d f:%d %p %p-%p %p %O-%O",
+                          cl->buf->temporary,
+                          cl->buf->recycled,
+                          cl->buf->in_file,
+                          cl->buf->start,
+                          cl->buf->pos,
+                          cl->buf->last,
+                          cl->buf->file,
+                          cl->buf->file_pos,
+                          cl->buf->file_last);
+
+            ngx_debug_point();
+
+            continue;
+        }
+#endif
+
+        size += ngx_buf_size(cl->buf);
+    }
+
+    if (size == 0 && !c->buffered) {
+        return NGX_OK;
+    }
+
+    chain = c->send_chain(c, ctx->out, ctx->limit);
+
+    ngx_log_debug1(NGX_LOG_DEBUG_CORE, c->log, 0,
+                   "chain writer out: %p", chain);
+
+    if (chain == NGX_CHAIN_ERROR) {
+        return NGX_ERROR;
+    }
+
+    for (cl = ctx->out; cl && cl != chain; /* void */) {
+        ln = cl;
+        cl = cl->next;
+        ngx_free_chain(ctx->pool, ln);
+    }
+
+    ctx->out = chain;
+
+    if (ctx->out == NULL) {
+        ctx->last = &ctx->out;
+
+        if (!c->buffered) {
+            return NGX_OK;
+        }
+    }
+
+    return NGX_AGAIN;
+}
+{% endhighlight %}
+此函数是用来真正调用```connection```来将chain中的数据发送出去。下面我们简要分析一下该函数的实现：
+{% highlight string %}
+ngx_int_t
+ngx_chain_writer(void *data, ngx_chain_t *in)
+{
+	ngx_chain_writer_ctx_t *ctx = data;
+	c = ctx->connection;
+
+	//遍历in链
+	for (size = 0; in; in = in->next) {
+		if (ngx_buf_size(in->buf) == 0 && !ngx_buf_special(in->buf)) {
+			//1) 当buf大小为0时，则跳过并打印相应的调试信息
+			continue;
+		}
+
+		//2) 将in中的数据追加到ctx->out这个缓存中
+	}
+
+	//3) 计算ctx->out总的数据的大小
+
+	//4) 当前没有数据要发送，直接返回
+	if (size == 0 && !c->buffered) {
+		return NGX_OK;
+	}
+
+	//5) 发送数据,返回值chain表示当前已经发送到哪一个chain了
+	chain = c->send_chain(c, ctx->out, ctx->limit);
+
+	//6) 后续空间回收等相关操作
+}
+{% endhighlight %}
 
 <br />
 <br />
