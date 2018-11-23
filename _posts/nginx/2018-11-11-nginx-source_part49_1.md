@@ -159,6 +159,62 @@ typedef struct {
 } ngx_pool_cleanup_file_t;
 {% endhighlight %}
 
+此结构主要用于针对```Nginx静态文件缓存```(open file cache)的pool在释放时传递相应的上下文。
+
+* fd: 所打开文件的句柄
+
+* name: 文件的名称
+
+* log: 所关联的日志对象
+
+## 6. 相关函数声明
+{% highlight string %}
+
+//下面两个函数用于分配指定大小的空间，在os/unix/ngx_alloc.c中定义
+void *ngx_alloc(size_t size, ngx_log_t *log);
+void *ngx_calloc(size_t size, ngx_log_t *log);
+
+
+// 创建内存块大小为size的内存池
+ngx_pool_t *ngx_create_pool(size_t size, ngx_log_t *log);
+
+//销毁一个内存池
+void ngx_destroy_pool(ngx_pool_t *pool);
+
+//重置一个内存池
+void ngx_reset_pool(ngx_pool_t *pool);
+
+//在内存池中分配指定大小的内存块(所分配的内存会进行对齐）
+void *ngx_palloc(ngx_pool_t *pool, size_t size);
+
+//在内存池中分配指定大小的内存块（所分配的内存不会进行对齐）
+void *ngx_pnalloc(ngx_pool_t *pool, size_t size);
+
+//在内存池中分配指定大小的内存块，并初始化为0
+void *ngx_pcalloc(ngx_pool_t *pool, size_t size);
+
+//向pool中增加一个大内存块
+void *ngx_pmemalign(ngx_pool_t *pool, size_t size, size_t alignment);
+
+//释放pool中的大内存块
+ngx_int_t ngx_pfree(ngx_pool_t *pool, void *p);
+
+//向pool注册一个cleanup回调（size是回调上下文的大小）
+ngx_pool_cleanup_t *ngx_pool_cleanup_add(ngx_pool_t *p, size_t size);
+
+//执行pool中的cleanup_file回调
+void ngx_pool_run_cleanup_file(ngx_pool_t *p, ngx_fd_t fd);
+
+//cleanup file时的相关操作(一般用于nginx静态文件缓存）
+void ngx_pool_cleanup_file(void *data);
+
+//删除文件（一般用于删除那些与pool绑定的临时文件)
+void ngx_pool_delete_file(void *data);
+
+
+#endif /* _NGX_PALLOC_H_INCLUDED_ */
+{% endhighlight %}
+
 
 
 <br />
