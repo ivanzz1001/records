@@ -92,6 +92,8 @@ struct ngx_pool_large_s {
 
 ## 4. ngx_pool_t数据结构
 {% highlight string %}
+typedef struct ngx_pool_s        ngx_pool_t;
+
 typedef struct {
     u_char               *last;
     u_char               *end;
@@ -111,7 +113,51 @@ struct ngx_pool_s {
 };
 {% endhighlight %}
 
+下面我们简要介绍一下这两个数据结构：
 
+1) **ngx_pool_data_t结构体**
+
+```ngx_pool_data_t```用于表示内存池中的一个数据块，供用户分配之用。下面介绍一下各个字段的含义：
+
+* last: 当前内存分配结束位置，即下一段可分配内存的起始位置；
+
+* end: 本内存块的结束位置；
+
+* next: 内存池里面有很多块内存，这些内存块就是通过该指针连成链表的
+
+* failed: 统计该内存池不能满足分配请求的次数，即分配失败的次数；
+
+2） **ngx_pool_t结构体**
+
+```ngx_pool_t```用于维护整个内存池的头部信息。下面介绍一下各个字段的含义：
+
+* d: 内存池的数据块
+
+* max: 数据块大小，可分配小块内存的最大值
+
+* current: 当前内存池，以后的内存分配从该指针指向的内存池中分配；
+
+* chain: 指向一个ngx_chain_t结构
+
+* large: 指向大块内存分配，nginx中，大块内存分配直接采用标准系统接口malloc
+
+* cleanup: 析构函数
+
+* log: 内存分配相关的日志记录
+
+下面画出```ngx_pool_t```结构的示意图：
+
+![ngx-pool-t](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_pool_t.jpg)
+
+
+## 5. ngx_pool_cleanup_file_t结构
+{% highlight string %}
+typedef struct {
+    ngx_fd_t              fd;
+    u_char               *name;
+    ngx_log_t            *log;
+} ngx_pool_cleanup_file_t;
+{% endhighlight %}
 
 
 
@@ -124,7 +170,11 @@ struct ngx_pool_s {
 
 2. [nginx源码分析—内存池结构ngx_pool_t及内存管理](https://www.cnblogs.com/405845829qq/p/4379093.html)
 
-3. [ Nginx开发从入门到精通 Nginx开发从入门到精通](http://www.treelib.com/book-detail-id-17-aid-853.html)
+3. [Nginx开发从入门到精通 Nginx开发从入门到精通](http://www.treelib.com/book-detail-id-17-aid-853.html)
+
+4. [nginx 学习四 内存池 ngx_pool_t 和内存管理操作](https://blog.csdn.net/xiaoliangsky/article/details/39523875)
+
+5. [nginx源码解析(二)-内存池与内存管理ngx_pool_t](https://blog.csdn.net/mao19931004/article/details/54377101)
 
 <br />
 <br />
