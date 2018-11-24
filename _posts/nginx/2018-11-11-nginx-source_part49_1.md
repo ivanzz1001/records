@@ -149,6 +149,9 @@ struct ngx_pool_s {
 
 ![ngx-pool-t](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_pool_t.jpg)
 
+注： 其实上面图画的有些小问题，对于```pool->d.next```指向的```ngx_pool_t```结构,在实际使用过程中其实指向的是一个```ngx_pool_data_t```结构，即只是ngx_pool_t结构的一小部分。这样做的原因主要是为了节省空间。
+
+
 
 ## 5. ngx_pool_cleanup_file_t结构
 {% highlight string %}
