@@ -89,6 +89,15 @@ function lookup(string x)
 ![radix-tree-lookup](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_radixtree_lookup.png)
 
 
+### 3.2 插入操作
+要插入一个字符串，首先我们需要执行查找，直到查找到某个节点处停止。此时，我们或者可以直接将```input string```的剩余部分添加到一个新的```Edge```中； 或者有一个edge与我们的```input string```的剩余部分有相同的前缀，此种情况下我们需要将该```edge```分裂成两个```edge```（其中第一个edge存储common prefix）然后再进行处理。这里分裂edge确保了一个节点的孩子(children)数目不会超过总的字符串的个数。
+
+如下我们展示了插入时的多种情况（仍有部分未列出）。下图中```r```代表的是根节点（root)。这里我们假设```edge```以空字符串(empty string)作为结尾。
+
+![radix-tree-insert](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_radixtree_insert.png)
+
+
+
 
 <br />
 <br />
