@@ -117,6 +117,8 @@ Find successor: Locates the smallest string greater than a given string, by lexi
 
 
 ### 3.5 示例代码
+
+下面我们给出一个radix tree实现的示例代码：
 {% highlight string %}
 typedef struct radix_node_s radix_node_t;
 
@@ -226,7 +228,7 @@ int insert_radix_tree(radix_node_t *root, char *label)
 	
 }
 
-{% highlight %}
+{% endhighlight %}
 
 
 <br />
