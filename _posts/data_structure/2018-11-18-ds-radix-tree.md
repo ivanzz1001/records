@@ -94,9 +94,139 @@ function lookup(string x)
 
 如下我们展示了插入时的多种情况（仍有部分未列出）。下图中```r```代表的是根节点（root)。这里我们假设```edge```以空字符串(empty string)作为结尾。
 
-![radix-tree-insert](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_radixtree_insert.png)
+![radix-tree-insert](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_radixtree_insert.jpg)
+
+### 3.3 删除节点
+
+要从radix tree中删除一个字符串```x```，我们必须首先定位到代表```x```的叶子节点。假设该叶子节点存在，我们就移除该叶子节点。此时，我们需要检查该被删节点的父节点，假如父节点只剩下一个孩子节点的话，则将该孩子节点的```incomming label```追加到父节点的```incomming label```上并将该孩子节点移除。
+
+### 3.4 与其他数据结构的比较
+(说明： 如下的比较，我们假设key的长度为```k```，数据结构中元素的数目为```n```)
+
+radix tree允许在O(k)的时间复杂度内进行查找、插入、删除等操作，而```balanced trees```在进行这些操作时时间复杂度一般为```O(logn)```。这看起来并不像是一个优势，因为通常情况下```k>=log(n)```，但是在平衡树中key的比较通常是字符串的完整比较，时间复杂度是```O(k)```，并且在实际使用过程中很多key可能还拥有相同的前缀。假如使用```trie```数据结构来进行存储，所有key的比较都是```constant time```，但是如果我们查询的字符串长度为```m```，那么也必须执行```m```次的比较。使用```radix tree```数据结构时，则需要更少的比较操作，并且使用的节点个数也更少。
+
+当然，radix tree也与```trie```树一样有相同的劣势，然而：因为它们只能被应用于字符串元素或者能够高效映射为字符串的元素，它们缺少了平衡查找树那样的通用性，平衡查找树可以应用于任何类型以及任何比较顺序。
+
+而```Hashtables```通常被认为具有```O(1)```时间复杂度的插入与删除操作，但先决条件是我们认为计算```hash key```的操作可以在```constant-time```内完成。当我们把计算```hash key```的时间也考虑在内的话，```hashtables```的插入和删除时间复杂度就变为O(k)，并且在key碰撞的情况下，可能会有更差的时间复杂度。radix tree的插入和删除的时间复杂度为```O(k)```。此外，hashtables也不支持```Find predecessor```与```Find successor```操作。
+<pre>
+Find predecessor: Locates the largest string less than a given string, by lexicographic order.
+
+Find successor: Locates the smallest string greater than a given string, by lexicographic order.
+</pre>
 
 
+
+### 3.5 示例代码
+{% highlight string %}
+typedef struct radix_node_s radix_node_t;
+
+
+struct radix_edge_t{
+	radix_node_t *incommingNode;
+	char *label;
+
+	struct radix_edge_t *next;		
+};
+
+struct radix_node_s{
+	struct radix_edge_t *head;
+};
+
+
+char *global_empty_str = ""
+
+int init_radix_tree(radix_node_t *root)
+{
+	root->head = NULL;
+}
+
+
+int is_leaf(radix_node_t *node)
+{
+	if(node->head == NULL)
+		return 1;
+
+	return 0;
+}
+
+
+/*
+ *  description: check wether 'pre' is prefix of label
+ * 
+ *  return: 0---not prefix    1---is prefix and but not equal    2 --- equal
+ */
+int is_prefix(char *pre, char *label, char **out)
+{
+	*out = label;
+	
+	while(*pre && *pre++ == *label++);
+
+	if(*pre)
+		return 0;
+	else{
+		*out = label;
+		if (*label)
+			return 1;
+		else
+			return 2;
+	}
+	
+}
+
+int insert_radix_tree(radix_node_t *root, char *label)
+{
+	radix_node_t *p = root;
+	radix_node_t *prev = root;
+	struct radix_edge_t *edge;
+	
+	char *s = label;
+	int a;
+
+	while(p && !is_leaf(p) && *s){
+	
+		edge = p->head;
+		while(edge){
+			a = is_prefix(edge->label,s, &s);
+			if(a = 1){
+				prev = p;
+				p = edge->incommingNode;
+				break;
+			}else if(a == 2){
+				return 0;
+			}
+			edge = edge->next;
+		}
+		if (!edge)
+			break;
+	}
+
+	if (prev->head)
+	{
+		struct radix_edge_t *new_edge = (struct radix_edge_t *)malloc(sizeof(struct radix_edge_t));
+		new_edge.incommingNode = NULL;
+		new_edge.label = strdup(s);
+		new_edge.next = prev->head;
+		prev->head = new_edge;
+	}else{
+		struct radix_edge_t *empty_edge = (struct radix_edge_t *)malloc(sizeof(struct radix_edge_t));
+		struct radix_edge_t *new_edge = (struct radix_edge_t *)malloc(sizeof(struct radix_edge_t));
+
+		empty_edge.label = global_empty_str
+		empty_edge.incommingNode = NULL;
+		empty_edge.next = new_edge;
+
+		new_edge.label = strdup(s);
+		new_edge.incommingNode = NULL;
+		new_edge.next = NULL;
+
+		prev->head = empty_edge;
+	}
+
+	return 0x0;
+	
+}
+
+{% highlight %}
 
 
 <br />
