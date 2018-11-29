@@ -162,7 +162,268 @@ Test 26: Specials for the 32-bit library with UTF-32 support
 {% endhighlight %}
 
 
-## 3. 
+## 3. PCRE正则表达式的定义
+用于描述字符排列和匹配模式的一种语法规则。它主要用于字符串的模式分割、匹配、查找及替换操作。正则表达式中重要的几个概念有： 元字符、转义、模式单元（重复）、反义、引用和断言。
+
+1) **常用的元字符(Meta-character)**
+
+* ```\A```: 匹配字符串串首的原子；
+
+* ```\Z```: 匹配字符串串尾的原子； 例如pattern=```job\\Z```，输入input="hello,world, I am looking a job"
+
+* ```\b```: 匹配单词的边界。例如， ```\bis```用于匹配头为is的字符串， ```is\b```用于匹配尾是is的字符串, ```\bis\b```用于定界.
+
+
+
+
+
+## 4. PCRE使用示例
+如下我们通过几个pcre的基本使用示例来简单介绍一些pcre库的使用。
+
+### 4.1 匹配手机号码
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <assert.h>
+#include <pcre.h>
+#include <string.h>
+
+
+
+#define OVECCOUNT 30 /* should be a multiple of 3 */
+#define EBUFLEN 128
+#define BUFLEN 1024
+
+
+
+int main(int argc, char *argv[])
+{
+	/*
+	 * China mobile(中国移动) 
+	 * China unicom(中国联通)
+	 * China Telecom(中国电信)
+	 * CDMA
+	 */
+	pcre *reCM, *reUN, *reTC, *reCDMA;
+	
+	const char *error_cm, *error_un, *error_tc, *error_cdma;
+	int erroffset_cm, erroffset_un, erroffset_tc, erroffset_cdma;
+	int ovecter[OVECCOUNT];
+
+	int rcCM, rcUN, rcTC, rcCDMA, i;
+	
+
+	/*
+	 * telephones
+	 *
+	 * CM: 134, 135, 136, 137, 138, 139, 150, 151, 152, 157, 158, 159, 187, 188, 147
+	 * UN: 130, 131, 132, 155, 156, 185, 186
+	 * TC: 180, 189
+	 * CDMA: 133, 153
+	 */
+	char src[22]; 
+	char pattern_CM[] = "^1(3[4-9]|5[012789]|8[78])\\d{8}$";  
+	char pattern_UN[] = "^1(3[0-2]|5[56]|8[56])\\d{8}$";  
+	char pattern_TC[] = "^18[09]\\d{8}$";  
+	char pattern_CDMA[] = "^1[35]3\\d{8}$";
+
+	printf("please input your telephone number: "); 
+	scanf("%s", src);    
+	printf("String : %s\n", src);   
+	printf("Pattern_CM: \"%s\"\n", pattern_CM);  
+	printf("Pattern_UN: \"%s\"\n", pattern_UN);
+	printf("Pattern_TC: \"%s\"\n", pattern_TC);  
+	printf("Pattern_CDMA: \"%s\"\n", pattern_CDMA);
+	printf("\n");
+
+	reCM = pcre_compile(pattern_CM, 0, &error_cm, &erroffset_cm, NULL);
+	reUN = pcre_compile(pattern_UN, 0, &error_un, &erroffset_un, NULL); 
+	reTC = pcre_compile(pattern_TC, 0, &error_tc, &erroffset_tc, NULL);  
+	reCDMA = pcre_compile(pattern_CDMA, 0, &error_cdma, &erroffset_cdma, NULL);
+
+	if(!reCM)
+	{
+		printf("PCRE compilation (China mobile) telephone pattern failed at offset %d: %s\n", erroffset_cm, error_cm);
+	}else{
+		rcCM = pcre_exec(reCM, NULL, src, strlen(src), 0, 0, ovecter, OVECCOUNT);
+		if (rcCM < 0)
+		{
+			if(rcCM == PCRE_ERROR_NOMATCH){
+				printf("sorry, China mobile telephone no match...\n");
+			}else{
+				printf("China mobile telephone match error: %d\n", rcCM);
+			}
+		}else{
+			printf("OK, has matched China mobile telephone\n");
+		}
+		free(reCM);
+	}
+
+	if(!reUN)
+	{
+		printf("PCRE compilation (China unicom) telephone pattern failed at offset %d: %s\n", erroffset_un, error_un);
+	}else{
+		rcUN = pcre_exec(reUN, NULL, src, strlen(src), 0, 0, ovecter, OVECCOUNT);
+		if (rcUN < 0)
+		{
+			if(rcUN == PCRE_ERROR_NOMATCH){
+				printf("sorry, China unicom telephone no match...\n");
+			}else{
+				printf("China unicom telephone match error: %d\n", rcUN);
+			}
+		}else{
+			printf("OK, has matched China unicom telephone\n");
+		}
+		free(reUN);
+	}
+
+	if(!reTC)
+	{
+		printf("PCRE compilation (China Telecom) telephone pattern failed at offset %d: %s\n", erroffset_tc, error_tc);
+	}else{
+		rcTC = pcre_exec(reTC, NULL, src, strlen(src), 0, 0, ovecter, OVECCOUNT);
+		if (rcTC < 0)
+		{
+			if(rcTC == PCRE_ERROR_NOMATCH){
+				printf("sorry, China Telecom telephone no match...\n");
+			}else{
+				printf("China Telecom telephone match error: %d\n", rcTC);
+			}
+		}else{
+			printf("OK, has matched China Telecom telephone\n");
+		}
+		free(reTC);
+	}
+
+	if(!reCDMA)
+	{
+		printf("PCRE compilation (CDMA) telephone pattern failed at offset %d: %s\n", erroffset_cdma, error_cdma);
+	}else{
+		rcCDMA = pcre_exec(reCDMA, NULL, src, strlen(src), 0, 0, ovecter, OVECCOUNT);
+		if (rcCDMA < 0)
+		{
+			if(rcCDMA == PCRE_ERROR_NOMATCH){
+				printf("sorry, CDMA telephone no match...\n");
+			}else{
+				printf("CDMA telephone match error: %d\n", rcCDMA);
+			}
+		}else{
+			printf("OK, has matched CDMA telephone\n");
+		}
+		free(reCDMA);
+	}
+
+	return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -c -o test.o test.c
+# gcc -o test test.o -lpcre
+# ./test
+please input your telephone number: 13838382438
+String : 13838382438
+Pattern_CM: "^1(3[4-9]|5[012789]|8[78])\d{8}$"
+Pattern_UN: "^1(3[0-2]|5[56]|8[56])\d{8}$"
+Pattern_TC: "^18[09]\d{8}$"
+Pattern_CDMA: "^1[35]3\d{8}$"
+
+OK, has matched China mobile telephone
+sorry, China unicom telephone no match...
+sorry, China Telecom telephone no match...
+sorry, CDMA telephone no match...
+</pre>
+
+从上面我们可以看到PCRE库的使用相对简单，首先执行```pcre_compile()```函数将模式编译为```pcre```数据结构，然后再采用该数据结构来完成后续的匹配。
+
+### 4.2 pcre_exec()函数用法
+{% highlight string %}
+#include <stdio.h>
+#include <string.h>
+#include <pcre.h>
+
+
+#define OVECCOUNT 30 /* should be a multiple of 3 */
+#define EBUFLEN 128
+#define BUFLEN 1024
+ 
+int main(int argc, char **argv)
+{
+    pcre *re;
+    const char *error;
+    int  erroffset;
+    int  ovector[OVECCOUNT];
+    int  rc, i;
+ 
+    char src[] = "123.123.123.123:80|1.1.1.1:88";
+    char pattern[] = "(\\d*.\\d*.\\d*.\\d*):(\\d*)";
+ 
+    printf("String : %s\n", src);
+    printf("Pattern: \"%s\"\n", pattern);
+ 
+ 
+    re = pcre_compile(pattern, 0, &error, &erroffset, NULL);
+    if (re == NULL) {
+        printf("PCRE compilation failed at offset %d: %s\n", erroffset, error);
+        return 1;
+    }
+ 
+    char *p = src;
+    while ( ( rc = pcre_exec(re, NULL, p, strlen(p), 0, 0, ovector, OVECCOUNT)) != PCRE_ERROR_NOMATCH )
+    {
+        printf("\nOK, has matched ...\n\n");
+ 
+        for (i = 0; i < rc; i++)
+        {
+            char *substring_start = p + ovector[2*i];
+            int substring_length = ovector[2*i+1] - ovector[2*i];
+            char matched[1024];
+            memset( matched, 0, 1024 );
+            strncpy( matched, substring_start, substring_length );
+ 
+            printf( "match:%s\n", matched );
+        }
+ 
+        p += ovector[1];
+        if ( !p )
+        {
+            break;
+        }
+    }
+    pcre_free(re);
+ 
+    return 0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -c -o test.o test.c
+# gcc -o test test.o -lpcre
+# ./test
+String : 123.123.123.123:80|1.1.1.1:88
+Pattern: "(\d*.\d*.\d*.\d*):(\d*)"
+
+OK, has matched ...
+
+match:123.123.123.123:80
+match:123.123.123.123
+match:80
+
+OK, has matched ...
+
+match:1.1.1.1:88
+match:1.1.1.1
+match:88
+</pre>
+从这里我们可以看出，```pcre_exec()```函数返回的是总匹配的条目数（请参看匹配模式中```(```的用法）。
+
+
+
+
+
 
 
 <br />
@@ -189,6 +450,10 @@ Test 26: Specials for the 32-bit library with UTF-32 support
 9. [c语言正则表达式库pcre使用例子](https://blog.csdn.net/earbao/article/details/52152625)
 
 10. [PCRE-正则库及用法](https://www.cnblogs.com/LiuYanYGZ/p/5903946.html)
+
+11. [正则表达式边界符](https://blog.csdn.net/justheretobe/article/details/53152267)
+
+12. [正则表达式 - 语法](http://www.runoob.com/regexp/regexp-syntax.html)
 
 <br />
 <br />
