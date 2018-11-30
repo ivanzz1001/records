@@ -169,9 +169,40 @@ Test 26: Specials for the 32-bit library with UTF-32 support
 
 * ```\A```: 匹配字符串串首的原子；
 
-* ```\Z```: 匹配字符串串尾的原子； 例如pattern=```job\\Z```，输入input="hello,world, I am looking a job"
+* ```\Z```: 匹配字符串串尾的原子； 例如```pattern=job\\Z```，输入input="hello,world, I am looking a job"
 
 * ```\b```: 匹配单词的边界。例如， ```\bis```用于匹配头为is的字符串， ```is\b```用于匹配尾是is的字符串, ```\bis\b```用于定界.
+
+* ```\B```: 匹配除单词边界之外的任意字符。例如```\\Bis```匹配单词```This```中的```is```
+
+* ```\d```: 匹配一个数字，等价于[0-9];
+
+* ```\D```: 匹配除数字以外的任何一个字符，等价于 [^0-9]
+
+* ```\w```: 匹配一个英文字母、数字或下划线，等价于 [0-9a-zA-Z_]
+
+* ```\W```: 匹配除英文字母、数字和下划线以外任何一个字符，等价于 [^0-9a-zA-Z_]
+
+* ```\s```: 匹配一个空白字符， 等价于[\f\t\v]
+
+* ```\S```: 匹配除空白字符以外任何一个字符，等价于[^\f\t\v]
+
+* ```\f```: 匹配一个换页符，等价于```\x0c```或者```\cL```
+
+* ```\n```: 匹配一个换行符，等价于```\x0a```或者```\cJ```
+
+* ```\r```: 匹配一个回车符，等价于```\x0d```或者```\cM```
+
+* ```\t```: 匹配一个制表符，等价于```\x09```或者```\cl```
+
+* ```\v```: 匹配一个垂直制表符，等价于```\x0b```或者```\ck```
+
+* ```\oNN```: 匹配一个八进制数字
+
+* ```\xNN```: 匹配一个十六进制数字
+
+* ```\cx```: 匹配由```x```指明的控制字符。例如```\cM``` 匹配一个 Control-M 或回车符。x 的值必须为 A-Z 或 a-z 之一。否则，将 c 视为一个原义的 'c' 字符。
+
 
 
 
@@ -455,6 +486,9 @@ match:88
 
 12. [正则表达式 - 语法](http://www.runoob.com/regexp/regexp-syntax.html)
 
+13. [正则表达式30分钟入门教程](https://blog.csdn.net/wushuai1346/article/details/7180920)
+
+14. [Specifying Modes Inside The Regular Expression](https://www.regular-expressions.info/modifiers.html)
 <br />
 <br />
 <br />
