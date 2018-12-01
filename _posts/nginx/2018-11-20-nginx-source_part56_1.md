@@ -1,12 +1,13 @@
 ---
 layout: post
-title: core/ngx_regex.h头文件分析
+title: pcre库的使用
 tags:
 - nginx
 categories: nginx
 description: nginx源代码分析
 ---
 
+在分析nginx中```ngx_regex_module```之前，我们先讲述一下pcre库的使用。
 
 本章我们主要讲述一下nginx中表达式匹配(ngx_regex)的实现。我们先讲解pcre库的基本使用，接着在讲解nginx中对pcre的封装。
 
@@ -203,15 +204,189 @@ Test 26: Specials for the 32-bit library with UTF-32 support
 
 * ```\cx```: 匹配由```x```指明的控制字符。例如```\cM``` 匹配一个 Control-M 或回车符。x 的值必须为 A-Z 或 a-z 之一。否则，将 c 视为一个原义的 'c' 字符。
 
+2) **模式修正符(Pattern Modifiers)**
+
+模式修正符在忽略大小写、匹配多行中使用特别多，掌握了这一个修正符，往往能解决我们遇到的很多问题。
+
+* ```(?i)```: 可同时匹配大小写字母
+
+* ```(?m)```: 将字符串视为多行
+
+* ```(?s)```: 将字符串视为单行，换行符做普通字符看待，使````.```匹配任何字符
+
+* ```(?X)```: 忽略无效的转义
+
+* ```(?U)```: 匹配到最近的字符串
+
+* ```(?e)```: 将替换的字符串作为表达式使用
 
 
+例如下面可以匹配以```Hel```开头的单词（忽略大小写):
+{% highlight string %}
+char src[] = "hello,world, I am looking a job";
+char pattern[] = "(?i)\\AHel";
+{% endhighlight %}
+
+## 4. PCRE的函数简介
+
+### 4.1 PCRE函数的基本介绍
+
+PCRE是一个```NFA```正则引擎，不然不能提供完全与Perl一致的正则语法功能。但PCRE同时也实现了```DFA```， 只是满足数学意义上的正则。PCRE提供了19个接口函数，这里只介绍几个主要和常用的接口函数，另外的可以通过PCRE源码文档进行了解。注意，使用PCRE主要是使用下面介绍的前4个函数，对这4个函数有了了解，使用PCRE库的时候就会简单很多。
+
+下面所介绍的函数，均在PCRE头文件中进行了声明。
+
+1) **函数pcre_compile()**
+
+函数原型为：
+<pre>
+pcre *pcre_compile(const char *pattern, int options, const char **errptr, int *erroffset, const unsigned char *tableptr)
+</pre>
+
+功能： 将一个正则表达式编译成一个内部的```pcre```结构，在匹配多个字符串时，可以加速匹配。其中```pcre_compile2()```功能一样，只是缺少一个参数```errorcodeptr```。
+
+参数说明：
+
+* pattern: 正则表达式
+
+* options: 为0， 或者其他参数选项
+
+* errptr: 返回出错信息
+
+* erroffset: 返回出错位置
+
+* tableptr: 指向一个字符数组的指针，可以设置为NULL
 
 
+2) **函数pcre_compile2()**
 
-## 4. PCRE使用示例
+函数原型：
+<pre>
+pcre *pcre_compile2(const char *pattern, int options, int *errorcodeptr, const char **errptr, int *erroffset, const unsigned char *tableptr)
+</pre>
+
+功能： 将一个正则表达式编译成一个内部的```pcre```结构，在匹配多个字符串时，可以加速匹配。其同```pcre_compile()```功能一样，只是多一个参数```errorcodeptr```。
+
+参数说明：
+
+* pattern: 正则表达式
+
+* options: 为0， 或者其他参数选项
+
+* errorcodeptr: 存放出错码
+
+* errptr: 出错消息
+
+* erroffset: 出错位置
+
+* tableptr: 指向一个字符数组的指针，可以设置为NULL
+
+
+**3) 函数pcre_exec()**
+
+函数原型：
+<pre>
+int pcre_exec(const pcre *code, const pcre_extra *extra, const char *subject, int length, int startoffset, int options, int *ovector, int ovecsize)
+</pre>
+功能： 使用编译好的模式进行匹配，采用与```Perl```相似的算法。返回值大于0，表示匹配到的个数； 否则表示出错信息
+
+参数说明：
+
+* code: 编译好的模式
+
+* extra: 指向一个pcre_extra结构体，可以为NULL
+
+* subject: 需要匹配的字符串
+
+* length: 匹配的字符串长度(Byte)
+
+* startoffset: 匹配的开始位置
+
+* options: 选项位
+
+* ovector: 指向一个结果的整形数组
+
+* ovecsize: 数组大小(数组大小一般应为3的整数倍)
+
+**4) 函数pcre_study()**
+
+函数原型：
+<pre>
+pcre_extra *pcre_study(const pcre *code, int options, const char **errptr)
+</pre>
+功能： 对编译的模式进行学习，提取可以加速匹配过程的信息
+
+参数说明：
+
+* code: 已编译的模式
+
+* options: 选项
+
+* errptr: 出错消息
+
+
+**5) 函数pcre_version()**
+
+函数原型：
+<pre>
+char *pcre_version(void)
+</pre>
+
+功能： 返回PCRE的版本信息
+
+参数说明： 无
+
+
+**6) 函数pcre_config()**
+
+函数原型：
+<pre>
+int pcre_config(int what, void *where)
+</pre>
+
+功能： 查询当前PCRE版本中使用的选项信息
+
+参数说明： 
+
+* what: 选项名
+
+* where: 存储结果的位置
+
+
+**7) 函数pcre_maketables()**
+
+函数原型：
+<pre>
+const unsigned char *pcre_maketables(void)
+</pre>
+功能： 生成一个字符表，表中每一个元素的值不大于256，可以用它传给pcre_compile()替换掉内建的字符表
+
+参数： 无
+
+
+### 4.2 使用PCRE在C语言中实现正则表达式的解析
+上面讲述了这么多```PCRE```相关函数的介绍，目的还是为了能够运用上，所以这里就先讲解下使用PCRE的过程。主要过程分三步： 首先编译正则表达式； 接着匹配正则表达式； 最后释放正则表达式。
+
+**1) 编译正则表达式**
+
+为了提高效率，在将一个字符串与正则表达式进行比较之前，首先要用pcre_compile()/pcre_compile2()函数对它进行编译，转化成```PCRE```引擎能够识别的结构(struct real_pcre)。
+
+这里还可以调用pcre_study()函数，对编译后的正则表达式结构(struct real_pcre)进行分析和学习，学习的结果是一个数据结构(struct pcre_extra)，这个数据结构连同编译后的规则(struct real_pcre)可以一起送给pcre_exec()单元进行匹配。
+
+
+**2) 匹配正则表达式**
+
+一旦用函数pcre_compile()/pcre_compile2()成功地编译了正则表达式，接下来就可以调用pcre_exec()函数完成模式匹配，根据正则表达式到指定的字符串中进行查找和匹配，并输出匹配结果。
+
+
+**3） 释放正则表达式**
+
+无论什么时候，当不再需要已编译过的正则表达式时，都应该调用函数free()将其释放，以免产生内存泄露。
+
+
+## 5. PCRE使用示例
 如下我们通过几个pcre的基本使用示例来简单介绍一些pcre库的使用。
 
-### 4.1 匹配手机号码
+### 5.1 匹配手机号码
 {% highlight string %}
 #include <stdio.h>
 #include <stdlib.h>
@@ -370,7 +545,7 @@ sorry, CDMA telephone no match...
 
 从上面我们可以看到PCRE库的使用相对简单，首先执行```pcre_compile()```函数将模式编译为```pcre```数据结构，然后再采用该数据结构来完成后续的匹配。
 
-### 4.2 pcre_exec()函数用法
+### 5.2 pcre_exec()函数用法
 {% highlight string %}
 #include <stdio.h>
 #include <string.h>
@@ -462,33 +637,25 @@ match:88
 
 **[参看]**
 
-1. [Nginx模块开发中使用PCRE正则表达式匹配](https://blog.x-speed.cc/archives/38.html)
+1. [pcre官网](http://www.pcre.org/)
 
-2. [nx单独使用pcre的一个小坑](http://dinic.iteye.com/blog/2057150)
+2. [pcre使用例子](http://blog.chinaunix.net/uid-26575352-id-3517146.html)
 
-3. [深入解析Nginx的pcre库及相关注意事项](https://blog.csdn.net/deltatang/article/details/8754002)
+3. [PCRE的安装及使用](https://www.cnblogs.com/LiuYanYGZ/p/5903954.html)
 
-4. [Nginx模块开发中使用PCRE正则表达式匹配](https://blog.x-speed.cc/archives/38.html)
+4. [正则表达式引擎pcre使用JIT...](https://segmentfault.com/q/1010000000366720)
 
-5. [pcre官网](http://www.pcre.org/)
+5. [c语言正则表达式库pcre使用例子](https://blog.csdn.net/earbao/article/details/52152625)
 
-6. [pcre使用例子](http://blog.chinaunix.net/uid-26575352-id-3517146.html)
+6. [PCRE-正则库及用法](https://www.cnblogs.com/LiuYanYGZ/p/5903946.html)
 
-7. [PCRE的安装及使用](https://www.cnblogs.com/LiuYanYGZ/p/5903954.html)
+7. [正则表达式边界符](https://blog.csdn.net/justheretobe/article/details/53152267)
 
-8. [正则表达式引擎pcre使用JIT...](https://segmentfault.com/q/1010000000366720)
+8. [正则表达式 - 语法](http://www.runoob.com/regexp/regexp-syntax.html)
 
-9. [c语言正则表达式库pcre使用例子](https://blog.csdn.net/earbao/article/details/52152625)
+9. [正则表达式30分钟入门教程](https://blog.csdn.net/wushuai1346/article/details/7180920)
 
-10. [PCRE-正则库及用法](https://www.cnblogs.com/LiuYanYGZ/p/5903946.html)
-
-11. [正则表达式边界符](https://blog.csdn.net/justheretobe/article/details/53152267)
-
-12. [正则表达式 - 语法](http://www.runoob.com/regexp/regexp-syntax.html)
-
-13. [正则表达式30分钟入门教程](https://blog.csdn.net/wushuai1346/article/details/7180920)
-
-14. [Specifying Modes Inside The Regular Expression](https://www.regular-expressions.info/modifiers.html)
+10. [Specifying Modes Inside The Regular Expression](https://www.regular-expressions.info/modifiers.html)
 <br />
 <br />
 <br />
