@@ -16,7 +16,54 @@ description: nginx源代码分析
 
 
 
-## 1. 
+## 1. ngx_resolver_t数据结构
+{% highlight string %}
+struct ngx_resolver_s {
+    /* has to be pointer because of "incomplete type" */
+    ngx_event_t              *event;
+    void                     *dummy;
+    ngx_log_t                *log;
+
+    /* event ident must be after 3 pointers as in ngx_connection_t */
+    ngx_int_t                 ident;
+
+    /* simple round robin DNS peers balancer */
+    ngx_array_t               connections;
+    ngx_uint_t                last_connection;
+
+    ngx_rbtree_t              name_rbtree;
+    ngx_rbtree_node_t         name_sentinel;
+
+    ngx_rbtree_t              srv_rbtree;
+    ngx_rbtree_node_t         srv_sentinel;
+
+    ngx_rbtree_t              addr_rbtree;
+    ngx_rbtree_node_t         addr_sentinel;
+
+    ngx_queue_t               name_resend_queue;
+    ngx_queue_t               srv_resend_queue;
+    ngx_queue_t               addr_resend_queue;
+
+    ngx_queue_t               name_expire_queue;
+    ngx_queue_t               srv_expire_queue;
+    ngx_queue_t               addr_expire_queue;
+
+#if (NGX_HAVE_INET6)
+    ngx_uint_t                ipv6;                 /* unsigned  ipv6:1; */
+    ngx_rbtree_t              addr6_rbtree;
+    ngx_rbtree_node_t         addr6_sentinel;
+    ngx_queue_t               addr6_resend_queue;
+    ngx_queue_t               addr6_expire_queue;
+#endif
+
+    time_t                    resend_timeout;
+    time_t                    tcp_timeout;
+    time_t                    expire;
+    time_t                    valid;
+
+    ngx_uint_t                log_level;
+};
+{% endhighlight %}
 
 
 
