@@ -62,7 +62,104 @@ typedef struct {
 {% endhighlight %}
 此结构定义了DNS查询报文中的```Queries区域```。其中```type```用于指明查询类型； ```class```用于指明查询类。
 
-## 1. 函数ngx_resolver_create()
+## 3. ngx_resolver_an_t数据结构
+{% highlight string %}
+typedef struct {
+    u_char  type_hi;
+    u_char  type_lo;
+    u_char  class_hi;
+    u_char  class_lo;
+    u_char  ttl[4];
+    u_char  len_hi;
+    u_char  len_lo;
+} ngx_resolver_an_t;
+{% endhighlight %}
+此结构定义了DNS应答报文中相应数据格式。
+
+
+## 4. 相关静态函数声明
+{% highlight string %}
+#define ngx_resolver_node(n)                                                 \
+    (ngx_resolver_node_t *)                                                  \
+        ((u_char *) (n) - offsetof(ngx_resolver_node_t, node))
+
+
+ngx_int_t ngx_udp_connect(ngx_resolver_connection_t *rec);
+ngx_int_t ngx_tcp_connect(ngx_resolver_connection_t *rec);
+
+
+static void ngx_resolver_cleanup(void *data);
+static void ngx_resolver_cleanup_tree(ngx_resolver_t *r, ngx_rbtree_t *tree);
+static ngx_int_t ngx_resolve_name_locked(ngx_resolver_t *r,
+    ngx_resolver_ctx_t *ctx, ngx_str_t *name);
+static void ngx_resolver_expire(ngx_resolver_t *r, ngx_rbtree_t *tree,
+    ngx_queue_t *queue);
+static ngx_int_t ngx_resolver_send_query(ngx_resolver_t *r,
+    ngx_resolver_node_t *rn);
+static ngx_int_t ngx_resolver_send_udp_query(ngx_resolver_t *r,
+    ngx_resolver_connection_t *rec, u_char *query, u_short qlen);
+static ngx_int_t ngx_resolver_send_tcp_query(ngx_resolver_t *r,
+    ngx_resolver_connection_t *rec, u_char *query, u_short qlen);
+static ngx_int_t ngx_resolver_create_name_query(ngx_resolver_t *r,
+    ngx_resolver_node_t *rn, ngx_str_t *name);
+
+//创建DNS服务查询报文
+static ngx_int_t ngx_resolver_create_srv_query(ngx_resolver_t *r,
+    ngx_resolver_node_t *rn, ngx_str_t *name);
+static ngx_int_t ngx_resolver_create_addr_query(ngx_resolver_t *r,
+    ngx_resolver_node_t *rn, ngx_resolver_addr_t *addr);
+static void ngx_resolver_resend_handler(ngx_event_t *ev);
+static time_t ngx_resolver_resend(ngx_resolver_t *r, ngx_rbtree_t *tree,
+    ngx_queue_t *queue);
+static ngx_uint_t ngx_resolver_resend_empty(ngx_resolver_t *r);
+static void ngx_resolver_udp_read(ngx_event_t *rev);
+static void ngx_resolver_tcp_write(ngx_event_t *wev);
+static void ngx_resolver_tcp_read(ngx_event_t *rev);
+static void ngx_resolver_process_response(ngx_resolver_t *r, u_char *buf,
+    size_t n, ngx_uint_t tcp);
+static void ngx_resolver_process_a(ngx_resolver_t *r, u_char *buf, size_t n,
+    ngx_uint_t ident, ngx_uint_t code, ngx_uint_t qtype,
+    ngx_uint_t nan, ngx_uint_t trunc, ngx_uint_t ans);
+static void ngx_resolver_process_srv(ngx_resolver_t *r, u_char *buf, size_t n,
+    ngx_uint_t ident, ngx_uint_t code, ngx_uint_t nan,
+    ngx_uint_t trunc, ngx_uint_t ans);
+static void ngx_resolver_process_ptr(ngx_resolver_t *r, u_char *buf, size_t n,
+    ngx_uint_t ident, ngx_uint_t code, ngx_uint_t nan);
+static ngx_resolver_node_t *ngx_resolver_lookup_name(ngx_resolver_t *r,
+    ngx_str_t *name, uint32_t hash);
+static ngx_resolver_node_t *ngx_resolver_lookup_srv(ngx_resolver_t *r,
+    ngx_str_t *name, uint32_t hash);
+static ngx_resolver_node_t *ngx_resolver_lookup_addr(ngx_resolver_t *r,
+    in_addr_t addr);
+static void ngx_resolver_rbtree_insert_value(ngx_rbtree_node_t *temp,
+    ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
+static ngx_int_t ngx_resolver_copy(ngx_resolver_t *r, ngx_str_t *name,
+    u_char *buf, u_char *src, u_char *last);
+static void ngx_resolver_timeout_handler(ngx_event_t *ev);
+static void ngx_resolver_free_node(ngx_resolver_t *r, ngx_resolver_node_t *rn);
+static void *ngx_resolver_alloc(ngx_resolver_t *r, size_t size);
+static void *ngx_resolver_calloc(ngx_resolver_t *r, size_t size);
+static void ngx_resolver_free(ngx_resolver_t *r, void *p);
+static void ngx_resolver_free_locked(ngx_resolver_t *r, void *p);
+static void *ngx_resolver_dup(ngx_resolver_t *r, void *src, size_t size);
+static ngx_resolver_addr_t *ngx_resolver_export(ngx_resolver_t *r,
+    ngx_resolver_node_t *rn, ngx_uint_t rotate);
+static void ngx_resolver_report_srv(ngx_resolver_t *r, ngx_resolver_ctx_t *ctx);
+static u_char *ngx_resolver_log_error(ngx_log_t *log, u_char *buf, size_t len);
+static void ngx_resolver_resolve_srv_names(ngx_resolver_ctx_t *ctx,
+    ngx_resolver_node_t *rn);
+static void ngx_resolver_srv_names_handler(ngx_resolver_ctx_t *ctx);
+static ngx_int_t ngx_resolver_cmp_srvs(const void *one, const void *two);
+
+#if (NGX_HAVE_INET6)
+static void ngx_resolver_rbtree_insert_addr6_value(ngx_rbtree_node_t *temp,
+    ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel);
+static ngx_resolver_node_t *ngx_resolver_lookup_addr6(ngx_resolver_t *r,
+    struct in6_addr *addr, uint32_t hash);
+#endif
+{% endhighlight %}
+
+## 5. 函数ngx_resolver_create()
 {% highlight string %}
 ngx_resolver_t *
 ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
@@ -232,6 +329,67 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
 	//4) 若n>0，则创建对应的connections对象数组，数组中的每一个元素表示与DNS服务器的连接（注意，对于一个DNS域名
 	// 可能会对应多个不同的IP地址)
 }
+{% endhighlight %}
+
+
+## 5. 函数ngx_resolver_cleanup()
+{% highlight string %}
+static void
+ngx_resolver_cleanup(void *data)
+{
+    ngx_resolver_t  *r = data;
+
+    ngx_uint_t                  i;
+    ngx_resolver_connection_t  *rec;
+
+    if (r) {
+        ngx_log_debug0(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0,
+                       "cleanup resolver");
+
+        ngx_resolver_cleanup_tree(r, &r->name_rbtree);
+
+        ngx_resolver_cleanup_tree(r, &r->srv_rbtree);
+
+        ngx_resolver_cleanup_tree(r, &r->addr_rbtree);
+
+#if (NGX_HAVE_INET6)
+        ngx_resolver_cleanup_tree(r, &r->addr6_rbtree);
+#endif
+
+        if (r->event) {
+            ngx_free(r->event);
+        }
+
+
+        rec = r->connections.elts;
+
+        for (i = 0; i < r->connections.nelts; i++) {
+            if (rec[i].udp) {
+                ngx_close_connection(rec[i].udp);
+            }
+
+            if (rec[i].tcp) {
+                ngx_close_connection(rec[i].tcp);
+            }
+
+            if (rec[i].read_buf) {
+                ngx_resolver_free(r, rec[i].read_buf->start);
+                ngx_resolver_free(r, rec[i].read_buf);
+            }
+
+            if (rec[i].write_buf) {
+                ngx_resolver_free(r, rec[i].write_buf->start);
+                ngx_resolver_free(r, rec[i].write_buf);
+            }
+        }
+
+        ngx_free(r);
+    }
+}
+
+{% endhighlight %}
+此函数完成在ngx_resolver_t对象的所占用的池空间释放时进行相应的资源回收：
+{% highlight string %}
 {% endhighlight %}
 
 
@@ -593,6 +751,121 @@ failed:
     return NGX_ERROR;
 }
 {% endhighlight %}
+本函数进行DNS逆查询，即通过DNS，查询```ctx->addr```地址所对应的域名。下面简要介绍一下本函数的实现：
+{% highlight string %}
+ngx_int_t
+ngx_resolve_addr(ngx_resolver_ctx_t *ctx)
+{
+	//1) 从红黑树中查询当前所缓存的IP地址到域名的映射
+
+	//2) 如果红黑树r->addr_rbtree中有对应的缓存信息
+	// 2.1) 如果缓存信息并未过期，则将该节点加入到addr_expire_queue或addr6_expire_queue中，同时调用对应的handler()回调函数
+	// 2.2) 如果对应节点的waiting链表不为NULL，则将当前上下文加入到waiting链表中， 并将ctx状态设置为NGX_AGAIN
+
+	//3) 如果在红黑树r->addr_rbtree中没有对应的缓存信息，创建一个ngx_resolver_node_t对象加入到ctx->resolver相应的红黑树中
+
+	//4) 创建DNS逆解析报文，并向对应的DNS服务器发送请求
+
+	//5) 将ctx->state设置为NGX_AGAIN，等待返回相应的处理结果
+}
+{% endhighlight %}
+
+## 5. 函数ngx_resolve_addr_done()
+{% highlight string %}
+void
+ngx_resolve_addr_done(ngx_resolver_ctx_t *ctx)
+{
+    ngx_queue_t          *expire_queue;
+    ngx_rbtree_t         *tree;
+    ngx_resolver_t       *r;
+    ngx_resolver_ctx_t   *w, **p;
+    ngx_resolver_node_t  *rn;
+
+    r = ctx->resolver;
+
+    switch (ctx->addr.sockaddr->sa_family) {
+
+#if (NGX_HAVE_INET6)
+    case AF_INET6:
+        tree = &r->addr6_rbtree;
+        expire_queue = &r->addr6_expire_queue;
+        break;
+#endif
+
+    default: /* AF_INET */
+        tree = &r->addr_rbtree;
+        expire_queue = &r->addr_expire_queue;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_CORE, r->log, 0,
+                   "resolve addr done: %i", ctx->state);
+
+    if (ctx->event && ctx->event->timer_set) {
+        ngx_del_timer(ctx->event);
+    }
+
+    /* lock addr mutex */
+
+    if (ctx->state == NGX_AGAIN || ctx->state == NGX_RESOLVE_TIMEDOUT) {
+
+        rn = ctx->node;
+
+        if (rn) {
+            p = &rn->waiting;
+            w = rn->waiting;
+
+            while (w) {
+                if (w == ctx) {
+                    *p = w->next;
+
+                    goto done;
+                }
+
+                p = &w->next;
+                w = w->next;
+            }
+        }
+
+        {
+            u_char     text[NGX_SOCKADDR_STRLEN];
+            ngx_str_t  addrtext;
+
+            addrtext.data = text;
+            addrtext.len = ngx_sock_ntop(ctx->addr.sockaddr, ctx->addr.socklen,
+                                         text, NGX_SOCKADDR_STRLEN, 0);
+
+            ngx_log_error(NGX_LOG_ALERT, r->log, 0,
+                          "could not cancel %V resolving", &addrtext);
+        }
+    }
+
+done:
+
+    ngx_resolver_expire(r, tree, expire_queue);
+
+    /* unlock addr mutex */
+
+    /* lock alloc mutex */
+
+    if (ctx->event) {
+        ngx_resolver_free_locked(r, ctx->event);
+    }
+
+    ngx_resolver_free_locked(r, ctx);
+
+    /* unlock alloc mutex */
+
+    if (r->event->timer_set && ngx_resolver_resend_empty(r)) {
+        ngx_del_timer(r->event);
+    }
+}
+{% endhighlight %}
+此函数用于处理当解析完成（可能成功，也可能失败），进行相应的收尾工作：
+<pre>
+1) 如果状态为NGX_AGAIN或者NGX_RESOLVE_TIMEDOUT，那么将该上下文从waiting链表中移除
+
+2) 从ctx->resolver的addr_expire_queue或addr6_expire_queue队列中移除相应的节点
+</pre>
 
 <br />
 <br />

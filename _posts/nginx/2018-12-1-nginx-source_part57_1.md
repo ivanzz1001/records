@@ -111,9 +111,17 @@ typedef struct {
 {% endhighlight %}
 下面简要介绍一下各字段的含义：
 
+* queue: 作为一个辅助元素，用于实现ngx_resolver_t中的超时队列。
+
+* name: 当执行的是DNS ```A```类型查询时，本字段保存的是需要解析的域名； 当执行的是DNS ```PTR```类型的查询时，本字段保存的是逆解析后得到的域名
+
 * query: 用于存放当前DNS的查询请求报文
 
+* expire: 用于指示当前节点的过期```时刻```，主要是用于控制超时队列使用，适时的淘汰```ngx_resolver_t```中```name_rbtree```、```srv_rbtree```或```addr_rbtree```中的节点，对应的超时队列分别是ngx_resolver_t中的name_expire_queue、srv_expire_queue或addr_expire_queue;
 
+* valid： 用于指示当前节点的有效期```时刻```。注意： 本字段含义上与expire相似，但expire主要用于控制超时队列。
+
+* waiting: 用于指示当前节点所对应的ngx_resolver_ctx_t类型的等待链表
 
 ## 1. ngx_resolver_t数据结构
 {% highlight string %}
@@ -175,15 +183,44 @@ ngx_resolver_t数据结构用于表示nginx中的一个DNS解析器。下面简�
 
 * name_sentinel: name_rbtree红黑树的叶子终节点
 
+* srv_rbtree: 用于保存从DNS查询到的```服务名到IP地址的映射```的红黑树
+
+* srv_sentinel: srv_rbtree红黑树的叶子终节点
+
 * addr_rbtree: 用于保存从DNS逆查询得到的```IP地址域名的映射```的红黑树。红黑树中的value是```ngx_resolver_node_t```结构
 
 * addr_sentinel: addr_rbtree红黑树的叶子终节点
+
+* name_expire_queue: 用于控制name_rbtree中节点超时的队列
+
+* srv_expire_queue： 用于控制srv_rbtree中节点超时的队列
+
+* addr_expire_queue； 用于控制addr_rbtree中节点超时的队列
+
+* IPv6相关
+<pre>
+#if (NGX_HAVE_INET6)
+    ngx_uint_t                ipv6;                 /* unsigned  ipv6:1; */
+    ngx_rbtree_t              addr6_rbtree;
+    ngx_rbtree_node_t         addr6_sentinel;
+    ngx_queue_t               addr6_resend_queue;
+    ngx_queue_t               addr6_expire_queue;
+#endif
+</pre>
+在当前，我们暂未支持```NGX_HAVE_INET6```这一宏定义。这里除了协议版本与ipv4不同外，字段含义与ipv4中对应字段均相同。
+
+* resend_timeout: 用于指示请求重发的超时时间
+
 
 * tcp_timeout: 代表与DNS服务连接的TCP超时时间
 
 * expire: 用于指示当前resolver缓存DNS解析结果的时间，这样就可以不需要每一次请求都去请求DNS
 
 * valid: 
+
+<pre>
+注意： 上面介绍的DNS逆地址解析，一般只会在邮件模块用到
+</pre>
 
 
 ## 4. ngx_resolver_ctx_t数据结构
@@ -225,6 +262,15 @@ struct ngx_resolver_ctx_s {
 * next: 用于指示ngx_resolver_ctx_t链表中的下一个上下文对象；
 
 * resolver: 本上下文对象所关联的resolver
+
+* node： 本上下文所关联的ngx_resolver_node_t数据结构
+
+* state: 用于指示当前上下文对DNS域名解析，或DNS逆解析的状态
+
+* name: DNS ```A```类型解析时保存的是将要解析的域名； DNS ```PTR```类型解析时，保存的是IP地址逆解析到的域名
+
+
+
 
 * addr: 当前需要进行DNS逆查询的IP地址
 
