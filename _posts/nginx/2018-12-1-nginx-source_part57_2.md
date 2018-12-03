@@ -14,7 +14,53 @@ description: nginx源代码分析
 
 <!-- more -->
 
+## 1. ngx_resolver_hdr_t数据结构
+{% highlight string %}
+/*
+ * Copyright (C) Igor Sysoev
+ * Copyright (C) Nginx, Inc.
+ */
 
+
+#include <ngx_config.h>
+#include <ngx_core.h>
+#include <ngx_event.h>
+
+
+#define NGX_RESOLVER_UDP_SIZE   4096
+
+#define NGX_RESOLVER_TCP_RSIZE  (2 + 65535)
+#define NGX_RESOLVER_TCP_WSIZE  8192
+
+
+typedef struct {
+    u_char  ident_hi;
+    u_char  ident_lo;
+    u_char  flags_hi;
+    u_char  flags_lo;
+    u_char  nqs_hi;
+    u_char  nqs_lo;
+    u_char  nan_hi;
+    u_char  nan_lo;
+    u_char  nns_hi;
+    u_char  nns_lo;
+    u_char  nar_hi;
+    u_char  nar_lo;
+} ngx_resolver_hdr_t;
+{% endhighlight %}
+```ngx_resolver_hdr_t```定义了DNS报文结构的头部。关于各字段的含义，请参看[DNS协议详解及报文格式分析](https://blog.csdn.net/tianxuhong/article/details/74922454)
+
+
+## 2. ngx_resolver_qs_t数据结构
+{% highlight string %}
+typedef struct {
+    u_char  type_hi;
+    u_char  type_lo;
+    u_char  class_hi;
+    u_char  class_lo;
+} ngx_resolver_qs_t;
+{% endhighlight %}
+此结构定义了DNS查询报文中的```Queries区域```。其中```type```用于指明查询类型； ```class```用于指明查询类。
 
 ## 1. 函数ngx_resolver_create()
 {% highlight string %}
@@ -189,6 +235,365 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
 {% endhighlight %}
 
 
+## 2. 函数ngx_resolve_start()
+{% highlight string %}
+ngx_resolver_ctx_t *
+ngx_resolve_start(ngx_resolver_t *r, ngx_resolver_ctx_t *temp)
+{
+    in_addr_t            addr;
+    ngx_resolver_ctx_t  *ctx;
+
+    if (temp) {
+        addr = ngx_inet_addr(temp->name.data, temp->name.len);
+
+        if (addr != INADDR_NONE) {
+            temp->resolver = r;
+            temp->state = NGX_OK;
+            temp->naddrs = 1;
+            temp->addrs = &temp->addr;
+            temp->addr.sockaddr = (struct sockaddr *) &temp->sin;
+            temp->addr.socklen = sizeof(struct sockaddr_in);
+            ngx_memzero(&temp->sin, sizeof(struct sockaddr_in));
+            temp->sin.sin_family = AF_INET;
+            temp->sin.sin_addr.s_addr = addr;
+            temp->quick = 1;
+
+            return temp;
+        }
+    }
+
+    if (r->connections.nelts == 0) {
+        return NGX_NO_RESOLVER;
+    }
+
+    ctx = ngx_resolver_calloc(r, sizeof(ngx_resolver_ctx_t));
+
+    if (ctx) {
+        ctx->resolver = r;
+    }
+
+    return ctx;
+}
+{% endhighlight %}
+本函数用于创建```ngx_resolver_t```的上下文。如果传入的参数temp不为NULL，且```temp->name```能够被解析为一个IPv4地址，则复用temp，将其作为```r```的上下文对象； 否则新建一个新的上下文对象。
+
+
+## 3. 函数ngx_resolve_name()
+{% highlight string %}
+ngx_int_t
+ngx_resolve_name(ngx_resolver_ctx_t *ctx)
+{
+    size_t           slen;
+    ngx_int_t        rc;
+    ngx_str_t        name;
+    ngx_resolver_t  *r;
+
+    r = ctx->resolver;
+
+    if (ctx->name.len > 0 && ctx->name.data[ctx->name.len - 1] == '.') {
+        ctx->name.len--;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_CORE, r->log, 0,
+                   "resolve: \"%V\"", &ctx->name);
+
+    if (ctx->quick) {
+        ctx->handler(ctx);
+        return NGX_OK;
+    }
+
+    if (ctx->service.len) {
+        slen = ctx->service.len;
+
+        if (ngx_strlchr(ctx->service.data,
+                        ctx->service.data + ctx->service.len, '.')
+            == NULL)
+        {
+            slen += sizeof("_._tcp") - 1;
+        }
+
+        name.len = slen + 1 + ctx->name.len;
+
+        name.data = ngx_resolver_alloc(r, name.len);
+        if (name.data == NULL) {
+            return NGX_ERROR;
+        }
+
+        if (slen == ctx->service.len) {
+            ngx_sprintf(name.data, "%V.%V", &ctx->service, &ctx->name);
+
+        } else {
+            ngx_sprintf(name.data, "_%V._tcp.%V", &ctx->service, &ctx->name);
+        }
+
+        /* lock name mutex */
+
+        rc = ngx_resolve_name_locked(r, ctx, &name);
+
+        ngx_resolver_free(r, name.data);
+
+    } else {
+        /* lock name mutex */
+
+        rc = ngx_resolve_name_locked(r, ctx, &ctx->name);
+    }
+
+    if (rc == NGX_OK) {
+        return NGX_OK;
+    }
+
+    /* unlock name mutex */
+
+    if (rc == NGX_AGAIN) {
+        return NGX_OK;
+    }
+
+    /* NGX_ERROR */
+
+    if (ctx->event) {
+        ngx_resolver_free(r, ctx->event);
+    }
+
+    ngx_resolver_free(r, ctx);
+
+    return NGX_ERROR;
+}
+{% endhighlight %}
+
+
+## 4. 函数ngx_resolve_addr()
+{% highlight string %}
+ngx_int_t
+ngx_resolve_addr(ngx_resolver_ctx_t *ctx)
+{
+    u_char               *name;
+    in_addr_t             addr;
+    ngx_queue_t          *resend_queue, *expire_queue;
+    ngx_rbtree_t         *tree;
+    ngx_resolver_t       *r;
+    struct sockaddr_in   *sin;
+    ngx_resolver_node_t  *rn;
+#if (NGX_HAVE_INET6)
+    uint32_t              hash;
+    struct sockaddr_in6  *sin6;
+#endif
+
+#if (NGX_SUPPRESS_WARN)
+    addr = 0;
+#if (NGX_HAVE_INET6)
+    hash = 0;
+    sin6 = NULL;
+#endif
+#endif
+
+    r = ctx->resolver;
+
+    switch (ctx->addr.sockaddr->sa_family) {
+
+#if (NGX_HAVE_INET6)
+    case AF_INET6:
+        sin6 = (struct sockaddr_in6 *) ctx->addr.sockaddr;
+        hash = ngx_crc32_short(sin6->sin6_addr.s6_addr, 16);
+
+        /* lock addr mutex */
+
+        rn = ngx_resolver_lookup_addr6(r, &sin6->sin6_addr, hash);
+
+        tree = &r->addr6_rbtree;
+        resend_queue = &r->addr6_resend_queue;
+        expire_queue = &r->addr6_expire_queue;
+
+        break;
+#endif
+
+    default: /* AF_INET */
+        sin = (struct sockaddr_in *) ctx->addr.sockaddr;
+        addr = ntohl(sin->sin_addr.s_addr);
+
+        /* lock addr mutex */
+
+        rn = ngx_resolver_lookup_addr(r, addr);
+
+        tree = &r->addr_rbtree;
+        resend_queue = &r->addr_resend_queue;
+        expire_queue = &r->addr_expire_queue;
+    }
+
+    if (rn) {
+
+        if (rn->valid >= ngx_time()) {
+
+            ngx_log_debug0(NGX_LOG_DEBUG_CORE, r->log, 0, "resolve cached");
+
+            ngx_queue_remove(&rn->queue);
+
+            rn->expire = ngx_time() + r->expire;
+
+            ngx_queue_insert_head(expire_queue, &rn->queue);
+
+            name = ngx_resolver_dup(r, rn->name, rn->nlen);
+            if (name == NULL) {
+                goto failed;
+            }
+
+            ctx->name.len = rn->nlen;
+            ctx->name.data = name;
+
+            /* unlock addr mutex */
+
+            ctx->state = NGX_OK;
+            ctx->valid = rn->valid;
+
+            ctx->handler(ctx);
+
+            ngx_resolver_free(r, name);
+
+            return NGX_OK;
+        }
+
+        if (rn->waiting) {
+
+            if (ctx->event == NULL && ctx->timeout) {
+                ctx->event = ngx_resolver_calloc(r, sizeof(ngx_event_t));
+                if (ctx->event == NULL) {
+                    return NGX_ERROR;
+                }
+
+                ctx->event->handler = ngx_resolver_timeout_handler;
+                ctx->event->data = ctx;
+                ctx->event->log = r->log;
+                ctx->ident = -1;
+
+                ngx_add_timer(ctx->event, ctx->timeout);
+            }
+
+            ctx->next = rn->waiting;
+            rn->waiting = ctx;
+            ctx->state = NGX_AGAIN;
+            ctx->node = rn;
+
+            /* unlock addr mutex */
+
+            return NGX_OK;
+        }
+
+        ngx_queue_remove(&rn->queue);
+
+        ngx_resolver_free(r, rn->query);
+        rn->query = NULL;
+#if (NGX_HAVE_INET6)
+        rn->query6 = NULL;
+#endif
+
+    } else {
+        rn = ngx_resolver_alloc(r, sizeof(ngx_resolver_node_t));
+        if (rn == NULL) {
+            goto failed;
+        }
+
+        switch (ctx->addr.sockaddr->sa_family) {
+
+#if (NGX_HAVE_INET6)
+        case AF_INET6:
+            rn->addr6 = sin6->sin6_addr;
+            rn->node.key = hash;
+            break;
+#endif
+
+        default: /* AF_INET */
+            rn->node.key = addr;
+        }
+
+        rn->query = NULL;
+#if (NGX_HAVE_INET6)
+        rn->query6 = NULL;
+#endif
+
+        ngx_rbtree_insert(tree, &rn->node);
+    }
+
+    if (ngx_resolver_create_addr_query(r, rn, &ctx->addr) != NGX_OK) {
+        goto failed;
+    }
+
+    rn->last_connection = r->last_connection++;
+    if (r->last_connection == r->connections.nelts) {
+        r->last_connection = 0;
+    }
+
+    rn->naddrs = (u_short) -1;
+    rn->tcp = 0;
+#if (NGX_HAVE_INET6)
+    rn->naddrs6 = (u_short) -1;
+    rn->tcp6 = 0;
+#endif
+    rn->nsrvs = 0;
+
+    if (ngx_resolver_send_query(r, rn) != NGX_OK) {
+        goto failed;
+    }
+
+    if (ctx->event == NULL && ctx->timeout) {
+        ctx->event = ngx_resolver_calloc(r, sizeof(ngx_event_t));
+        if (ctx->event == NULL) {
+            goto failed;
+        }
+
+        ctx->event->handler = ngx_resolver_timeout_handler;
+        ctx->event->data = ctx;
+        ctx->event->log = r->log;
+        ctx->ident = -1;
+
+        ngx_add_timer(ctx->event, ctx->timeout);
+    }
+
+    if (ngx_queue_empty(resend_queue)) {
+        ngx_add_timer(r->event, (ngx_msec_t) (r->resend_timeout * 1000));
+    }
+
+    rn->expire = ngx_time() + r->resend_timeout;
+
+    ngx_queue_insert_head(resend_queue, &rn->queue);
+
+    rn->code = 0;
+    rn->cnlen = 0;
+    rn->name = NULL;
+    rn->nlen = 0;
+    rn->valid = 0;
+    rn->ttl = NGX_MAX_UINT32_VALUE;
+    rn->waiting = ctx;
+
+    /* unlock addr mutex */
+
+    ctx->state = NGX_AGAIN;
+    ctx->node = rn;
+
+    return NGX_OK;
+
+failed:
+
+    if (rn) {
+        ngx_rbtree_delete(tree, &rn->node);
+
+        if (rn->query) {
+            ngx_resolver_free(r, rn->query);
+        }
+
+        ngx_resolver_free(r, rn);
+    }
+
+    /* unlock addr mutex */
+
+    if (ctx->event) {
+        ngx_resolver_free(r, ctx->event);
+    }
+
+    ngx_resolver_free(r, ctx);
+
+    return NGX_ERROR;
+}
+{% endhighlight %}
+
 <br />
 <br />
 
@@ -198,6 +603,8 @@ ngx_resolver_create(ngx_conf_t *cf, ngx_str_t *names, ngx_uint_t n)
 
 
 2. [nginx关于域名解析的源码分析](https://blog.csdn.net/ChuiGeDaQiQiu/article/details/78842744?utm_source=blogxgwz7)
+
+3. [DNS协议详解及报文格式分析](https://blog.csdn.net/tianxuhong/article/details/74922454)
 
 
 
