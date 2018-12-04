@@ -563,6 +563,134 @@ ngx_resolve_name(ngx_resolver_ctx_t *ctx)
 }
 {% endhighlight %}
 
+在介绍本函数之前，我们先大体说明一下DNS的服务查询(SRV)的格式：
+<pre>
+_ldap._tcp.example.com
+</pre>
+下面我们再来简单介绍本函数的实现：
+{% highlight string %}
+ngx_int_t
+ngx_resolve_name(ngx_resolver_ctx_t *ctx)
+{
+	//1) 如果ctx->quick为1，那么直接回调handler()即可
+
+	//2) 若指定了ctx->service，表示的是查询某一个服务，这时需要做特定的处理，然后调用ngx_resolve_name_locked()来完成'服务名到IP的映射'
+
+	//3) 否则，直接调用ngx_resolve_name_locked()来完成'域名到IP的映射'
+}
+{% endhighlight %}
+
+## 9. 函数ngx_resolve_name_done()
+{% highlight string %}
+void
+ngx_resolve_name_done(ngx_resolver_ctx_t *ctx)
+{
+    ngx_uint_t            i;
+    ngx_resolver_t       *r;
+    ngx_resolver_ctx_t   *w, **p;
+    ngx_resolver_node_t  *rn;
+
+    r = ctx->resolver;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_CORE, r->log, 0,
+                   "resolve name done: %i", ctx->state);
+
+    if (ctx->quick) {
+        return;
+    }
+
+    if (ctx->event && ctx->event->timer_set) {
+        ngx_del_timer(ctx->event);
+    }
+
+    /* lock name mutex */
+
+    if (ctx->nsrvs) {
+        for (i = 0; i < ctx->nsrvs; i++) {
+            if (ctx->srvs[i].ctx) {
+                ngx_resolve_name_done(ctx->srvs[i].ctx);
+            }
+
+            if (ctx->srvs[i].addrs) {
+                ngx_resolver_free(r, ctx->srvs[i].addrs->sockaddr);
+                ngx_resolver_free(r, ctx->srvs[i].addrs);
+            }
+
+            ngx_resolver_free(r, ctx->srvs[i].name.data);
+        }
+
+        ngx_resolver_free(r, ctx->srvs);
+    }
+
+    if (ctx->state == NGX_AGAIN || ctx->state == NGX_RESOLVE_TIMEDOUT) {
+
+        rn = ctx->node;
+
+        if (rn) {
+            p = &rn->waiting;
+            w = rn->waiting;
+
+            while (w) {
+                if (w == ctx) {
+                    *p = w->next;
+
+                    goto done;
+                }
+
+                p = &w->next;
+                w = w->next;
+            }
+
+            ngx_log_error(NGX_LOG_ALERT, r->log, 0,
+                          "could not cancel %V resolving", &ctx->name);
+        }
+    }
+
+done:
+
+    if (ctx->service.len) {
+        ngx_resolver_expire(r, &r->srv_rbtree, &r->srv_expire_queue);
+
+    } else {
+        ngx_resolver_expire(r, &r->name_rbtree, &r->name_expire_queue);
+    }
+
+    /* unlock name mutex */
+
+    /* lock alloc mutex */
+
+    if (ctx->event) {
+        ngx_resolver_free_locked(r, ctx->event);
+    }
+
+    ngx_resolver_free_locked(r, ctx);
+
+    /* unlock alloc mutex */
+
+    if (r->event->timer_set && ngx_resolver_resend_empty(r)) {
+        ngx_del_timer(r->event);
+    }
+}
+{% endhighlight %}
+
+此函数用于处理当解析完成（可能成功，也可能失败），进行相应的收尾工作。下面我们先简要介绍一下```通过服务名来查询IP```返回报文的基本格式：
+<pre>
+_Service._Proto.Name TTL Class SRV Priority Weight Port Target
+</pre>
+
+下面是本函数的基本流程：
+{% highlight string %}
+void
+ngx_resolve_name_done(ngx_resolver_ctx_t *ctx)
+{
+	//1) 如果ctx->quick为真，此种情况根本没有向DNS发出解析请求，因此这里可以直接返回
+
+	//2) 如果ctx->event上仍还有定时器在运行，那么清除相应定时器
+
+	//3) 若是 SRV查询，即ctx->nsrvs>0，那么释放服务所占用的空间
+}
+{% endhighlight %}
+
 
 ## 4. 函数ngx_resolve_addr()
 {% highlight string %}

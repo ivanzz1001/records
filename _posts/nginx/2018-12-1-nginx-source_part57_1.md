@@ -50,7 +50,35 @@ typedef struct {
 
 
 
+## 2. ngx_resolver_srv_name_t数据结构
+{% highlight string %}
+typedef struct {
+    ngx_str_t                 name;
+    u_short                   priority;
+    u_short                   weight;
+    u_short                   port;
 
+    ngx_resolver_ctx_t       *ctx;
+
+    ngx_uint_t                naddrs;
+    ngx_addr_t               *addrs;
+} ngx_resolver_srv_name_t;
+{% endhighlight %}
+本数据结构用于表示某一个域名(name)下所指定的服务的IP地址，用于服务查询。下面我们简要介绍一下各字段的含义：
+
+* name: 服务对应的域名
+
+* priority: 服务在```name```域名下的优先级
+
+* weight： 权重
+
+* port: 对应的端口
+
+* ctx: 所关联的ngx_resolver_ctx_t上下文
+
+* naddrs: ip地址个数
+
+* addrs: 所返回的IP地址
 
 ## 2. ngx_resolver_node_t数据结构
 {% highlight string %}
@@ -189,7 +217,7 @@ ngx_resolver_t数据结构用于表示nginx中的一个DNS解析器。下面简�
 
 * srv_sentinel: srv_rbtree红黑树的叶子终节点
 
-* addr_rbtree: 用于保存从DNS逆查询得到的```IP地址域名的映射```的红黑树。红黑树中的value是```ngx_resolver_node_t```结构
+* addr_rbtree: 用于保存从DNS逆查询得到的```IP地址到域名的映射```的红黑树。红黑树中的value是```ngx_resolver_node_t```结构
 
 * addr_sentinel: addr_rbtree红黑树的叶子终节点
 
@@ -274,7 +302,14 @@ struct ngx_resolver_ctx_s {
 * service： 用于保存要解析的服务名称
 
 
-* addr: 当前需要进行DNS逆查询的IP地址
+* addr: 当前需要进行DNS逆查询的IP地址（即IP地址到域名的映射)
+
+
+* handler: 本context对象绑定的回调函数
+
+* quick： 一般情况下，当我们并不需要调用DNS服务器进行解析时会将本字段设置为1，这时直接调用ngx_resolver_ctx_t的handler回调函数即可。
+
+
 
 
 
