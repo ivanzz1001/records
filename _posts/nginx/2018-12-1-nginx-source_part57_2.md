@@ -388,12 +388,55 @@ ngx_resolver_cleanup(void *data)
 }
 
 {% endhighlight %}
-此函数完成在ngx_resolver_t对象的所占用的池空间释放时进行相应的资源回收：
+此函数是ngx_resolver_t对象的pool被销毁时的回调函数，主要完成相关内存资源的回收以及关闭对应的连接：
 {% highlight string %}
+static void
+ngx_resolver_cleanup(void *data)
+{
+	//1) 回收相应的红黑树结构: name_rbtree、srv_rbtree、addr_rbtree、addr6_rbtree
+
+	//2) 释放ngx_resolver_t的event对象
+
+	//3) 关闭与DNS的连接，并释放连接相关的内存占用
+
+	//4) 释放ngx_resolver_t对象本身
+}
 {% endhighlight %}
 
+## 6. 函数ngx_resolver_cleanup_tree()
+{% highlight string %}
+static void
+ngx_resolver_cleanup_tree(ngx_resolver_t *r, ngx_rbtree_t *tree)
+{
+    ngx_resolver_ctx_t   *ctx, *next;
+    ngx_resolver_node_t  *rn;
 
-## 2. 函数ngx_resolve_start()
+    while (tree->root != tree->sentinel) {
+
+        rn = ngx_resolver_node(ngx_rbtree_min(tree->root, tree->sentinel));
+
+        ngx_queue_remove(&rn->queue);
+
+        for (ctx = rn->waiting; ctx; ctx = next) {
+            next = ctx->next;
+
+            if (ctx->event) {
+                ngx_resolver_free(r, ctx->event);
+            }
+
+            ngx_resolver_free(r, ctx);
+        }
+
+        ngx_rbtree_delete(tree, &rn->node);
+
+        ngx_resolver_free_node(r, rn);
+    }
+}
+{% endhighlight %}
+本函数按从小到大的顺序依次删除```ngx_resolver_t```中相应红黑树的节点。并将该节点所关联的```rn->waiting```链表中的上下文对象进行删除。
+
+
+## 7. 函数ngx_resolve_start()
 {% highlight string %}
 ngx_resolver_ctx_t *
 ngx_resolve_start(ngx_resolver_t *r, ngx_resolver_ctx_t *temp)
@@ -435,8 +478,10 @@ ngx_resolve_start(ngx_resolver_t *r, ngx_resolver_ctx_t *temp)
 {% endhighlight %}
 本函数用于创建```ngx_resolver_t```的上下文。如果传入的参数temp不为NULL，且```temp->name```能够被解析为一个IPv4地址，则复用temp，将其作为```r```的上下文对象； 否则新建一个新的上下文对象。
 
+这里注意，当```temp->name```能够成功解析为IP地址时，会将temp->quick置为1，这样后续就不再需要请求DNS来解析了。
 
-## 3. 函数ngx_resolve_name()
+
+## 8. 函数ngx_resolve_name()
 {% highlight string %}
 ngx_int_t
 ngx_resolve_name(ngx_resolver_ctx_t *ctx)
@@ -879,9 +924,11 @@ done:
 
 3. [DNS协议详解及报文格式分析](https://blog.csdn.net/tianxuhong/article/details/74922454)
 
+4. [DNS系统SRV和NAPTR记录类型说明](https://blog.csdn.net/zhangmingcai/article/details/81126632)
 
+5. [DNS中的协议字段定义](https://www.cnblogs.com/cobbliu/p/3691119.html)
 
-
+6. [DNS RFC文档](https://www.isc.org/community/rfcs/dns/)
 <br />
 <br />
 <br />

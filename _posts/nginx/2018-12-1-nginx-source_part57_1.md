@@ -111,6 +111,8 @@ typedef struct {
 {% endhighlight %}
 下面简要介绍一下各字段的含义：
 
+* node: 作为红黑树的一个节点存在，将```ngx_resolver_node_t```数据结构作为红黑树的一个节点来进行管理
+
 * queue: 作为一个辅助元素，用于实现ngx_resolver_t中的超时队列。
 
 * name: 当执行的是DNS ```A```类型查询时，本字段保存的是需要解析的域名； 当执行的是DNS ```PTR```类型的查询时，本字段保存的是逆解析后得到的域名
@@ -183,7 +185,7 @@ ngx_resolver_t数据结构用于表示nginx中的一个DNS解析器。下面简�
 
 * name_sentinel: name_rbtree红黑树的叶子终节点
 
-* srv_rbtree: 用于保存从DNS查询到的```服务名到IP地址的映射```的红黑树
+* srv_rbtree: 用于保存从DNS查询到的```服务名到IP地址的映射```的红黑树（实际上，当前程序中并未有任何地方使用到此功能）
 
 * srv_sentinel: srv_rbtree红黑树的叶子终节点
 
@@ -261,15 +263,15 @@ struct ngx_resolver_ctx_s {
 
 * next: 用于指示ngx_resolver_ctx_t链表中的下一个上下文对象；
 
-* resolver: 本上下文对象所关联的resolver
+* resolver: 本上下文对象所关联的resolver（注意： 本身ngx_resolver_t并不直接与ctx关联，而是通过ngx_resolver_t中相应的节点来关联的）
 
-* node： 本上下文所关联的ngx_resolver_node_t数据结构
+* node： 本上下文所关联的ngx_resolver_node_t数据结构。
 
 * state: 用于指示当前上下文对DNS域名解析，或DNS逆解析的状态
 
 * name: DNS ```A```类型解析时保存的是将要解析的域名； DNS ```PTR```类型解析时，保存的是IP地址逆解析到的域名
 
-
+* service： 用于保存要解析的服务名称
 
 
 * addr: 当前需要进行DNS逆查询的IP地址
