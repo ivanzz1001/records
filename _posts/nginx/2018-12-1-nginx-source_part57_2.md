@@ -34,16 +34,27 @@ description: nginx源代码分析
 
 
 typedef struct {
+	//identifier 字段
     u_char  ident_hi;
     u_char  ident_lo;
+
+	
     u_char  flags_hi;
     u_char  flags_lo;
+
+	//查询问题的个数
     u_char  nqs_hi;
     u_char  nqs_lo;
+
+	//'answer section' 段的应答资源记录数
     u_char  nan_hi;
     u_char  nan_lo;
+
+	// 'authority records section' 段授权资源记录数
     u_char  nns_hi;
     u_char  nns_lo;
+
+	//'additional records section'段的附加资源记录数
     u_char  nar_hi;
     u_char  nar_lo;
 } ngx_resolver_hdr_t;
@@ -74,7 +85,8 @@ typedef struct {
     u_char  len_lo;
 } ngx_resolver_an_t;
 {% endhighlight %}
-此结构定义了DNS应答报文中相应数据格式。
+此结构定义了DNS应答报文中的```Answers区域```
+
 
 
 ## 4. 相关静态函数声明

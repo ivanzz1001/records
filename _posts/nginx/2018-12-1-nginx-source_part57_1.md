@@ -149,10 +149,10 @@ typedef struct {
 #endif
 
     union {
-        in_addr_t             addr;
-        in_addr_t            *addrs;
-        u_char               *cname;
-        ngx_resolver_srv_t   *srvs;
+        in_addr_t             addr;		//表示单个IP地址
+        in_addr_t            *addrs;	//表示IP地址的数组
+        u_char               *cname;	//用于表示查询返回的规范名称
+        ngx_resolver_srv_t   *srvs;		//
     } u;
 
     u_char                    code;
@@ -199,17 +199,17 @@ typedef struct {
 
 * query6: 用于存放当前DNS的查询请求报文(适用于IPv6, 当前我们并不支持```NGX_HAVE_INET6```宏定义)
 
-* u: 用于保存当前DNS查询到的地址信息(IPv4)
+* u: 用于保存当前DNS查询到的地址信息(IPv4)。
 
-* naddrs: 用于指明当前解析到的```u.addrs```的个数
+* naddrs: 用于指明当前解析到的```u.addrs```的个数。 -1表示未开始解析，或解析出错。
 
-* nsrvs: 用于指明当前解析大的```u.srvs```的个数
+* nsrvs: 用于指明当前解析大的```u.srvs```的个数。 -1表示未开始解析，或解析出错
 
 * cnlen: 用于指明u.cname的长度
 
 * u6: 用于保存当前DNS查询到的地址信息(IPv6)
 
-* naddrs6:当前DNS解析到的IPv6地址信息的个数
+* naddrs6:当前DNS解析到的IPv6地址信息的个数。 -1表示未开始解析，或解析出错
 
 * expire: 用于指示当前节点的过期```时刻```，主要是用于控制超时队列使用，适时的淘汰```ngx_resolver_t```中```name_rbtree```、```srv_rbtree```或```addr_rbtree```中的节点，对应的超时队列分别是ngx_resolver_t中的name_expire_queue、srv_expire_queue或addr_expire_queue;
 
@@ -291,11 +291,11 @@ ngx_resolver_t数据结构用于表示nginx中的一个DNS解析器。下面简�
 
 * addr_sentinel: addr_rbtree红黑树的叶子终节点
 
-* name_resend_queue：一般作为name查询服务类型的ngx_resolver_node_t(context)所关联事件的重复执行队列
+* name_resend_queue：一般作为name查询服务类型ngx_resolver_node_t的waiting context所关联事件的```resend```队列
 
-* srv_resend_queue： 一般作为srv查询服务类型的ngx_resolver_node_t(context)所关联事件的重复执行队列
+* srv_resend_queue： 一般作为srv查询服务类型ngx_resolver_node_t的waiting context所关联事件的```resend```队列
 
-* addr_resend_queue： 一般作为addr查询服务类型的ngx_resolver_node_t(context)所关联事件的重复执行队列
+* addr_resend_queue： 一般作为addr查询服务类型ngx_resolver_node_t的waiting context所关联事件的```resend```队列
 
 
 * name_expire_queue: 用于控制name_rbtree中节点超时的队列
