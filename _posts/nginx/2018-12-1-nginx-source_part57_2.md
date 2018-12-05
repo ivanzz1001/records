@@ -688,11 +688,383 @@ ngx_resolve_name_done(ngx_resolver_ctx_t *ctx)
 	//2) 如果ctx->event上仍还有定时器在运行，那么清除相应定时器
 
 	//3) 若是 SRV查询，即ctx->nsrvs>0，那么释放服务所占用的空间
+
+	//4) 如果状态为NGX_AGAIN或者NGX_RESOLVE_TIMEDOUT，那么将该上下文从waiting链表中移除
+
+	//5) 从超时队列中移除1~2个超时节点（这里注意到，一次只会移除少数几个超时节点，从而把整个超时处理过程分摊到
+	// 整个程序运行过程中，此种处理方法在很多程序设计中值得借鉴）
+
+	//6) 删除ctx->event
+
+	//7) 删除ctx本身
+
+	//8) 若对应ngx_resolver_t的resend_queue并没有重发任务时，则移除ctx对应的resolver上的事件定时器
 }
 {% endhighlight %}
 
 
-## 4. 函数ngx_resolve_addr()
+## 10. 函数ngx_resolve_name_locked()
+{% highlight string %}
+static ngx_int_t
+ngx_resolve_name_locked(ngx_resolver_t *r, ngx_resolver_ctx_t *ctx,
+    ngx_str_t *name)
+{
+    uint32_t              hash;
+    ngx_int_t             rc;
+    ngx_str_t             cname;
+    ngx_uint_t            i, naddrs;
+    ngx_queue_t          *resend_queue, *expire_queue;
+    ngx_rbtree_t         *tree;
+    ngx_resolver_ctx_t   *next, *last;
+    ngx_resolver_addr_t  *addrs;
+    ngx_resolver_node_t  *rn;
+
+    ngx_strlow(name->data, name->data, name->len);
+
+    hash = ngx_crc32_short(name->data, name->len);
+
+    if (ctx->service.len) {
+        rn = ngx_resolver_lookup_srv(r, name, hash);
+
+        tree = &r->srv_rbtree;
+        resend_queue = &r->srv_resend_queue;
+        expire_queue = &r->srv_expire_queue;
+
+    } else {
+        rn = ngx_resolver_lookup_name(r, name, hash);
+
+        tree = &r->name_rbtree;
+        resend_queue = &r->name_resend_queue;
+        expire_queue = &r->name_expire_queue;
+    }
+
+    if (rn) {
+
+        /* ctx can be a list after NGX_RESOLVE_CNAME */
+        for (last = ctx; last->next; last = last->next);
+
+        if (rn->valid >= ngx_time()) {
+
+            ngx_log_debug0(NGX_LOG_DEBUG_CORE, r->log, 0, "resolve cached");
+
+            ngx_queue_remove(&rn->queue);
+
+            rn->expire = ngx_time() + r->expire;
+
+            ngx_queue_insert_head(expire_queue, &rn->queue);
+
+            naddrs = (rn->naddrs == (u_short) -1) ? 0 : rn->naddrs;
+#if (NGX_HAVE_INET6)
+            naddrs += (rn->naddrs6 == (u_short) -1) ? 0 : rn->naddrs6;
+#endif
+
+            if (naddrs) {
+
+                if (naddrs == 1 && rn->naddrs == 1) {
+                    addrs = NULL;
+
+                } else {
+                    addrs = ngx_resolver_export(r, rn, 1);
+                    if (addrs == NULL) {
+                        return NGX_ERROR;
+                    }
+                }
+
+                last->next = rn->waiting;
+                rn->waiting = NULL;
+
+                /* unlock name mutex */
+
+                do {
+                    ctx->state = NGX_OK;
+                    ctx->valid = rn->valid;
+                    ctx->naddrs = naddrs;
+
+                    if (addrs == NULL) {
+                        ctx->addrs = &ctx->addr;
+                        ctx->addr.sockaddr = (struct sockaddr *) &ctx->sin;
+                        ctx->addr.socklen = sizeof(struct sockaddr_in);
+                        ngx_memzero(&ctx->sin, sizeof(struct sockaddr_in));
+                        ctx->sin.sin_family = AF_INET;
+                        ctx->sin.sin_addr.s_addr = rn->u.addr;
+
+                    } else {
+                        ctx->addrs = addrs;
+                    }
+
+                    next = ctx->next;
+
+                    ctx->handler(ctx);
+
+                    ctx = next;
+                } while (ctx);
+
+                if (addrs != NULL) {
+                    ngx_resolver_free(r, addrs->sockaddr);
+                    ngx_resolver_free(r, addrs);
+                }
+
+                return NGX_OK;
+            }
+
+            if (rn->nsrvs) {
+                last->next = rn->waiting;
+                rn->waiting = NULL;
+
+                /* unlock name mutex */
+
+                do {
+                    next = ctx->next;
+
+                    ngx_resolver_resolve_srv_names(ctx, rn);
+
+                    ctx = next;
+                } while (ctx);
+
+                return NGX_OK;
+            }
+
+            /* NGX_RESOLVE_CNAME */
+
+            if (ctx->recursion++ < NGX_RESOLVER_MAX_RECURSION) {
+
+                cname.len = rn->cnlen;
+                cname.data = rn->u.cname;
+
+                return ngx_resolve_name_locked(r, ctx, &cname);
+            }
+
+            last->next = rn->waiting;
+            rn->waiting = NULL;
+
+            /* unlock name mutex */
+
+            do {
+                ctx->state = NGX_RESOLVE_NXDOMAIN;
+                ctx->valid = ngx_time() + (r->valid ? r->valid : 10);
+                next = ctx->next;
+
+                ctx->handler(ctx);
+
+                ctx = next;
+            } while (ctx);
+
+            return NGX_OK;
+        }
+
+        if (rn->waiting) {
+
+            if (ctx->event == NULL && ctx->timeout) {
+                ctx->event = ngx_resolver_calloc(r, sizeof(ngx_event_t));
+                if (ctx->event == NULL) {
+                    return NGX_ERROR;
+                }
+
+                ctx->event->handler = ngx_resolver_timeout_handler;
+                ctx->event->data = ctx;
+                ctx->event->log = r->log;
+                ctx->ident = -1;
+
+                ngx_add_timer(ctx->event, ctx->timeout);
+            }
+
+            last->next = rn->waiting;
+            rn->waiting = ctx;
+            ctx->state = NGX_AGAIN;
+
+            do {
+                ctx->node = rn;
+                ctx = ctx->next;
+            } while (ctx);
+
+            return NGX_AGAIN;
+        }
+
+        ngx_queue_remove(&rn->queue);
+
+        /* lock alloc mutex */
+
+        if (rn->query) {
+            ngx_resolver_free_locked(r, rn->query);
+            rn->query = NULL;
+#if (NGX_HAVE_INET6)
+            rn->query6 = NULL;
+#endif
+        }
+
+        if (rn->cnlen) {
+            ngx_resolver_free_locked(r, rn->u.cname);
+        }
+
+        if (rn->naddrs > 1 && rn->naddrs != (u_short) -1) {
+            ngx_resolver_free_locked(r, rn->u.addrs);
+        }
+
+#if (NGX_HAVE_INET6)
+        if (rn->naddrs6 > 1 && rn->naddrs6 != (u_short) -1) {
+            ngx_resolver_free_locked(r, rn->u6.addrs6);
+        }
+#endif
+
+        if (rn->nsrvs) {
+            for (i = 0; i < rn->nsrvs; i++) {
+                if (rn->u.srvs[i].name.data) {
+                    ngx_resolver_free_locked(r, rn->u.srvs[i].name.data);
+                }
+            }
+
+            ngx_resolver_free_locked(r, rn->u.srvs);
+        }
+
+        /* unlock alloc mutex */
+
+    } else {
+
+        rn = ngx_resolver_alloc(r, sizeof(ngx_resolver_node_t));
+        if (rn == NULL) {
+            return NGX_ERROR;
+        }
+
+        rn->name = ngx_resolver_dup(r, name->data, name->len);
+        if (rn->name == NULL) {
+            ngx_resolver_free(r, rn);
+            return NGX_ERROR;
+        }
+
+        rn->node.key = hash;
+        rn->nlen = (u_short) name->len;
+        rn->query = NULL;
+#if (NGX_HAVE_INET6)
+        rn->query6 = NULL;
+#endif
+
+        ngx_rbtree_insert(tree, &rn->node);
+    }
+
+    if (ctx->service.len) {
+        rc = ngx_resolver_create_srv_query(r, rn, name);
+
+    } else {
+        rc = ngx_resolver_create_name_query(r, rn, name);
+    }
+
+    if (rc == NGX_ERROR) {
+        goto failed;
+    }
+
+    if (rc == NGX_DECLINED) {
+        ngx_rbtree_delete(tree, &rn->node);
+
+        ngx_resolver_free(r, rn->query);
+        ngx_resolver_free(r, rn->name);
+        ngx_resolver_free(r, rn);
+
+        do {
+            ctx->state = NGX_RESOLVE_NXDOMAIN;
+            next = ctx->next;
+
+            ctx->handler(ctx);
+
+            ctx = next;
+        } while (ctx);
+
+        return NGX_OK;
+    }
+
+    rn->last_connection = r->last_connection++;
+    if (r->last_connection == r->connections.nelts) {
+        r->last_connection = 0;
+    }
+
+    rn->naddrs = (u_short) -1;
+    rn->tcp = 0;
+#if (NGX_HAVE_INET6)
+    rn->naddrs6 = r->ipv6 ? (u_short) -1 : 0;
+    rn->tcp6 = 0;
+#endif
+    rn->nsrvs = 0;
+
+    if (ngx_resolver_send_query(r, rn) != NGX_OK) {
+        goto failed;
+    }
+
+    if (ctx->event == NULL && ctx->timeout) {
+        ctx->event = ngx_resolver_calloc(r, sizeof(ngx_event_t));
+        if (ctx->event == NULL) {
+            goto failed;
+        }
+
+        ctx->event->handler = ngx_resolver_timeout_handler;
+        ctx->event->data = ctx;
+        ctx->event->log = r->log;
+        ctx->ident = -1;
+
+        ngx_add_timer(ctx->event, ctx->timeout);
+    }
+
+    if (ngx_queue_empty(resend_queue)) {
+        ngx_add_timer(r->event, (ngx_msec_t) (r->resend_timeout * 1000));
+    }
+
+    rn->expire = ngx_time() + r->resend_timeout;
+
+    ngx_queue_insert_head(resend_queue, &rn->queue);
+
+    rn->code = 0;
+    rn->cnlen = 0;
+    rn->valid = 0;
+    rn->ttl = NGX_MAX_UINT32_VALUE;
+    rn->waiting = ctx;
+
+    ctx->state = NGX_AGAIN;
+
+    do {
+        ctx->node = rn;
+        ctx = ctx->next;
+    } while (ctx);
+
+    return NGX_AGAIN;
+
+failed:
+
+    ngx_rbtree_delete(tree, &rn->node);
+
+    if (rn->query) {
+        ngx_resolver_free(r, rn->query);
+    }
+
+    ngx_resolver_free(r, rn->name);
+
+    ngx_resolver_free(r, rn);
+
+    return NGX_ERROR;
+}
+{% endhighlight %}
+本函数实现的主要功能就是向DNS服务器发起```域名查询```或```服务名查询```。下面我们简要分析一下函数的实现步骤：
+{% highlight string %}
+static ngx_int_t
+ngx_resolve_name_locked(ngx_resolver_t *r, ngx_resolver_ctx_t *ctx,
+    ngx_str_t *name)
+{
+	//1) 首先检查r->srv_rbtree或者r->name_rbtree，看是否有已经缓存有对应的信息
+
+	//2) 如果检查到有对应的缓存信息
+	//  2.1) 如果查找到的节点仍在有效期内
+			2.1.1） 如果当前已经有解析到的地址信息了，那么直接调用ctx所绑定的handler()回调函数即可
+	//		2.1.2） 否则，根据相应的情况重新发起 '域名查询' 或 '服务名查询', 或将状态设置为NGX_RESOLVE_NXDOMAIN,
+	//       		然后直接回调ctx绑定的handler()
+	//  2.2) 否则，检查rn->waiting链表，如果不为NULL，表示当前仍有等待解析的任务，直接将ctx->state设置为NGX_AGAIN，然后返回
+	
+
+	//3) 否则，构造相应的查询报文，然后发起查询请求
+	 
+	
+}
+{% endhighlight %}
+
+
+
+## 11. 函数ngx_resolve_addr()
 {% highlight string %}
 ngx_int_t
 ngx_resolve_addr(ngx_resolver_ctx_t *ctx)

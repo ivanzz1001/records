@@ -14,7 +14,44 @@ description: nginx源代码分析
 
 <!-- more -->
 
-## 1. ngx_resolver_connection_t数据结构
+## 1. 相关宏定义
+{% highlight string %}
+#include <ngx_core.h>
+
+
+#ifndef _NGX_RESOLVER_H_INCLUDED_
+#define _NGX_RESOLVER_H_INCLUDED_
+
+
+#define NGX_RESOLVE_A         1
+#define NGX_RESOLVE_CNAME     5
+#define NGX_RESOLVE_PTR       12
+#define NGX_RESOLVE_MX        15
+#define NGX_RESOLVE_TXT       16
+#if (NGX_HAVE_INET6)
+#define NGX_RESOLVE_AAAA      28
+#endif
+#define NGX_RESOLVE_SRV       33
+#define NGX_RESOLVE_DNAME     39
+
+#define NGX_RESOLVE_FORMERR   1
+#define NGX_RESOLVE_SERVFAIL  2
+
+
+// 表示并未指定domain域，一般表示不需要进行DNS查询
+#define NGX_RESOLVE_NXDOMAIN  3
+#define NGX_RESOLVE_NOTIMP    4
+#define NGX_RESOLVE_REFUSED   5
+#define NGX_RESOLVE_TIMEDOUT  NGX_ETIMEDOUT
+
+
+#define NGX_NO_RESOLVER       (void *) -1
+
+#define NGX_RESOLVER_MAX_RECURSION    50
+{% endhighlight %}
+
+
+## 2. ngx_resolver_connection_t数据结构
 {% highlight string %}
 typedef struct {
     ngx_connection_t         *udp;
@@ -49,8 +86,17 @@ typedef struct {
 * resolver: 当前connection对象所属的resolver
 
 
+## 2. ngx_resolver_srv_t数据结构
+{% highlight string %}
+typedef struct {
+    ngx_str_t                 name;
+    u_short                   priority;
+    u_short                   weight;
+    u_short                   port;
+} ngx_resolver_srv_t;
+{% endhighlight %}
 
-## 2. ngx_resolver_srv_name_t数据结构
+## 3. ngx_resolver_srv_name_t数据结构
 {% highlight string %}
 typedef struct {
     ngx_str_t                 name;
@@ -80,7 +126,7 @@ typedef struct {
 
 * addrs: 所返回的IP地址
 
-## 2. ngx_resolver_node_t数据结构
+## 4. ngx_resolver_node_t数据结构
 {% highlight string %}
 typedef struct {
     ngx_rbtree_node_t         node;
@@ -145,15 +191,35 @@ typedef struct {
 
 * name: 当执行的是DNS ```A```类型查询时，本字段保存的是需要解析的域名； 当执行的是DNS ```PTR```类型的查询时，本字段保存的是逆解析后得到的域名
 
+* nlen: 用于指明```name```的长度
+
+* qlen: 用于指明```query```的长度
+
 * query: 用于存放当前DNS的查询请求报文
+
+* query6: 用于存放当前DNS的查询请求报文(适用于IPv6, 当前我们并不支持```NGX_HAVE_INET6```宏定义)
+
+* u: 用于保存当前DNS查询到的地址信息(IPv4)
+
+* naddrs: 当前DNS解析到IPv4地址个数
+
+* nsrvs: 当前执行```服务名查询```解析到的地址个数
+
+* cnlen: 用于指明u.cname的长度
+
+* u6: 用于保存当前DNS查询到的地址信息(IPv6)
+
+* naddrs6:当前DNS解析到的IPv6地址信息的个数
 
 * expire: 用于指示当前节点的过期```时刻```，主要是用于控制超时队列使用，适时的淘汰```ngx_resolver_t```中```name_rbtree```、```srv_rbtree```或```addr_rbtree```中的节点，对应的超时队列分别是ngx_resolver_t中的name_expire_queue、srv_expire_queue或addr_expire_queue;
 
 * valid： 用于指示当前节点的有效期```时刻```。注意： 本字段含义上与expire相似，但expire主要用于控制超时队列。
 
+* last_connection: 用于表示适用resolver连接数组中的哪一个连接（这里采用round-robin算法）
+
 * waiting: 用于指示当前节点所对应的ngx_resolver_ctx_t类型的等待链表
 
-## 1. ngx_resolver_t数据结构
+## 5. ngx_resolver_t数据结构
 {% highlight string %}
 struct ngx_resolver_s {
     /* has to be pointer because of "incomplete type" */
@@ -209,6 +275,8 @@ ngx_resolver_t数据结构用于表示nginx中的一个DNS解析器。下面简�
 
 * connections: 是一个```ngx_resolver_connection_t```类型的数组，数组的每一个元素代表与DNS的一条连接。这里涉及到两个方面，首先一个resolver可能对应多个不同域名(或IP）的DNS， 其次即使是同一个DNS域名，也可能对应多个IP地址, 因此这里需要用数组来保存。
 
+* last_connection：采用round-robin算法时，用于控制采用连接数组中的哪一个连接
+
 * name_rbtree: 用于保存从DNS查询到的```域名到IP地址的映射```的红黑树，
 
 * name_sentinel: name_rbtree红黑树的叶子终节点
@@ -253,7 +321,7 @@ ngx_resolver_t数据结构用于表示nginx中的一个DNS解析器。下面简�
 </pre>
 
 
-## 4. ngx_resolver_ctx_t数据结构
+## 6. ngx_resolver_ctx_t数据结构
 {% highlight string %}
 typedef struct ngx_resolver_ctx_s  ngx_resolver_ctx_t;
 struct ngx_resolver_ctx_s {
@@ -301,11 +369,14 @@ struct ngx_resolver_ctx_s {
 
 * service： 用于保存要解析的服务名称
 
+* valid: 当前context的有效期时间
 
 * addr: 当前需要进行DNS逆查询的IP地址（即IP地址到域名的映射)
 
 
 * handler: 本context对象绑定的回调函数
+
+* timeout: 当前context的超时时间，主要用于event事件的超时管理
 
 * quick： 一般情况下，当我们并不需要调用DNS服务器进行解析时会将本字段设置为1，这时直接调用ngx_resolver_ctx_t的handler回调函数即可。
 
