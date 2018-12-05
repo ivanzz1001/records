@@ -1058,6 +1058,7 @@ ngx_resolve_name_locked(ngx_resolver_t *r, ngx_resolver_ctx_t *ctx,
 
 	//3) 否则，构造相应的查询报文，然后发起查询请求
 	 
+	//4) 如果当前ctx->event为NULL，并且ctx又具有timeout属性，那么默认为此context绑定一个超时回调事件
 	
 }
 {% endhighlight %}
@@ -1315,7 +1316,7 @@ ngx_resolve_addr(ngx_resolver_ctx_t *ctx)
 }
 {% endhighlight %}
 
-## 5. 函数ngx_resolve_addr_done()
+## 12. 函数ngx_resolve_addr_done()
 {% highlight string %}
 void
 ngx_resolve_addr_done(ngx_resolver_ctx_t *ctx)
@@ -1406,11 +1407,56 @@ done:
 }
 {% endhighlight %}
 此函数用于处理当解析完成（可能成功，也可能失败），进行相应的收尾工作：
-<pre>
+{% highlight string %}
 1) 如果状态为NGX_AGAIN或者NGX_RESOLVE_TIMEDOUT，那么将该上下文从waiting链表中移除
 
 2) 从ctx->resolver的addr_expire_queue或addr6_expire_queue队列中移除相应的节点
-</pre>
+
+3) 如果ctx->resolver上并没有相应的resend事件了，则将ctx->resolver上相应的定时器移除
+{% endhighlight %}
+
+
+## 13. 函数ngx_resolver_expire()
+{% highlight string %}
+static void
+ngx_resolver_expire(ngx_resolver_t *r, ngx_rbtree_t *tree, ngx_queue_t *queue)
+{
+    time_t                now;
+    ngx_uint_t            i;
+    ngx_queue_t          *q;
+    ngx_resolver_node_t  *rn;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_CORE, r->log, 0, "resolver expire");
+
+    now = ngx_time();
+
+    for (i = 0; i < 2; i++) {
+        if (ngx_queue_empty(queue)) {
+            return;
+        }
+
+        q = ngx_queue_last(queue);
+
+        rn = ngx_queue_data(q, ngx_resolver_node_t, queue);
+
+        if (now <= rn->expire) {
+            return;
+        }
+
+        ngx_log_debug2(NGX_LOG_DEBUG_CORE, r->log, 0,
+                       "resolver expire \"%*s\"", (size_t) rn->nlen, rn->name);
+
+        ngx_queue_remove(q);
+
+        ngx_rbtree_delete(tree, &rn->node);
+
+        ngx_resolver_free_node(r, rn);
+    }
+}
+{% endhighlight %}
+此函数用于淘汰相应超时队列上的1~2个超时节点。
+
+
 
 <br />
 <br />
