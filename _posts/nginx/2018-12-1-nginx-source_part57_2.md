@@ -1456,6 +1456,177 @@ ngx_resolver_expire(ngx_resolver_t *r, ngx_rbtree_t *tree, ngx_queue_t *queue)
 {% endhighlight %}
 此函数用于淘汰相应超时队列上的1~2个超时节点。
 
+## 14. 函数ngx_resolver_send_query()
+{% highlight string %}
+static ngx_int_t
+ngx_resolver_send_query(ngx_resolver_t *r, ngx_resolver_node_t *rn)
+{
+    ngx_int_t                   rc;
+    ngx_resolver_connection_t  *rec;
+
+    rec = r->connections.elts;
+    rec = &rec[rn->last_connection];
+
+    if (rec->log.handler == NULL) {
+        rec->log = *r->log;
+        rec->log.handler = ngx_resolver_log_error;
+        rec->log.data = rec;
+        rec->log.action = "resolving";
+    }
+
+    if (rn->naddrs == (u_short) -1) {
+        rc = rn->tcp ? ngx_resolver_send_tcp_query(r, rec, rn->query, rn->qlen)
+                     : ngx_resolver_send_udp_query(r, rec, rn->query, rn->qlen);
+
+        if (rc != NGX_OK) {
+            return rc;
+        }
+    }
+
+#if (NGX_HAVE_INET6)
+
+    if (rn->query6 && rn->naddrs6 == (u_short) -1) {
+        rc = rn->tcp6
+                    ? ngx_resolver_send_tcp_query(r, rec, rn->query6, rn->qlen)
+                    : ngx_resolver_send_udp_query(r, rec, rn->query6, rn->qlen);
+
+        if (rc != NGX_OK) {
+            return rc;
+        }
+    }
+
+#endif
+
+    return NGX_OK;
+}
+
+{% endhighlight %}
+此函数用于向DNS服务器发送相应的查询报文。
+
+
+## 15. 函数ngx_resolver_send_udp_query()
+{% highlight string %}
+static ngx_int_t
+ngx_resolver_send_udp_query(ngx_resolver_t *r, ngx_resolver_connection_t  *rec,
+    u_char *query, u_short qlen)
+{
+    ssize_t  n;
+
+    if (rec->udp == NULL) {
+        if (ngx_udp_connect(rec) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        rec->udp->data = rec;
+        rec->udp->read->handler = ngx_resolver_udp_read;
+        rec->udp->read->resolver = 1;
+    }
+
+    n = ngx_send(rec->udp, query, qlen);
+
+    if (n == -1) {
+        return NGX_ERROR;
+    }
+
+    if ((size_t) n != (size_t) qlen) {
+        ngx_log_error(NGX_LOG_CRIT, &rec->log, 0, "send() incomplete");
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+{% endhighlight %}
+采用UDP方式向DNS服务器发送查询报文
+
+## 16. 函数ngx_resolver_send_tcp_query()
+{% highlight string %}
+static ngx_int_t
+ngx_resolver_send_tcp_query(ngx_resolver_t *r, ngx_resolver_connection_t *rec,
+    u_char *query, u_short qlen)
+{
+    ngx_buf_t  *b;
+    ngx_int_t   rc;
+
+    rc = NGX_OK;
+
+    if (rec->tcp == NULL) {
+        b = rec->read_buf;
+
+        if (b == NULL) {
+            b = ngx_resolver_calloc(r, sizeof(ngx_buf_t));
+            if (b == NULL) {
+                return NGX_ERROR;
+            }
+
+            b->start = ngx_resolver_alloc(r, NGX_RESOLVER_TCP_RSIZE);
+            if (b->start == NULL) {
+                ngx_resolver_free(r, b);
+                return NGX_ERROR;
+            }
+
+            b->end = b->start + NGX_RESOLVER_TCP_RSIZE;
+
+            rec->read_buf = b;
+        }
+
+        b->pos = b->start;
+        b->last = b->start;
+
+        b = rec->write_buf;
+
+        if (b == NULL) {
+            b = ngx_resolver_calloc(r, sizeof(ngx_buf_t));
+            if (b == NULL) {
+                return NGX_ERROR;
+            }
+
+            b->start = ngx_resolver_alloc(r, NGX_RESOLVER_TCP_WSIZE);
+            if (b->start == NULL) {
+                ngx_resolver_free(r, b);
+                return NGX_ERROR;
+            }
+
+            b->end = b->start + NGX_RESOLVER_TCP_WSIZE;
+
+            rec->write_buf = b;
+        }
+
+        b->pos = b->start;
+        b->last = b->start;
+
+        rc = ngx_tcp_connect(rec);
+        if (rc == NGX_ERROR) {
+            return NGX_ERROR;
+        }
+
+        rec->tcp->data = rec;
+        rec->tcp->write->handler = ngx_resolver_tcp_write;
+        rec->tcp->read->handler = ngx_resolver_tcp_read;
+        rec->tcp->read->resolver = 1;
+
+        ngx_add_timer(rec->tcp->write, (ngx_msec_t) (r->tcp_timeout * 1000));
+    }
+
+    b = rec->write_buf;
+
+    if (b->end - b->last <  2 + qlen) {
+        ngx_log_error(NGX_LOG_CRIT, &rec->log, 0, "buffer overflow");
+        return NGX_ERROR;
+    }
+
+    *b->last++ = (u_char) (qlen >> 8);
+    *b->last++ = (u_char) qlen;
+    b->last = ngx_cpymem(b->last, query, qlen);
+
+    if (rc == NGX_OK) {
+        ngx_resolver_tcp_write(rec->tcp->write);
+    }
+
+    return NGX_OK;
+}
+{% endhighlight %}
+
+以TCP方式向DNS服务器发送查询报文。如果连接没有建立，则创建对应的连接，并设置好读写缓冲。
 
 
 <br />
