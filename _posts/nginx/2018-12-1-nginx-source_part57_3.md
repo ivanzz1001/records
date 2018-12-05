@@ -15,7 +15,7 @@ description: nginx源代码分析
 <!-- more -->
 
 
-## 1. 函数
+## 1. 函数ngx_resolver_resend_handler()
 {% highlight string %}
 static void
 ngx_resolver_resend_handler(ngx_event_t *ev)
