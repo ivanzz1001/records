@@ -23,14 +23,21 @@ description: nginx源代码分析
 #define _NGX_RESOLVER_H_INCLUDED_
 
 
+//由域名转换成IP地址
 #define NGX_RESOLVE_A         1
+
+//查询规范名称
 #define NGX_RESOLVE_CNAME     5
+
+//将IP地址转换成域名
 #define NGX_RESOLVE_PTR       12
 #define NGX_RESOLVE_MX        15
 #define NGX_RESOLVE_TXT       16
 #if (NGX_HAVE_INET6)
 #define NGX_RESOLVE_AAAA      28
 #endif
+
+//根据服务名查询IP地址
 #define NGX_RESOLVE_SRV       33
 #define NGX_RESOLVE_DNAME     39
 
