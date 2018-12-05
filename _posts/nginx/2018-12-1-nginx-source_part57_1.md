@@ -311,6 +311,10 @@ struct ngx_resolver_ctx_s {
 
 
 
+下面我们给出nginx resolver各数据结构的一个整体图景：
+
+![ngx-resolver-pic](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_resolver_pic.jpg)
+
 
 
 <br />
