@@ -738,6 +738,455 @@ ngx_resolver_timeout_handler(ngx_event_t *ev)
     ctx->handler(ctx);
 }
 {% endhighlight %}
+此函数作为context在超时(context->timeout)之后的回调函数
+
+## 12. 函数ngx_resolver_free_node()
+{% highlight string %}
+static void
+ngx_resolver_free_node(ngx_resolver_t *r, ngx_resolver_node_t *rn)
+{
+    ngx_uint_t  i;
+
+    /* lock alloc mutex */
+
+    if (rn->query) {
+        ngx_resolver_free_locked(r, rn->query);
+    }
+
+    if (rn->name) {
+        ngx_resolver_free_locked(r, rn->name);
+    }
+
+    if (rn->cnlen) {
+        ngx_resolver_free_locked(r, rn->u.cname);
+    }
+
+    if (rn->naddrs > 1 && rn->naddrs != (u_short) -1) {
+        ngx_resolver_free_locked(r, rn->u.addrs);
+    }
+
+#if (NGX_HAVE_INET6)
+    if (rn->naddrs6 > 1 && rn->naddrs6 != (u_short) -1) {
+        ngx_resolver_free_locked(r, rn->u6.addrs6);
+    }
+#endif
+
+    if (rn->nsrvs) {
+        for (i = 0; i < rn->nsrvs; i++) {
+            if (rn->u.srvs[i].name.data) {
+                ngx_resolver_free_locked(r, rn->u.srvs[i].name.data);
+            }
+        }
+
+        ngx_resolver_free_locked(r, rn->u.srvs);
+    }
+
+    ngx_resolver_free_locked(r, rn);
+
+    /* unlock alloc mutex */
+}
+{% endhighlight %}
+此函数用于释放一个```ngx_resolver_node_t```节点。删除如下：
+<pre>
+1) query查询报文
+2) name查询域名或服务名
+3) 规范名称canonical name
+4) 解析到的IP地址信息
+5) SRV查询时的目标服务器信息
+</pre>
+
+## 13. resolver相关的内存分配与释放
+{% highlight string %}
+static void *
+ngx_resolver_alloc(ngx_resolver_t *r, size_t size)
+{
+    u_char  *p;
+
+    /* lock alloc mutex */
+
+    p = ngx_alloc(size, r->log);
+
+    /* unlock alloc mutex */
+
+    return p;
+}
+
+
+static void *
+ngx_resolver_calloc(ngx_resolver_t *r, size_t size)
+{
+    u_char  *p;
+
+    p = ngx_resolver_alloc(r, size);
+
+    if (p) {
+        ngx_memzero(p, size);
+    }
+
+    return p;
+}
+
+
+static void
+ngx_resolver_free(ngx_resolver_t *r, void *p)
+{
+    /* lock alloc mutex */
+
+    ngx_free(p);
+
+    /* unlock alloc mutex */
+}
+
+
+static void
+ngx_resolver_free_locked(ngx_resolver_t *r, void *p)
+{
+    ngx_free(p);
+}
+{% endhighlight %}
+
+
+## 14. 函数ngx_resolver_dup()
+{% highlight string %}
+static void *
+ngx_resolver_dup(ngx_resolver_t *r, void *src, size_t size)
+{
+    void  *dst;
+
+    dst = ngx_resolver_alloc(r, size);
+
+    if (dst == NULL) {
+        return dst;
+    }
+
+    ngx_memcpy(dst, src, size);
+
+    return dst;
+}
+{% endhighlight %}
+分配一块```size```大小的内存，并进行数据拷贝。
+
+## 15. 函数ngx_resolver_export()
+{% highlight string %}
+static ngx_resolver_addr_t *
+ngx_resolver_export(ngx_resolver_t *r, ngx_resolver_node_t *rn,
+    ngx_uint_t rotate)
+{
+    ngx_uint_t             d, i, j, n;
+    u_char               (*sockaddr)[NGX_SOCKADDRLEN];
+    in_addr_t             *addr;
+    struct sockaddr_in    *sin;
+    ngx_resolver_addr_t   *dst;
+#if (NGX_HAVE_INET6)
+    struct in6_addr       *addr6;
+    struct sockaddr_in6   *sin6;
+#endif
+
+    n = rn->naddrs;
+#if (NGX_HAVE_INET6)
+    n += rn->naddrs6;
+#endif
+
+    dst = ngx_resolver_calloc(r, n * sizeof(ngx_resolver_addr_t));
+    if (dst == NULL) {
+        return NULL;
+    }
+
+    sockaddr = ngx_resolver_calloc(r, n * NGX_SOCKADDRLEN);
+    if (sockaddr == NULL) {
+        ngx_resolver_free(r, dst);
+        return NULL;
+    }
+
+    i = 0;
+    d = rotate ? ngx_random() % n : 0;
+
+    if (rn->naddrs) {
+        j = rotate ? ngx_random() % rn->naddrs : 0;
+
+        addr = (rn->naddrs == 1) ? &rn->u.addr : rn->u.addrs;
+
+        do {
+            sin = (struct sockaddr_in *) sockaddr[d];
+            sin->sin_family = AF_INET;
+            sin->sin_addr.s_addr = addr[j++];
+            dst[d].sockaddr = (struct sockaddr *) sin;
+            dst[d++].socklen = sizeof(struct sockaddr_in);
+
+            if (d == n) {
+                d = 0;
+            }
+
+            if (j == rn->naddrs) {
+                j = 0;
+            }
+        } while (++i < rn->naddrs);
+    }
+
+#if (NGX_HAVE_INET6)
+    if (rn->naddrs6) {
+        j = rotate ? ngx_random() % rn->naddrs6 : 0;
+
+        addr6 = (rn->naddrs6 == 1) ? &rn->u6.addr6 : rn->u6.addrs6;
+
+        do {
+            sin6 = (struct sockaddr_in6 *) sockaddr[d];
+            sin6->sin6_family = AF_INET6;
+            ngx_memcpy(sin6->sin6_addr.s6_addr, addr6[j++].s6_addr, 16);
+            dst[d].sockaddr = (struct sockaddr *) sin6;
+            dst[d++].socklen = sizeof(struct sockaddr_in6);
+
+            if (d == n) {
+                d = 0;
+            }
+
+            if (j == rn->naddrs6) {
+                j = 0;
+            }
+        } while (++i < n);
+    }
+#endif
+
+    return dst;
+}
+{% endhighlight %}
+此函数用于导出```ngx_resolver_node_t```节点中的ip地址信息。参数```rotate```用于控制是否以一个随机的起始点导出数据。
+
+## 16. 函数ngx_resolver_report_srv()
+{% highlight string %}
+static void
+ngx_resolver_report_srv(ngx_resolver_t *r, ngx_resolver_ctx_t *ctx)
+{
+    ngx_uint_t                naddrs, nsrvs, nw, i, j, k, l, m, n, w;
+    ngx_resolver_addr_t      *addrs;
+    ngx_resolver_srv_name_t  *srvs;
+
+    naddrs = 0;
+
+    for (i = 0; i < ctx->nsrvs; i++) {
+        naddrs += ctx->srvs[i].naddrs;
+    }
+
+    if (naddrs == 0) {
+        ctx->state = NGX_RESOLVE_NXDOMAIN;
+        ctx->valid = ngx_time() + (r->valid ? r->valid : 10);
+
+        ctx->handler(ctx);
+        return;
+    }
+
+    addrs = ngx_resolver_calloc(r, naddrs * sizeof(ngx_resolver_addr_t));
+    if (addrs == NULL) {
+        ctx->state = NGX_ERROR;
+        ctx->valid = ngx_time() + (r->valid ? r->valid : 10);
+
+        ctx->handler(ctx);
+        return;
+    }
+
+    srvs = ctx->srvs;
+    nsrvs = ctx->nsrvs;
+
+    i = 0;
+    n = 0;
+
+    do {
+        nw = 0;
+
+        for (j = i; j < nsrvs; j++) {
+            if (srvs[j].priority != srvs[i].priority) {
+                break;
+            }
+
+            nw += srvs[j].naddrs * srvs[j].weight;
+        }
+
+        if (nw == 0) {
+            goto next_srv;
+        }
+
+        w = ngx_random() % nw;
+
+        for (k = i; k < j; k++) {
+            if (w < srvs[k].naddrs * srvs[k].weight) {
+                break;
+            }
+
+            w -= srvs[k].naddrs * srvs[k].weight;
+        }
+
+        for (l = i; l < j; l++) {
+
+            for (m = 0; m < srvs[k].naddrs; m++) {
+                addrs[n].socklen = srvs[k].addrs[m].socklen;
+                addrs[n].sockaddr = srvs[k].addrs[m].sockaddr;
+                addrs[n].name = srvs[k].name;
+                addrs[n].priority = srvs[k].priority;
+                addrs[n].weight = srvs[k].weight;
+                n++;
+            }
+
+            if (++k == j) {
+                k = i;
+            }
+        }
+
+next_srv:
+
+        i = j;
+
+    } while (i < ctx->nsrvs);
+
+    ctx->state = NGX_OK;
+    ctx->addrs = addrs;
+    ctx->naddrs = naddrs;
+
+    ctx->handler(ctx);
+
+    ngx_resolver_free(r, addrs);
+}
+{% endhighlight %}
+此函数用于按一定的顺序报告查询到的ip地址信息。
+
+## 17. 函数ngx_resolver_strerror()
+{% highlight string %}
+char *
+ngx_resolver_strerror(ngx_int_t err)
+{
+    static char *errors[] = {
+        "Format error",     /* FORMERR */
+        "Server failure",   /* SERVFAIL */
+        "Host not found",   /* NXDOMAIN */
+        "Unimplemented",    /* NOTIMP */
+        "Operation refused" /* REFUSED */
+    };
+
+    if (err > 0 && err < 6) {
+        return errors[err - 1];
+    }
+
+    if (err == NGX_RESOLVE_TIMEDOUT) {
+        return "Operation timed out";
+    }
+
+    return "Unknown error";
+}
+{% endhighlight %}
+打印指定错误码的error信息。
+
+## 18. 函数ngx_resolver_log_error()
+{% highlight string %}
+static u_char *
+ngx_resolver_log_error(ngx_log_t *log, u_char *buf, size_t len)
+{
+    u_char                     *p;
+    ngx_resolver_connection_t  *rec;
+
+    p = buf;
+
+    if (log->action) {
+        p = ngx_snprintf(buf, len, " while %s", log->action);
+        len -= p - buf;
+    }
+
+    rec = log->data;
+
+    if (rec) {
+        p = ngx_snprintf(p, len, ", resolver: %V", &rec->server);
+    }
+
+    return p;
+}
+{% endhighlight %}
+用于将日志格式话到```buf```中。
+
+## 19. 函数ngx_udp_connect()
+{% highlight string %}
+ngx_int_t
+ngx_udp_connect(ngx_resolver_connection_t *rec)
+{
+    int                rc;
+    ngx_int_t          event;
+    ngx_event_t       *rev, *wev;
+    ngx_socket_t       s;
+    ngx_connection_t  *c;
+
+    s = ngx_socket(rec->sockaddr->sa_family, SOCK_DGRAM, 0);
+
+    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, &rec->log, 0, "UDP socket %d", s);
+
+    if (s == (ngx_socket_t) -1) {
+        ngx_log_error(NGX_LOG_ALERT, &rec->log, ngx_socket_errno,
+                      ngx_socket_n " failed");
+        return NGX_ERROR;
+    }
+
+    c = ngx_get_connection(s, &rec->log);
+
+    if (c == NULL) {
+        if (ngx_close_socket(s) == -1) {
+            ngx_log_error(NGX_LOG_ALERT, &rec->log, ngx_socket_errno,
+                          ngx_close_socket_n "failed");
+        }
+
+        return NGX_ERROR;
+    }
+
+    if (ngx_nonblocking(s) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, &rec->log, ngx_socket_errno,
+                      ngx_nonblocking_n " failed");
+
+        goto failed;
+    }
+
+    rev = c->read;
+    wev = c->write;
+
+    rev->log = &rec->log;
+    wev->log = &rec->log;
+
+    rec->udp = c;
+
+    c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
+
+    ngx_log_debug3(NGX_LOG_DEBUG_EVENT, &rec->log, 0,
+                   "connect to %V, fd:%d #%uA", &rec->server, s, c->number);
+
+    rc = connect(s, rec->sockaddr, rec->socklen);
+
+    /* TODO: iocp */
+
+    if (rc == -1) {
+        ngx_log_error(NGX_LOG_CRIT, &rec->log, ngx_socket_errno,
+                      "connect() failed");
+
+        goto failed;
+    }
+
+    /* UDP sockets are always ready to write */
+    wev->ready = 1;
+
+    event = (ngx_event_flags & NGX_USE_CLEAR_EVENT) ?
+                /* kqueue, epoll */                 NGX_CLEAR_EVENT:
+                /* select, poll, /dev/poll */       NGX_LEVEL_EVENT;
+                /* eventport event type has no meaning: oneshot only */
+
+    if (ngx_add_event(rev, NGX_READ_EVENT, event) != NGX_OK) {
+        goto failed;
+    }
+
+    return NGX_OK;
+
+failed:
+
+    ngx_close_connection(c);
+    rec->udp = NULL;
+
+    return NGX_ERROR;
+}
+{% endhighlight %}
+此函数首先采用```socket()```方法构造一个fd，然后调用非阻塞的connect()连接到指定地址。
+
 
 
 <br />
