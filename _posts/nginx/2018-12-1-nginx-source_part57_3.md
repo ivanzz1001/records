@@ -2153,7 +2153,16 @@ static void
 ngx_resolver_process_ptr(ngx_resolver_t *r, u_char *buf, size_t n,
     ngx_uint_t ident, ngx_uint_t code, ngx_uint_t nan)
 {
-	
+	//1) 调用ngx_resolver_copy()分离出查询的域名name,
+
+	//2) 从response的buf中解析出IP地址
+
+	//3) 通过ngx_resolver_lookup_addr查询出本地保存的标识符qident与查询返回的标识符是否一致，如果不一样的话表示响应有问题
+
+	//4) 如果code不为0， 则一般情况表示出现了异常， 打印相应的错误退出
+
+	//5) 若nan>0，表示有相应的应答资源记录数，那么解析出对应的name，接着回调rn->waiting上下文列表中的handler()
+	ngx_resolver_copy(r, &name, buf, buf + i, buf + n)；
 }
 {% endhighlight %}
 
