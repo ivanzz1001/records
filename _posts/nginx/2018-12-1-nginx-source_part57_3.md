@@ -1611,110 +1611,551 @@ failed:
 }
 {% endhighlight %}
 
-## 1. 函数ngx_resolver_create_addr_query()
+此函数用于处理```由服务名获得IPv4(或IPv6)地址```的解析。下面简要介绍一下函数的处理流程：
 {% highlight string %}
-static ngx_int_t
-ngx_resolver_create_addr_query(ngx_resolver_t *r, ngx_resolver_node_t *rn,
-    ngx_resolver_addr_t *addr)
+static void
+ngx_resolver_process_srv(ngx_resolver_t *r, u_char *buf, size_t n,
+    ngx_uint_t ident, ngx_uint_t code, ngx_uint_t nan,
+    ngx_uint_t trunc, ngx_uint_t ans)
 {
-    u_char               *p, *d;
-    size_t                len;
-    in_addr_t             inaddr;
-    ngx_int_t             n;
-    ngx_uint_t            ident;
-    ngx_resolver_hdr_t   *query;
-    struct sockaddr_in   *sin;
-#if (NGX_HAVE_INET6)
-    struct sockaddr_in6  *sin6;
-#endif
+	//1) 调用ngx_resolver_copy()分离出查询的域名name
 
-    switch (addr->sockaddr->sa_family) {
+	//2) 调用ngx_resolver_lookup_srv()查找对应的ngx_resolver_node_t节点
 
-#if (NGX_HAVE_INET6)
-    case AF_INET6:
-        len = sizeof(ngx_resolver_hdr_t)
-              + 64 + sizeof(".ip6.arpa.") - 1
-              + sizeof(ngx_resolver_qs_t);
+	//3) 根据qtype获得当前的查询标识符(qident), 并判断我们本地保存的查询标识符与DNS返回的标识符是否一样，不一样的话表示响应有问题
 
-        break;
-#endif
+	//4) 处理trunc情况，表示有截断，此时可能需要重新发起查询请求
 
-    default: /* AF_INET */
-        len = sizeof(ngx_resolver_hdr_t)
-              + sizeof(".255.255.255.255.in-addr.arpa.") - 1
-              + sizeof(ngx_resolver_qs_t);
-    }
+	//5) 如果code==0 且 nan==0(即应答资源记录数为0），则一般情况表示出现了异常，此种情况会将ctx->state设置为相应的异常状态，
+	// 直接调用ctx->handler()来处理
 
-    p = ngx_resolver_alloc(r, len);
-    if (p == NULL) {
-        return NGX_ERROR;
-    }
+	//6) 解析应答报文，获取srvs的个数
 
-    rn->query = p;
-    query = (ngx_resolver_hdr_t *) p;
+	//7) 假如srvs个数大于0， 
+	// 7.1) 循环解析应答报文，获得所查询服务的domain name、优先级、权重、端口等等
+	// 7.2) 对返回的srvs进行排序，并将该ngx_resolver_node_t节点插入到resolver的srv_expire_queue队列中
+	// 7.3) 接着再根据服务的domain name等查询具体的IP地址等信息（通过调用ngx_resolver_resolve_srv_names())
 
-    ident = ngx_random();
-
-    query->ident_hi = (u_char) ((ident >> 8) & 0xff);
-    query->ident_lo = (u_char) (ident & 0xff);
-
-    /* recursion query */
-    query->flags_hi = 1; query->flags_lo = 0;
-
-    /* one question */
-    query->nqs_hi = 0; query->nqs_lo = 1;
-    query->nan_hi = 0; query->nan_lo = 0;
-    query->nns_hi = 0; query->nns_lo = 0;
-    query->nar_hi = 0; query->nar_lo = 0;
-
-    p += sizeof(ngx_resolver_hdr_t);
-
-    switch (addr->sockaddr->sa_family) {
-
-#if (NGX_HAVE_INET6)
-    case AF_INET6:
-        sin6 = (struct sockaddr_in6 *) addr->sockaddr;
-
-        for (n = 15; n >= 0; n--) {
-            p = ngx_sprintf(p, "\1%xd\1%xd",
-                            sin6->sin6_addr.s6_addr[n] & 0xf,
-                            (sin6->sin6_addr.s6_addr[n] >> 4) & 0xf);
-        }
-
-        p = ngx_cpymem(p, "\3ip6\4arpa\0", 10);
-
-        break;
-#endif
-
-    default: /* AF_INET */
-
-        sin = (struct sockaddr_in *) addr->sockaddr;
-        inaddr = ntohl(sin->sin_addr.s_addr);
-
-        for (n = 0; n < 32; n += 8) {
-            d = ngx_sprintf(&p[1], "%ud", (inaddr >> n) & 0xff);
-            *p = (u_char) (d - &p[1]);
-            p = d;
-        }
-
-        p = ngx_cpymem(p, "\7in-addr\4arpa\0", 14);
-    }
-
-    /* query type "PTR", IN query class */
-    p = ngx_cpymem(p, "\0\14\0\1", 4);
-
-    rn->qlen = (u_short) (p - rn->query);
-
-    return NGX_OK;
+	//8) 如果cname不为NULL，将rn->nsrvs设置为0，表示返回的是规范化名称CNAME，此时可能需要再采用该canonical name
+	//来进行继续的解析(注意： 在解析时可能产生递归，这里判别当出现NGX_RESOLVER_MAX_RECURSION次递归时，直接结束查询)
+	
 }
 {% endhighlight %}
 
-此函数用于构造向DNS服务器进行逆查询的报文，即查询```addr```地址处的域名。函数实现较为简单，这里不进行详细介绍。
+## 10. 函数ngx_resolver_resolve_srv_names()
+{% highlight string %}
+static void
+ngx_resolver_resolve_srv_names(ngx_resolver_ctx_t *ctx, ngx_resolver_node_t *rn)
+{
+    ngx_uint_t                i;
+    ngx_resolver_t           *r;
+    ngx_resolver_ctx_t       *cctx;
+    ngx_resolver_srv_name_t  *srvs;
+
+    r = ctx->resolver;
+
+    ctx->node = NULL;
+    ctx->state = NGX_OK;
+    ctx->valid = rn->valid;
+    ctx->count = rn->nsrvs;
+
+    srvs = ngx_resolver_calloc(r, rn->nsrvs * sizeof(ngx_resolver_srv_name_t));
+    if (srvs == NULL) {
+        goto failed;
+    }
+
+    ctx->srvs = srvs;
+    ctx->nsrvs = rn->nsrvs;
+
+    for (i = 0; i < rn->nsrvs; i++) {
+        srvs[i].name.data = ngx_resolver_alloc(r, rn->u.srvs[i].name.len);
+        if (srvs[i].name.data == NULL) {
+            goto failed;
+        }
+
+        srvs[i].name.len = rn->u.srvs[i].name.len;
+        ngx_memcpy(srvs[i].name.data, rn->u.srvs[i].name.data,
+                   srvs[i].name.len);
+
+        cctx = ngx_resolve_start(r, NULL);
+        if (cctx == NULL) {
+            goto failed;
+        }
+
+        cctx->name = srvs[i].name;
+        cctx->handler = ngx_resolver_srv_names_handler;
+        cctx->data = ctx;
+        cctx->srvs = &srvs[i];
+        cctx->timeout = 0;
+
+        srvs[i].priority = rn->u.srvs[i].priority;
+        srvs[i].weight = rn->u.srvs[i].weight;
+        srvs[i].port = rn->u.srvs[i].port;
+        srvs[i].ctx = cctx;
+
+        if (ngx_resolve_name(cctx) == NGX_ERROR) {
+            srvs[i].ctx = NULL;
+            goto failed;
+        }
+    }
+
+    return;
+
+failed:
+
+    ctx->state = NGX_ERROR;
+    ctx->valid = ngx_time() + (r->valid ? r->valid : 10);
+
+    ctx->handler(ctx);
+}
+{% endhighlight %}
+此函数用于解析```rn->u.srvs```，即将```规范化服务名称解析为IP地址```。下面简要讲解一下本函数的实现流程：
+{% highlight string %}
+static void
+ngx_resolver_resolve_srv_names(ngx_resolver_ctx_t *ctx, ngx_resolver_node_t *rn)
+{
+	//循环rn->nsrvs，重新创建ngx_resolver_ctx_t来进行'规范化服务名称解析为IP地址'
+	for (i = 0; i < rn->nsrvs; i++) {
+		//创建新的ctx对象
+		cctx = ngx_resolve_start(r, NULL);
+
+		//使用新的ctx完成解析
+		ngx_resolve_name()
+	}
+}
+{% endhighlight %}
 
 
+## 11. 函数ngx_resolver_srv_names_handler()
+{% highlight string %}
+static void
+ngx_resolver_srv_names_handler(ngx_resolver_ctx_t *cctx)
+{
+    ngx_uint_t                 i;
+    u_char                   (*sockaddr)[NGX_SOCKADDRLEN];
+    ngx_addr_t                *addrs;
+    ngx_resolver_t            *r;
+    struct sockaddr_in        *sin;
+    ngx_resolver_ctx_t        *ctx;
+    ngx_resolver_srv_name_t   *srv;
+#if (NGX_HAVE_INET6)
+    struct sockaddr_in6       *sin6;
+#endif
+
+    r = cctx->resolver;
+    ctx = cctx->data;
+    srv = cctx->srvs;
+
+    ctx->count--;
+
+    srv->ctx = NULL;
+
+    if (cctx->naddrs) {
+
+        ctx->valid = ngx_min(ctx->valid, cctx->valid);
+
+        addrs = ngx_resolver_calloc(r, cctx->naddrs * sizeof(ngx_addr_t));
+        if (addrs == NULL) {
+            ngx_resolve_name_done(cctx);
+
+            ctx->state = NGX_ERROR;
+            ctx->valid = ngx_time() + (r->valid ? r->valid : 10);
+
+            ctx->handler(ctx);
+            return;
+        }
+
+        sockaddr = ngx_resolver_alloc(r, cctx->naddrs * NGX_SOCKADDRLEN);
+        if (sockaddr == NULL) {
+            ngx_resolver_free(r, addrs);
+            ngx_resolve_name_done(cctx);
+
+            ctx->state = NGX_ERROR;
+            ctx->valid = ngx_time() + (r->valid ? r->valid : 10);
+
+            ctx->handler(ctx);
+            return;
+        }
+
+        for (i = 0; i < cctx->naddrs; i++) {
+            addrs[i].sockaddr = (struct sockaddr *) sockaddr[i];
+            addrs[i].socklen = cctx->addrs[i].socklen;
+
+            ngx_memcpy(sockaddr[i], cctx->addrs[i].sockaddr,
+                       addrs[i].socklen);
+
+            switch (addrs[i].sockaddr->sa_family) {
+#if (NGX_HAVE_INET6)
+            case AF_INET6:
+                sin6 = (struct sockaddr_in6 *) addrs[i].sockaddr;
+                sin6->sin6_port = htons(srv->port);
+                break;
+#endif
+            default: /* AF_INET */
+                sin = (struct sockaddr_in *) addrs[i].sockaddr;
+                sin->sin_port = htons(srv->port);
+            }
+        }
+
+        srv->addrs = addrs;
+        srv->naddrs = cctx->naddrs;
+    }
+
+    ngx_resolve_name_done(cctx);
+
+    if (ctx->count == 0) {
+        ngx_resolver_report_srv(r, ctx);
+    }
+}
+{% endhighlight %}
+本函数是将```规范化服务名称解析为IP地址```完成后的回调函数。涉及到两个context: 首先```context_1```将尝试将服务名解析为```IP地址```，但是只返回了```规范化服务名称```； 接着会创建一个新的```context_2```来将该规范化服务名成解析为```IP地址```。这里可以认为context_1是context_2的父上下文。
+
+基本实现步骤如下：
+{% highlight string %}
+static void
+ngx_resolver_srv_names_handler(ngx_resolver_ctx_t *cctx)
+{
+	//1) 如果成功解析到了IP地址
+	if (cctx->naddrs) {
+		
+		//将解析到的IP地址保存到cctx->srvs->addrs里面(一个规范化名称，可能会对应多个IP地址)
+
+	}
+
+	//2) 执行ngx_resolve_name_done(cctx)，表明当前context已经处理完，进行相应的收尾工作
+
+	//3) 如果cctx->data所表示的context的count为0，表示已经完成了所有规范名称的IP地址转换，此时ngx_resolver_report_srv()
+}
+{% endhighlight %}
 
 
+## 12. 函数ngx_resolver_process_ptr()
+{% highlight string %}
+static void
+ngx_resolver_process_ptr(ngx_resolver_t *r, u_char *buf, size_t n,
+    ngx_uint_t ident, ngx_uint_t code, ngx_uint_t nan)
+{
+    char                 *err;
+    size_t                len;
+    in_addr_t             addr;
+    int32_t               ttl;
+    ngx_int_t             octet;
+    ngx_str_t             name;
+    ngx_uint_t            mask, type, class, qident, a, i, start;
+    ngx_queue_t          *expire_queue;
+    ngx_rbtree_t         *tree;
+    ngx_resolver_an_t    *an;
+    ngx_resolver_ctx_t   *ctx, *next;
+    ngx_resolver_node_t  *rn;
+#if (NGX_HAVE_INET6)
+    uint32_t              hash;
+    ngx_int_t             digit;
+    struct in6_addr       addr6;
+#endif
 
+    if (ngx_resolver_copy(r, &name, buf,
+                          buf + sizeof(ngx_resolver_hdr_t), buf + n)
+        != NGX_OK)
+    {
+        return;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_CORE, r->log, 0, "resolver qs:%V", &name);
+
+    /* AF_INET */
+
+    addr = 0;
+    i = sizeof(ngx_resolver_hdr_t);
+
+    for (mask = 0; mask < 32; mask += 8) {
+        len = buf[i++];
+
+        octet = ngx_atoi(&buf[i], len);
+        if (octet == NGX_ERROR || octet > 255) {
+            goto invalid_in_addr_arpa;
+        }
+
+        addr += octet << mask;
+        i += len;
+    }
+
+    if (ngx_strcasecmp(&buf[i], (u_char *) "\7in-addr\4arpa") == 0) {
+        i += sizeof("\7in-addr\4arpa");
+
+        /* lock addr mutex */
+
+        rn = ngx_resolver_lookup_addr(r, addr);
+
+        tree = &r->addr_rbtree;
+        expire_queue = &r->addr_expire_queue;
+
+        goto valid;
+    }
+
+invalid_in_addr_arpa:
+
+#if (NGX_HAVE_INET6)
+
+    i = sizeof(ngx_resolver_hdr_t);
+
+    for (octet = 15; octet >= 0; octet--) {
+        if (buf[i++] != '\1') {
+            goto invalid_ip6_arpa;
+        }
+
+        digit = ngx_hextoi(&buf[i++], 1);
+        if (digit == NGX_ERROR) {
+            goto invalid_ip6_arpa;
+        }
+
+        addr6.s6_addr[octet] = (u_char) digit;
+
+        if (buf[i++] != '\1') {
+            goto invalid_ip6_arpa;
+        }
+
+        digit = ngx_hextoi(&buf[i++], 1);
+        if (digit == NGX_ERROR) {
+            goto invalid_ip6_arpa;
+        }
+
+        addr6.s6_addr[octet] += (u_char) (digit * 16);
+    }
+
+    if (ngx_strcasecmp(&buf[i], (u_char *) "\3ip6\4arpa") == 0) {
+        i += sizeof("\3ip6\4arpa");
+
+        /* lock addr mutex */
+
+        hash = ngx_crc32_short(addr6.s6_addr, 16);
+        rn = ngx_resolver_lookup_addr6(r, &addr6, hash);
+
+        tree = &r->addr6_rbtree;
+        expire_queue = &r->addr6_expire_queue;
+
+        goto valid;
+    }
+
+invalid_ip6_arpa:
+#endif
+
+    ngx_log_error(r->log_level, r->log, 0,
+                  "invalid in-addr.arpa or ip6.arpa name in DNS response");
+    ngx_resolver_free(r, name.data);
+    return;
+
+valid:
+
+    if (rn == NULL || rn->query == NULL) {
+        ngx_log_error(r->log_level, r->log, 0,
+                      "unexpected response for %V", &name);
+        ngx_resolver_free(r, name.data);
+        goto failed;
+    }
+
+    qident = (rn->query[0] << 8) + rn->query[1];
+
+    if (ident != qident) {
+        ngx_log_error(r->log_level, r->log, 0,
+                      "wrong ident %ui response for %V, expect %ui",
+                      ident, &name, qident);
+        ngx_resolver_free(r, name.data);
+        goto failed;
+    }
+
+    ngx_resolver_free(r, name.data);
+
+    if (code == 0 && nan == 0) {
+        code = NGX_RESOLVE_NXDOMAIN;
+    }
+
+    if (code) {
+        next = rn->waiting;
+        rn->waiting = NULL;
+
+        ngx_queue_remove(&rn->queue);
+
+        ngx_rbtree_delete(tree, &rn->node);
+
+        /* unlock addr mutex */
+
+        while (next) {
+            ctx = next;
+            ctx->state = code;
+            ctx->valid = ngx_time() + (r->valid ? r->valid : 10);
+            next = ctx->next;
+
+            ctx->handler(ctx);
+        }
+
+        ngx_resolver_free_node(r, rn);
+
+        return;
+    }
+
+    i += sizeof(ngx_resolver_qs_t);
+
+    for (a = 0; a < nan; a++) {
+
+        start = i;
+
+        while (i < n) {
+
+            if (buf[i] & 0xc0) {
+                i += 2;
+                goto found;
+            }
+
+            if (buf[i] == 0) {
+                i++;
+                goto test_length;
+            }
+
+            i += 1 + buf[i];
+        }
+
+        goto short_response;
+
+    test_length:
+
+        if (i - start < 2) {
+            err = "invalid name in DNS response";
+            goto invalid;
+        }
+
+    found:
+
+        if (i + sizeof(ngx_resolver_an_t) >= n) {
+            goto short_response;
+        }
+
+        an = (ngx_resolver_an_t *) &buf[i];
+
+        type = (an->type_hi << 8) + an->type_lo;
+        class = (an->class_hi << 8) + an->class_lo;
+        len = (an->len_hi << 8) + an->len_lo;
+        ttl = (an->ttl[0] << 24) + (an->ttl[1] << 16)
+            + (an->ttl[2] << 8) + (an->ttl[3]);
+
+        if (class != 1) {
+            ngx_log_error(r->log_level, r->log, 0,
+                          "unexpected RR class %ui", class);
+            goto failed;
+        }
+
+        if (ttl < 0) {
+            ttl = 0;
+        }
+
+        ngx_log_debug3(NGX_LOG_DEBUG_CORE, r->log, 0,
+                      "resolver qt:%ui cl:%ui len:%uz",
+                      type, class, len);
+
+        i += sizeof(ngx_resolver_an_t);
+
+        switch (type) {
+
+        case NGX_RESOLVE_PTR:
+
+            goto ptr;
+
+        case NGX_RESOLVE_CNAME:
+
+            break;
+
+        default:
+
+            ngx_log_error(r->log_level, r->log, 0,
+                          "unexpected RR type %ui", type);
+        }
+
+        i += len;
+    }
+
+    /* unlock addr mutex */
+
+    ngx_log_error(r->log_level, r->log, 0,
+                  "no PTR type in DNS response");
+    return;
+
+ptr:
+
+    if (ngx_resolver_copy(r, &name, buf, buf + i, buf + n) != NGX_OK) {
+        goto failed;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_CORE, r->log, 0, "resolver an:%V", &name);
+
+    if (name.len != (size_t) rn->nlen
+        || ngx_strncmp(name.data, rn->name, name.len) != 0)
+    {
+        if (rn->nlen) {
+            ngx_resolver_free(r, rn->name);
+        }
+
+        rn->nlen = (u_short) name.len;
+        rn->name = name.data;
+
+        name.data = ngx_resolver_dup(r, rn->name, name.len);
+        if (name.data == NULL) {
+            goto failed;
+        }
+    }
+
+    ngx_queue_remove(&rn->queue);
+
+    rn->valid = ngx_time() + (r->valid ? r->valid : ttl);
+    rn->expire = ngx_time() + r->expire;
+
+    ngx_queue_insert_head(expire_queue, &rn->queue);
+
+    next = rn->waiting;
+    rn->waiting = NULL;
+
+    /* unlock addr mutex */
+
+    while (next) {
+        ctx = next;
+        ctx->state = NGX_OK;
+        ctx->valid = rn->valid;
+        ctx->name = name;
+        next = ctx->next;
+
+        ctx->handler(ctx);
+    }
+
+    ngx_resolver_free(r, name.data);
+
+    return;
+
+short_response:
+
+    err = "short DNS response";
+
+invalid:
+
+    /* unlock addr mutex */
+
+    ngx_log_error(r->log_level, r->log, 0, err);
+
+    return;
+
+failed:
+
+    /* unlock addr mutex */
+
+    return;
+}
+{% endhighlight %}
+此函数用于处理```将IP地址转换为域名```的响应。下面简要介绍一下函数的实现流程：
+{% highlight string %}
+static void
+ngx_resolver_process_ptr(ngx_resolver_t *r, u_char *buf, size_t n,
+    ngx_uint_t ident, ngx_uint_t code, ngx_uint_t nan)
+{
+	
+}
+{% endhighlight %}
 
 <br />
 <br />

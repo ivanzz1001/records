@@ -37,7 +37,7 @@ description: nginx源代码分析
 #define NGX_RESOLVE_AAAA      28
 #endif
 
-//根据服务名查询IP地址
+//根据服务名查询目标服务器的域名
 #define NGX_RESOLVE_SRV       33
 #define NGX_RESOLVE_DNAME     39
 
@@ -102,6 +102,16 @@ typedef struct {
     u_short                   port;
 } ngx_resolver_srv_t;
 {% endhighlight %}
+在进行```NGX_RESOLVE_SRV```查询时，返回目标服务器的相关信息。下面简要介绍一下各字段的含义(rfc2782)：
+
+* name: 目标服务器的域名信息
+
+* priority: 优先级。一般值越低，优先级越高
+
+* weight: 目标服务器所占用的权重
+
+* port: 该不服务在目标服务器上所占用的端口
+
 
 ## 3. ngx_resolver_srv_name_t数据结构
 {% highlight string %}
@@ -158,8 +168,8 @@ typedef struct {
     union {
         in_addr_t             addr;		//表示单个IP地址
         in_addr_t            *addrs;	//表示IP地址的数组
-        u_char               *cname;	//用于表示查询返回的规范名称
-        ngx_resolver_srv_t   *srvs;		//
+        u_char               *cname;	//用于表示查询返回的规范名称（canonical name)
+        ngx_resolver_srv_t   *srvs;		//用于SRV查询时，返回的目标服务器的相关信息
     } u;
 
     u_char                    code;
@@ -389,6 +399,11 @@ struct ngx_resolver_ctx_s {
 
 * addr: 当前需要进行DNS逆查询的IP地址（即IP地址到域名的映射)
 
+* count: 用于保存当前未处理完的srvs的个数。（srv表示将```服务名转换为IP地址```，有时可能不能直接转换，会先返回规范化的名称，然后我们需要再根据返回的规范化名称再去查询DNS，以返回IP地址。此处用于指明当前我们未处理的规范化名称个数)
+
+* nsrvs: 当前ctx所要解析的```srvs```的个数
+
+* srvs: 当前ctx所要解析的```规范化服务名称```(canonical name)
 
 * handler: 本context对象绑定的回调函数
 
@@ -398,6 +413,7 @@ struct ngx_resolver_ctx_s {
 
 * quick： 一般情况下，当我们并不需要调用DNS服务器进行解析时会将本字段设置为1，这时直接调用ngx_resolver_ctx_t的handler回调函数即可。
 
+* recursion: 因为DNS解析时可能会产生递归，这里用于记录递归的次数。超过了一定的次数之后，一般可以认为出现了问题，此时不应该继续查询DNS让递归一直进行下去了
 
 
 下面我们给出nginx resolver各数据结构的一个整体图景：
