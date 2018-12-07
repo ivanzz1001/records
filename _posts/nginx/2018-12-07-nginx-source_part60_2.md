@@ -19,9 +19,6 @@ description: nginx源代码分析
 
 
 
-
-
-
 <br />
 <br />
 
@@ -38,6 +35,8 @@ description: nginx源代码分析
 5. [linux进程锁](https://blog.csdn.net/zyembed/article/details/79884211)
 
 6. [进程间同步（进程间互斥锁、文件锁）](https://blog.csdn.net/qq_35396127/article/details/78942245?utm_source=blogxgwz9)
+
+7. [nginx之共享内存](https://blog.csdn.net/evsqiezi/article/details/51785093)
 
 <br />
 <br />
