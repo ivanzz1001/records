@@ -8,7 +8,7 @@ description: nginx源代码分析
 ---
 
 
-本章讲述一下nginx中队列的实现。
+本章讲述nginx中读写锁的实现。
 
 
 <!-- more -->
