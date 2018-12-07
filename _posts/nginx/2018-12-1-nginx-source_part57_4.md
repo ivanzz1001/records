@@ -1185,7 +1185,251 @@ failed:
     return NGX_ERROR;
 }
 {% endhighlight %}
-此函数首先采用```socket()```方法构造一个fd，然后调用非阻塞的connect()连接到指定地址。
+此函数首先采用```socket()```方法构造一个fd，然后调用非阻塞的connect()连接到指定地址。注意： 针对UDP建立连接，那么后续在发送时就可以不用指定目标地址。
+
+## 20 函数ngx_tcp_connect()
+{% highlight string %}
+ngx_int_t
+ngx_tcp_connect(ngx_resolver_connection_t *rec)
+{
+    int                rc;
+    ngx_int_t          event;
+    ngx_err_t          err;
+    ngx_uint_t         level;
+    ngx_socket_t       s;
+    ngx_event_t       *rev, *wev;
+    ngx_connection_t  *c;
+
+    s = ngx_socket(rec->sockaddr->sa_family, SOCK_STREAM, 0);
+
+    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, &rec->log, 0, "TCP socket %d", s);
+
+    if (s == (ngx_socket_t) -1) {
+        ngx_log_error(NGX_LOG_ALERT, &rec->log, ngx_socket_errno,
+                      ngx_socket_n " failed");
+        return NGX_ERROR;
+    }
+
+    c = ngx_get_connection(s, &rec->log);
+
+    if (c == NULL) {
+        if (ngx_close_socket(s) == -1) {
+            ngx_log_error(NGX_LOG_ALERT, &rec->log, ngx_socket_errno,
+                          ngx_close_socket_n "failed");
+        }
+
+        return NGX_ERROR;
+    }
+
+    if (ngx_nonblocking(s) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, &rec->log, ngx_socket_errno,
+                      ngx_nonblocking_n " failed");
+
+        goto failed;
+    }
+
+    rev = c->read;
+    wev = c->write;
+
+    rev->log = &rec->log;
+    wev->log = &rec->log;
+
+    rec->tcp = c;
+
+    c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
+
+    if (ngx_add_conn) {
+        if (ngx_add_conn(c) == NGX_ERROR) {
+            goto failed;
+        }
+    }
+
+    ngx_log_debug3(NGX_LOG_DEBUG_EVENT, &rec->log, 0,
+                   "connect to %V, fd:%d #%uA", &rec->server, s, c->number);
+
+    rc = connect(s, rec->sockaddr, rec->socklen);
+
+    if (rc == -1) {
+        err = ngx_socket_errno;
+
+
+        if (err != NGX_EINPROGRESS
+#if (NGX_WIN32)
+            /* Winsock returns WSAEWOULDBLOCK (NGX_EAGAIN) */
+            && err != NGX_EAGAIN
+#endif
+            )
+        {
+            if (err == NGX_ECONNREFUSED
+#if (NGX_LINUX)
+                /*
+                 * Linux returns EAGAIN instead of ECONNREFUSED
+                 * for unix sockets if listen queue is full
+                 */
+                || err == NGX_EAGAIN
+#endif
+                || err == NGX_ECONNRESET
+                || err == NGX_ENETDOWN
+                || err == NGX_ENETUNREACH
+                || err == NGX_EHOSTDOWN
+                || err == NGX_EHOSTUNREACH)
+            {
+                level = NGX_LOG_ERR;
+
+            } else {
+                level = NGX_LOG_CRIT;
+            }
+
+            ngx_log_error(level, c->log, err, "connect() to %V failed",
+                          &rec->server);
+
+            ngx_close_connection(c);
+            rec->tcp = NULL;
+
+            return NGX_ERROR;
+        }
+    }
+
+    if (ngx_add_conn) {
+        if (rc == -1) {
+
+            /* NGX_EINPROGRESS */
+
+            return NGX_AGAIN;
+        }
+
+        ngx_log_debug0(NGX_LOG_DEBUG_EVENT, &rec->log, 0, "connected");
+
+        wev->ready = 1;
+
+        return NGX_OK;
+    }
+
+    if (ngx_event_flags & NGX_USE_IOCP_EVENT) {
+
+        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, &rec->log, ngx_socket_errno,
+                       "connect(): %d", rc);
+
+        if (ngx_blocking(s) == -1) {
+            ngx_log_error(NGX_LOG_ALERT, &rec->log, ngx_socket_errno,
+                          ngx_blocking_n " failed");
+            goto failed;
+        }
+
+        /*
+         * FreeBSD's aio allows to post an operation on non-connected socket.
+         * NT does not support it.
+         *
+         * TODO: check in Win32, etc. As workaround we can use NGX_ONESHOT_EVENT
+         */
+
+        rev->ready = 1;
+        wev->ready = 1;
+
+        return NGX_OK;
+    }
+
+    if (ngx_event_flags & NGX_USE_CLEAR_EVENT) {
+
+        /* kqueue */
+
+        event = NGX_CLEAR_EVENT;
+
+    } else {
+
+        /* select, poll, /dev/poll */
+
+        event = NGX_LEVEL_EVENT;
+    }
+
+    if (ngx_add_event(rev, NGX_READ_EVENT, event) != NGX_OK) {
+        goto failed;
+    }
+
+    if (rc == -1) {
+
+        /* NGX_EINPROGRESS */
+
+        if (ngx_add_event(wev, NGX_WRITE_EVENT, event) != NGX_OK) {
+            goto failed;
+        }
+
+        return NGX_AGAIN;
+    }
+
+    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, &rec->log, 0, "connected");
+
+    wev->ready = 1;
+
+    return NGX_OK;
+
+failed:
+
+    ngx_close_connection(c);
+    rec->tcp = NULL;
+
+    return NGX_ERROR;
+}
+{% endhighlight %}
+此函数用于建立一个tcp连接。下面我们简要分析一下建立流程：
+{% highlight string %}
+ngx_int_t
+ngx_tcp_connect(ngx_resolver_connection_t *rec)
+{
+	//1) 调用socket()方法建立文件句柄fd
+
+	//2) 从全局ngx_cycle中获取一个空闲的connection对象
+
+	//3) 设置socket为非阻塞方式
+
+	//4) 将连接的使用次数加1
+	c->number = ngx_atomic_fetch_add(ngx_connection_counter, 1);
+
+	//5) 调用connect()函数连接到服务器
+	rc = connect(s, rec->sockaddr, rec->socklen);
+	if (rc == -1)
+	{
+		//5.1 如果errno值为NGX_EINPROGRESS，表示当前socket为非阻塞模式并且不能马上返回连接
+	}
+
+	//6) 处理ready情况, 表明当前socket正处于连接中
+	if (ngx_add_conn) {
+		if (rc == -1) {
+			
+			/* NGX_EINPROGRESS */
+			
+			return NGX_AGAIN;
+		}
+	
+		ngx_log_debug0(NGX_LOG_DEBUG_EVENT, &rec->log, 0, "connected");
+	
+		wev->ready = 1;
+	
+		return NGX_OK;
+	}
+
+	//7) 在socket上监听相应的可读、可写事件
+}
+{% endhighlight %}
+
+## 21. 函数ngx_resolver_cmp_srvs()
+{% highlight string %}
+static ngx_int_t
+ngx_resolver_cmp_srvs(const void *one, const void *two)
+{
+    ngx_int_t            p1, p2;
+    ngx_resolver_srv_t  *first, *second;
+
+    first = (ngx_resolver_srv_t *) one;
+    second = (ngx_resolver_srv_t *) two;
+
+    p1 = first->priority;
+    p2 = second->priority;
+
+    return p1 - p2;
+}
+{% endhighlight %}
+根据```priority```来比较两个ngx_resolver_srv_t类型对象的大小。
 
 
 
