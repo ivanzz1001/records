@@ -57,16 +57,44 @@ typedef struct {
     ngx_uint_t     spin;
 } ngx_shmtx_t;
 {% endhighlight %}
+本数据结构用于实现```进程间的互斥锁```。当支持**NGX_HAVE_ATOMIC_OPS**宏定义时采用原子锁来实现，否则采用文件锁来实现。当前我们支持GCC的```NGX_HAVE_ATOMIC_OPS```原子操作。
+
+下面我们简要介绍一下各字段的含义:
+
+* lock: 用于实现原子锁
+
+* wait: 可以用于记录当前正在sem_wait()信号量的```请求者数量```。当前我们支持```NGX_HAVE_POSIX_SEM```宏定义
+
+* semaphore: 用于记录信号量是否创建成功
+
+* sem: linux信号量。用于辅助实现NGINX互斥锁，可以获得较高的性能
+
+* fd: 用于实现文件锁的句柄
+
+* name: 文件的名称
+
+* spin: 当不能马上获取到锁时，会采用自旋的方式pause CPU，这里用于控制每一次主动让出CPU之前(通过调用ngx_sched_yield())，进行自旋的次数。
 
 
 ## 3. 相关函数声明
 {% highlight string %}
+// 创建一把'nginx进程间互斥锁'
 ngx_int_t ngx_shmtx_create(ngx_shmtx_t *mtx, ngx_shmtx_sh_t *addr,
     u_char *name);
+
+// 销毁互斥锁
 void ngx_shmtx_destroy(ngx_shmtx_t *mtx);
+
+// 尝试获取互斥锁
 ngx_uint_t ngx_shmtx_trylock(ngx_shmtx_t *mtx);
+
+//获取互斥锁
 void ngx_shmtx_lock(ngx_shmtx_t *mtx);
+
+//解锁
 void ngx_shmtx_unlock(ngx_shmtx_t *mtx);
+
+//强制解锁
 ngx_uint_t ngx_shmtx_force_unlock(ngx_shmtx_t *mtx, ngx_pid_t pid);
 
 
