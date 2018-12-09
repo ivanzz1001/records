@@ -193,7 +193,38 @@ Nginx的slab内存分配方式是基于best-fit思路的，即当我们申请一
 如上图所示，每一页都会有一个ngx_slab_page_t结构体描述，object是申请分配到的内存存放的对象，阴影方块是已经分配出去的内存块，空白方块则是未分配的内存块。
 
 
+### 4.1 slab池中的空闲页与全满页
+我们从上图中可以看到，页分为空闲页和已使用页，而已使用页又分为还有空闲空间可供分配的半满页和完全分配完毕的全满页。每一页的大小由```ngx_pagesize```变量指定，同时为方便大量的位操作，还定义了页大小对应的位移变量ngx_pagesize_shift。如下：
+{% highlight string %}
+//ngx_alloc.c文件
+ngx_uint_t  ngx_pagesize;
+ngx_uint_t  ngx_pagesize_shift;
 
+//ngx_posix_init.c文件
+ngx_int_t
+ngx_os_init(ngx_log_t *log)
+{
+	...
+	ngx_pagesize = getpagesize();
+    ngx_cacheline_size = NGX_CPU_CACHE_LINE;
+
+    for (n = ngx_pagesize; n >>= 1; ngx_pagesize_shift++) { /* void */ }
+	...
+}
+{% endhighlight %}
+
+在我们当前调试的系统32bit Ubuntu系统中，ngx_pagesize为4096，因此ngx_pagesize_shift的值为12。
+
+全满页和空闲页较为简单。全满页不在任何链表中，它对应的ngx_slab_page_t中的next和prev成员没有任何链表功能。
+
+所有的空闲页链表构成一个双向链表，ngx_slab_pool_t中的free指向这个链表。然而需要注意的是，并不是每一个空闲页都是该双向链表中的元素，可能存在多个相邻的页面中，仅首页面在链表中的情况，故而首页面的slab成员大于1的时候则表示其后面有相邻的页面，这些相邻的多个页面作为一个链表元素存在。但是，也并不是相邻的页面一定作为一个链表元素存在。如下图所示：
+
+![ngx-freefull-page](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_freefull_page.jpg)
+
+在上图中，有5个连续的页面，中间是描述页面的ngx_slab_page_t结构体，右边则是真正的页面，它们是一一对应的。其中，第1、2、4、5都是空闲页，第3页则是全满页。而free链表的第一个元素是第5页，第2个元素是第4页，可见，虽然第4、5页时连续的，但是由于分配页面与回收页面时的时序不同，导致这第4、5两个页面间出现了相见不相识的现象，只能作为2个链表元素存在。这会造成未来分配不出占用2个页面的大块内存，虽然原本是可以分配出的。第3个元素是第1页。第2页附在第1页上，则还是与分配、回收页面的时机有关，事实上，当slab内存池刚刚初始化完毕时，free链表中只有1个元素，就是第1个页面，该页面的slab成员值为总页数。第3页时全满页，其next指针为NULL，而prev也没有指针的含义。
+
+
+对于半满页，存放相同大小内存块的页面会构成双向链表，挂在slots数组的相应位置上。
 
 <br />
 <br />
