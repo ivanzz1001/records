@@ -100,19 +100,67 @@ typedef struct {
     void             *addr;
 } ngx_slab_pool_t;
 {% endhighlight %}
-本数据结构作为nginx slab内存管理的池结构，用于记录及管理整个slab的内存分配情况。下面我们简要介绍一下各字段的含义：
+本数据结构作为nginx slab内存管理的池结构，用于记录及管理整个slab的内存分配情况。每一个slab内存池对应着一块共享内存，这是一段线性的连续的地址空间，这里不止是有将要分配给使用者的应用内存，还包括slab管理结构，事实上从这块内存的首地址开始就是管理结构体ngx_slab_pool_t。下面我们简要介绍一下各字段的含义：
 
-* lock:
+* lock: 为下面的互斥锁```mutex```服务，使用```原子锁```来实现的Nginx互斥锁需要用到本变量；
+
+* min_size: 设定的最小内存块长度；
+
+* min_shift: min_size对应的位偏移，因为slab的算法大量采用位操作，在后面我们可以看出先计算出min_shift很有好处。
+
+* pages: 每一页对应一个ngx_slab_page_t页描述结构体，所有的ngx_slab_page_t存放在连续的内存中构成数组，而pages就是数组首地址。
+
+
+* last: 
+
+* free: 所有的空闲页组成一个链表挂在free成员上。
+
+* start: 所有的实际页面全部连续地放在一起，第一页的首地址就是start
+
+* end: 指向这段共享内存的尾部
+
+* mutex: nginx对互斥锁结构的封装
+
+* log_ctx: slab操作失败时会记录日志，为区别是哪个slab共享内存出错，可以在slab中分配一段内存存放描述的字符串，然后再用log_ctx指向这个字符串；
+
+* zero: 实际上就是'\0'，当log_ctx没有赋值时，将直接指向zero，表示空字符串防止出错；
+
+* data: 由各个使用slab的模块自由使用，slab管理内存时不会用到它
+
+* addr: 指向所属的ngx_shm_zone_t里的ngx_shm_t成员的addr成员，一般用于指示一段共享内存块的起始位置
+
+<pre>
+注： slab中每一个页大小为ngx_pagesize，这个大小用于实际的内存分配，但另外还需要一个ngx_slab_page_t结构
+来管理该页。该结构所占用的空间是24个字节(我们当前是32bit的ubuntu系统），即管理一页需要额外付出24字节的空间。
+</pre>
+下面给出```ngx_slab_pool_t```数据结构的一个整体视图：
+
+![ngx-slab-pool](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_slab_pool.jpg)
+
+
 
 
 ## 3. 相关函数声明
 {% highlight string %}
+//用于初始化slab管理池
 void ngx_slab_init(ngx_slab_pool_t *pool);
+
+//用于从slab管理池中分配出一块指定大小的内存
 void *ngx_slab_alloc(ngx_slab_pool_t *pool, size_t size);
+
+//与ngx_slab_alloc()类似，只是默认认为在调用此函数前我们已经加了锁，不会出现互斥性问题
 void *ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size);
+
+//从slab管理池中分配出一块指定大小的内存，并初始化为0
 void *ngx_slab_calloc(ngx_slab_pool_t *pool, size_t size);
+
+//与ngx_slab_alloc_locked()相似
 void *ngx_slab_calloc_locked(ngx_slab_pool_t *pool, size_t size);
+
+//用于将一块内存归还回slab管理池
 void ngx_slab_free(ngx_slab_pool_t *pool, void *p);
+
+//与ngx_slab_free()类似，只是默认认为在调用此函数前我们已经加了锁，不会出现互斥性问题
 void ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p);
 {% endhighlight %}
 
