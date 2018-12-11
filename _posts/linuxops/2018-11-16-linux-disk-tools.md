@@ -91,6 +91,8 @@ Error: The backup GPT table is corrupt, but the primary appears OK, so that will
 
 4. [在 Linux 上检测硬盘上的坏道和坏块](https://linux.cn/article-7961-1.html)
 
+5. [parted分区工具用法](https://www.cnblogs.com/yinzhengjie/p/6844372.html)
+
 <br />
 <br />
 <br />
