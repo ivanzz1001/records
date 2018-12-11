@@ -280,7 +280,7 @@ ngx_slab_alloc(ngx_slab_pool_t *pool, size_t size)
 {% endhighlight %}
 本函数首先使用```pool->mutex```加锁，然后再调用ngx_slab_alloc_locked()函数分配指定大小的空间。
 
-## 5. 函数
+## 5. 函数ngx_slab_alloc_locked()
 {% highlight string %}
 void *
 ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
@@ -530,7 +530,18 @@ done:
 {% endhighlight %}
 本函数用于分配指定大小的内存空间。下面我们详细分析一下函数的执行流程：
 {% highlight string %}
+void *
+ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
+{
+	//1) 判断当前所请求分配的空间size是否大于ngx_slab_max_size(当前值为2048)，如果大于，那么直接调用
+	//ngx_slab_alloc_pages()函数来进行分配
+	page = ngx_slab_alloc_pages(pool, (size >> ngx_pagesize_shift)
+                                          + ((size % ngx_pagesize) ? 1 : 0));
 
+	//2) 判断从哪一个slot来分配空间（当前pool->min_size=8)
+	// 2.1) 如果size > pool->min_size的话，则找到对应的slot;
+	// 2.2) 否则，按最小8字节的方式来分配，因此slot=0
+}
 {% endhighlight %}
 
 
