@@ -407,6 +407,25 @@ Running as unit ceph-mon.ceph001-node1.1500444774.538123924.service.
 Starting ceph-create-keys on ceph001-node1...
 </pre>
 
+另外，如果当前Linux操作系统上ceph支持service的话，那么也可以用如下方式来启动：
+<pre>
+# chkconfig --list
+
+Note: This output shows SysV services only and does not include native
+      systemd services. SysV configuration data might be overridden by native
+      systemd configuration.
+
+      If you want to list systemd services use 'systemctl list-unit-files'.
+      To see services enabled on particular target use
+      'systemctl list-dependencies [target]'.
+
+ceph            0:off   1:off   2:off   3:off   4:off   5:off   6:off
+netconsole      0:off   1:off   2:off   3:off   4:off   5:off   6:off
+network         0:off   1:off   2:on    3:on    4:on    5:on    6:off
+
+# service ceph restart mon
+</pre>
+
 8) 查看monitor状态
 
 此时，因为我们配置文件中同时指定了3个initial monitors，但是目前我们只启动了1个，因此monitor会出现如下状况：
@@ -504,6 +523,25 @@ Running as unit ceph-mon.ceph001-node2.1500446828.301474392.service.
 Starting ceph-create-keys on ceph001-node2...
 </pre>
 
+另外，如果当前Linux操作系统上ceph支持service的话，那么也可以用如下方式来启动：
+<pre>
+# chkconfig --list
+
+Note: This output shows SysV services only and does not include native
+      systemd services. SysV configuration data might be overridden by native
+      systemd configuration.
+
+      If you want to list systemd services use 'systemctl list-unit-files'.
+      To see services enabled on particular target use
+      'systemctl list-dependencies [target]'.
+
+ceph            0:off   1:off   2:off   3:off   4:off   5:off   6:off
+netconsole      0:off   1:off   2:off   3:off   4:off   5:off   6:off
+network         0:off   1:off   2:on    3:on    4:on    5:on    6:off
+
+# service ceph restart mon
+</pre>
+
 4) 查看monitor状态
 <pre>
 [root@ceph001-node2 build]# ceph -s
@@ -564,7 +602,28 @@ sudo /etc/init.d/ceph start mon.ceph001-node3
 ceph -s
 {% endhighlight %}
 
-查看状态信息如下：
+另外，如果当前Linux操作系统上ceph支持service的话，那么也可以用如下方式来启动：
+<pre>
+# chkconfig --list
+
+Note: This output shows SysV services only and does not include native
+      systemd services. SysV configuration data might be overridden by native
+      systemd configuration.
+
+      If you want to list systemd services use 'systemctl list-unit-files'.
+      To see services enabled on particular target use
+      'systemctl list-dependencies [target]'.
+
+ceph            0:off   1:off   2:off   3:off   4:off   5:off   6:off
+netconsole      0:off   1:off   2:off   3:off   4:off   5:off   6:off
+network         0:off   1:off   2:on    3:on    4:on    5:on    6:off
+
+# service ceph restart mon
+</pre>
+
+4) 查看状态信息
+
+通过如下的命令查看当前ceph集群的状态信息：
 <pre>
 [root@ceph001-node3 build]# ceph -s
     cluster ba47fcbc-b2f7-4071-9c37-be859d8c7e6e
@@ -683,6 +742,25 @@ mkdir: created directory ‘/var/lib/ceph/osd/ceph-0’
 2017-07-19 15:41:43.358784 7ff5ec9d3880 -1 auth: error reading file: /var/lib/ceph/osd/ceph-0/keyring: can't open /var/lib/ceph/osd/ceph-0/keyring: (2) No such file or directory
 2017-07-19 15:41:43.359121 7ff5ec9d3880 -1 created new key in keyring /var/lib/ceph/osd/ceph-0/keyring
 added key for osd.0
+</pre>
+
+另外，如果当前Linux操作系统的ceph支持service的话，也可以通过如下方式启动：
+<pre>
+# chkconfig --list
+
+Note: This output shows SysV services only and does not include native
+      systemd services. SysV configuration data might be overridden by native
+      systemd configuration.
+
+      If you want to list systemd services use 'systemctl list-unit-files'.
+      To see services enabled on particular target use
+      'systemctl list-dependencies [target]'.
+
+ceph            0:off   1:off   2:off   3:off   4:off   5:off   6:off
+netconsole      0:off   1:off   2:off   3:off   4:off   5:off   6:off
+network         0:off   1:off   2:on    3:on    4:on    5:on    6:off
+
+# service ceph restart osd.{OSD_ID} 
 </pre>
 
 2） 查看OSD的启动状况
