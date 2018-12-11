@@ -31,9 +31,6 @@ description: Linux下相关硬盘工具的使用
 分区表头还记录了这块硬盘的GUID，记录了分区表头本身的位置和大小（位置总是在LBA 1)以及备份分区表头和分区表的位置和大小（在硬盘的最后）。它还存储着它本身和分区表的CRC32校验。固件、引导程序和操作系统在启动时可以根据这个校验值来判断分区表是否出错，如果出错了，可以使用软件从硬盘最后的本分GPT中恢复整个分区表； 如果备份GPT也校验错误，硬盘将不可使用。所以GPT硬盘的分区表不可以直接使用16进制编辑器修改。
 
 
-
-
-
 ## 2. sgdisk工具的使用
 
 通过如下命令删除所有分区：
@@ -43,6 +40,35 @@ description: Linux下相关硬盘工具的使用
 
 ## 3. fdisk工具的使用
 
+1） **使用fdisk查看分区信息**
+
+我们可以使用```fdisk```命令来显示你的所有磁盘或闪存的信息以及它们的分区信息
+<pre>
+# fdisk -l /dev/sdj
+WARNING: fdisk GPT support is currently new, and therefore in an experimental phase. Use at your own discretion.
+
+Disk /dev/sdj: 1200.2 GB, 1200243695616 bytes, 2344225968 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 33553920 bytes
+Disk label type: gpt
+
+
+#         Start          End    Size  Type            Name
+ 1        65535     23461529   11.2G  Microsoft basic primary
+ 2     23461530   2344186949    1.1T  Microsoft basic primary
+</pre>
+上面我们看到最新版的```fdisk```工具也支持GPT分区了。并且看到第一个分区是从65535这个扇区开始的（这里进行了对齐，请参看后面parted)。
+
+2) **使用badblocks工具进行坏块扫描**
+
+<pre>
+# badblocks -v /dev/sdj1 >> badblocks.txt
+Checking blocks 0 to 11697996
+Checking for bad blocks (read-only test): 
+done                                                 
+Pass completed, 0 bad blocks found. (0/0/0 errors)
+</pre>
 
 
 ## 4. parted工具
