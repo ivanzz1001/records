@@ -262,6 +262,279 @@ ngx_slab_init(ngx_slab_pool_t *pool)
 ![ngx-slab-init](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_slab_init.jpg)
 
 
+## 4. 函数ngx_slab_alloc()
+{% highlight string %}
+void *
+ngx_slab_alloc(ngx_slab_pool_t *pool, size_t size)
+{
+    void  *p;
+
+    ngx_shmtx_lock(&pool->mutex);
+
+    p = ngx_slab_alloc_locked(pool, size);
+
+    ngx_shmtx_unlock(&pool->mutex);
+
+    return p;
+}
+{% endhighlight %}
+本函数首先使用```pool->mutex```加锁，然后再调用ngx_slab_alloc_locked()函数分配指定大小的空间。
+
+## 5. 函数
+{% highlight string %}
+void *
+ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
+{
+    size_t            s;
+    uintptr_t         p, n, m, mask, *bitmap;
+    ngx_uint_t        i, slot, shift, map;
+    ngx_slab_page_t  *page, *prev, *slots;
+
+    if (size > ngx_slab_max_size) {
+
+        ngx_log_debug1(NGX_LOG_DEBUG_ALLOC, ngx_cycle->log, 0,
+                       "slab alloc: %uz", size);
+
+        page = ngx_slab_alloc_pages(pool, (size >> ngx_pagesize_shift)
+                                          + ((size % ngx_pagesize) ? 1 : 0));
+        if (page) {
+            p = (page - pool->pages) << ngx_pagesize_shift;
+            p += (uintptr_t) pool->start;
+
+        } else {
+            p = 0;
+        }
+
+        goto done;
+    }
+
+    if (size > pool->min_size) {
+        shift = 1;
+        for (s = size - 1; s >>= 1; shift++) { /* void */ }
+        slot = shift - pool->min_shift;
+
+    } else {
+        size = pool->min_size;
+        shift = pool->min_shift;
+        slot = 0;
+    }
+
+    ngx_log_debug2(NGX_LOG_DEBUG_ALLOC, ngx_cycle->log, 0,
+                   "slab alloc: %uz slot: %ui", size, slot);
+
+    slots = (ngx_slab_page_t *) ((u_char *) pool + sizeof(ngx_slab_pool_t));
+    page = slots[slot].next;
+
+    if (page->next != page) {
+
+        if (shift < ngx_slab_exact_shift) {
+
+            do {
+                p = (page - pool->pages) << ngx_pagesize_shift;
+                bitmap = (uintptr_t *) (pool->start + p);
+
+                map = (1 << (ngx_pagesize_shift - shift))
+                          / (sizeof(uintptr_t) * 8);
+
+                for (n = 0; n < map; n++) {
+
+                    if (bitmap[n] != NGX_SLAB_BUSY) {
+
+                        for (m = 1, i = 0; m; m <<= 1, i++) {
+                            if ((bitmap[n] & m)) {
+                                continue;
+                            }
+
+                            bitmap[n] |= m;
+
+                            i = ((n * sizeof(uintptr_t) * 8) << shift)
+                                + (i << shift);
+
+                            if (bitmap[n] == NGX_SLAB_BUSY) {
+                                for (n = n + 1; n < map; n++) {
+                                    if (bitmap[n] != NGX_SLAB_BUSY) {
+                                        p = (uintptr_t) bitmap + i;
+
+                                        goto done;
+                                    }
+                                }
+
+                                prev = (ngx_slab_page_t *)
+                                            (page->prev & ~NGX_SLAB_PAGE_MASK);
+                                prev->next = page->next;
+                                page->next->prev = page->prev;
+
+                                page->next = NULL;
+                                page->prev = NGX_SLAB_SMALL;
+                            }
+
+                            p = (uintptr_t) bitmap + i;
+
+                            goto done;
+                        }
+                    }
+                }
+
+                page = page->next;
+
+            } while (page);
+
+        } else if (shift == ngx_slab_exact_shift) {
+
+            do {
+                if (page->slab != NGX_SLAB_BUSY) {
+
+                    for (m = 1, i = 0; m; m <<= 1, i++) {
+                        if ((page->slab & m)) {
+                            continue;
+                        }
+
+                        page->slab |= m;
+
+                        if (page->slab == NGX_SLAB_BUSY) {
+                            prev = (ngx_slab_page_t *)
+                                            (page->prev & ~NGX_SLAB_PAGE_MASK);
+                            prev->next = page->next;
+                            page->next->prev = page->prev;
+
+                            page->next = NULL;
+                            page->prev = NGX_SLAB_EXACT;
+                        }
+
+                        p = (page - pool->pages) << ngx_pagesize_shift;
+                        p += i << shift;
+                        p += (uintptr_t) pool->start;
+
+                        goto done;
+                    }
+                }
+
+                page = page->next;
+
+            } while (page);
+
+        } else { /* shift > ngx_slab_exact_shift */
+
+            n = ngx_pagesize_shift - (page->slab & NGX_SLAB_SHIFT_MASK);
+            n = 1 << n;
+            n = ((uintptr_t) 1 << n) - 1;
+            mask = n << NGX_SLAB_MAP_SHIFT;
+
+            do {
+                if ((page->slab & NGX_SLAB_MAP_MASK) != mask) {
+
+                    for (m = (uintptr_t) 1 << NGX_SLAB_MAP_SHIFT, i = 0;
+                         m & mask;
+                         m <<= 1, i++)
+                    {
+                        if ((page->slab & m)) {
+                            continue;
+                        }
+
+                        page->slab |= m;
+
+                        if ((page->slab & NGX_SLAB_MAP_MASK) == mask) {
+                            prev = (ngx_slab_page_t *)
+                                            (page->prev & ~NGX_SLAB_PAGE_MASK);
+                            prev->next = page->next;
+                            page->next->prev = page->prev;
+
+                            page->next = NULL;
+                            page->prev = NGX_SLAB_BIG;
+                        }
+
+                        p = (page - pool->pages) << ngx_pagesize_shift;
+                        p += i << shift;
+                        p += (uintptr_t) pool->start;
+
+                        goto done;
+                    }
+                }
+
+                page = page->next;
+
+            } while (page);
+        }
+    }
+
+    page = ngx_slab_alloc_pages(pool, 1);
+
+    if (page) {
+        if (shift < ngx_slab_exact_shift) {
+            p = (page - pool->pages) << ngx_pagesize_shift;
+            bitmap = (uintptr_t *) (pool->start + p);
+
+            s = 1 << shift;
+            n = (1 << (ngx_pagesize_shift - shift)) / 8 / s;
+
+            if (n == 0) {
+                n = 1;
+            }
+
+            bitmap[0] = (2 << n) - 1;
+
+            map = (1 << (ngx_pagesize_shift - shift)) / (sizeof(uintptr_t) * 8);
+
+            for (i = 1; i < map; i++) {
+                bitmap[i] = 0;
+            }
+
+            page->slab = shift;
+            page->next = &slots[slot];
+            page->prev = (uintptr_t) &slots[slot] | NGX_SLAB_SMALL;
+
+            slots[slot].next = page;
+
+            p = ((page - pool->pages) << ngx_pagesize_shift) + s * n;
+            p += (uintptr_t) pool->start;
+
+            goto done;
+
+        } else if (shift == ngx_slab_exact_shift) {
+
+            page->slab = 1;
+            page->next = &slots[slot];
+            page->prev = (uintptr_t) &slots[slot] | NGX_SLAB_EXACT;
+
+            slots[slot].next = page;
+
+            p = (page - pool->pages) << ngx_pagesize_shift;
+            p += (uintptr_t) pool->start;
+
+            goto done;
+
+        } else { /* shift > ngx_slab_exact_shift */
+
+            page->slab = ((uintptr_t) 1 << NGX_SLAB_MAP_SHIFT) | shift;
+            page->next = &slots[slot];
+            page->prev = (uintptr_t) &slots[slot] | NGX_SLAB_BIG;
+
+            slots[slot].next = page;
+
+            p = (page - pool->pages) << ngx_pagesize_shift;
+            p += (uintptr_t) pool->start;
+
+            goto done;
+        }
+    }
+
+    p = 0;
+
+done:
+
+    ngx_log_debug1(NGX_LOG_DEBUG_ALLOC, ngx_cycle->log, 0,
+                   "slab alloc: %p", (void *) p);
+
+    return (void *) p;
+}
+{% endhighlight %}
+本函数用于分配指定大小的内存空间。下面我们详细分析一下函数的执行流程：
+{% highlight string %}
+
+{% endhighlight %}
+
+
+
 
 <br />
 <br />
@@ -273,6 +546,10 @@ ngx_slab_init(ngx_slab_pool_t *pool)
 2. [Linux内存管理中的slab分配器](https://www.cnblogs.com/pengdonglin137/p/3878552.html)
 
 3. [共享内存管理之slab机制](https://blog.csdn.net/hnudlz/article/details/50972596)
+
+4. [nginx slab内存管理](http://www.cnblogs.com/doop-ymc/p/3412572.html)
+
+5. [Nginx开发从入门到精通](http://tengine.taobao.org/book/index.html#)
 
 <br />
 <br />
