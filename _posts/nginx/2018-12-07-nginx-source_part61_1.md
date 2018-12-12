@@ -58,7 +58,7 @@ struct ngx_slab_page_s {
 
 * prev: 低2位为10，以NGX_SLAB_EXACT表示当前页面存放的是中等大小的内存
 
-3) **大块内存，大于ngx_slab_exact_size而小于ngx_slab_max_size**
+3) **大块内存，大于ngx_slab_exact_size而小于等于ngx_slab_max_size**
 
 * slab: 高NGX_SLAB_MAP_MASK位表示bitmap，而低NGX_SLAB_SHIFT_MASK位表示存放的内存块大小；
 
@@ -66,7 +66,7 @@ struct ngx_slab_page_s {
 
 * prev: 低2位为01， 以NGX_SLAB_BIG表示当前页面存放的是大块内存
 
-4) **超大内存，大于等于ngx_slab_max_size**
+4) **超大内存，大于ngx_slab_max_size**
 
 * slab: 超大内存会使用一页或者多页，这些页都在一起使用。对于这批页面中的第1页，slab的前3位会被设为NGX_SLAB_PAGE_START，其余位表示紧随其后相邻的同批页面数；反之，slab会被设置为NGX_SLAB_PAGE_BUSY
 
