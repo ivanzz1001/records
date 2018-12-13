@@ -44,7 +44,7 @@ struct ngx_slab_page_s {
 
 1) **小块内存，小于ngx_slab_exact_size**
 
-* slab: 表示该页面上存放的等长内存块大小，当然是用位偏移的方式存放的；
+* slab: 表示该页面上存放的等长内存块大小，当然是用位偏移的方式存放的(存储于slab的低NGX_SLAB_SHIFT_MASK位)；
 
 * next: 指向双链表的下一个元素，如果不在双链表中，则为0
 

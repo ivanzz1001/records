@@ -559,8 +559,8 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
                                           + ((size % ngx_pagesize) ? 1 : 0));
         if (page) {
 			
-			//1.1) 由返回page在页数组中的偏移量，计算出实际数组地址的偏移量。然后再加上真实可用内存的起始地址pool->start，
-			//即可算出本次所分配内存的起始地址
+            //1.1) 由返回page在页数组中的偏移量，计算出实际数组地址的偏移量。然后再加上真实可用内存的起始地址pool->start，
+            //即可算出本次所分配内存的起始地址
             p = (page - pool->pages) << ngx_pagesize_shift;
             p += (uintptr_t) pool->start;
 
@@ -578,7 +578,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
 
 	//3) 计算出slots数组的起始位置
 	slots = (ngx_slab_page_t *) ((u_char *) pool + sizeof(ngx_slab_pool_t));
-    page = slots[slot].next;
+	page = slots[slot].next;
 
 	//4) 如果page->next != page，说明指定slot下的page仍有空闲内存块
 	if (page->next != page) {
@@ -599,7 +599,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
 				//4.1.2) 通过(1<<(ngx_pagesize_shift - shift))可以算出一页中可以存放多少内存块，然后再除以sizeof(uintptr_t) *8
 				// 则可以计算出需要多少个uintptr_t空间来作为整个页的位图
 				map = (1 << (ngx_pagesize_shift - shift))
-                          / (sizeof(uintptr_t) * 8);
+					/ (sizeof(uintptr_t) * 8);
 
 				//4.1.3) 遍历每一个位图，找出其中的可用内存块
 				for (n = 0; n < map; n++) {
@@ -622,11 +622,11 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
 
 								 prev = (ngx_slab_page_t *)
 										(page->prev & ~NGX_SLAB_PAGE_MASK);
-								prev->next = page->next;
-                                page->next->prev = page->prev;
+								 prev->next = page->next;
+								 page->next->prev = page->prev;
 
-                                page->next = NULL;
-                                page->prev = NGX_SLAB_SMALL;
+								 page->next = NULL;
+								 page->prev = NGX_SLAB_SMALL;
 							}
 						}
 
@@ -684,7 +684,7 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
 			 * 其实，是对n = 2^ngx_pagesize_shift/2^(page->slab & NGX_SLAB_SHIFT_MASK) = 2^(ngx_pagesize_shift - (page->slab & NGX_SLAB_SHIFT_MASK))公式的简化
 			 */
 			n = ngx_pagesize_shift - (page->slab & NGX_SLAB_SHIFT_MASK);
-            n = 1 << n;
+			n = 1 << n;
 
 			
 			//得到表示这些块数都用完的bitmap，用现在是低16位的(当前Ubuntu 32bit操作系统）
@@ -728,14 +728,14 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
 
 			//6.1.1) 计算位图的位置
 			p = (page - pool->pages) << ngx_pagesize_shift;
-            bitmap = (uintptr_t *) (pool->start + p);
+			bitmap = (uintptr_t *) (pool->start + p);
 
 			/*
 			 * 6.1.2） 这里shift代表要分配多大内存块的移位数，因此s为需要分配内存块的大小；
 			 * n用于表示需要用多少块大小为s的内存块来作为位图空间
 			 */ 
 			s = 1 << shift;
-            n = (1 << (ngx_pagesize_shift - shift)) / 8 / s;
+			n = (1 << (ngx_pagesize_shift - shift)) / 8 / s;
 
 			
 			//6.1.3) 前面n块内存作为位图被占用，另外还有一块内存由本次分配出去，因此位图中要(n+1)位来表示这写内存被占用
@@ -749,10 +749,10 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
 
 			//6.1.4) 将当前page插入到对应的slot。因为这里是新分配的一页，因此对应slot链表肯定为空，否则不会运行到此处
 			page->slab = shift;
-            page->next = &slots[slot];
-            page->prev = (uintptr_t) &slots[slot] | NGX_SLAB_SMALL;
+			page->next = &slots[slot];
+			page->prev = (uintptr_t) &slots[slot] | NGX_SLAB_SMALL;
 
-            slots[slot].next = page;
+			slots[slot].next = page;
 
 			//6.1.5) 返回实际分配的空间的地址
 			
@@ -813,6 +813,311 @@ ngx_slab_calloc_locked(ngx_slab_pool_t *pool, size_t size)
 {% endhighlight %}
 与ngx_slab_alloc_locked()函数类似，不过这里会将分配的内存清0.
 
+
+
+## 8. 函数ngx_slab_free()
+{% highlight string %}
+void
+ngx_slab_free(ngx_slab_pool_t *pool, void *p)
+{
+    ngx_shmtx_lock(&pool->mutex);
+
+    ngx_slab_free_locked(pool, p);
+
+    ngx_shmtx_unlock(&pool->mutex);
+}
+{% endhighlight %}
+本函数首先使用pool->mutex加锁，然后再调用ngx_slab_free_locked()函数来释放对应的内存。
+
+
+## 9. 函数ngx_slab_free_locked()
+{% highlight string %}
+void
+ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
+{
+    size_t            size;
+    uintptr_t         slab, m, *bitmap;
+    ngx_uint_t        n, type, slot, shift, map;
+    ngx_slab_page_t  *slots, *page;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_ALLOC, ngx_cycle->log, 0, "slab free: %p", p);
+
+    if ((u_char *) p < pool->start || (u_char *) p > pool->end) {
+        ngx_slab_error(pool, NGX_LOG_ALERT, "ngx_slab_free(): outside of pool");
+        goto fail;
+    }
+
+    n = ((u_char *) p - pool->start) >> ngx_pagesize_shift;
+    page = &pool->pages[n];
+    slab = page->slab;
+    type = page->prev & NGX_SLAB_PAGE_MASK;
+
+    switch (type) {
+
+    case NGX_SLAB_SMALL:
+
+        shift = slab & NGX_SLAB_SHIFT_MASK;
+        size = 1 << shift;
+
+        if ((uintptr_t) p & (size - 1)) {
+            goto wrong_chunk;
+        }
+
+        n = ((uintptr_t) p & (ngx_pagesize - 1)) >> shift;
+        m = (uintptr_t) 1 << (n & (sizeof(uintptr_t) * 8 - 1));
+        n /= (sizeof(uintptr_t) * 8);
+        bitmap = (uintptr_t *)
+                             ((uintptr_t) p & ~((uintptr_t) ngx_pagesize - 1));
+
+        if (bitmap[n] & m) {
+
+            if (page->next == NULL) {
+                slots = (ngx_slab_page_t *)
+                                   ((u_char *) pool + sizeof(ngx_slab_pool_t));
+                slot = shift - pool->min_shift;
+
+                page->next = slots[slot].next;
+                slots[slot].next = page;
+
+                page->prev = (uintptr_t) &slots[slot] | NGX_SLAB_SMALL;
+                page->next->prev = (uintptr_t) page | NGX_SLAB_SMALL;
+            }
+
+            bitmap[n] &= ~m;
+
+            n = (1 << (ngx_pagesize_shift - shift)) / 8 / (1 << shift);
+
+            if (n == 0) {
+                n = 1;
+            }
+
+            if (bitmap[0] & ~(((uintptr_t) 1 << n) - 1)) {
+                goto done;
+            }
+
+            map = (1 << (ngx_pagesize_shift - shift)) / (sizeof(uintptr_t) * 8);
+
+            for (n = 1; n < map; n++) {
+                if (bitmap[n]) {
+                    goto done;
+                }
+            }
+
+            ngx_slab_free_pages(pool, page, 1);
+
+            goto done;
+        }
+
+        goto chunk_already_free;
+
+    case NGX_SLAB_EXACT:
+
+        m = (uintptr_t) 1 <<
+                (((uintptr_t) p & (ngx_pagesize - 1)) >> ngx_slab_exact_shift);
+        size = ngx_slab_exact_size;
+
+        if ((uintptr_t) p & (size - 1)) {
+            goto wrong_chunk;
+        }
+
+        if (slab & m) {
+            if (slab == NGX_SLAB_BUSY) {
+                slots = (ngx_slab_page_t *)
+                                   ((u_char *) pool + sizeof(ngx_slab_pool_t));
+                slot = ngx_slab_exact_shift - pool->min_shift;
+
+                page->next = slots[slot].next;
+                slots[slot].next = page;
+
+                page->prev = (uintptr_t) &slots[slot] | NGX_SLAB_EXACT;
+                page->next->prev = (uintptr_t) page | NGX_SLAB_EXACT;
+            }
+
+            page->slab &= ~m;
+
+            if (page->slab) {
+                goto done;
+            }
+
+            ngx_slab_free_pages(pool, page, 1);
+
+            goto done;
+        }
+
+        goto chunk_already_free;
+
+    case NGX_SLAB_BIG:
+
+        shift = slab & NGX_SLAB_SHIFT_MASK;
+        size = 1 << shift;
+
+        if ((uintptr_t) p & (size - 1)) {
+            goto wrong_chunk;
+        }
+
+        m = (uintptr_t) 1 << ((((uintptr_t) p & (ngx_pagesize - 1)) >> shift)
+                              + NGX_SLAB_MAP_SHIFT);
+
+        if (slab & m) {
+
+            if (page->next == NULL) {
+                slots = (ngx_slab_page_t *)
+                                   ((u_char *) pool + sizeof(ngx_slab_pool_t));
+                slot = shift - pool->min_shift;
+
+                page->next = slots[slot].next;
+                slots[slot].next = page;
+
+                page->prev = (uintptr_t) &slots[slot] | NGX_SLAB_BIG;
+                page->next->prev = (uintptr_t) page | NGX_SLAB_BIG;
+            }
+
+            page->slab &= ~m;
+
+            if (page->slab & NGX_SLAB_MAP_MASK) {
+                goto done;
+            }
+
+            ngx_slab_free_pages(pool, page, 1);
+
+            goto done;
+        }
+
+        goto chunk_already_free;
+
+    case NGX_SLAB_PAGE:
+
+        if ((uintptr_t) p & (ngx_pagesize - 1)) {
+            goto wrong_chunk;
+        }
+
+        if (slab == NGX_SLAB_PAGE_FREE) {
+            ngx_slab_error(pool, NGX_LOG_ALERT,
+                           "ngx_slab_free(): page is already free");
+            goto fail;
+        }
+
+        if (slab == NGX_SLAB_PAGE_BUSY) {
+            ngx_slab_error(pool, NGX_LOG_ALERT,
+                           "ngx_slab_free(): pointer to wrong page");
+            goto fail;
+        }
+
+        n = ((u_char *) p - pool->start) >> ngx_pagesize_shift;
+        size = slab & ~NGX_SLAB_PAGE_START;
+
+        ngx_slab_free_pages(pool, &pool->pages[n], size);
+
+        ngx_slab_junk(p, size << ngx_pagesize_shift);
+
+        return;
+    }
+
+    /* not reached */
+
+    return;
+
+done:
+
+    ngx_slab_junk(p, size);
+
+    return;
+
+wrong_chunk:
+
+    ngx_slab_error(pool, NGX_LOG_ALERT,
+                   "ngx_slab_free(): pointer to wrong chunk");
+
+    goto fail;
+
+chunk_already_free:
+
+    ngx_slab_error(pool, NGX_LOG_ALERT,
+                   "ngx_slab_free(): chunk is already free");
+
+fail:
+
+    return;
+}
+{% endhighlight %}
+本函数用于将对应的空间释放回内存池。下面我们简要分析一下函数的执行流程：
+{% highlight string %}
+void
+ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
+{
+	//1) 判定对应的内存p是否属于内存池所管理
+	 if ((u_char *) p < pool->start || (u_char *) p > pool->end) {}
+
+	//2) 计算空间p所属的page以及page的类型
+	n = ((u_char *) p - pool->start) >> ngx_pagesize_shift;
+	page = &pool->pages[n];
+	slab = page->slab;
+	type = page->prev & NGX_SLAB_PAGE_MASK;
+
+	//3) 根据不同类型的内存，做不同的处理
+	switch(type){
+		case NGX_SLAB_SMALL:
+			/*
+			 * 3.1) 小块内存
+			 *
+			 * 对于小块内存无法用uintptr_t slab;来标识一页内所有内存块的使用情况，因此，这里不用
+			 * page->slab来标识该页内所有内存块的使用情况，而是使用页数据空间的开始几个uintptr_t
+			 * 空间来表示了
+			 *
+			 * 3.1.1) 在 '小内存块' 中，page->slab存放的是等长内存块的大小（用位偏移的方式存储）
+			 * 因此，size为当前页小块内存的大小
+			 */
+			shift = slab & NGX_SLAB_SHIFT_MASK;
+			size = 1 << shift;
+
+
+			//3.1.2) 因为从pool中分配的空间首先是ngx_pagesize对齐的，自然也是这里的size对齐的，因此 (uintptr_t)p & (size -1)的值应该为0
+			if ((uintptr_t) p & (size - 1)) {
+				goto wrong_chunk;
+			}
+
+			/*
+			 * 3.1.3) 这里很巧妙：由于前面对页进行了内存对齐处理，因此下面的式子可直接
+			 *
+			 * 求出 p 对应的slot块的位置，即 p 对应的小块内存位于page中的第几个块：
+			 * 首先((uintptr_t) p & (ngx_pagesize -1))可以计算出页内的偏移地址p_offset，然后将页内偏移地址p_offset除以每一块的大小即可
+			 * 求出是属于page内的第几块
+			 */
+			 n = ((uintptr_t) p & (ngx_pagesize - 1)) >> shift;
+
+			//3.1.4) m是计算page中第n块内存对应于uintptr_t中的第几位
+			m = (uintptr_t) 1 << (n & (sizeof(uintptr_t) * 8 - 1));
+
+			//3.1.5) 用于计算page中第n块内存对应于位图中的第几个uintptr_t
+			n /= (sizeof(uintptr_t) * 8);
+
+			//3.1.6) 用于计算位图的起始位置
+			bitmap = (uintptr_t *)
+					((uintptr_t) p & ~((uintptr_t) ngx_pagesize - 1));
+			
+
+			/*
+			 * 3.1.7) bitmap[n] & m 值不等于0，表明了此处了内存处于busy状态，即表示分配了出去。这种情况才有释放内存一说，
+			 * 否则直接 go chunk_already_free，表明此块内存已经处于free状态，不需要释放
+			 */
+			if(bitmap[n] & m){
+
+				/*
+				 * a) 如果页面的当前状态是全部已使用（全满页，全满页不在任何链表中；全满页释放一个内存块后变为半满页），
+				 * 则把它重新加入到slot链表的表头
+				 */
+				if(page->next == NULL){}
+
+
+				//b) 将对应的内存块的位图置为空闲状态
+				bitmap[n] &= ~m;
+				
+			}
+
+			goto chunk_already_free
+	}
+}
+{% endhighlight %}
 
 
 <br />
