@@ -1111,11 +1111,346 @@ ngx_slab_free_locked(ngx_slab_pool_t *pool, void *p)
 
 				//b) 将对应的内存块的位图置为空闲状态
 				bitmap[n] &= ~m;
-				
+
+				/*
+				 * c) 如下是计算要多少个内存块来存放位图
+				 * (1<<(ngx_pagesize_shift -shift))用于计算一页内总共有多少块内存块，再除以8用于计算要多少个字节来作为位图表示这些内存块；
+				 * 最后再除以(1<<shift)用于计算要用多少块内存块来作为位图
+				 */
+				n = (1 << (ngx_pagesize_shift - shift)) / 8 / (1 << shift);
+				if (n == 0) {
+					n = 1;
+				}
+
+				/*
+				 * d) 从上面步骤c)可知道，要用n个内存块来存放位图。因此这里我们要判定bitmap[0]中除用来存放位图的内存块外，是否处于busy状态
+				 * ((uintptr_t)1 << n) -1)用于表示存储位图的内存块的掩码，再取反，则可以得出前32个内存块中除用作位图的内存块外的掩码，然后
+				 * 在按位与上bitmap[0]，则可以知道前32块内存块中实际用于存储数据的内存块是否使用。
+				 * 如果仍处于busy状态，那么直接goto done;
+				 */
+				if (bitmap[0] & ~(((uintptr_t) 1 << n) - 1)) {
+					goto done;
+				}
+
+				//e) 计算有多少个uintptr_t对象才能表示整个位图
+				map = (1 << (ngx_pagesize_shift - shift)) / (sizeof(uintptr_t) * 8);
+
+				//f) 判断剩余的位图是否处于busy状态
+
+				//g) 到此步骤时，表明当前整个页都处于空闲状态，此时需要调用ngx_slab_free_pages()来释放整个页。
+				ngx_slab_free_pages(pool, page, 1);
 			}
 
-			goto chunk_already_free
+			goto chunk_already_free;
+		case NGX_SLAB_EXACT:
+			/*
+			 * 用于释放中等大小内存块。
+			 *
+			 * 此种情况下，page->slab作为当前页的使用情况的位图
+			 */
+
+			/*
+			 * a) 
+			 * ((uintptr_t) p & (ngx_pagesize -1))可以计算出当前内存块的页内偏移地址
+			 * (((uintptr_t) p & (ngx_pagesize - 1)) >> ngx_slab_exact_shift)可以计算出当前内存块是属于页内的第几块内存块
+			 * 再接着左移，则可以计算出该块内存块对应与位图(page->slab)中的哪一位
+			 */
+			m = (uintptr_t) 1 <<
+			 	(((uintptr_t) p & (ngx_pagesize - 1)) >> ngx_slab_exact_shift);
+
+			//b) 因为从pool中分配的空间首先是ngx_pagesize对齐的，自然也是这里的size对齐的，因此 (uintptr_t)p & (size -1)的值应该为0
+			if ((uintptr_t) p & (size - 1)) {
+				goto wrong_chunk;
+			}
+
+			/*
+			 * c) slab & m 值不等于0，表明了此处了内存处于busy状态，即表示分配了出去。这种情况才有释放内存一说，
+			 * 否则直接 go chunk_already_free，表明此块内存已经处于free状态，不需要释放
+			 */
+			if (slab & m) {
+				if(slab == NGX_SLAB_BUSY)
+				{
+					//d) 表明当前整个page中的内存块都处于busy状态。此种情况即使释放了当前块，整个page仍处于半满页状态，需要
+					//加入到对应slot链表的表头
+				}
+
+				//e) 将当前内存块为空闲状态
+				page->slab &= ~m;
+
+				//f) 说明当前page页并不是空闲页，直接goto done;
+				if(page->slab){
+				}
+
+				//g) 整个page处于空闲状态，需要释放整个page
+				 ngx_slab_free_pages(pool, page, 1);
+			}
+
+		case NGX_SLAB_BIG:
+			/*
+			 * 用于释放大内存页的情况
+			 */
+			
+			//a) slab的低NGX_SLAB_SHIFT_MASK位用于表示当前页内存块大小的移位，然后就可以算出当前页内存块的大小
+			shift = slab & NGX_SLAB_SHIFT_MASK;
+			size = 1 << shift;
+
+			//b) 因为从pool中分配的空间首先是ngx_pagesize对齐的，自然也是这里的size对齐的，因此 (uintptr_t)p & (size -1)的值应该为0
+			if ((uintptr_t) p & (size - 1)) {
+				goto wrong_chunk;
+			}
+
+			/*
+			 * c) 用于计算当前内存块的位图
+			 * ((uintptr_t) p & (ngx_pagesize - 1))用于计算页内偏移地址
+			 * (((uintptr_t) p & (ngx_pagesize - 1)) >> shift) 用于计算出当前是属于页内的第几个内存块
+			 * ((((uintptr_t) p & (ngx_pagesize - 1)) >> shift)+ NGX_SLAB_MAP_SHIFT) 用于计算出在位图的第几位
+			 */
+			 m = (uintptr_t) 1 << ((((uintptr_t) p & (ngx_pagesize - 1)) >> shift)
+				+ NGX_SLAB_MAP_SHIFT);
+
+
+			/*
+			 * d) slab & m 值不等于0，表明了此处了内存处于busy状态，即表示分配了出去。这种情况才有释放内存一说，
+			 * 否则直接 go chunk_already_free，表明此块内存已经处于free状态，不需要释放
+			 */
+			if (slab & m) {
+				/*
+				 * e) 如果页面的当前状态是全部已使用（全满页，全满页不在任何链表中；全满页释放一个内存块后变为半满页），
+				 * 则把它重新加入到slot链表的表头
+				 */
+				if(page->next == NULL){}
+				
+				//f) 将当前内存块置为空闲状态
+				page->slab &= ~m;
+
+				//g) 说明当前page页并不是空闲页，直接goto done;
+				if (page->slab & NGX_SLAB_MAP_MASK) {
+					goto done;
+				}
+
+				//h) 整个page处于空闲状态，需要释放整个page
+				 ngx_slab_free_pages(pool, page, 1);
+			}
+
+		case NGX_SLAB_PAGE:
+			/*
+			 * 释放超大内存
+			 */
+
+			//a) 因为从pool中分配的空间首先是ngx_pagesize对齐的，自然也是这里的size对齐的，因此 (uintptr_t)p & (size -1)的值应该为0
+			if ((uintptr_t) p & (ngx_pagesize - 1)) {
+				goto wrong_chunk;
+			}
+
+			//b) 当前页的slab处于free状态，表明不需要进行释放
+			if (slab == NGX_SLAB_PAGE_FREE) {}
+	
+			//c) 对于按页分配的内存，第一页的page->slab的值为 pages | NGX_SLAB_PAGE_START;即NGX_SLAB_PAGE_START标识再按位或上连续的页数
+			//而后续页才会设置为NGX_SLAB_PAGE_BUSY
+			if (slab == NGX_SLAB_PAGE_BUSY) {}
+
+			//d) 用于计算页偏移，及当前内存块所包含的页数
+			n = ((u_char *) p - pool->start) >> ngx_pagesize_shift;
+			size = slab & ~NGX_SLAB_PAGE_START;
+
+			//e) 用于释放对应的页
+			ngx_slab_free_pages(pool, &pool->pages[n], size);
 	}
+}
+{% endhighlight %}
+
+## 10. 函数ngx_slab_alloc_pages()
+{% highlight string %}
+static ngx_slab_page_t *
+static ngx_slab_page_t *
+ngx_slab_alloc_pages(ngx_slab_pool_t *pool, ngx_uint_t pages)
+{
+    ngx_slab_page_t  *page, *p;
+
+    for (page = pool->free.next; page != &pool->free; page = page->next) {
+
+        if (page->slab >= pages) {
+
+            if (page->slab > pages) {
+                page[page->slab - 1].prev = (uintptr_t) &page[pages];
+
+                page[pages].slab = page->slab - pages;
+                page[pages].next = page->next;
+                page[pages].prev = page->prev;
+
+                p = (ngx_slab_page_t *) page->prev;
+                p->next = &page[pages];
+                page->next->prev = (uintptr_t) &page[pages];
+
+            } else {
+                p = (ngx_slab_page_t *) page->prev;
+                p->next = page->next;
+                page->next->prev = page->prev;
+            }
+
+            page->slab = pages | NGX_SLAB_PAGE_START;
+            page->next = NULL;
+            page->prev = NGX_SLAB_PAGE;
+
+            if (--pages == 0) {
+                return page;
+            }
+
+            for (p = page + 1; pages; pages--) {
+                p->slab = NGX_SLAB_PAGE_BUSY;
+                p->next = NULL;
+                p->prev = NGX_SLAB_PAGE;
+                p++;
+            }
+
+            return page;
+        }
+    }
+
+    if (pool->log_nomem) {
+        ngx_slab_error(pool, NGX_LOG_CRIT,
+                       "ngx_slab_alloc() failed: no memory");
+    }
+
+    return NULL;
+}
+{% endhighlight %}
+本函数用于从pool中分配出指定的 n 页。下面我们简单分析一下函数的执行流程：
+{% highlight string %}
+static ngx_slab_page_t *
+ngx_slab_alloc_pages(ngx_slab_pool_t *pool, ngx_uint_t pages)
+{
+	//遍历整个空闲链表
+	for (page = pool->free.next; page != &pool->free; page = page->next) {
+		//找出连续空闲页大于指定大小的内存块
+		if (page->slab >= pages) {
+
+			 if (page->slab > pages){
+				//说明分配之后，还有剩余的空闲页，此时需要重新设置链表
+			 }else{
+				//说明刚好够分配，此种情况只需要将这一系列页从free链表摘除即可
+			 }
+
+			//将新分配出的这些page设置如下标识
+			page->slab = pages | NGX_SLAB_PAGE_START;
+			page->next = NULL;
+			page->prev = NGX_SLAB_PAGE;
+
+			//若请求分配的页数是1页，则直接返回
+
+			//否则，从第2页起将page->slab都设置为NGX_SLAB_PAGE_BUSY
+			for (p = page + 1; pages; pages--) {
+				p->slab = NGX_SLAB_PAGE_BUSY;
+				p->next = NULL;
+				p->prev = NGX_SLAB_PAGE;
+				p++;
+			}
+		}
+	}
+}
+{% endhighlight %}
+
+
+## 11. 函数ngx_slab_free_pages()
+{% highlight string %}
+static void
+ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t *page,
+    ngx_uint_t pages)
+{
+    ngx_uint_t        type;
+    ngx_slab_page_t  *prev, *join;
+
+    page->slab = pages--;
+
+    if (pages) {
+        ngx_memzero(&page[1], pages * sizeof(ngx_slab_page_t));
+    }
+
+    if (page->next) {
+        prev = (ngx_slab_page_t *) (page->prev & ~NGX_SLAB_PAGE_MASK);
+        prev->next = page->next;
+        page->next->prev = page->prev;
+    }
+
+    join = page + page->slab;
+
+    if (join < pool->last) {
+        type = join->prev & NGX_SLAB_PAGE_MASK;
+
+        if (type == NGX_SLAB_PAGE) {
+
+            if (join->next != NULL) {
+                pages += join->slab;
+                page->slab += join->slab;
+
+                prev = (ngx_slab_page_t *) (join->prev & ~NGX_SLAB_PAGE_MASK);
+                prev->next = join->next;
+                join->next->prev = join->prev;
+
+                join->slab = NGX_SLAB_PAGE_FREE;
+                join->next = NULL;
+                join->prev = NGX_SLAB_PAGE;
+            }
+        }
+    }
+
+    if (page > pool->pages) {
+        join = page - 1;
+        type = join->prev & NGX_SLAB_PAGE_MASK;
+
+        if (type == NGX_SLAB_PAGE) {
+
+            if (join->slab == NGX_SLAB_PAGE_FREE) {
+                join = (ngx_slab_page_t *) (join->prev & ~NGX_SLAB_PAGE_MASK);
+            }
+
+            if (join->next != NULL) {
+                pages += join->slab;
+                join->slab += page->slab;
+
+                prev = (ngx_slab_page_t *) (join->prev & ~NGX_SLAB_PAGE_MASK);
+                prev->next = join->next;
+                join->next->prev = join->prev;
+
+                page->slab = NGX_SLAB_PAGE_FREE;
+                page->next = NULL;
+                page->prev = NGX_SLAB_PAGE;
+
+                page = join;
+            }
+        }
+    }
+
+    if (pages) {
+        page[pages].prev = (uintptr_t) page;
+    }
+
+    page->prev = (uintptr_t) &pool->free;
+    page->next = pool->free.next;
+
+    page->next->prev = (uintptr_t) page;
+
+    pool->free.next = page;
+}
+{% endhighlight %}
+此函数用于释放指定页数的page。下面我们简要分析一下函数的执行流程：
+{% highlight string %}
+static void
+ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t *page,
+    ngx_uint_t pages)
+{
+	/*
+	 * 将page->slab设置为指定的页数，
+	 */
+	page->slab = pages--;
+
+	//如果释放的页数大于1，那么会将从第1叶开始的后续所有的页清0
+	if (pages) {
+		ngx_memzero(&page[1], pages * sizeof(ngx_slab_page_t));
+	}
+
+	//如果page后面还跟有节点，则将其连接至page的前一个结点
+
 }
 {% endhighlight %}
 
