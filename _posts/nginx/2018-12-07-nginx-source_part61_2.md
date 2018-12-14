@@ -552,24 +552,24 @@ ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size)
 	//ngx_slab_alloc_pages()函数来进行分配
 	if (size > ngx_slab_max_size) {
 
-        ngx_log_debug1(NGX_LOG_DEBUG_ALLOC, ngx_cycle->log, 0,
-                       "slab alloc: %uz", size);
+		ngx_log_debug1(NGX_LOG_DEBUG_ALLOC, ngx_cycle->log, 0,
+				"slab alloc: %uz", size);
 
-        page = ngx_slab_alloc_pages(pool, (size >> ngx_pagesize_shift)
-                                          + ((size % ngx_pagesize) ? 1 : 0));
-        if (page) {
+		page = ngx_slab_alloc_pages(pool, (size >> ngx_pagesize_shift)
+				+ ((size % ngx_pagesize) ? 1 : 0));
+		if (page) {
 			
-            //1.1) 由返回page在页数组中的偏移量，计算出实际数组地址的偏移量。然后再加上真实可用内存的起始地址pool->start，
-            //即可算出本次所分配内存的起始地址
-            p = (page - pool->pages) << ngx_pagesize_shift;
-            p += (uintptr_t) pool->start;
+			//1.1) 由返回page在页数组中的偏移量，计算出实际数组地址的偏移量。然后再加上真实可用内存的起始地址pool->start，
+			//即可算出本次所分配内存的起始地址
+			p = (page - pool->pages) << ngx_pagesize_shift;
+			p += (uintptr_t) pool->start;
 
-        } else {
-            p = 0;
-        }
+		} else {
+			p = 0;
+		}
 
-        goto done;
-    }
+		goto done;
+	}
 
 
 	//2) 判断从哪一个slot来分配空间（当前pool->min_size=8)
@@ -1444,15 +1444,87 @@ ngx_slab_free_pages(ngx_slab_pool_t *pool, ngx_slab_page_t *page,
 	 */
 	page->slab = pages--;
 
-	//如果释放的页数大于1，那么会将从第1叶开始的后续所有的页清0
+	//1) 如果释放的页数大于1，那么会将从第1叶开始的后续所有的页清0
 	if (pages) {
 		ngx_memzero(&page[1], pages * sizeof(ngx_slab_page_t));
 	}
 
-	//如果page后面还跟有节点，则将其连接至page的前一个结点
+	//2) 如果page->next不为空，表示当前page还没有脱离原来的slot链表（因为对于全满页，早已脱离了链表）
+	
 
+	//3) 检查当前所释放page(s)是否能够和后续页进行合并
+	if (join < pool->last) {
+		type = join->prev & NGX_SLAB_PAGE_MASK;
+	
+		/*
+		 * 3.1) 表明此处是一个完整的页，并不是slot中对应的页（因为只有全满页 和 全空页 的type值会是NGX_SLAB_PAGE)
+		 */
+		if(type == NGX_SLAB_PAGE){
+
+			if (join->next != NULL) {
+				/*
+				 * join->next不为NULL，表明不是全满页，因为全满页已经脱离了任何的链表，其next一定为NULL
+				 *
+				 * 将join脱离链表，并加入到当前释放的page中
+				 */
+				
+			}
+		}
+
+	}
+
+	//4) 检查当前所释放的page(s)是否能够和前面的页进行合并
+	if (page > pool->pages) {
+		join = page - 1;
+		type = join->prev & NGX_SLAB_PAGE_MASK;
+
+		/*
+		 * 4.1) 表明此处是一个完整的页，并不是slot中对应的页（因为只有全满页 和 全空页 的type值会是NGX_SLAB_PAGE)
+		 */
+		if (type == NGX_SLAB_PAGE) {
+			
+			//a) 找出该空闲内存页（组）的首页
+			if (join->slab == NGX_SLAB_PAGE_FREE) {
+				join = (ngx_slab_page_t *) (join->prev & ~NGX_SLAB_PAGE_MASK);
+			}
+
+			if (join->next != NULL){
+				/*
+				 * join->next不为NULL，表明不是全满页，因为全满页已经脱离了任何的链表，其next一定为NULL
+				 *
+				 * 将join脱离链表，并加入到当前释放的page中
+				 */
+			}
+
+		}
+	}
+
+
+	//5)将所释放的内存页组的最后一页的prev指向该组的第一页，这样方便后续合并
+	if (pages) {
+		page[pages].prev = (uintptr_t) page;
+	}
+
+	//6) 将page加入到free链表的首部
 }
 {% endhighlight %}
+下面给出一张释放pages的示意图：
+
+
+![ngx-slab-freepages](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_slab_freepages.jpg)
+
+
+## 12. 函数ngx_slab_error()
+{% highlight string %}
+static void
+ngx_slab_error(ngx_slab_pool_t *pool, ngx_uint_t level, char *text)
+{
+    ngx_log_error(level, ngx_cycle->log, 0, "%s%s", text, pool->log_ctx);
+}
+{% endhighlight %}
+用于打印slab内存分配相关的错误消息
+
+
 
 
 <br />
