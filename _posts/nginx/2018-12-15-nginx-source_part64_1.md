@@ -87,6 +87,39 @@ ssize_t ngx_syslog_send(ngx_syslog_peer_t *peer, u_char *buf, size_t len);
 
 
 ## 3. syslog配置文件
+```error_log```与```access_log```指令都支持将日志写到syslog中。如下的一些参数用于配置nginx的syslog:
+
+* server=address: 用于指定syslog服务器的地址。该地址可以是一个```域名```或```IP地址```（端口号可选），或者是通过```unix:```前缀指定的一个unix域socket路径。假如未指定端口的话，则默认情况下会使用514 UDP端口。另外，假如一个域名对应多个IP地址的话，将会使用解析到的第一个IP。
+
+* facility=string: 用于指明syslog消息的facility（请参看[RFC3164](https://tools.ietf.org/html/rfc3164#section-4.1.1))，可选的值有
+<pre>
+“kern”, “user”, “mail”, “daemon”, 
+“auth”, “intern”, “lpr”, “news”, 
+“uucp”, “clock”, “authpriv”, “ftp”,
+“ntp”, “audit”, “alert”, “cron”,
+ “local0”..“local7”
+</pre>
+默认值为```local7```。
+
+* severity=string: 用于为```access_log```指令指明日志消息的优先级（
+* facility=string: 用于指明syslog消息的facility（请参看[RFC3164](https://tools.ietf.org/html/rfc3164#section-4.1.1)。其实与```error_log```指令的第二个参数的取值范围是一样的。默认值是```info```。
+<pre>
+注意：当在error_log指令中使用syslog时，由于错误消息的级别是由nginx本身所指定的，因此
+在这种情况下，会忽略syslog中定义的级别
+</pre>
+
+* tag=string: 用于为syslog消息指定tag。默认值为```nginx```
+
+* nohostname: 用于禁止添加hostname字段到syslog消息的header部分
+
+下面给出几个syslog配置的示例：
+<pre>
+error_log syslog:server=192.168.1.1 debug;
+
+access_log syslog:server=unix:/var/log/nginx.sock,nohostname;
+access_log syslog:server=[2001:db8::1]:12345,facility=local7,tag=nginx,severity=info combined;
+</pre>
+
 
 
 
