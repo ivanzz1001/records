@@ -120,7 +120,7 @@ access_log syslog:server=unix:/var/log/nginx.sock,nohostname;
 access_log syslog:server=[2001:db8::1]:12345,facility=local7,tag=nginx,severity=info combined;
 </pre>
 
-
+上面注意到error_log使用的是其自身的级别，并不会采用syslog中的severity。
 
 
 <br />
