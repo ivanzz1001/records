@@ -89,6 +89,43 @@ time_t ngx_next_time(time_t when);
 {% endhighlight %}
 
 
+## 3. 相关全局变量声明
+{% highlight string %}
+extern volatile ngx_time_t  *ngx_cached_time;
+
+#define ngx_time()           ngx_cached_time->sec
+#define ngx_timeofday()      (ngx_time_t *) ngx_cached_time
+
+extern volatile ngx_str_t    ngx_cached_err_log_time;
+extern volatile ngx_str_t    ngx_cached_http_time;
+extern volatile ngx_str_t    ngx_cached_http_log_time;
+extern volatile ngx_str_t    ngx_cached_http_log_iso8601;
+extern volatile ngx_str_t    ngx_cached_syslog_time;
+
+/*
+ * milliseconds elapsed since epoch and truncated to ngx_msec_t,
+ * used in event timers
+ */
+extern volatile ngx_msec_t  ngx_current_msec;
+{% endhighlight %}
+
+* ngx_cached_time: 当前nginx所缓存的时间
+
+* ngx_time(): 获取当前Nginx缓存时间的秒数（精度为秒级）
+
+*ngx_timeofday(): 获取当前nginx缓存的时间
+
+* ngx_cached_err_log_time: 当前缓存的错误日志时间
+
+* ngx_cached_http_time: 当前缓存的http时间
+
+* ngx_cached_http_log_time: 当前缓存的http log时间
+
+* ngx_cached_ttp_log_iso8601: 当前缓存的http log的ios8601格式的时间
+
+* ngx_cached_syslog_time: 当前缓存的syslog格式的时间
+
+* ngx_current_msec： 当前时间的毫秒数。只用作nginx中的相对时间的计算，因为```msec```所能保存的时间范围较小。
 
 <br />
 <br />
