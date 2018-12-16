@@ -24,6 +24,15 @@ description: Ubuntu16.04操作系统环境下修改时区
 # date
 Tue Feb  6 20:37:28 CST 2018
 
+# timedatectl
+      Local time: Sun 2018-12-16 02:58:35 PST
+  Universal time: Sun 2018-12-16 10:58:35 UTC
+        RTC time: Sun 2018-12-16 10:58:35
+       Time zone: America/Los_Angeles (PST, -0800)
+ Network time on: yes
+NTP synchronized: yes
+ RTC in local TZ: no
+
 # ls -al /etc/localtime 
 lrwxrwxrwx. 1 root root 33 Feb  6 20:38 /etc/localtime -> /usr/share/zoneinfo/Asia/Shanghai
 {% endhighlight %}
