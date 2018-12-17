@@ -279,11 +279,11 @@ ngx_time_update(void)
 
 	//6) 更新各全局变量的值，由于这里都是指针操作，因此是原子性的
 	ngx_cached_time = tp;
-    ngx_cached_http_time.data = p0;
-    ngx_cached_err_log_time.data = p1;
-    ngx_cached_http_log_time.data = p2;
-    ngx_cached_http_log_iso8601.data = p3;
-    ngx_cached_syslog_time.data = p4;
+	ngx_cached_http_time.data = p0;
+	ngx_cached_err_log_time.data = p1;
+	ngx_cached_http_log_time.data = p2;
+	ngx_cached_http_log_iso8601.data = p3;
+	ngx_cached_syslog_time.data = p4;
 
 	//7) 解锁
 }
