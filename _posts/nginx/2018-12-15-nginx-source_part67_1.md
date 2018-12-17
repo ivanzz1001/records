@@ -168,6 +168,135 @@ struct ngx_event_s {
 #endif
 };
 {% endhighlight %}
+Nginx中的event对象```ngx_event_t```提供了一种机制，能够通知程序发生了某个事件。下面我们详细介绍一下各字段的含义：
+
+* data: 指向用于event handlers的任何事件上下文，通常是指向与该event关联的connection对象。
+
+* write: 用于指示```写事件```发生的标志。缺省状态下表示的是一个```读事件```
+
+* accept: 用于标识该事件是一个accept事件，还是一个posted事件。这两种不同的事件会放到不同的队列来进行处理
+
+* instance: 用于侦测kqueue和epoll中的```陈旧事件```(stale event)
+
+* active: 该标志(flag)用于指示本event被登记(registered)为接收IO通知，通常是来自于epoll、kqueue、poll这样的通知机制
+
+* disabled: 该标志用于指明是否禁止本事件（读事件/写事件)
+
+* ready: 该标记用于指明本event收到了一个IO通知
+
+* oneshot: 一般用于指明当前event是否是属于```一次性事件```
+
+* complete： 当进行异步处理本事件时，标志是否处理完成
+
+* eof: 用于标记在进行```读数据```(read data)的时候，读到了EOF
+
+* error: 用于标记在进行读(read event)或者写(write event)时，是否发生了错误
+
+* timedout： 用于标记事件定时器(event timer)是否已经超时
+
+* timer_set: 用于标记事件定时器(event timer)被设置，并且没有超时
+
+* delayed: 用于标记由于```速率限制```(rate limiting)的原因导致IO被延迟
+
+* deferred_accept: 是否进行延迟accept，主要是为了提高程序的性能方面考虑
+
+* pending_eof: 本标志用于指示所对应socket上有未处理的EOF，即使在EOF之前可能仍存在一些可用数据。这通常是由epoll的```EPOLLRDHUP```时间产生的或者kqueue的```EV_EOF```标志产生的。
+
+* posted: 用于指示该事件是否要投递到一个队列
+
+* closed: 用于指示本事件所关联的socket句柄或文件句柄是否被关闭
+
+* channel: 指示本事件用于nginx中master与worker之间的通信，以反应子进程是否已经退出
+
+* resolver: 指示本事件用于nginx中的域名解析，判断在nginx的worker进程退出时，是否仍然还有连接处于resolver状态
+
+* cancelable： 本标志用于定时器事件，用于指示当worker进程退出时，本事件应该被忽略。优雅的关闭worker子进程(Graceful worker shutdown)时，如果有```不可取消```(none-cancelable)的定时器事件正处于```scheduled```，那么关闭会被延迟
+
+* accept_context_updated: 当前我们不支持```NGX_WIN32```宏定义，暂不使用
+
+* kq_vnode: 当前我们不支持```NGX_HAVE_KQUEUE```宏定义，在kqueue中```EVFILT_VNODE过滤器```用于检测对文件系统上一个文件的某种改动
+
+* kq_errno: 当前我们不支持```NGX_HAVE_KQUEUE```宏定义。kqueue报告的处于pending状态的错误码
+
+* available： 我们当前并不支持```NGX_HAVE_KQUEUE```以及```NGX_HAVE_IOCP```宏定义。```available:1```用于指示当前event所关联的socket是否可用；
+<pre>
+#if (NGX_HAVE_KQUEUE) || (NGX_HAVE_IOCP)
+    int              available;
+#else
+    unsigned         available:1;			
+#endif
+</pre>
+
+* handler: 当事件发生时所执行的回调函数。该回调函数的原型在core/ngx_core.h头文件中定义
+<pre>
+typedef void (*ngx_event_handler_pt)(ngx_event_t *ev);
+</pre>
+
+* ovlp: 当前我们并不支持```NGX_HAVE_IOCP```宏定义
+
+* index: 其通常用于表示本event属于某一个event数组中的哪个索引处
+
+* log: 本event所关联的日志对象
+
+* timer: 红黑树节点，用于插入当前事件(event)到timer树中
+
+* queue: Queue节点，用于将本事件post到一个队列中（不同类型的事件，可能会投递到不同的队列）
+
+
+## 3. ngx_event_aio_s数据结构
+{% highlight string %}
+#if (NGX_HAVE_FILE_AIO)
+
+struct ngx_event_aio_s {
+    void                      *data;
+    ngx_event_handler_pt       handler;
+    ngx_file_t                *file;
+
+#if (NGX_HAVE_AIO_SENDFILE)
+    ssize_t                  (*preload_handler)(ngx_buf_t *file);
+#endif
+
+    ngx_fd_t                   fd;
+
+#if (NGX_HAVE_EVENTFD)
+    int64_t                    res;
+#endif
+
+#if !(NGX_HAVE_EVENTFD) || (NGX_TEST_BUILD_EPOLL)
+    ngx_err_t                  err;
+    size_t                     nbytes;
+#endif
+
+    ngx_aiocb_t                aiocb;
+    ngx_event_t                event;
+};
+
+#endif
+{% endhighlight %}
+
+当前我们并不支持```NGX_HAVE_FILE_AIO```宏定义，这里不做介绍。
+
+## 4. ngx_event_actions_t数据结构
+{% highlight string %}
+typedef struct {
+    ngx_int_t  (*add)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
+    ngx_int_t  (*del)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
+
+    ngx_int_t  (*enable)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
+    ngx_int_t  (*disable)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
+
+    ngx_int_t  (*add_conn)(ngx_connection_t *c);
+    ngx_int_t  (*del_conn)(ngx_connection_t *c, ngx_uint_t flags);
+
+    ngx_int_t  (*notify)(ngx_event_handler_pt handler);
+
+    ngx_int_t  (*process_events)(ngx_cycle_t *cycle, ngx_msec_t timer,
+                                 ngx_uint_t flags);
+
+    ngx_int_t  (*init)(ngx_cycle_t *cycle, ngx_msec_t timer);
+    void       (*done)(ngx_cycle_t *cycle);
+} ngx_event_actions_t;
+{% endhighlight %}
 
 
 
@@ -181,8 +310,11 @@ struct ngx_event_s {
 
 2. [nginx event 模块解析](https://blog.csdn.net/jackywgw/article/details/48676643)
 
+3. [Linux TCP_DEFER_ACCEPT的作用](https://blog.csdn.net/for_tech/article/details/54175571)
 
+4. [freebsd高级I/O,kevent的资料很详细](https://www.cnblogs.com/fengyv/archive/2012/07/30/2614783.html)
 
+5. [Nginx学习笔记(十八)：事件处理框架](https://blog.csdn.net/fzy0201/article/details/23171207)
 
 
 <br />
