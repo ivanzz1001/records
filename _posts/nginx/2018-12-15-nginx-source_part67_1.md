@@ -298,7 +298,9 @@ typedef struct {
 } ngx_event_actions_t;
 {% endhighlight %}
 
+本数据结构定义了一些函数指针，用于处理与```事件```相关的一些操作。下面简单介绍一下这些函数指针：
 
+* add: 
 
 
 <br />
@@ -316,6 +318,7 @@ typedef struct {
 
 5. [Nginx学习笔记(十八)：事件处理框架](https://blog.csdn.net/fzy0201/article/details/23171207)
 
+6. [事件和连接](https://blog.csdn.net/nestler/article/details/37570401)
 
 <br />
 <br />
