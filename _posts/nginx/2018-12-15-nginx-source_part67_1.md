@@ -408,10 +408,219 @@ extern ngx_event_actions_t   ngx_event_actions;
 
 上面我们介绍到有select、poll、epoll、kqueue、eventport等不同的事件驱动机制。每一种事件驱动机制所能支持的一些特性可能也有些不同。下面我们分别介绍一些这些标志：
 
-* NGX_USE_LEVEL_EVENT： 表示
+* **NGX_USE_LEVEL_EVENT**： 表示事件驱动机制的event filter支持水平触发。select, poll, /dev/poll, kqueue, epoll均支持这一模式
+
+* **NGX_USE_ONESHOT_EVENT**: 表示事件驱动机制的event filter支持oneshot，即表示某个事件触发一次之后，对应的event filter就会被自动的移除，可以确保事件只触发一次。kqueue, epoll支持本选项。
+
+* **NGX_USE_CLEAR_EVENT**: 表示事件驱动机制的event filter支持边沿触发。epoll、kqueue支持本选项
+
+* **NGX_USE_KQUEUE_EVENT**: 表示对应的事件驱动机制的event filter支持kqueue特性： eof flag、errno、available data等。一般kqueue支持本选项
+
+* **NGX_USE_LOWAT_EVENT**: 表示对应的事件驱动机制的event filter支持```低水位标志```(low water mark)。一般kqueue支持本选项
+
+* **NGX_USE_GREEDY_EVENT**: 表示对应的事件驱动机制的event filter需要重复执行IO操作，直到EAGAIN。一般epoll支持本选项。
+<pre>
+通常情况下，我们读取数据时，如果实际读取的数据字节数小于我们的请求数，那么此时我们可以直接将event.ready设置为0；
+但是对于支持本选项的事件机制，即使遇到此情形，通常还是要继续进行读取，直到返回的EAGAIN为止，才将event.ready设置为0.
+</pre>
+
+* **NGX_USE_EPOLL_EVENT**： 本event filter用于epoll
+
+* **NGX_USE_RTSIG_EVENT**: 当前已经过时，不再使用
+
+* **NGX_USE_AIO_EVENT**: 当前已经过时，不再使用
+
+* **NGX_USE_IOCP_EVENT**: 本event filter用于IOCP
+
+* **NGX_USE_FD_EVENT**: 表示本event filter没有透明数据，并需要一个文件描述符表。本标志通常用于poll、dev/poll。下面我们以poll为例来说明一下为何要使用此选项：
+{% highlight string %}
+struct pollfd pfds[1];
+
+ret = poll(fds,1,timeout);
+{% endhighlight %}
+上面代码，当有读写事件到来时，我们只能够通过```pfds```获取到文件的句柄信息，并没有```透明数据```。但是一般我们可能还需要获取到更为详细的信息(透明数据)，此时我们可能还需要绑定另外一个结构，通过fd就可以简单快捷的定位到。
+
+* **NGX_USE_EVENTPORT_EVENT**: 本标志表示在notification之后，文件描述符上的所有event filter都会被移除。用于eventport
+
+* **NGX_USE_VNODE_EVENT**： 本event filter表示支持vnode通知。用于kqueue
+
+## 6. 事件驱动机制中的各种事件
+{% highlight string %}
+/*
+ * The event filter is deleted just before the closing file.
+ * Has no meaning for select and poll.
+ * kqueue, epoll, eventport:         allows to avoid explicit delete,
+ *                                   because filter automatically is deleted
+ *                                   on file close,
+ *
+ * /dev/poll:                        we need to flush POLLREMOVE event
+ *                                   before closing file.
+ */
+#define NGX_CLOSE_EVENT    1
+
+/*
+ * disable temporarily event filter, this may avoid locks
+ * in kernel malloc()/free(): kqueue.
+ */
+#define NGX_DISABLE_EVENT  2
+
+/*
+ * event must be passed to kernel right now, do not wait until batch processing.
+ */
+#define NGX_FLUSH_EVENT    4
 
 
+/* these flags have a meaning only for kqueue */
+#define NGX_LOWAT_EVENT    0
+#define NGX_VNODE_EVENT    0
 
+
+#if (NGX_HAVE_EPOLL) && !(NGX_HAVE_EPOLLRDHUP)
+#define EPOLLRDHUP         0
+#endif
+
+
+#if (NGX_HAVE_KQUEUE)
+
+#define NGX_READ_EVENT     EVFILT_READ
+#define NGX_WRITE_EVENT    EVFILT_WRITE
+
+#undef  NGX_VNODE_EVENT
+#define NGX_VNODE_EVENT    EVFILT_VNODE
+
+/*
+ * NGX_CLOSE_EVENT, NGX_LOWAT_EVENT, and NGX_FLUSH_EVENT are the module flags
+ * and they must not go into a kernel so we need to choose the value
+ * that must not interfere with any existent and future kqueue flags.
+ * kqueue has such values - EV_FLAG1, EV_EOF, and EV_ERROR:
+ * they are reserved and cleared on a kernel entrance.
+ */
+#undef  NGX_CLOSE_EVENT
+#define NGX_CLOSE_EVENT    EV_EOF
+
+#undef  NGX_LOWAT_EVENT
+#define NGX_LOWAT_EVENT    EV_FLAG1
+
+#undef  NGX_FLUSH_EVENT
+#define NGX_FLUSH_EVENT    EV_ERROR
+
+#define NGX_LEVEL_EVENT    0
+#define NGX_ONESHOT_EVENT  EV_ONESHOT
+#define NGX_CLEAR_EVENT    EV_CLEAR
+
+#undef  NGX_DISABLE_EVENT
+#define NGX_DISABLE_EVENT  EV_DISABLE
+
+
+#elif (NGX_HAVE_DEVPOLL && !(NGX_TEST_BUILD_DEVPOLL)) \
+      || (NGX_HAVE_EVENTPORT && !(NGX_TEST_BUILD_EVENTPORT))
+
+#define NGX_READ_EVENT     POLLIN
+#define NGX_WRITE_EVENT    POLLOUT
+
+#define NGX_LEVEL_EVENT    0
+#define NGX_ONESHOT_EVENT  1
+
+
+#elif (NGX_HAVE_EPOLL) && !(NGX_TEST_BUILD_EPOLL)
+
+#define NGX_READ_EVENT     (EPOLLIN|EPOLLRDHUP)
+#define NGX_WRITE_EVENT    EPOLLOUT
+
+#define NGX_LEVEL_EVENT    0
+#define NGX_CLEAR_EVENT    EPOLLET
+#define NGX_ONESHOT_EVENT  0x70000000
+#if 0
+#define NGX_ONESHOT_EVENT  EPOLLONESHOT
+#endif
+
+
+#elif (NGX_HAVE_POLL)
+
+#define NGX_READ_EVENT     POLLIN
+#define NGX_WRITE_EVENT    POLLOUT
+
+#define NGX_LEVEL_EVENT    0
+#define NGX_ONESHOT_EVENT  1
+
+
+#else /* select */
+
+#define NGX_READ_EVENT     0
+#define NGX_WRITE_EVENT    1
+
+#define NGX_LEVEL_EVENT    0
+#define NGX_ONESHOT_EVENT  1
+
+#endif /* NGX_HAVE_KQUEUE */
+
+
+#if (NGX_HAVE_IOCP)
+#define NGX_IOCP_ACCEPT      0
+#define NGX_IOCP_IO          1
+#define NGX_IOCP_CONNECT     2
+#endif
+
+
+#ifndef NGX_CLEAR_EVENT
+#define NGX_CLEAR_EVENT    0    /* dummy declaration */
+#endif
+{% endhighlight %}
+这里主要是定义了各```事件驱动机制```中的一些事件。通过宏屏蔽不同事件驱动机制的差异。
+
+## 7. 相关函数的宏定义
+{% highlight string %}
+
+#define ngx_process_events   ngx_event_actions.process_events
+#define ngx_done_events      ngx_event_actions.done
+
+#define ngx_add_event        ngx_event_actions.add
+#define ngx_del_event        ngx_event_actions.del
+#define ngx_add_conn         ngx_event_actions.add_conn
+#define ngx_del_conn         ngx_event_actions.del_conn
+
+#define ngx_notify           ngx_event_actions.notify
+
+#define ngx_add_timer        ngx_event_add_timer
+#define ngx_del_timer        ngx_event_del_timer
+
+
+extern ngx_os_io_t  ngx_io;
+
+#define ngx_recv             ngx_io.recv
+#define ngx_recv_chain       ngx_io.recv_chain
+#define ngx_udp_recv         ngx_io.udp_recv
+#define ngx_send             ngx_io.send
+#define ngx_send_chain       ngx_io.send_chain
+#define ngx_udp_send         ngx_io.udp_send
+{% endhighlight %}
+这里主要是对相关函数指针进行重新定义，方便使用。
+
+## 8. event模块宏
+{% highlight string %}
+#define NGX_EVENT_MODULE      0x544E5645  /* "EVNT" */
+#define NGX_EVENT_CONF        0x02000000
+{% endhighlight %}
+这里主要是nginx event模块相应的标识
+
+## 9. ngx_event_conf_t数据结构
+{% highlight string %}
+typedef struct {
+    ngx_uint_t    connections;
+    ngx_uint_t    use;
+
+    ngx_flag_t    multi_accept;
+    ngx_flag_t    accept_mutex;
+
+    ngx_msec_t    accept_mutex_delay;
+
+    u_char       *name;
+
+#if (NGX_DEBUG)
+    ngx_array_t   debug_connection;
+#endif
+} ngx_event_conf_t;
+{% endhighlight %}
 
 
 

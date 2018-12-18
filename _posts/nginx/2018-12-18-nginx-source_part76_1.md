@@ -36,6 +36,8 @@ description: nginx源代码分析
 
 7. [事件模块（二）ngx_epoll_module详解](https://blog.csdn.net/ws891033655/article/details/25643465)
 
+8. [Linux下的I/O复用与epoll详解](https://www.cnblogs.com/lojunren/p/3856290.html)
+
 <br />
 <br />
 <br />
