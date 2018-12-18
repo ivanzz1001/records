@@ -296,6 +296,8 @@ typedef struct {
     ngx_int_t  (*init)(ngx_cycle_t *cycle, ngx_msec_t timer);
     void       (*done)(ngx_cycle_t *cycle);
 } ngx_event_actions_t;
+
+extern ngx_event_actions_t   ngx_event_actions;
 {% endhighlight %}
 
 本数据结构定义了一些函数指针，用于处理与```事件```相关的一些操作。每一个事件模块(event module)都需要实现如下10个方法。下面简单介绍一下这些函数指针：
@@ -314,7 +316,104 @@ typedef struct {
 
 * notify: 主要是实现某种类似与```pipe```这样的通知机制。当前主要用在```nginx线程池````的实现方面，当任务处理完成，异步通知主线程。
 
-* process_events: 
+* process_events: 处理事件的方法。由于select、poll、epoll等不同的事件驱动机制，对事件的处理也有些不同。
+
+* init: 一般用于初始化事件驱动机制
+
+* done: 事件驱动机制退出时的回调函数
+
+接着声明了一个全局的ngx_event_actions_t类型的对象： ngx_event_actions。
+
+
+## 5. 事件驱动机制特性掩码
+{% highlight string %}
+/*
+ * The event filter requires to read/write the whole data:
+ * select, poll, /dev/poll, kqueue, epoll.
+ */
+#define NGX_USE_LEVEL_EVENT      0x00000001
+
+/*
+ * The event filter is deleted after a notification without an additional
+ * syscall: kqueue, epoll.
+ */
+#define NGX_USE_ONESHOT_EVENT    0x00000002
+
+/*
+ * The event filter notifies only the changes and an initial level:
+ * kqueue, epoll.
+ */
+#define NGX_USE_CLEAR_EVENT      0x00000004
+
+/*
+ * The event filter has kqueue features: the eof flag, errno,
+ * available data, etc.
+ */
+#define NGX_USE_KQUEUE_EVENT     0x00000008
+
+/*
+ * The event filter supports low water mark: kqueue's NOTE_LOWAT.
+ * kqueue in FreeBSD 4.1-4.2 has no NOTE_LOWAT so we need a separate flag.
+ */
+#define NGX_USE_LOWAT_EVENT      0x00000010
+
+/*
+ * The event filter requires to do i/o operation until EAGAIN: epoll.
+ */
+#define NGX_USE_GREEDY_EVENT     0x00000020
+
+/*
+ * The event filter is epoll.
+ */
+#define NGX_USE_EPOLL_EVENT      0x00000040
+
+/*
+ * Obsolete.
+ */
+#define NGX_USE_RTSIG_EVENT      0x00000080
+
+/*
+ * Obsolete.
+ */
+#define NGX_USE_AIO_EVENT        0x00000100
+
+/*
+ * Need to add socket or handle only once: i/o completion port.
+ */
+#define NGX_USE_IOCP_EVENT       0x00000200
+
+/*
+ * The event filter has no opaque data and requires file descriptors table:
+ * poll, /dev/poll.
+ */
+#define NGX_USE_FD_EVENT         0x00000400
+
+/*
+ * The event module handles periodic or absolute timer event by itself:
+ * kqueue in FreeBSD 4.4, NetBSD 2.0, and MacOSX 10.4, Solaris 10's event ports.
+ */
+#define NGX_USE_TIMER_EVENT      0x00000800
+
+/*
+ * All event filters on file descriptor are deleted after a notification:
+ * Solaris 10's event ports.
+ */
+#define NGX_USE_EVENTPORT_EVENT  0x00001000
+
+/*
+ * The event filter support vnode notifications: kqueue.
+ */
+#define NGX_USE_VNODE_EVENT      0x00002000
+{% endhighlight %}
+
+上面我们介绍到有select、poll、epoll、kqueue、eventport等不同的事件驱动机制。每一种事件驱动机制所能支持的一些特性可能也有些不同。下面我们分别介绍一些这些标志：
+
+* NGX_USE_LEVEL_EVENT： 表示
+
+
+
+
+
 
 
 <br />
@@ -333,6 +432,8 @@ typedef struct {
 5. [Nginx学习笔记(十八)：事件处理框架](https://blog.csdn.net/fzy0201/article/details/23171207)
 
 6. [事件和连接](https://blog.csdn.net/nestler/article/details/37570401)
+
+7. [Nginx学习笔记(十八)：事件处理框架](https://blog.csdn.net/fzy0201/article/details/23171207)
 
 <br />
 <br />
