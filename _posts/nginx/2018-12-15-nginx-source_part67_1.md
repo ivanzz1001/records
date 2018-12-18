@@ -621,7 +621,21 @@ typedef struct {
 #endif
 } ngx_event_conf_t;
 {% endhighlight %}
+本数据结构用于event的相关配置。下面简要介绍一下各字段的含义：
 
+* connections:
+
+* use:
+
+* multi_accept:
+
+* accept_mutex:
+
+* accept_mutex_delay:
+
+* name:
+
+* debug_connection:
 
 
 
