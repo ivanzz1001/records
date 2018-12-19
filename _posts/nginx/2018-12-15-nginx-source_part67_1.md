@@ -621,22 +621,117 @@ typedef struct {
 #endif
 } ngx_event_conf_t;
 {% endhighlight %}
-本数据结构用于event的相关配置。下面简要介绍一下各字段的含义：
+本数据结构用于保存event模块相关配置。下面简要介绍一下各字段的含义：
 
-* connections:
+* connections: 指定一个worker进程可以打开的最大连接数。注意这不仅包括客户端的连接数，还包括nginx到后端代理服务器之间的连接等
 
-* use:
+* use: 保存当前事件模块采用的是哪一种事件处理方法([connection_processing](https://nginx.org/en/docs/events.html))。通常配置文件中不会进行指定，nginx会自己选择当前所支持的最高效的方法，然后保存到此变量中。
 
-* multi_accept:
+* multi_accept: 假如```multi_accept```被禁用的话，worker进程一次只会accept一个新的连接(new connection)。否则，worker进程一次会accept所有新的连接。
 
-* accept_mutex:
+* accept_mutex: 假如```accept_mutex```被启用的话，worker进程之间将会轮流地```accept```新的连接(connection)。否则，在新连接(connections)到来时，所有的worker进程都会被唤醒，但可能只有某些进程能够获取到新连接(connections)，其他的worker进程会继续进入休眠状态。这就是所谓的```惊群现象```。
+<pre>
+注：
+ 1. 高版本的Linux中，accept不存在惊群问题，不过epoll_wait等操作还有
 
-* accept_mutex_delay:
+ 2. 在nginx 1.11.3版本之前，本选项是默认启用的
+</pre>
 
-* name:
+* accept_mutex_delay: 当```accept_mutex```被启用的话，如果当前有另一个worker进程正在accept新连接(connections)，则当前worker进程最长会等待多长时间尝试重新开始accept新连接。其实就是获取互斥锁的最大延迟时间
 
-* debug_connection:
+* name: 用于存放当前event_module的名称(select、poll、epoll、kqueue等）
 
+* debug_connection:  为所指定的客户端连接启用调试日志(debugging log)。而对于其他的连接则会使用```error_log```指令所设置的日志级别。调试的连接可以通过**IPv4**或者**IPv6**来指定，也可以通过主机名来指定。此外，也支持unix域socket。参看如下示例：
+<pre>
+events {
+    debug_connection 127.0.0.1;
+    debug_connection localhost;
+    debug_connection 192.0.2.0/24;
+    debug_connection ::1;
+    debug_connection 2001:0db8::/32;
+    debug_connection unix:;
+    ...
+}
+</pre>
+
+
+## 10. ngx_event_module_t数据结构
+{% highlight string %}
+typedef struct {
+    ngx_str_t              *name;
+
+    void                 *(*create_conf)(ngx_cycle_t *cycle);
+    char                 *(*init_conf)(ngx_cycle_t *cycle, void *conf);
+
+    ngx_event_actions_t     actions;
+} ngx_event_module_t;
+{% endhighlight %}
+本数据结构作为```事件模块```的上下文环境。下面我们简要介绍一下各字段的含义：
+
+* name: 用于保存所使用的```事件驱动机制```的名称(select、poll、epoll、kqueue等)
+
+* create_conf: 用于创建event模块相关配置(ngx_event_conf_t)的回调函数
+
+* init_conf: 用于初始化event模块相关配置(ngx_event_conf_t)的回调函数
+
+* action: event模块的actions操作函数
+
+## 11. 相关全局变量声明
+{% highlight string %}
+extern ngx_atomic_t          *ngx_connection_counter;
+
+extern ngx_atomic_t          *ngx_accept_mutex_ptr;
+extern ngx_shmtx_t            ngx_accept_mutex;
+extern ngx_uint_t             ngx_use_accept_mutex;
+extern ngx_uint_t             ngx_accept_events;
+extern ngx_uint_t             ngx_accept_mutex_held;
+extern ngx_msec_t             ngx_accept_mutex_delay;
+extern ngx_int_t              ngx_accept_disabled;
+
+
+#if (NGX_STAT_STUB)
+
+extern ngx_atomic_t  *ngx_stat_accepted;
+extern ngx_atomic_t  *ngx_stat_handled;
+extern ngx_atomic_t  *ngx_stat_requests;
+extern ngx_atomic_t  *ngx_stat_active;
+extern ngx_atomic_t  *ngx_stat_reading;
+extern ngx_atomic_t  *ngx_stat_writing;
+extern ngx_atomic_t  *ngx_stat_waiting;
+
+#endif
+
+
+#define NGX_UPDATE_TIME         1
+#define NGX_POST_EVENTS         2
+
+
+extern sig_atomic_t           ngx_event_timer_alarm;
+extern ngx_uint_t             ngx_event_flags;
+extern ngx_module_t           ngx_events_module;
+extern ngx_module_t           ngx_event_core_module;
+
+
+#define ngx_event_get_conf(conf_ctx, module)                                  \
+             (*(ngx_get_conf(conf_ctx, ngx_events_module))) [module.ctx_index];
+
+{% endhighlight %}
+
+下面简要介绍一下各变量的含义：
+
+* ngx_connection_counter: 用于统计当前的连接数
+
+* ngx_accept_mutex_ptr: 存放互斥量内存地址的指针
+
+* ngx_accept_mutex: accept互斥锁
+
+* ngx_use_accept_mutex: 表示是否需要通过对accept加锁来解决惊群问题。当nginx worker进程数```大于1```时，且配置文件中开启了```accept_mutex```时，这个标志置为1
+
+* ngx_accept_events： 表示在获取accept互斥锁的时候，是否还需要调用ngx_enable_accept_events()来使能accept events。通常采用```eventport```这一事件驱动机制时才需要。
+
+* ngx_accept_mutex_held： 用于指示当前是否拿到了锁
+
+* ngx_accept_mutex_delay： 
 
 
 <br />
@@ -657,6 +752,8 @@ typedef struct {
 6. [事件和连接](https://blog.csdn.net/nestler/article/details/37570401)
 
 7. [Nginx学习笔记(十八)：事件处理框架](https://blog.csdn.net/fzy0201/article/details/23171207)
+
+8. [Nginx的accept_mutex配置](https://blog.csdn.net/adams_wu/article/details/51669203)
 
 <br />
 <br />
