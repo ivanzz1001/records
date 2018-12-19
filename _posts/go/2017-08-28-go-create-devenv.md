@@ -113,7 +113,7 @@ Hello, 世界
 {% highlight string %}
 C:\Users\Administrator>go version
 go version go1.8 windows/amd64
-</pre>
+{% endhighlight %}
 
 
 
