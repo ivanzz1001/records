@@ -115,6 +115,12 @@ C:\Users\Administrator>go version
 go version go1.8 windows/amd64
 {% endhighlight %}
 
+### 3.2 安装goland
+这里安装```goland-2018.1.exe```并进行破解。安装完成后，我们在上面设置的```GOPATH```目录下新建```oss/src```目录。然后启动goland。然后进入**"File"**->**Settings**，重新设置我们的```工程路径```(project GOPATH)，如下图所示：
+
+![goland-usage](https://ivanzz1001.github.io/records/assets/img/go/goland-usage.png)
+
+上面我们注意到，设置的project GOPATH是```E:\Workspace\go\oss```，并没有包含```src```。而我们实际建立的工程文件夹是放在src目录下的。
 
 
 
@@ -131,6 +137,8 @@ go version go1.8 windows/amd64
 4. [go官网](https://golang.org/dl/)
 
 5. [centos 7搭建go环境](https://www.cnblogs.com/ylqs/p/7541806.html)
+
+6. [Goland2018破解](https://blog.csdn.net/github_39533414/article/details/81038333)
 
 <br />
 <br />
