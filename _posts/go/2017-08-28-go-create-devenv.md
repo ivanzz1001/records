@@ -93,6 +93,28 @@ func main() {
 Hello, 世界
 </pre>
 
+## 3. 64bit Win7上安装Go开发环境
+
+### 3.1 安装Go开发环境
+
+这里我们直接安装```go1.8.windows-amd64.msi```可执行文件(这里假设我们安装在```D:\Go```目录），安装完成后新建如下系统变量：
+
+* GOARCH: 配置当前系统架构，这里配置为amd64
+
+* GOOS: 配置当前操作系统，这里配置为```windows```
+
+* GOPATH: 配置我们当前的工作目录。假设以后我们在```E:\Workspace\go```目录下编写程序，那么我们可以将此目录设置到GOPATH中
+
+* GOROOT: 这里将我们的安装目录（即```D:\Go```)设置为GOROOT。
+
+接着将```%GOROOT%bin;```加入到系统环境变量PATH中。
+
+到此为止，我们就把Go开发环境搭建完毕。
+{% highlight string %}
+C:\Users\Administrator>go version
+go version go1.8 windows/amd64
+</pre>
+
 
 
 
