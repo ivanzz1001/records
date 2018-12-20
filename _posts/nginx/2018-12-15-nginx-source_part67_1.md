@@ -758,12 +758,90 @@ extern ngx_module_t           ngx_event_core_module;
 
 * NGX_UPDATE_TIME: 本宏定义用于指示当前是否需要更新nginx缓存时间
 
-* 
+* NGX_POST_EVENTS: 本用定义用于指示是否要将```事件```post，使得其可以在当前事件循环(event loop)遍历的后续某个时间点被处理
+
+<br />
+
+* ngx_event_timer_alarm: 表示收到了```SIGALRM```信号产生的alarm事件，收到信号后一般表示需要更新nginx缓存时间
+
+* ngx_event_flags: 用于保存当前```事件驱动机制```所支持的事件掩码
+
+* ngx_events_module： events模块。作为event模块的入口，解析events{}中的配置项，同时管理这些事件模块存储配置项的结构体。select、poll、epoll都是属于events模块，每一个事件模块产生的配置结构体指针都会被放在ngx_events_module模块创建的指针数组中。
+
+* ngx_event_core_module： events核心模块。负责维护事件模块相关核心配置。
+<pre>
+注： ngx_events_module与ngx_event_core_module与的关系是一种包含与被包含的关系。参看events模块的配置文件：
+
+events {
+
+accept_mutex on;
+
+multi_accept on;
+
+#use epoll; 
+
+worker_connections 1024; 
+}
+</pre>
+
+* ngx_event_get_conf： 用于获取event模块相关配置项的值
+
+## 12. 相关函数声明
+{% highlight string %}
+//用于处理TCP连接事件
+void ngx_event_accept(ngx_event_t *ev);
 
 
+//负责处理udp连接的处理
+#if !(NGX_WIN32)
+void ngx_event_recvmsg(ngx_event_t *ev);
+#endif
+
+//尝试获取accept互斥锁
+ngx_int_t ngx_trylock_accept_mutex(ngx_cycle_t *cycle);
+
+//对accept相应的日志进行格式化
+u_char *ngx_accept_log_error(ngx_log_t *log, u_char *buf, size_t len);
+
+//事件处理主流程
+void ngx_process_events_and_timers(ngx_cycle_t *cycle);
+
+//处理读事件
+ngx_int_t ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags);
+
+//处理写事件
+ngx_int_t ngx_handle_write_event(ngx_event_t *wev, size_t lowat);
 
 
+//Windows平台专用，这里不会使用到
+#if (NGX_WIN32)
+void ngx_event_acceptex(ngx_event_t *ev);
+ngx_int_t ngx_event_post_acceptex(ngx_listening_t *ls, ngx_uint_t n);
+u_char *ngx_acceptex_log_error(ngx_log_t *log, u_char *buf, size_t len);
+#endif
 
+//用于设置相应的socket的SO_SNDLOWAT选项
+ngx_int_t ngx_send_lowat(ngx_connection_t *c, size_t lowat);
+
+
+//获取connection的fd字段的值
+/* used in ngx_log_debugX() */
+#define ngx_event_ident(p)  ((ngx_connection_t *) (p))->fd
+
+
+#include <ngx_event_timer.h>
+#include <ngx_event_posted.h>
+
+#if (NGX_WIN32)
+#include <ngx_iocp_module.h>
+#endif
+
+
+#endif /* _NGX_EVENT_H_INCLUDED_ */
+{% endhighlight %}
+
+
+## 13. nginx中事件介绍
 
 
 
@@ -789,6 +867,8 @@ extern ngx_module_t           ngx_event_core_module;
 7. [Nginx学习笔记(十八)：事件处理框架](https://blog.csdn.net/fzy0201/article/details/23171207)
 
 8. [Nginx的accept_mutex配置](https://blog.csdn.net/adams_wu/article/details/51669203)
+
+9. [Nginx配置晋级之路（四）---events模块](https://blog.csdn.net/qq_26711103/article/details/81117770)
 
 <br />
 <br />

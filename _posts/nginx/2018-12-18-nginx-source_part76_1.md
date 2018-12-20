@@ -38,6 +38,8 @@ description: nginx源代码分析
 
 8. [Linux下的I/O复用与epoll详解](https://www.cnblogs.com/lojunren/p/3856290.html)
 
+9. [Nginx配置详解](http://www.cnblogs.com/knowledgesea/p/5175711.html)
+
 <br />
 <br />
 <br />

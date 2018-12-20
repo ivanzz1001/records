@@ -36,6 +36,8 @@ description: nginx源代码分析
 
 6. [EVENTFD](http://man7.org/linux/man-pages/man2/eventfd.2.html)
 
+7. [Nginx源码分析 - Event事件篇 - Event模块和配置的初始化](https://blog.csdn.net/initphp/article/details/52434261)
+
 <br />
 <br />
 <br />
