@@ -16,6 +16,69 @@ description: nginx源代码分析
 <!-- more -->
 
 
+## 1. 相关事件模块变量的声明
+{% highlight string %}
+
+/*
+ * Copyright (C) Igor Sysoev
+ * Copyright (C) Nginx, Inc.
+ */
+
+
+#include <ngx_config.h>
+#include <ngx_core.h>
+#include <ngx_event.h>
+
+
+#define DEFAULT_CONNECTIONS  512
+
+
+extern ngx_module_t ngx_kqueue_module;
+extern ngx_module_t ngx_eventport_module;
+extern ngx_module_t ngx_devpoll_module;
+extern ngx_module_t ngx_epoll_module;
+extern ngx_module_t ngx_select_module;
+{% endhighlight %}
+通常情况下，我们Linux操作系统支持select、poll、epoll这三种事件驱动机制。这里nginx启动时会根据当前event模块的配置选择恰当的事件驱动。
+{% highlight string %}
+注： 这里似乎没有ngx_poll_module，但是在ngx_event_core_init_conf()函数中，通过cycle->modules[i]仍能够选择到。
+{% endhighlight %}
+
+## 2. 相关静态函数声明
+{% highlight string %}
+//
+static char *ngx_event_init_conf(ngx_cycle_t *cycle, void *conf);
+
+
+static ngx_int_t ngx_event_module_init(ngx_cycle_t *cycle);
+
+
+static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle);
+
+
+static char *ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+
+
+static char *ngx_event_connections(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+
+
+static char *ngx_event_use(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+
+
+static char *ngx_event_debug_connection(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+
+
+static void *ngx_event_core_create_conf(ngx_cycle_t *cycle);
+
+
+static char *ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf);
+{% endhighlight %}
+
+
+
+
 
 
 
