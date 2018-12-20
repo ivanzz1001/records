@@ -505,7 +505,7 @@ ngx_gmtime(time_t t, ngx_tm_t *tp)
 本函数用于将```time_t```格式表示的时间转换成```ngx_tm_t```格式。
 
 
-## 8. 函数
+## 8. 函数ngx_next_time()
 {% highlight string %}
 time_t
 ngx_next_time(time_t when)

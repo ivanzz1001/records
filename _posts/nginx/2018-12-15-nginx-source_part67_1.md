@@ -843,6 +843,78 @@ ngx_int_t ngx_send_lowat(ngx_connection_t *c, size_t lowat);
 
 ## 13. nginx中事件介绍
 
+### 13.1 IO事件
+每一条通过调用函数ngx_get_connection()获取到的连接(connection)都绑定了两个事件：c->read以及c->write，分别用于接收对应socket读、写就绪的通知(notification)。所有这些事件都以```边沿触发模式```(Edge-Triggered mode)工作，这意味着这些事件只会在socket状态发生改变时才会触发通知(notification)。举例来说，假如你在一个socket上只读取部分数据(partial read)，那么nginx并不会重复投递(deliver)读通知(read notification)，直到后续有更多的数据到达socket。注意，即使底层的IO通知机制实际上用的是```水平触发```(Level Triggered，如select、poll等)，nginx会将这些通知转换成```边沿触发```(Edge-Triggered)。
+
+为了使得nginx事件通知在不同平台的所有通知系统(notification systems)上都保持一致，在处理完一个IO socket通知或者调用了socket的任何IO函数之后，我们都需要再函数ngx_handle_read_event(rev, flags)或ngx_handle_write_event(wev,lowat)。通常情况下，这些函数都会在每一个读(read)、写(write)事件的handler末尾处被调用一次。
+
+### 13.2 定时器事件
+
+一个event可以被设置为在其超时的时候发送一个notification。由该event所使用的定时器从上一次某一个时间点开始以```毫秒```为单位开始进行计数。当前的毫秒值可以通过```ngx_current_msec```变量来获取到。
+
+函数ngx_add_timer(ev,timer)可以为一个事件设置超时时间，而ngx_del_timer(ev)可以删除一个以前所设置的超时时间。全局的超时红黑树ngx_event_timer_rbtree存储当前所有的超时集。红黑树中节点的key为```ngx_msec_t```类型，其存储的就是定时器的到期时间。红黑树的结构使得能够快速的进行插入与删除操作，也能够快捷的访问到当前最近的超时时间，nginx会使用该最近超时时间来等待IO的发生。
+
+### 13.3 Posted事件
+一个event可以被```posted```，这就意味着在当前事件循环的后续某个时间点，该event的handler会被调用。posting events在简化代码以及避免栈溢出方面都是很好实践(good practise)。被投递(posted)的事件会被存放在```post queue```中。宏定义ngx_post_event(ev,q)会将事件```ev```投递到post队列```q```中；而ngx_delete_posted_event(ev)宏定义会将事件```ev```从其当前所投递的队列中移除。通常情况下，events会被投递到**ngx_posted_events**队列中，这些事件会在事件循环的后期被处理： 在所有的IO及定时器事件被处理完成之后。函数**ngx_event_process_posted()**会被调用以处理一个事件队列，其会不断调用event handlers直到整个队列为空。这就意味着一个**posted event handler**可以在一个事件循环中投递多个事件，然后再被处理。请参看如下示例：
+{% highlight string %}
+void
+ngx_my_connection_read(ngx_connection_t *c)
+{
+    ngx_event_t  *rev;
+
+    rev = c->read;
+
+    ngx_add_timer(rev, 1000);
+
+    rev->handler = ngx_my_read_handler;
+
+    ngx_my_read(rev);
+}
+
+
+void
+ngx_my_read_handler(ngx_event_t *rev)
+{
+    ssize_t            n;
+    ngx_connection_t  *c;
+    u_char             buf[256];
+
+    if (rev->timedout) { /* timeout expired */ }
+
+    c = rev->data;
+
+    while (rev->ready) {
+        n = c->recv(c, buf, sizeof(buf));
+
+        if (n == NGX_AGAIN) {
+            break;
+        }
+
+        if (n == NGX_ERROR) { /* error */ }
+
+        /* process buf */
+    }
+
+    if (ngx_handle_read_event(rev, 0) != NGX_OK) { /* error */ }
+}
+{% endhighlight %}
+
+示例中，当connection有可读事件到达时，就会调用ngx_my_read_handler()回调函数来读取数据。
+
+### 13.4 Event loop
+除了nginx的master进程之外，所有的worker进程都会进行IO操作，因此都有一个```事件循环(event loop)```。（nginx的master进程把其大部分时间都耗费在sigsuspend()函数调用上，以等待信号signals的到达。）nginx事件循环是在函数ngx_process_events_and_timers()中实现的，其会重复的被调用，直到整个进程退出。
+
+事件循环(event loop)有如下的一些stages(阶段）：
+
+* 通过调用ngx_event_find_timer()来查找当前最近的超时时间。该函数会查找红黑树中的最左边的节点，并返回该节点超时的毫秒数
+
+* 根据nginx的配置的特定的事件通知机制,通过调用一个handler来处理IO事件。该handler会等待至少一个IO事件发生，或者等待超时。当一个读(read)、写(write)事件发生时，```ready```标志会被设置，然后事件的handler会被调用。对于Linux来说，通常情况下会使用函数**ngx_epoll_process_events()**，该函数会调用```epoll_wait()```来等待IO事件
+
+* 通过调用ngx_event_expire_timers()来处理超时定时器事件。会从timer红黑树的最左侧节点开始遍历直到一个未超时的事件被找到。对于每一个已经超时的节点，event的```timeout```标志会被设置，event的timer_set标志会被重置，然后事件的handler会被调用
+
+* 通过调用**ngx_event_process_posted()**来处理被投递(posted)的事件。该函数会重复的执行： 移除队列中的第一个元素，然后调用该元素的handler()回调，直到整个队列为空。
+
+所有的nginx进程（包括master进程与worker进程）都会处理信号(signals)。信号处理器只会是指一些```全局变量```的值，这些变量的值会在调用完ngx_process_events_and_timers()函数之后被检查，以做进一步处理。
 
 
 

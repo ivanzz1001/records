@@ -112,7 +112,7 @@ extern volatile ngx_msec_t  ngx_current_msec;
 
 * ngx_time(): 获取当前Nginx缓存时间的秒数（精度为秒级）
 
-*ngx_timeofday(): 获取当前nginx缓存的时间
+* ngx_timeofday(): 获取当前nginx缓存的时间
 
 * ngx_cached_err_log_time: 当前缓存的错误日志时间
 

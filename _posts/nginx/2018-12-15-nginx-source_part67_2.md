@@ -38,6 +38,8 @@ description: nginx源代码分析
 
 7. [Nginx源码分析 - Event事件篇 - Event模块和配置的初始化](https://blog.csdn.net/initphp/article/details/52434261)
 
+8. [文章5：Nginx源码分析--事件循环](https://blog.csdn.net/yankai0219/article/details/8453297)
+
 <br />
 <br />
 <br />
