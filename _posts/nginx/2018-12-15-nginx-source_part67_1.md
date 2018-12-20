@@ -737,11 +737,34 @@ extern ngx_module_t           ngx_event_core_module;
 
 <br />
 
-我们当前并不支持```NGX_STAT_STUB```，该宏定义需要在启用```HTTP_STUB_STATUS```编译选项时才会定义。但是这里我们还是简单介绍一下各字段的含义。
+我们当前并不支持```NGX_STAT_STUB```，该宏定义需要在启用```HTTP_STUB_STATUS```编译选项时才会定义。请参看[Module ngx_http_stub_status_module](https://nginx.org/en/docs/http/ngx_http_stub_status_module.html)但是这里我们还是简单介绍一下各字段的含义。
 
 * ngx_stat_accepted: 用于统计当前nginx一共accept多少连接
 
-* ngx_stat_handled: 
+* ngx_stat_handled: 用于统计当前所处理的总的连接数。通常情况下，本字段的值与```ngx_stat_accepted```字段的值相同，除非达到了一些资源的限制（例如，worker_connections的限制）
+
+* ngx_stat_requests: 用于统计客户端总的请求数
+
+* ngx_stat_active: 用于统计当前处于active状态的客户端连接数，这也包括```Waiting```状态的连接
+
+* ngx_stat_reading: 当前Nginx正在读取```请求头```(request header)的连接数
+
+* ngx_stat_writing: 当前nginx正在向客户端```回写应答```(write the response back)的连接数
+
+* ngx_stat_waiting: 当前正处于空闲状态的客户端连接数。
+
+
+<br />
+
+* NGX_UPDATE_TIME: 本宏定义用于指示当前是否需要更新nginx缓存时间
+
+* 
+
+
+
+
+
+
 
 
 

@@ -27,6 +27,8 @@ description: nginx源代码分析
 
 3. [Nginx的锁的实现以及惊群的避免](http://www.cnblogs.com/549294286/p/6058811.html)
 
+4. [nginx平台初探](http://tengine.taobao.org/book/chapter_2.html)
+
 
 <br />
 <br />
