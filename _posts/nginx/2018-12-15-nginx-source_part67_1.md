@@ -731,7 +731,19 @@ extern ngx_module_t           ngx_event_core_module;
 
 * ngx_accept_mutex_held： 用于指示当前是否拿到了锁
 
-* ngx_accept_mutex_delay： 
+* ngx_accept_mutex_delay： 当```accept_mutex```被启用的话，如果当前有另一个worker进程正在accept新连接(connections)，则当前worker进程最长会等待多长时间尝试重新开始accept新连接。其实就是获取互斥锁的最大延迟时间
+
+* ngx_accept_disabled： 用于控制当前worker进程是否参与获取```ngx_accept_mutex```。一般在当前worker进程连接数过多时，就不会参与竞争，这样可以起到负载均衡的目的。
+
+<br />
+
+我们当前并不支持```NGX_STAT_STUB```，该宏定义需要在启用```HTTP_STUB_STATUS```编译选项时才会定义。但是这里我们还是简单介绍一下各字段的含义。
+
+* ngx_stat_accepted: 用于统计当前nginx一共accept多少连接
+
+* ngx_stat_handled: 
+
+
 
 
 <br />

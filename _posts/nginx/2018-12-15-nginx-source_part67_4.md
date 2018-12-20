@@ -25,6 +25,7 @@ description: nginx源代码分析
 
 2. [“惊群”，看看nginx是怎么解决它的](https://blog.csdn.net/russell_tao/article/details/7204260)
 
+3. [Nginx的锁的实现以及惊群的避免](http://www.cnblogs.com/549294286/p/6058811.html)
 
 
 <br />
