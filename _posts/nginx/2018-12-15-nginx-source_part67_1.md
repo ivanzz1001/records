@@ -408,31 +408,31 @@ extern ngx_event_actions_t   ngx_event_actions;
 
 上面我们介绍到有select、poll、epoll、kqueue、eventport等不同的事件驱动机制。每一种事件驱动机制所能支持的一些特性可能也有些不同。下面我们分别介绍一些这些标志：
 
-* **NGX_USE_LEVEL_EVENT**： 表示事件驱动机制的event filter支持水平触发。select, poll, /dev/poll, kqueue, epoll均支持这一模式
+* NGX_USE_LEVEL_EVENT： 表示事件驱动机制的event filter支持水平触发。select, poll, /dev/poll, kqueue, epoll均支持这一模式
 
-* **NGX_USE_ONESHOT_EVENT**: 表示事件驱动机制的event filter支持oneshot，即表示某个事件触发一次之后，对应的event filter就会被自动的移除，可以确保事件只触发一次。kqueue, epoll支持本选项。
+* NGX_USE_ONESHOT_EVENT: 表示事件驱动机制的event filter支持oneshot，即表示某个事件触发一次之后，对应的event filter就会被自动的移除，可以确保事件只触发一次。kqueue, epoll支持本选项。
 
-* **NGX_USE_CLEAR_EVENT**: 表示事件驱动机制的event filter支持边沿触发。epoll、kqueue支持本选项
+* NGX_USE_CLEAR_EVENT: 表示事件驱动机制的event filter支持边沿触发。epoll、kqueue支持本选项
 
-* **NGX_USE_KQUEUE_EVENT**: 表示对应的事件驱动机制的event filter支持kqueue特性： eof flag、errno、available data等。一般kqueue支持本选项
+* NGX_USE_KQUEUE_EVENT: 表示对应的事件驱动机制的event filter支持kqueue特性： eof flag、errno、available data等。一般kqueue支持本选项
 
-* **NGX_USE_LOWAT_EVENT**: 表示对应的事件驱动机制的event filter支持```低水位标志```(low water mark)。一般kqueue支持本选项
+* NGX_USE_LOWAT_EVENT: 表示对应的事件驱动机制的event filter支持```低水位标志```(low water mark)。一般kqueue支持本选项
 
-* **NGX_USE_GREEDY_EVENT**: 表示对应的事件驱动机制的event filter需要重复执行IO操作，直到EAGAIN。一般epoll支持本选项。
+* NGX_USE_GREEDY_EVENT: 表示对应的事件驱动机制的event filter需要重复执行IO操作，直到EAGAIN。一般epoll支持本选项。
 <pre>
 通常情况下，我们读取数据时，如果实际读取的数据字节数小于我们的请求数，那么此时我们可以直接将event.ready设置为0；
 但是对于支持本选项的事件机制，即使遇到此情形，通常还是要继续进行读取，直到返回的EAGAIN为止，才将event.ready设置为0.
 </pre>
 
-* **NGX_USE_EPOLL_EVENT**： 本event filter用于epoll
+* NGX_USE_EPOLL_EVENT： 本event filter用于epoll
 
-* **NGX_USE_RTSIG_EVENT**: 当前已经过时，不再使用
+* NGX_USE_RTSIG_EVENT: 当前已经过时，不再使用
 
-* **NGX_USE_AIO_EVENT**: 当前已经过时，不再使用
+* NGX_USE_AIO_EVENT: 当前已经过时，不再使用
 
-* **NGX_USE_IOCP_EVENT**: 本event filter用于IOCP
+* NGX_USE_IOCP_EVENT: 本event filter用于IOCP
 
-* **NGX_USE_FD_EVENT**: 表示本event filter没有透明数据，并需要一个文件描述符表。本标志通常用于poll、dev/poll。下面我们以poll为例来说明一下为何要使用此选项：
+* NGX_USE_FD_EVENT: 表示本event filter没有透明数据，并需要一个文件描述符表。本标志通常用于poll、dev/poll。下面我们以poll为例来说明一下为何要使用此选项：
 {% highlight string %}
 struct pollfd pfds[1];
 
@@ -440,9 +440,9 @@ ret = poll(fds,1,timeout);
 {% endhighlight %}
 上面代码，当有读写事件到来时，我们只能够通过```pfds```获取到文件的句柄信息，并没有```透明数据```。但是一般我们可能还需要获取到更为详细的信息(透明数据)，此时我们可能还需要绑定另外一个结构，通过fd就可以简单快捷的定位到。
 
-* **NGX_USE_EVENTPORT_EVENT**: 本标志表示在notification之后，文件描述符上的所有event filter都会被移除。用于eventport
+* NGX_USE_EVENTPORT_EVENT: 本标志表示在notification之后，文件描述符上的所有event filter都会被移除。用于eventport
 
-* **NGX_USE_VNODE_EVENT**： 本event filter表示支持vnode通知。用于kqueue
+* NGX_USE_VNODE_EVENT： 本event filter表示支持vnode通知。用于kqueue
 
 ## 6. 事件驱动机制中的各种事件
 {% highlight string %}
