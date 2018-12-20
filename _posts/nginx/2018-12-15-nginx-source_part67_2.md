@@ -46,38 +46,80 @@ extern ngx_module_t ngx_select_module;
 
 ## 2. 相关静态函数声明
 {% highlight string %}
-//
+//初始化event模块 上下文 时的一个回调函数
 static char *ngx_event_init_conf(ngx_cycle_t *cycle, void *conf);
 
-
+//初始化event core模块的回调函数
 static ngx_int_t ngx_event_module_init(ngx_cycle_t *cycle);
 
-
+//初始化进程时候针对event core模块的回调函数，其会在ngx_event_module_init()函数之后才会调用
 static ngx_int_t ngx_event_process_init(ngx_cycle_t *cycle);
 
-
+//配置文件解析到events命令时候的回调函数
 static char *ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
-
+//配置文件解析到worker_connections指令时的回调函数
 static char *ngx_event_connections(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
-
+//配置文件解析到use指令时的回调函数
 static char *ngx_event_use(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
-
+//配置文件解析到debug_connection指令时的回调函数
 static char *ngx_event_debug_connection(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
-
+//创建event core模块上下文的回调函数
 static void *ngx_event_core_create_conf(ngx_cycle_t *cycle);
 
-
+//初始化event core模块上下文的回调函数
 static char *ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf);
 {% endhighlight %}
 
 
+## 3. 相关变量定义
+{% highlight string %}
+static ngx_uint_t     ngx_timer_resolution;
+sig_atomic_t          ngx_event_timer_alarm;
 
+static ngx_uint_t     ngx_event_max_module;
+
+ngx_uint_t            ngx_event_flags;
+ngx_event_actions_t   ngx_event_actions;
+
+
+static ngx_atomic_t   connection_counter = 1;
+ngx_atomic_t         *ngx_connection_counter = &connection_counter;
+
+
+ngx_atomic_t         *ngx_accept_mutex_ptr;
+ngx_shmtx_t           ngx_accept_mutex;
+ngx_uint_t            ngx_use_accept_mutex;
+ngx_uint_t            ngx_accept_events;
+ngx_uint_t            ngx_accept_mutex_held;
+ngx_msec_t            ngx_accept_mutex_delay;
+ngx_int_t             ngx_accept_disabled;
+
+
+#if (NGX_STAT_STUB)
+
+ngx_atomic_t   ngx_stat_accepted0;
+ngx_atomic_t  *ngx_stat_accepted = &ngx_stat_accepted0;
+ngx_atomic_t   ngx_stat_handled0;
+ngx_atomic_t  *ngx_stat_handled = &ngx_stat_handled0;
+ngx_atomic_t   ngx_stat_requests0;
+ngx_atomic_t  *ngx_stat_requests = &ngx_stat_requests0;
+ngx_atomic_t   ngx_stat_active0;
+ngx_atomic_t  *ngx_stat_active = &ngx_stat_active0;
+ngx_atomic_t   ngx_stat_reading0;
+ngx_atomic_t  *ngx_stat_reading = &ngx_stat_reading0;
+ngx_atomic_t   ngx_stat_writing0;
+ngx_atomic_t  *ngx_stat_writing = &ngx_stat_writing0;
+ngx_atomic_t   ngx_stat_waiting0;
+ngx_atomic_t  *ngx_stat_waiting = &ngx_stat_waiting0;
+
+#endif
+{% endhighlight %}
 
 
 
