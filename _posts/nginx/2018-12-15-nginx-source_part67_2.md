@@ -121,6 +121,34 @@ ngx_atomic_t  *ngx_stat_waiting = &ngx_stat_waiting0;
 #endif
 {% endhighlight %}
 
+下面我们简要介绍一下这些字段：
+
+* ngx_timer_resolution: 可以通过nginx配置文件主配置段中的```timer_resolution```指令来降低worker进程的定时器分辨率(timer resolution)，这样就可以降低gettimeofday()系统调用的次数。默认情况下，gettimeofday()会在每一次收到kernel事件时被调用。我们可以通过降低timer resolution的值，这样gettimeofday()函数就会每隔```interval```时间被调用一次。例如：
+<pre>
+timer_resolution 100ms;
+</pre>
+内部```interval```的实现依赖于所使用的方法：
+<pre>
+假如所采用的事件驱动机制是```kqueue```的话，使用EVFILT_TIMER filter来实现
+假如所采用的事件驱动机制是```eventport```的话，使用timer_create()来实现
+否则，采用setitimer()来实现
+</pre>
+
+* ngx_event_timer_alarm: 当收到```SIGALARM```信号时，会将此变量置为1，以指示更新Nginx缓存时间
+
+* ngx_event_max_module: 当前属于NGX_EVENT_MODULE模块的个数
+
+*  ngx_event_flags: 用于保存当前```事件驱动机制```所支持的事件掩码
+
+* ngx_event_actions: 用于保存当前事件驱动机制下的actions函数
+
+* connection_counter/ngx_connection_counter: 用于统计当前的连接数
+
+* ngx_accept_mutex_ptr: 存放互斥量内存地址的指针
+
+* ngx_accept_mutex: accept互斥锁
+
+* ngx_use_accept_mutex: 表示是否需要通过对accept加锁来解决惊群问题。当nginx worker进程数```大于1```时，且配置文件中开启了```accept_mutex```时，这个标志置为1
 
 
 
