@@ -378,6 +378,124 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 }
 {% endhighlight %}
 
+本函数作为nginx处理IO事件以及定时器事件的主入口函数。下面我们简要分析一下函数的实现：
+{% highlight string %}
+void
+ngx_process_events_and_timers(ngx_cycle_t *cycle)
+{
+	//1) 获得下一次事件处理的超时时间。这里如果配置了ngx_timer_resolution的话，那么将timer设置为NGX_TIMER_INFINITE,
+	//	flag设置为0； 否则，将从红黑树中查找最近超时时间，并将flag设置为NGX_UPDATE_TIME。这里注意将timer设置为
+	// NGX_TIMER_INFINITE也并不会造成在IO空闲时无限等待，导致定时器事件永不执行，因为在ngx_event_process_init()函数中
+	// 我们会设置通过setitimer()或eventport或kqueue独有的超时机制来确保定时器会得到触发
+
+
+	//2) 当nginx worker进程数大于1，并且配置文件中开启了accept_mutex时，ngx_use_accept_mutex字段会置为1，此时会尝试
+	// 获取accept_mutex互斥锁。如果ngx_accept_disabled大于0，表示当前worker进程连接数较多负载较重，此时会放弃获取
+	//accept_mutex； 否则调用ngx_trylock_accept_mutex()尝试获取，如果获取到了的话，则flags |= NGX_POST_EVENTS;
+	//否则，会在ngx_accept_mutex_delay时间之后再尝试获取accept_mutex锁，以接受客户端的连接
+
+
+	//3) 记录当前的时间(单位： 毫秒)
+	 delta = ngx_current_msec;
+
+	//4) 等待IO事件的到来，timer时间到了超时返回，或者收到中断信号返回
+	(void) ngx_process_events(cycle, timer, flags);
+
+	//5) 计算上述等待耗费的时间
+	delta = ngx_current_msec - delta;
+
+	//6) 处理ngx_posted_accept_events这一post队列中的事件(这是因为accept事件优先级较高，所以放到前面来处理)
+	ngx_event_process_posted(cycle, &ngx_posted_accept_events);
+
+	//7) 如果当前获得了accept_mutex锁，还需要释放锁，否则别的进程获取不到accept_mutex锁，将永远得不到机会
+	// 来accept客户端连接
+	if (ngx_accept_mutex_held) {
+        ngx_shmtx_unlock(&ngx_accept_mutex);
+    }
+
+	//8) 处理定时器集合中的超时事件
+	if (delta) {
+        ngx_event_expire_timers();
+    }
+
+	//9) 处理ngx_posted_events这一post队列只能够的事件（这种事件优先级较低，放到最后来进行处理)
+	ngx_event_process_posted(cycle, &ngx_posted_events);
+}
+{% endhighlight %}
+
+
+
+## 6. 函数ngx_handle_read_event()
+{% highlight string %}
+ngx_int_t
+ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags)
+{
+    if (ngx_event_flags & NGX_USE_CLEAR_EVENT) {
+
+        /* kqueue, epoll */
+
+        if (!rev->active && !rev->ready) {
+            if (ngx_add_event(rev, NGX_READ_EVENT, NGX_CLEAR_EVENT)
+                == NGX_ERROR)
+            {
+                return NGX_ERROR;
+            }
+        }
+
+        return NGX_OK;
+
+    } else if (ngx_event_flags & NGX_USE_LEVEL_EVENT) {
+
+        /* select, poll, /dev/poll */
+
+        if (!rev->active && !rev->ready) {
+            if (ngx_add_event(rev, NGX_READ_EVENT, NGX_LEVEL_EVENT)
+                == NGX_ERROR)
+            {
+                return NGX_ERROR;
+            }
+
+            return NGX_OK;
+        }
+
+        if (rev->active && (rev->ready || (flags & NGX_CLOSE_EVENT))) {
+            if (ngx_del_event(rev, NGX_READ_EVENT, NGX_LEVEL_EVENT | flags)
+                == NGX_ERROR)
+            {
+                return NGX_ERROR;
+            }
+
+            return NGX_OK;
+        }
+
+    } else if (ngx_event_flags & NGX_USE_EVENTPORT_EVENT) {
+
+        /* event ports */
+
+        if (!rev->active && !rev->ready) {
+            if (ngx_add_event(rev, NGX_READ_EVENT, 0) == NGX_ERROR) {
+                return NGX_ERROR;
+            }
+
+            return NGX_OK;
+        }
+
+        if (rev->oneshot && !rev->ready) {
+            if (ngx_del_event(rev, NGX_READ_EVENT, 0) == NGX_ERROR) {
+                return NGX_ERROR;
+            }
+
+            return NGX_OK;
+        }
+    }
+
+    /* iocp */
+
+    return NGX_OK;
+}
+{% endhighlight %}
+
+
 
 <br />
 <br />
