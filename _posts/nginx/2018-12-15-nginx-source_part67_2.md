@@ -400,6 +400,8 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 
 8. [文章5：Nginx源码分析--事件循环](https://blog.csdn.net/yankai0219/article/details/8453297)
 
+9. [Nginx学习之十-超时管理（定时器事件）](https://blog.csdn.net/xiajun07061225/article/details/9284543)
+
 <br />
 <br />
 <br />
