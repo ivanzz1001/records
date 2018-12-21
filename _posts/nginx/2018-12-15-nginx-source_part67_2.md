@@ -150,6 +150,233 @@ timer_resolution 100ms;
 
 * ngx_use_accept_mutex: 表示是否需要通过对accept加锁来解决惊群问题。当nginx worker进程数```大于1```时，且配置文件中开启了```accept_mutex```时，这个标志置为1
 
+* ngx_accept_events: 表示在获取accept互斥锁的时候，是否还需要调用ngx_enable_accept_events()来使能accept events。通常采用```eventport```这一事件驱动机制时才需要。
+
+* ngx_accept_mutex_held: 用于指示当前是否拿到了锁
+
+* ngx_accept_mutex_delay: 当```accept_mutex```被启用的话，如果当前有另一个worker进程正在accept新连接(connections)，则当前worker进程最长会等待多长时间尝试重新开始accept新连接。其实就是获取互斥锁的最大延迟时间
+
+* ngx_accept_disabled: 用于控制当前worker进程是否参与获取```ngx_accept_mutex```。一般在当前worker进程连接数过多时，就不会参与竞争，这样可以起到负载均衡的目的。
+
+<br />
+
+我们当前并不支持```NGX_STAT_STUB```，该宏定义需要在启用```HTTP_STUB_STATUS```编译选项时才会定义。请参看[Module ngx_http_stub_status_module](https://nginx.org/en/docs/http/ngx_http_stub_status_module.html)但是这里我们还是简单介绍一下各字段的含义。
+
+* ngx_stat_accepted0/ngx_stat_accepted: 用于统计当前nginx一共accept多少连接
+
+* ngx_stat_handled0/ngx_stat_handled: 用于统计当前所处理的总的连接数。通常情况下，本字段的值与```ngx_stat_accepted```字段的值相同，除非达到了一些资源的限制（例如，worker_connections的限制）
+
+* ngx_stat_requests0/ngx_stat_requests: 用于统计客户端总的请求数
+
+* ngx_stat_active0/ngx_stat_active: 用于统计当前处于active状态的客户端连接数，这也包括```Waiting```状态的连接
+
+* ngx_stat_reading0/ngx_stat_reading: 当前Nginx正在读取```请求头```(request header)的连接数
+
+* ngx_stat_writing0/ngx_stat_writing: 当前nginx正在向客户端```回写应答```(write the response back)的连接数
+
+* ngx_stat_waiting0/ngx_stat_waiting: 当前正处于空闲状态的客户端连接数。
+
+## 4. event module相关变量
+{% highlight string %}
+static ngx_command_t  ngx_events_commands[] = {
+
+    { ngx_string("events"),
+      NGX_MAIN_CONF|NGX_CONF_BLOCK|NGX_CONF_NOARGS,
+      ngx_events_block,
+      0,
+      0,
+      NULL },
+
+      ngx_null_command
+};
+
+
+static ngx_core_module_t  ngx_events_module_ctx = {
+    ngx_string("events"),
+    NULL,
+    ngx_event_init_conf
+};
+
+
+ngx_module_t  ngx_events_module = {
+    NGX_MODULE_V1,
+    &ngx_events_module_ctx,                /* module context */
+    ngx_events_commands,                   /* module directives */
+    NGX_CORE_MODULE,                       /* module type */
+    NULL,                                  /* init master */
+    NULL,                                  /* init module */
+    NULL,                                  /* init process */
+    NULL,                                  /* init thread */
+    NULL,                                  /* exit thread */
+    NULL,                                  /* exit process */
+    NULL,                                  /* exit master */
+    NGX_MODULE_V1_PADDING
+};
+
+
+static ngx_str_t  event_core_name = ngx_string("event_core");
+
+
+static ngx_command_t  ngx_event_core_commands[] = {
+
+    { ngx_string("worker_connections"),
+      NGX_EVENT_CONF|NGX_CONF_TAKE1,
+      ngx_event_connections,
+      0,
+      0,
+      NULL },
+
+    { ngx_string("use"),
+      NGX_EVENT_CONF|NGX_CONF_TAKE1,
+      ngx_event_use,
+      0,
+      0,
+      NULL },
+
+    { ngx_string("multi_accept"),
+      NGX_EVENT_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      0,
+      offsetof(ngx_event_conf_t, multi_accept),
+      NULL },
+
+    { ngx_string("accept_mutex"),
+      NGX_EVENT_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot,
+      0,
+      offsetof(ngx_event_conf_t, accept_mutex),
+      NULL },
+
+    { ngx_string("accept_mutex_delay"),
+      NGX_EVENT_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_msec_slot,
+      0,
+      offsetof(ngx_event_conf_t, accept_mutex_delay),
+      NULL },
+
+    { ngx_string("debug_connection"),
+      NGX_EVENT_CONF|NGX_CONF_TAKE1,
+      ngx_event_debug_connection,
+      0,
+      0,
+      NULL },
+
+      ngx_null_command
+};
+
+
+ngx_event_module_t  ngx_event_core_module_ctx = {
+    &event_core_name,
+    ngx_event_core_create_conf,            /* create configuration */
+    ngx_event_core_init_conf,              /* init configuration */
+
+    { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
+};
+
+
+ngx_module_t  ngx_event_core_module = {
+    NGX_MODULE_V1,
+    &ngx_event_core_module_ctx,            /* module context */
+    ngx_event_core_commands,               /* module directives */
+    NGX_EVENT_MODULE,                      /* module type */
+    NULL,                                  /* init master */
+    ngx_event_module_init,                 /* init module */
+    ngx_event_process_init,                /* init process */
+    NULL,                                  /* init thread */
+    NULL,                                  /* exit thread */
+    NULL,                                  /* exit process */
+    NULL,                                  /* exit master */
+    NGX_MODULE_V1_PADDING
+};
+{% endhighlight %}
+
+下面简单介绍一下这些变量：
+
+* ngx_events_commands: nginx的```events```命令
+
+* ngx_events_module_ctx: events模块上下文
+
+* ngx_events_module: nginx events模块
+
+* event_core_name: nginx 事件核心模块名称为```event_core```
+
+* ngx_event_core_commands： nginx事件核心模块命令
+
+* ngx_event_core_module_ctx: nginx事件核心模块上下文
+
+* ngx_event_core_module： nginx事件核心模块
+
+## 5. 函数ngx_process_events_and_timers()
+{% highlight string %}
+void
+ngx_process_events_and_timers(ngx_cycle_t *cycle)
+{
+    ngx_uint_t  flags;
+    ngx_msec_t  timer, delta;
+
+    if (ngx_timer_resolution) {
+        timer = NGX_TIMER_INFINITE;
+        flags = 0;
+
+    } else {
+        timer = ngx_event_find_timer();
+        flags = NGX_UPDATE_TIME;
+
+#if (NGX_WIN32)
+
+        /* handle signals from master in case of network inactivity */
+
+        if (timer == NGX_TIMER_INFINITE || timer > 500) {
+            timer = 500;
+        }
+
+#endif
+    }
+
+    if (ngx_use_accept_mutex) {
+        if (ngx_accept_disabled > 0) {
+            ngx_accept_disabled--;
+
+        } else {
+            if (ngx_trylock_accept_mutex(cycle) == NGX_ERROR) {
+                return;
+            }
+
+            if (ngx_accept_mutex_held) {
+                flags |= NGX_POST_EVENTS;
+
+            } else {
+                if (timer == NGX_TIMER_INFINITE
+                    || timer > ngx_accept_mutex_delay)
+                {
+                    timer = ngx_accept_mutex_delay;
+                }
+            }
+        }
+    }
+
+    delta = ngx_current_msec;
+
+    (void) ngx_process_events(cycle, timer, flags);
+
+    delta = ngx_current_msec - delta;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+                   "timer delta: %M", delta);
+
+    ngx_event_process_posted(cycle, &ngx_posted_accept_events);
+
+    if (ngx_accept_mutex_held) {
+        ngx_shmtx_unlock(&ngx_accept_mutex);
+    }
+
+    if (delta) {
+        ngx_event_expire_timers();
+    }
+
+    ngx_event_process_posted(cycle, &ngx_posted_events);
+}
+{% endhighlight %}
 
 
 <br />
