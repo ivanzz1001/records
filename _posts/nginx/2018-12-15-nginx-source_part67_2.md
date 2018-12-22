@@ -494,6 +494,148 @@ ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags)
     return NGX_OK;
 }
 {% endhighlight %}
+本函数用于向nginx事件驱动机制登记为读事件。通常在连接建立或者读取完一次数据之后，需要再调用一次本函数。下面简要介绍一下函数的实现：
+{% highlight string %}
+ngx_int_t
+ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags)
+{
+	if (ngx_event_flags & NGX_USE_CLEAR_EVENT) {
+
+		//1） 表示当前nginx事件驱动机制采用的是边沿触发方式。一般epoll、kqueue支持
+		//此种触发方式。调用ngx_add_event()添加读事件
+
+		if (!rev->active && !rev->ready){
+		
+		}
+
+	}else if(ngx_event_flags & NGX_USE_LEVEL_EVENT){
+
+		//2) 表示当前nginx事件驱动机制采用的是水平触发方式。一般select、poll、dev/poll只
+		//支持此种触发方式。调用ngx_add_event()添加读事件
+
+		if (!rev->active && !rev->ready) {
+			ngx_add_event();
+
+			return NGX_OK;
+		}
+		if (rev->active && (rev->ready || (flags & NGX_CLOSE_EVENT))) {
+			//此种情况下要删除事件。这是因为底层nginx事件驱动机制采用的水平触发，而我们nginx对于上层
+			//统一采用的都是边沿触发。这里如果不移除，那么底层会不断的进行通知，导致系统性能较差
+			
+			ngx_del_event();
+		}
+		
+	}else if (ngx_event_flags & NGX_USE_EVENTPORT_EVENT) {
+		//3) 处理eventport读事件
+
+		if (!rev->active && !rev->ready){
+			//添加读事件
+
+			return NGX_OK;
+		}
+
+		if (rev->oneshot && !rev->ready) {
+
+			//如果是oneshot事件，并且现在没有数据可读了，那么要移除该一次性事件
+
+			ngx_del_event();
+
+			return NGX_OK;
+		}
+	}
+}
+{% endhighlight %}
+
+注意： Nginx中事件```驱动机制底层```有些支持边沿触发，有些只支持水平触发。但是在Nginx上层统一都采用边沿触发。以降低事件的通知频率，提高整体系统性能。
+
+## 7. 函数
+{% highlight string %}
+ngx_int_t
+ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
+{
+    ngx_connection_t  *c;
+
+    if (lowat) {
+        c = wev->data;
+
+        if (ngx_send_lowat(c, lowat) == NGX_ERROR) {
+            return NGX_ERROR;
+        }
+    }
+
+    if (ngx_event_flags & NGX_USE_CLEAR_EVENT) {
+
+        /* kqueue, epoll */
+
+        if (!wev->active && !wev->ready) {
+            if (ngx_add_event(wev, NGX_WRITE_EVENT,
+                              NGX_CLEAR_EVENT | (lowat ? NGX_LOWAT_EVENT : 0))
+                == NGX_ERROR)
+            {
+                return NGX_ERROR;
+            }
+        }
+
+        return NGX_OK;
+
+    } else if (ngx_event_flags & NGX_USE_LEVEL_EVENT) {
+
+        /* select, poll, /dev/poll */
+
+        if (!wev->active && !wev->ready) {
+            if (ngx_add_event(wev, NGX_WRITE_EVENT, NGX_LEVEL_EVENT)
+                == NGX_ERROR)
+            {
+                return NGX_ERROR;
+            }
+
+            return NGX_OK;
+        }
+
+        if (wev->active && wev->ready) {
+            if (ngx_del_event(wev, NGX_WRITE_EVENT, NGX_LEVEL_EVENT)
+                == NGX_ERROR)
+            {
+                return NGX_ERROR;
+            }
+
+            return NGX_OK;
+        }
+
+    } else if (ngx_event_flags & NGX_USE_EVENTPORT_EVENT) {
+
+        /* event ports */
+
+        if (!wev->active && !wev->ready) {
+            if (ngx_add_event(wev, NGX_WRITE_EVENT, 0) == NGX_ERROR) {
+                return NGX_ERROR;
+            }
+
+            return NGX_OK;
+        }
+
+        if (wev->oneshot && wev->ready) {
+            if (ngx_del_event(wev, NGX_WRITE_EVENT, 0) == NGX_ERROR) {
+                return NGX_ERROR;
+            }
+
+            return NGX_OK;
+        }
+    }
+
+    /* iocp */
+
+    return NGX_OK;
+}
+{% endhighlight %}
+本函数用于向nginx事件驱动机制登记为写事件。通常在连接建立或者连接当前不处于写状态时，需要再调用一次本函数。下面简要介绍一下函数的实现：
+{% highlight string %}
+ngx_int_t
+ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
+{
+}
+{% endhighlight %}
+
 
 
 
