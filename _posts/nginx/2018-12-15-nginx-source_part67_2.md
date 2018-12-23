@@ -548,7 +548,7 @@ ngx_handle_read_event(ngx_event_t *rev, ngx_uint_t flags)
 
 注意： Nginx中事件```驱动机制底层```有些支持边沿触发，有些只支持水平触发。但是在Nginx上层统一都采用边沿触发。以降低事件的通知频率，提高整体系统性能。
 
-## 7. 函数
+## 7. 函数ngx_handle_write_event()
 {% highlight string %}
 ngx_int_t
 ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
@@ -633,8 +633,1280 @@ ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
 ngx_int_t
 ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
 {
+	//1) 如果lowat值不为0，那么调用ngx_send_lowat()函数设置socket的SO_SNDLOWAT选项，表示
+	//若该socket发送缓冲区中的数据低于lowat时，那么epoll、select等事件驱动机制就能检测到
+	//当前socket可写
+
+	if (ngx_event_flags & NGX_USE_CLEAR_EVENT) {
+		//2) 表示当前nginx事件驱动机制采用的是边沿触发方式。一般epoll、kqueue支持
+		//此种触发方式。调用ngx_add_event()添加读事件
+
+		if (!wev->active && !wev->ready) {
+			//这里判断条件要求当前event本身不处于写ready状态，才需要进行设置
+		}
+	}else if (ngx_event_flags & NGX_USE_LEVEL_EVENT) {
+
+		//3) 表示当前nginx事件驱动机制采用的是水平触发方式。一般select、poll、dev/poll只
+		//支持此种触发方式。调用ngx_add_event()添加写事件
+		
+		if (!wev->active && !wev->ready) {
+			ngx_add_event();
+
+			return NGX_OK;
+		}
+		if (wev->active && wev->ready) {
+			//此种情况下要删除事件。这是因为底层nginx事件驱动机制采用的水平触发，而我们nginx对于上层
+			//统一采用的都是边沿触发。这里如果不移除，那么底层会不断的进行通知，导致系统性能较差
+			
+			ngx_del_event();
+		}
+	}else if (ngx_event_flags & NGX_USE_EVENTPORT_EVENT) {
+		//3) 处理eventport写事件
+
+		if (!wev->active && !wev->ready){
+			//添加读事件
+
+			return NGX_OK;
+		}
+
+		if (wev->oneshot && wev->ready) {
+
+			//如果是oneshot事件，并且现在处于写就绪状态，那么要移除该一次性事件
+
+			ngx_del_event();
+
+			return NGX_OK;
+		}
+	}
+
 }
 {% endhighlight %}
+
+
+## 8. 函数ngx_event_init_conf()
+{% highlight string %}
+static char *
+ngx_event_init_conf(ngx_cycle_t *cycle, void *conf)
+{
+    if (ngx_get_conf(cycle->conf_ctx, ngx_events_module) == NULL) {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
+                      "no \"events\" section in configuration");
+        return NGX_CONF_ERROR;
+    }
+
+    return NGX_CONF_OK;
+}
+{% endhighlight %}
+此函数会在nginx event模块初始化时被调用。下面简要介绍一下本函数的调用流程：
+{% highlight string %}
+ngx_init_cycle(){
+
+	ngx_conf_param();
+
+	//当解析到events{}块时，就会调用到ngx_events_block()函数，并在其中创建
+	//event的上下文
+	ngx_conf_parse();			
+
+	//初始化核心模块NGX_CORE_MODULE，即回调核心模块的init_conf()函数。
+	//对于events模块，其本身属于核心模块，因此会在这里调用到ngx_event_init_conf()函数
+	//如果配置文件中没有配置event{}块，那么此处就会出错
+	
+}
+{% endhighlight %}
+
+## 9. 函数ngx_event_module_init()
+{% highlight string %}
+static ngx_int_t
+ngx_event_module_init(ngx_cycle_t *cycle)
+{
+    void              ***cf;
+    u_char              *shared;
+    size_t               size, cl;
+    ngx_shm_t            shm;
+    ngx_time_t          *tp;
+    ngx_core_conf_t     *ccf;
+    ngx_event_conf_t    *ecf;
+
+    cf = ngx_get_conf(cycle->conf_ctx, ngx_events_module);
+    ecf = (*cf)[ngx_event_core_module.ctx_index];
+
+    if (!ngx_test_config && ngx_process <= NGX_PROCESS_MASTER) {
+        ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0,
+                      "using the \"%s\" event method", ecf->name);
+    }
+
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+
+    ngx_timer_resolution = ccf->timer_resolution;
+
+#if !(NGX_WIN32)
+    {
+    ngx_int_t      limit;
+    struct rlimit  rlmt;
+
+    if (getrlimit(RLIMIT_NOFILE, &rlmt) == -1) {
+        ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                      "getrlimit(RLIMIT_NOFILE) failed, ignored");
+
+    } else {
+        if (ecf->connections > (ngx_uint_t) rlmt.rlim_cur
+            && (ccf->rlimit_nofile == NGX_CONF_UNSET
+                || ecf->connections > (ngx_uint_t) ccf->rlimit_nofile))
+        {
+            limit = (ccf->rlimit_nofile == NGX_CONF_UNSET) ?
+                         (ngx_int_t) rlmt.rlim_cur : ccf->rlimit_nofile;
+
+            ngx_log_error(NGX_LOG_WARN, cycle->log, 0,
+                          "%ui worker_connections exceed "
+                          "open file resource limit: %i",
+                          ecf->connections, limit);
+        }
+    }
+    }
+#endif /* !(NGX_WIN32) */
+
+
+    if (ccf->master == 0) {
+        return NGX_OK;
+    }
+
+    if (ngx_accept_mutex_ptr) {
+        return NGX_OK;
+    }
+
+
+    /* cl should be equal to or greater than cache line size */
+
+    cl = 128;
+
+    size = cl            /* ngx_accept_mutex */
+           + cl          /* ngx_connection_counter */
+           + cl;         /* ngx_temp_number */
+
+#if (NGX_STAT_STUB)
+
+    size += cl           /* ngx_stat_accepted */
+           + cl          /* ngx_stat_handled */
+           + cl          /* ngx_stat_requests */
+           + cl          /* ngx_stat_active */
+           + cl          /* ngx_stat_reading */
+           + cl          /* ngx_stat_writing */
+           + cl;         /* ngx_stat_waiting */
+
+#endif
+
+    shm.size = size;
+    shm.name.len = sizeof("nginx_shared_zone") - 1;
+    shm.name.data = (u_char *) "nginx_shared_zone";
+    shm.log = cycle->log;
+
+    if (ngx_shm_alloc(&shm) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    shared = shm.addr;
+
+    ngx_accept_mutex_ptr = (ngx_atomic_t *) shared;
+    ngx_accept_mutex.spin = (ngx_uint_t) -1;
+
+    if (ngx_shmtx_create(&ngx_accept_mutex, (ngx_shmtx_sh_t *) shared,
+                         cycle->lock_file.data)
+        != NGX_OK)
+    {
+        return NGX_ERROR;
+    }
+
+    ngx_connection_counter = (ngx_atomic_t *) (shared + 1 * cl);
+
+    (void) ngx_atomic_cmp_set(ngx_connection_counter, 0, 1);
+
+    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+                   "counter: %p, %uA",
+                   ngx_connection_counter, *ngx_connection_counter);
+
+    ngx_temp_number = (ngx_atomic_t *) (shared + 2 * cl);
+
+    tp = ngx_timeofday();
+
+    ngx_random_number = (tp->msec << 16) + ngx_pid;
+
+#if (NGX_STAT_STUB)
+
+    ngx_stat_accepted = (ngx_atomic_t *) (shared + 3 * cl);
+    ngx_stat_handled = (ngx_atomic_t *) (shared + 4 * cl);
+    ngx_stat_requests = (ngx_atomic_t *) (shared + 5 * cl);
+    ngx_stat_active = (ngx_atomic_t *) (shared + 6 * cl);
+    ngx_stat_reading = (ngx_atomic_t *) (shared + 7 * cl);
+    ngx_stat_writing = (ngx_atomic_t *) (shared + 8 * cl);
+    ngx_stat_waiting = (ngx_atomic_t *) (shared + 9 * cl);
+
+#endif
+
+    return NGX_OK;
+}
+{% endhighlight %}
+此函数作为nginx event核心模块的初始化函数，会在nginx中所有模块(nginx core模块、http模块、event模块、upstream模块等）都完成之后，在ngx_init_cycle()中被调用：
+<pre>
+ngx_init_cycle(){
+
+	ngx_init_modules();
+}
+</pre>
+
+下面我们就简要介绍一下本函数的实现：
+{% highlight string %}
+static ngx_int_t
+ngx_event_module_init(ngx_cycle_t *cycle)
+{
+	//1) 获取nginx event模块的配置以及event core模块的配置
+	void              ***cf;
+	ngx_core_conf_t     *ccf;
+    ngx_event_conf_t    *ecf;
+
+    cf = ngx_get_conf(cycle->conf_ctx, ngx_events_module);
+    ecf = (*cf)[ngx_event_core_module.ctx_index];
+
+
+	//2) 日志中打印当前nginx所使用的事件驱动机制
+	if (!ngx_test_config && ngx_process <= NGX_PROCESS_MASTER) {
+		ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0,
+			"using the \"%s\" event method", ecf->name);
+	}
+
+	//3) 获取nginx core模块配置以当前时间分辨率
+	ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+	ngx_timer_resolution = ccf->timer_resolution;
+
+
+	//4) 获得可以打开连接的限制数。该限制数首先不能超过操作系统所设置的资源限制数，也不能
+	//操作nginx配置文件中worker_rlimit_nofile配置指令设置的值
+
+
+	//5) 因为下面都是初始化互斥锁相关操作，因此如果nginx不是以master/worker方式工作的话，那么初始化到
+	//这里就会结束
+	if (ccf->master == 0) {
+		return NGX_OK;
+	}
+
+
+	//6) 这里确保accept_mutex只会初始化一次。即使在nginx进行restart的情况下
+	if (ngx_accept_mutex_ptr) {
+        return NGX_OK;
+    }
+	
+	//7) 计算存放如下这些所有nginx进程都能访问到的全局变量所需要的空间。这里注意到
+	// c1的大小应该大于等于cache line size，这样就能确保下面所分配的共享内存块
+	// 被真正映射到物理内存之中
+
+
+	/* cl should be equal to or greater than cache line size */
+
+    cl = 128;
+
+    size = cl            /* ngx_accept_mutex */
+           + cl          /* ngx_connection_counter */
+           + cl;         /* ngx_temp_number */
+
+#if (NGX_STAT_STUB)
+
+    size += cl           /* ngx_stat_accepted */
+           + cl          /* ngx_stat_handled */
+           + cl          /* ngx_stat_requests */
+           + cl          /* ngx_stat_active */
+           + cl          /* ngx_stat_reading */
+           + cl          /* ngx_stat_writing */
+           + cl;         /* ngx_stat_waiting */
+
+#endif
+
+	//8) 为各全局共享内存变量指定首地址
+
+}
+{% endhighlight %}
+如下是各全局共享内存变量在内存中的示意图：
+
+![ngx-accept-mutex](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_accept_mutex.jpg)
+
+
+## 10. 函数ngx_timer_signal_handler()
+{% highlight string %}
+
+#if !(NGX_WIN32)
+
+static void
+ngx_timer_signal_handler(int signo)
+{
+    ngx_event_timer_alarm = 1;
+
+#if 1
+    ngx_log_debug0(NGX_LOG_DEBUG_EVENT, ngx_cycle->log, 0, "timer signal");
+#endif
+}
+
+#endif
+{% endhighlight %}
+此函数作为```SIGALRM```信号的处理函数。
+
+## 11. 函数ngx_event_process_init()
+{% highlight string %}
+static ngx_int_t
+ngx_event_process_init(ngx_cycle_t *cycle)
+{
+    ngx_uint_t           m, i;
+    ngx_event_t         *rev, *wev;
+    ngx_listening_t     *ls;
+    ngx_connection_t    *c, *next, *old;
+    ngx_core_conf_t     *ccf;
+    ngx_event_conf_t    *ecf;
+    ngx_event_module_t  *module;
+
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+    ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
+
+    if (ccf->master && ccf->worker_processes > 1 && ecf->accept_mutex) {
+        ngx_use_accept_mutex = 1;
+        ngx_accept_mutex_held = 0;
+        ngx_accept_mutex_delay = ecf->accept_mutex_delay;
+
+    } else {
+        ngx_use_accept_mutex = 0;
+    }
+
+#if (NGX_WIN32)
+
+    /*
+     * disable accept mutex on win32 as it may cause deadlock if
+     * grabbed by a process which can't accept connections
+     */
+
+    ngx_use_accept_mutex = 0;
+
+#endif
+
+    ngx_queue_init(&ngx_posted_accept_events);
+    ngx_queue_init(&ngx_posted_events);
+
+    if (ngx_event_timer_init(cycle->log) == NGX_ERROR) {
+        return NGX_ERROR;
+    }
+
+    for (m = 0; cycle->modules[m]; m++) {
+        if (cycle->modules[m]->type != NGX_EVENT_MODULE) {
+            continue;
+        }
+
+        if (cycle->modules[m]->ctx_index != ecf->use) {
+            continue;
+        }
+
+        module = cycle->modules[m]->ctx;
+
+        if (module->actions.init(cycle, ngx_timer_resolution) != NGX_OK) {
+            /* fatal */
+            exit(2);
+        }
+
+        break;
+    }
+
+#if !(NGX_WIN32)
+
+    if (ngx_timer_resolution && !(ngx_event_flags & NGX_USE_TIMER_EVENT)) {
+        struct sigaction  sa;
+        struct itimerval  itv;
+
+        ngx_memzero(&sa, sizeof(struct sigaction));
+        sa.sa_handler = ngx_timer_signal_handler;
+        sigemptyset(&sa.sa_mask);
+
+        if (sigaction(SIGALRM, &sa, NULL) == -1) {
+            ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                          "sigaction(SIGALRM) failed");
+            return NGX_ERROR;
+        }
+
+        itv.it_interval.tv_sec = ngx_timer_resolution / 1000;
+        itv.it_interval.tv_usec = (ngx_timer_resolution % 1000) * 1000;
+        itv.it_value.tv_sec = ngx_timer_resolution / 1000;
+        itv.it_value.tv_usec = (ngx_timer_resolution % 1000 ) * 1000;
+
+        if (setitimer(ITIMER_REAL, &itv, NULL) == -1) {
+            ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                          "setitimer() failed");
+        }
+    }
+
+    if (ngx_event_flags & NGX_USE_FD_EVENT) {
+        struct rlimit  rlmt;
+
+        if (getrlimit(RLIMIT_NOFILE, &rlmt) == -1) {
+            ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                          "getrlimit(RLIMIT_NOFILE) failed");
+            return NGX_ERROR;
+        }
+
+        cycle->files_n = (ngx_uint_t) rlmt.rlim_cur;
+
+        cycle->files = ngx_calloc(sizeof(ngx_connection_t *) * cycle->files_n,
+                                  cycle->log);
+        if (cycle->files == NULL) {
+            return NGX_ERROR;
+        }
+    }
+
+#else
+
+    if (ngx_timer_resolution && !(ngx_event_flags & NGX_USE_TIMER_EVENT)) {
+        ngx_log_error(NGX_LOG_WARN, cycle->log, 0,
+                      "the \"timer_resolution\" directive is not supported "
+                      "with the configured event method, ignored");
+        ngx_timer_resolution = 0;
+    }
+
+#endif
+
+    cycle->connections =
+        ngx_alloc(sizeof(ngx_connection_t) * cycle->connection_n, cycle->log);
+    if (cycle->connections == NULL) {
+        return NGX_ERROR;
+    }
+
+    c = cycle->connections;
+
+    cycle->read_events = ngx_alloc(sizeof(ngx_event_t) * cycle->connection_n,
+                                   cycle->log);
+    if (cycle->read_events == NULL) {
+        return NGX_ERROR;
+    }
+
+    rev = cycle->read_events;
+    for (i = 0; i < cycle->connection_n; i++) {
+        rev[i].closed = 1;
+        rev[i].instance = 1;
+    }
+
+    cycle->write_events = ngx_alloc(sizeof(ngx_event_t) * cycle->connection_n,
+                                    cycle->log);
+    if (cycle->write_events == NULL) {
+        return NGX_ERROR;
+    }
+
+    wev = cycle->write_events;
+    for (i = 0; i < cycle->connection_n; i++) {
+        wev[i].closed = 1;
+    }
+
+    i = cycle->connection_n;
+    next = NULL;
+
+    do {
+        i--;
+
+        c[i].data = next;
+        c[i].read = &cycle->read_events[i];
+        c[i].write = &cycle->write_events[i];
+        c[i].fd = (ngx_socket_t) -1;
+
+        next = &c[i];
+    } while (i);
+
+    cycle->free_connections = next;
+    cycle->free_connection_n = cycle->connection_n;
+
+    /* for each listening socket */
+
+    ls = cycle->listening.elts;
+    for (i = 0; i < cycle->listening.nelts; i++) {
+
+#if (NGX_HAVE_REUSEPORT)
+        if (ls[i].reuseport && ls[i].worker != ngx_worker) {
+            continue;
+        }
+#endif
+
+        c = ngx_get_connection(ls[i].fd, cycle->log);
+
+        if (c == NULL) {
+            return NGX_ERROR;
+        }
+
+        c->type = ls[i].type;
+        c->log = &ls[i].log;
+
+        c->listening = &ls[i];
+        ls[i].connection = c;
+
+        rev = c->read;
+
+        rev->log = c->log;
+        rev->accept = 1;
+
+#if (NGX_HAVE_DEFERRED_ACCEPT)
+        rev->deferred_accept = ls[i].deferred_accept;
+#endif
+
+        if (!(ngx_event_flags & NGX_USE_IOCP_EVENT)) {
+            if (ls[i].previous) {
+
+                /*
+                 * delete the old accept events that were bound to
+                 * the old cycle read events array
+                 */
+
+                old = ls[i].previous->connection;
+
+                if (ngx_del_event(old->read, NGX_READ_EVENT, NGX_CLOSE_EVENT)
+                    == NGX_ERROR)
+                {
+                    return NGX_ERROR;
+                }
+
+                old->fd = (ngx_socket_t) -1;
+            }
+        }
+
+#if (NGX_WIN32)
+
+        if (ngx_event_flags & NGX_USE_IOCP_EVENT) {
+            ngx_iocp_conf_t  *iocpcf;
+
+            rev->handler = ngx_event_acceptex;
+
+            if (ngx_use_accept_mutex) {
+                continue;
+            }
+
+            if (ngx_add_event(rev, 0, NGX_IOCP_ACCEPT) == NGX_ERROR) {
+                return NGX_ERROR;
+            }
+
+            ls[i].log.handler = ngx_acceptex_log_error;
+
+            iocpcf = ngx_event_get_conf(cycle->conf_ctx, ngx_iocp_module);
+            if (ngx_event_post_acceptex(&ls[i], iocpcf->post_acceptex)
+                == NGX_ERROR)
+            {
+                return NGX_ERROR;
+            }
+
+        } else {
+            rev->handler = ngx_event_accept;
+
+            if (ngx_use_accept_mutex) {
+                continue;
+            }
+
+            if (ngx_add_event(rev, NGX_READ_EVENT, 0) == NGX_ERROR) {
+                return NGX_ERROR;
+            }
+        }
+
+#else
+
+        rev->handler = (c->type == SOCK_STREAM) ? ngx_event_accept
+                                                : ngx_event_recvmsg;
+
+        if (ngx_use_accept_mutex
+#if (NGX_HAVE_REUSEPORT)
+            && !ls[i].reuseport
+#endif
+           )
+        {
+            continue;
+        }
+
+        if (ngx_add_event(rev, NGX_READ_EVENT, 0) == NGX_ERROR) {
+            return NGX_ERROR;
+        }
+
+#endif
+
+    }
+
+    return NGX_OK;
+}
+{% endhighlight %}
+
+此函数作为nginx event core模块的```init_process```回调函数，一般会在worker进程初始化时被调用。下面我们简要介绍一下本函数的执行流程：
+{% highlight string %}
+static ngx_int_t
+ngx_event_process_init(ngx_cycle_t *cycle)
+{
+	//1) 获取nginx core模块、event core模块的配置信息
+	ngx_core_conf_t     *ccf;
+	ngx_event_conf_t    *ecf;
+	ngx_event_module_t  *module;
+	
+	ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+	ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
+
+	
+	//2) 判断是否要采用accept_mutex： 只有在worker进程数大于1，且以master/worker方式工作，
+	// 且配置文件制定了accept_mutex配置时，才会启用。accept_mutex在系统并发性相对较低时，
+	// 通过避免惊群的方式提高系统性能；而在并发很高的情况下，让多个worker进程随时去accept新
+	// 进来的连接，反而能提高效率
+	if (ccf->master && ccf->worker_processes > 1 && ecf->accept_mutex) {
+		ngx_use_accept_mutex = 1;
+		ngx_accept_mutex_held = 0;
+		ngx_accept_mutex_delay = ecf->accept_mutex_delay;
+	
+	} else {
+		ngx_use_accept_mutex = 0;
+	}
+	
+	//3) 初始化ngx_posted_accept_events、ngx_posted_events队列，定时器红黑树，以及通过
+	//actions.init()回调函数完成事件驱动机制的初始化
+	
+
+	#if !(NGX_WIN32)
+		//4) 如果在nginx配置文件中指定了ngx_timer_resolution，那么这里通过setitimer()来
+		// 产生一个指定时间分辨率的定时器（这可能会导致nginx定时器红黑树中的各timer events
+		// 的精确性产生一定影响，之所以采用timer resolution，主要是性能方面的考虑）
+		if (ngx_timer_resolution && !(ngx_event_flags & NGX_USE_TIMER_EVENT)) {
+
+		}
+
+		
+		//5) 表示本event filter没有透明数据，并需要一个文件描述符表。这里进行建立
+		if (ngx_event_flags & NGX_USE_FD_EVENT) {
+
+		}
+
+	#else
+		//6) windows平台，一般不支持timer resolution，此时可以通过红黑树中的当前最小定时间隔
+		// 来设置事件驱动机制的超时时间
+		if (ngx_timer_resolution && !(ngx_event_flags & NGX_USE_TIMER_EVENT)) {
+			ngx_log_error(NGX_LOG_WARN, cycle->log, 0,
+				"the \"timer_resolution\" directive is not supported "
+				"with the configured event method, ignored");
+
+			ngx_timer_resolution = 0;
+		}
+	#endif
+
+	
+	//7) 为cycle->connections分配好空间
+	cycle->connections = ngx_alloc(sizeof(ngx_connection_t) * cycle->connection_n, cycle->log);
+	if (cycle->connections == NULL) {
+		return NGX_ERROR;
+	}
+	
+	c = cycle->connections;
+
+	
+	//8) 为cycle->read_events分配好空间
+	cycle->read_events = ngx_alloc(sizeof(ngx_event_t) * cycle->connection_n,cycle->log);
+	if (cycle->read_events == NULL) {
+		return NGX_ERROR;
+	}
+	
+	rev = cycle->read_events;
+	for (i = 0; i < cycle->connection_n; i++) {
+		rev[i].closed = 1;			//此处，closed标志表示当前connection所关联的socket是否处于打开状态
+		rev[i].instance = 1;		//
+	}
+
+
+	//9) 为cycle->write_events分配好空间
+	cycle->write_events = ngx_alloc(sizeof(ngx_event_t) * cycle->connection_n,cycle->log);
+	if (cycle->write_events == NULL) {
+		return NGX_ERROR;
+	}
+	
+	wev = cycle->write_events;
+	for (i = 0; i < cycle->connection_n; i++) {
+		wev[i].closed = 1;		//此处，closed标志表示当前connection所关联的socket是否处于打开状态
+	}
+
+	//10) 将上面建立好的connection结构分别于read_events、write_events关联起来
+	i = cycle->connection_n;
+	next = NULL;
+	
+	do {
+		i--;
+		
+		c[i].data = next;
+		c[i].read = &cycle->read_events[i];
+		c[i].write = &cycle->write_events[i];
+		c[i].fd = (ngx_socket_t) -1;
+		
+		next = &c[i];
+	} while (i);
+	
+	cycle->free_connections = next;
+	cycle->free_connection_n = cycle->connection_n;
+
+
+	//11) 
+	ls = cycle->listening.elts;
+    for (i = 0; i < cycle->listening.nelts; i++) {
+		//12) 将监听ngx_listening_t对象与对应的connection对象关联起来
+
+		//13) 对于监听connection，要求能够accept
+		rev = c->read;
+		rev->log = c->log;
+		rev->accept = 1;
+
+
+		//14) 非IOCP事件驱动机制，要求在Nginx重启的时候将绑定在old cycle上的accept events删除
+		// 这样在重启之后，old cycle将不会再接收到新的连接，之后就可以优雅的关闭掉旧的nginx进程
+		if (!(ngx_event_flags & NGX_USE_IOCP_EVENT)) {
+			/*
+			* delete the old accept events that were bound to
+			* the old cycle read events array
+			*/
+		}
+
+		#if (NGX_WIN32)
+			
+			//15) 绑定读事件的接收处理函数
+			rev->handler = ngx_event_acceptex;
+
+		#else
+			
+			//16) 绑定读事件的接收处理函数
+			rev->handler = (c->type == SOCK_STREAM) ? ngx_event_accept:
+						ngx_event_recvmsg;
+
+			
+			//17) 对于不使用accept_mutex的监听socket来说，当前就设置NGX_READ_EVENT
+			if (ngx_use_accept_mutex
+				#if (NGX_HAVE_REUSEPORT)
+					&& !ls[i].reuseport
+				#endif
+			)
+			{
+				continue;
+			}
+			
+			if (ngx_add_event(rev, NGX_READ_EVENT, 0) == NGX_ERROR) {
+				return NGX_ERROR;
+			}
+			
+		#endif
+	
+	}
+}
+{% endhighlight %}
+
+
+## 12. 函数ngx_send_lowat()
+{% highlight string %}
+ngx_int_t
+ngx_send_lowat(ngx_connection_t *c, size_t lowat)
+{
+    int  sndlowat;
+
+#if (NGX_HAVE_LOWAT_EVENT)
+
+    if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
+        c->write->available = lowat;
+        return NGX_OK;
+    }
+
+#endif
+
+    if (lowat == 0 || c->sndlowat) {
+        return NGX_OK;
+    }
+
+    sndlowat = (int) lowat;
+
+    if (setsockopt(c->fd, SOL_SOCKET, SO_SNDLOWAT,
+                   (const void *) &sndlowat, sizeof(int))
+        == -1)
+    {
+        ngx_connection_error(c, ngx_socket_errno,
+                             "setsockopt(SO_SNDLOWAT) failed");
+        return NGX_ERROR;
+    }
+
+    c->sndlowat = 1;
+
+    return NGX_OK;
+}
+
+{% endhighlight %}
+本函数用于设置socket的```SO_SNDLOWAT```选项，用于指示socket在发送缓冲区中可用空间大于```sndlowat```时提示socket可写。我们当前不支持```NGX_HAVE_LOWAT_EVENT```宏定义。
+
+## 13. 函数ngx_events_block()
+{% highlight string %}
+static char *
+ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    char                 *rv;
+    void               ***ctx;
+    ngx_uint_t            i;
+    ngx_conf_t            pcf;
+    ngx_event_module_t   *m;
+
+    if (*(void **) conf) {
+        return "is duplicate";
+    }
+
+    /* count the number of the event modules and set up their indices */
+
+    ngx_event_max_module = ngx_count_modules(cf->cycle, NGX_EVENT_MODULE);
+
+    ctx = ngx_pcalloc(cf->pool, sizeof(void *));
+    if (ctx == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    *ctx = ngx_pcalloc(cf->pool, ngx_event_max_module * sizeof(void *));
+    if (*ctx == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    *(void **) conf = ctx;
+
+    for (i = 0; cf->cycle->modules[i]; i++) {
+        if (cf->cycle->modules[i]->type != NGX_EVENT_MODULE) {
+            continue;
+        }
+
+        m = cf->cycle->modules[i]->ctx;
+
+        if (m->create_conf) {
+            (*ctx)[cf->cycle->modules[i]->ctx_index] =
+                                                     m->create_conf(cf->cycle);
+            if ((*ctx)[cf->cycle->modules[i]->ctx_index] == NULL) {
+                return NGX_CONF_ERROR;
+            }
+        }
+    }
+
+    pcf = *cf;
+    cf->ctx = ctx;
+    cf->module_type = NGX_EVENT_MODULE;
+    cf->cmd_type = NGX_EVENT_CONF;
+
+    rv = ngx_conf_parse(cf, NULL);
+
+    *cf = pcf;
+
+    if (rv != NGX_CONF_OK) {
+        return rv;
+    }
+
+    for (i = 0; cf->cycle->modules[i]; i++) {
+        if (cf->cycle->modules[i]->type != NGX_EVENT_MODULE) {
+            continue;
+        }
+
+        m = cf->cycle->modules[i]->ctx;
+
+        if (m->init_conf) {
+            rv = m->init_conf(cf->cycle,
+                              (*ctx)[cf->cycle->modules[i]->ctx_index]);
+            if (rv != NGX_CONF_OK) {
+                return rv;
+            }
+        }
+    }
+
+    return NGX_CONF_OK;
+}
+{% endhighlight %}
+
+本函数作为nginx配置文件中解析到```events{}```指令时的回调函数。下面我们简要讲述一下本函数的实现：
+{% highlight string %}
+static char *
+ngx_events_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+
+	//1) 统计当前NGX_EVENT_MODULE模块的个数，并为个event模块上下文分配空间。
+	
+	//2) 调用event模块的create_conf回调函数创建相应上下文
+
+	//3) 解析event{}配置块中的指令(注意这里为了防止配置在解析过程中被修改，使用了一个临时变量pcf)
+	pcf = *cf;
+	cf->ctx = ctx;
+	cf->module_type = NGX_EVENT_MODULE;
+	cf->cmd_type = NGX_EVENT_CONF;
+	
+	rv = ngx_conf_parse(cf, NULL);
+	
+	*cf = pcf;
+
+	//4) 调用event模块的init_conf回调函数初始化向下文
+	
+}
+{% endhighlight %}
+
+nginx event模块上下文在cycle->conf_ctx中的内存图景：
+
+![ngx-event-ctx](https://ivanzz1001.github.io/records/assets/img/nginx/ngx_event_ctx.jpg)
+
+
+
+## 14. 函数ngx_event_connections()
+{% highlight string %}
+static char *
+ngx_event_connections(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_event_conf_t  *ecf = conf;
+
+    ngx_str_t  *value;
+
+    if (ecf->connections != NGX_CONF_UNSET_UINT) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+    ecf->connections = ngx_atoi(value[1].data, value[1].len);
+    if (ecf->connections == (ngx_uint_t) NGX_ERROR) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "invalid number \"%V\"", &value[1]);
+
+        return NGX_CONF_ERROR;
+    }
+
+    cf->cycle->connection_n = ecf->connections;
+
+    return NGX_CONF_OK;
+}
+
+{% endhighlight %}
+用于解析events{}中的```worker_connections```指令。该指令配置语法如下：
+<pre>
+Syntax: 	worker_connections number;
+Default: 	
+
+worker_connections 512;
+
+Context: 	events
+</pre>
+
+
+## 15. 函数ngx_event_use()
+{% highlight string %}
+static char *
+ngx_event_use(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_event_conf_t  *ecf = conf;
+
+    ngx_int_t             m;
+    ngx_str_t            *value;
+    ngx_event_conf_t     *old_ecf;
+    ngx_event_module_t   *module;
+
+    if (ecf->use != NGX_CONF_UNSET_UINT) {
+        return "is duplicate";
+    }
+
+    value = cf->args->elts;
+
+    if (cf->cycle->old_cycle->conf_ctx) {
+        old_ecf = ngx_event_get_conf(cf->cycle->old_cycle->conf_ctx,
+                                     ngx_event_core_module);
+    } else {
+        old_ecf = NULL;
+    }
+
+
+    for (m = 0; cf->cycle->modules[m]; m++) {
+        if (cf->cycle->modules[m]->type != NGX_EVENT_MODULE) {
+            continue;
+        }
+
+        module = cf->cycle->modules[m]->ctx;
+        if (module->name->len == value[1].len) {
+            if (ngx_strcmp(module->name->data, value[1].data) == 0) {
+                ecf->use = cf->cycle->modules[m]->ctx_index;
+                ecf->name = module->name->data;
+
+                if (ngx_process == NGX_PROCESS_SINGLE
+                    && old_ecf
+                    && old_ecf->use != ecf->use)
+                {
+                    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "when the server runs without a master process "
+                               "the \"%V\" event type must be the same as "
+                               "in previous configuration - \"%s\" "
+                               "and it cannot be changed on the fly, "
+                               "to change it you need to stop server "
+                               "and start it again",
+                               &value[1], old_ecf->name);
+
+                    return NGX_CONF_ERROR;
+                }
+
+                return NGX_CONF_OK;
+            }
+        }
+    }
+
+    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                       "invalid event type \"%V\"", &value[1]);
+
+    return NGX_CONF_ERROR;
+}
+
+
+{% endhighlight %} 
+本函数用于解析events{}配置模块的```use```指令。该指令的配置语法是：
+<pre>
+Syntax: 	use method;
+Default: 	—
+Context: 	events
+</pre>
+method的值可以为select、poll、epoll...
+
+解析```use```指令时，如果当前nginx是以**NGX_PROCESS_SINGLE**模式工作，要求所采用事件驱动机制的ctx_index没有改变。
+
+## 16. 函数ngx_event_debug_connection()
+{% highlight string %}
+static char *
+ngx_event_debug_connection(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+#if (NGX_DEBUG)
+    ngx_event_conf_t  *ecf = conf;
+
+    ngx_int_t             rc;
+    ngx_str_t            *value;
+    ngx_url_t             u;
+    ngx_cidr_t            c, *cidr;
+    ngx_uint_t            i;
+    struct sockaddr_in   *sin;
+#if (NGX_HAVE_INET6)
+    struct sockaddr_in6  *sin6;
+#endif
+
+    value = cf->args->elts;
+
+#if (NGX_HAVE_UNIX_DOMAIN)
+
+    if (ngx_strcmp(value[1].data, "unix:") == 0) {
+        cidr = ngx_array_push(&ecf->debug_connection);
+        if (cidr == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        cidr->family = AF_UNIX;
+        return NGX_CONF_OK;
+    }
+
+#endif
+
+    rc = ngx_ptocidr(&value[1], &c);
+
+    if (rc != NGX_ERROR) {
+        if (rc == NGX_DONE) {
+            ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+                               "low address bits of %V are meaningless",
+                               &value[1]);
+        }
+
+        cidr = ngx_array_push(&ecf->debug_connection);
+        if (cidr == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        *cidr = c;
+
+        return NGX_CONF_OK;
+    }
+
+    ngx_memzero(&u, sizeof(ngx_url_t));
+    u.host = value[1];
+
+    if (ngx_inet_resolve_host(cf->pool, &u) != NGX_OK) {
+        if (u.err) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "%s in debug_connection \"%V\"",
+                               u.err, &u.host);
+        }
+
+        return NGX_CONF_ERROR;
+    }
+
+    cidr = ngx_array_push_n(&ecf->debug_connection, u.naddrs);
+    if (cidr == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    ngx_memzero(cidr, u.naddrs * sizeof(ngx_cidr_t));
+
+    for (i = 0; i < u.naddrs; i++) {
+        cidr[i].family = u.addrs[i].sockaddr->sa_family;
+
+        switch (cidr[i].family) {
+
+#if (NGX_HAVE_INET6)
+        case AF_INET6:
+            sin6 = (struct sockaddr_in6 *) u.addrs[i].sockaddr;
+            cidr[i].u.in6.addr = sin6->sin6_addr;
+            ngx_memset(cidr[i].u.in6.mask.s6_addr, 0xff, 16);
+            break;
+#endif
+
+        default: /* AF_INET */
+            sin = (struct sockaddr_in *) u.addrs[i].sockaddr;
+            cidr[i].u.in.addr = sin->sin_addr.s_addr;
+            cidr[i].u.in.mask = 0xffffffff;
+            break;
+        }
+    }
+
+#else
+
+    ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+                       "\"debug_connection\" is ignored, you need to rebuild "
+                       "nginx using --with-debug option to enable it");
+
+#endif
+
+    return NGX_CONF_OK;
+}
+{% endhighlight %}
+本函数用于解析events{}配置模块的```debug_connection```指令。该指令的配置示例如下：
+<pre>
+events {
+    debug_connection 127.0.0.1;
+    debug_connection localhost;
+    debug_connection 192.0.2.0/24;
+    debug_connection ::1;
+    debug_connection 2001:0db8::/32;
+    debug_connection unix:;
+    ...
+}
+</pre>
+本函数分别解析三种不同类型的配置：
+
+* unix域socket
+
+* cidr格式配置的地址
+
+* 通过主机名配置的地址
+
+## 17. 函数ngx_event_core_create_conf()
+{% highlight string %}
+
+static void *
+ngx_event_core_create_conf(ngx_cycle_t *cycle)
+{
+    ngx_event_conf_t  *ecf;
+
+    ecf = ngx_palloc(cycle->pool, sizeof(ngx_event_conf_t));
+    if (ecf == NULL) {
+        return NULL;
+    }
+
+    ecf->connections = NGX_CONF_UNSET_UINT;
+    ecf->use = NGX_CONF_UNSET_UINT;
+    ecf->multi_accept = NGX_CONF_UNSET;
+    ecf->accept_mutex = NGX_CONF_UNSET;
+    ecf->accept_mutex_delay = NGX_CONF_UNSET_MSEC;
+    ecf->name = (void *) NGX_CONF_UNSET;
+
+#if (NGX_DEBUG)
+
+    if (ngx_array_init(&ecf->debug_connection, cycle->pool, 4,
+                       sizeof(ngx_cidr_t)) == NGX_ERROR)
+    {
+        return NULL;
+    }
+
+#endif
+
+    return ecf;
+}
+
+{% endhighlight %}
+本函数作为nginx event core模块上下文在创建时候执行的回调函数，会在ngx_events_block()函数中被调用，此处主要是创建event core模块的配置上下文结构：ngx_event_conf_t
+
+
+## 18. 函数
+{% highlight string %}
+static char *
+ngx_event_core_init_conf(ngx_cycle_t *cycle, void *conf)
+{
+    ngx_event_conf_t  *ecf = conf;
+
+#if (NGX_HAVE_EPOLL) && !(NGX_TEST_BUILD_EPOLL)
+    int                  fd;
+#endif
+    ngx_int_t            i;
+    ngx_module_t        *module;
+    ngx_event_module_t  *event_module;
+
+    module = NULL;
+
+#if (NGX_HAVE_EPOLL) && !(NGX_TEST_BUILD_EPOLL)
+
+    fd = epoll_create(100);
+
+    if (fd != -1) {
+        (void) close(fd);
+        module = &ngx_epoll_module;
+
+    } else if (ngx_errno != NGX_ENOSYS) {
+        module = &ngx_epoll_module;
+    }
+
+#endif
+
+#if (NGX_HAVE_DEVPOLL) && !(NGX_TEST_BUILD_DEVPOLL)
+
+    module = &ngx_devpoll_module;
+
+#endif
+
+#if (NGX_HAVE_KQUEUE)
+
+    module = &ngx_kqueue_module;
+
+#endif
+
+#if (NGX_HAVE_SELECT)
+
+    if (module == NULL) {
+        module = &ngx_select_module;
+    }
+
+#endif
+
+    if (module == NULL) {
+        for (i = 0; cycle->modules[i]; i++) {
+
+            if (cycle->modules[i]->type != NGX_EVENT_MODULE) {
+                continue;
+            }
+
+            event_module = cycle->modules[i]->ctx;
+
+            if (ngx_strcmp(event_module->name->data, event_core_name.data) == 0)
+            {
+                continue;
+            }
+
+            module = cycle->modules[i];
+            break;
+        }
+    }
+
+    if (module == NULL) {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0, "no events module found");
+        return NGX_CONF_ERROR;
+    }
+
+    ngx_conf_init_uint_value(ecf->connections, DEFAULT_CONNECTIONS);
+    cycle->connection_n = ecf->connections;
+
+    ngx_conf_init_uint_value(ecf->use, module->ctx_index);
+
+    event_module = module->ctx;
+    ngx_conf_init_ptr_value(ecf->name, event_module->name->data);
+
+    ngx_conf_init_value(ecf->multi_accept, 0);
+    ngx_conf_init_value(ecf->accept_mutex, 1);
+    ngx_conf_init_msec_value(ecf->accept_mutex_delay, 500);
+
+    return NGX_CONF_OK;
+}
+{% endhighlight %}
+本函数作为nginx event core模块上下文在初始化时候执行的回调函数，会在ngx_events_block()函数中被调用，此处主要是给```ngx_event_conf_t```赋默认值。这里特别注意选择默认事件驱动机制的处理
 
 
 
@@ -661,6 +1933,8 @@ ngx_handle_write_event(ngx_event_t *wev, size_t lowat)
 8. [文章5：Nginx源码分析--事件循环](https://blog.csdn.net/yankai0219/article/details/8453297)
 
 9. [Nginx学习之十-超时管理（定时器事件）](https://blog.csdn.net/xiajun07061225/article/details/9284543)
+
+10. [GNU Linux中的SO_RCVLOWAT和SO_SNDLOWAT说明](https://blog.csdn.net/yygydjkthh/article/details/46853023)
 
 <br />
 <br />

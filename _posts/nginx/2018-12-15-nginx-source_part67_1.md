@@ -204,7 +204,7 @@ Nginx中的event对象```ngx_event_t```提供了一种机制，能够通知程�
 
 * posted: 用于指示该事件是否要投递到一个队列
 
-* closed: 用于指示本事件所关联的socket句柄或文件句柄是否被关闭
+* closed: 用于指示本事件所关联的socket句柄或文件句柄是否处于打开状态
 
 * channel: 指示本事件用于nginx中master与worker之间的通信，以反应子进程是否已经退出
 
@@ -439,6 +439,8 @@ struct pollfd pfds[1];
 ret = poll(fds,1,timeout);
 {% endhighlight %}
 上面代码，当有读写事件到来时，我们只能够通过```pfds```获取到文件的句柄信息，并没有```透明数据```。但是一般我们可能还需要获取到更为详细的信息(透明数据)，此时我们可能还需要绑定另外一个结构，通过fd就可以简单快捷的定位到。
+
+* NGX_USE_TIMER_EVENT: 表示使用事件驱动机制本身的```timer event```。则一般要求事件驱动机制的特性支持，当前kqueue以及eventport支持这一特性。
 
 * NGX_USE_EVENTPORT_EVENT: 本标志表示在notification之后，文件描述符上的所有event filter都会被移除。用于eventport
 
