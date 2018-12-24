@@ -8,7 +8,13 @@ description: nginx源代码分析
 ---
 
 
-千米那我们知道ngx_event_core_module模块的init_process函数**ngx_event_process_init()**会为每个监听套接字的读事件注册处理函数ngx_event_accept(TCP)或者ngx_event_recvmsg(UDP)，这里我们就来讲述一下nginx event acceptde的相关实现。
+通过我们知道ngx_event_core_module模块的init_process函数**ngx_event_process_init()**会为每个监听套接字的读事件注册处理函数ngx_event_accept(TCP)或者ngx_event_recvmsg(UDP)，这里我们就来讲述一下nginx event acceptde的相关实现。
+
+由于Nginx工作在master-worker多进程模式，若所有worker进程在同一时间监听同一个端口，当该端口有新的连接事件出现时，每个worker进程都会调用函数**ngx_event_accep()**试图与新的连接建立通信，即所有worker进程都会被唤醒，这就是所谓的```惊群```问题，这样会导致系统性能下降。
+
+幸好在Nginx中采用了```ngx_accept_mutex```同步锁机制，即只有获得该锁的worker进程才能去处理新的连接事件，也就在同一时间只能有一个worker进程监听某个端口。虽然这样做解决了```惊群```问题，但是随之会出现另一个问题，若每次出现的新连接都被同一个worker进程获得锁的权利并处理该连接事件，这样会导致进程之间出现不均衡的状态，即在所有worker进程中，某些进程处理的连接事件数量庞大，而某些进程基本上不用处理连接事件，一直处于空闲状态。因此，这样会导致worker进程之间的负载不均衡，会影响nginx的整体性能。为了解决负载失衡的问题，Nginx在已经实现同步锁的基础上定义了负载阈值```ngx_accept_disabled```，当某个worker进程的负载阈值大于0时，表示该进程处于负载超重的状态，则Nginx会控制该进程，使其没机会试图与新的连接事件进行通信，这样就会为其他没有负载超重的进程创造处理新连接事件的机会，以此达到进程间的负载均衡。
+
+
 
 
 <!-- more -->
@@ -352,6 +358,157 @@ ngx_event_accept(ngx_event_t *ev)
 }
 {% endhighlight %}
 
+本函数作为基于TCP```listenning``` connection读事件的处理函数，用于接受来自客户端的新连接。下面我们简要分析一下本函数：
+{% highlight string %}
+void
+ngx_event_accept(ngx_event_t *ev)
+{
+	//1) 在没有采用ngx_accept_mutex的情况下（通常为单进程，或者显示指明accept_mutex值为off)，我们会在监听socket的读事件
+	//(read event)同时加到超时红黑树中（参看本函数后面代码），此处正是为了处理此种超时事件
+	if (ev->timedout) {
+		if (ngx_enable_accept_events((ngx_cycle_t *) ngx_cycle) != NGX_OK) {
+			return;
+		}
+	
+		ev->timedout = 0;
+	}
+
+
+	//2) 获取event core模块的配置信息。
+	ecf = ngx_event_get_conf(ngx_cycle->conf_ctx, ngx_event_core_module);
+	
+
+	//3) multi_accept表示worker进程是否一次只能accept一个连接，ev->available变量用于控制如下do{}while();循环的次数
+	if (!(ngx_event_flags & NGX_USE_KQUEUE_EVENT)) {
+		ev->available = ecf->multi_accept;
+	}
+
+
+	//4) 处理来自客户端的连接
+	do{
+		//4.1) 调用accept函数接收来自客户端的连接
+		s = accept(lc->fd, (struct sockaddr *) sa, &socklen);
+
+
+		//4.2) 处理出错情况
+		if (s == (ngx_socket_t) -1) {
+			
+			err = ngx_socket_errno;
+
+            if (err == NGX_EAGAIN) {
+				//4.2.1) 直接返回
+			}
+
+
+			//4.2.2) 当前我们支持NGX_HAVE_ACCEPT4宏，但这里对该情况的处理，我们暂不介绍
+			#if (NGX_HAVE_ACCEPT4)
+				ngx_log_error(level, ev->log, err,
+					use_accept4 ? "accept4() failed" : "accept() failed");
+			
+				if (use_accept4 && err == NGX_ENOSYS) {
+					use_accept4 = 0;
+					ngx_inherited_nonblocking = 0;
+					continue;
+				}
+			#else
+				ngx_log_error(level, ev->log, err, "accept() failed");
+			#endif
+
+
+			//4.2.3) NGX_ECONNABORTED表示软件错误，通常我们需要继续进行处理
+			if (err == NGX_ECONNABORTED) {
+				if (ngx_event_flags & NGX_USE_KQUEUE_EVENT) {
+					ev->available--;
+				}
+			
+				if (ev->available) {
+					continue;
+				}
+			}
+
+			//4.2.4) NGX_EMFILE与NGX_ENFILE通常表示进程fd已经耗尽，此时一般需要禁用当前监听socket的再accept
+			//新的连接
+			if (err == NGX_EMFILE || err == NGX_ENFILE) {
+				if (ngx_disable_accept_events((ngx_cycle_t *) ngx_cycle, 1) != NGX_OK)
+				{
+					return;
+				}
+			
+				//对于使用accept_mutex情况，我们应该释放锁，以让其他worker进程accept
+				if (ngx_use_accept_mutex) {
+					if (ngx_accept_mutex_held) {
+						ngx_shmtx_unlock(&ngx_accept_mutex);
+						ngx_accept_mutex_held = 0;
+					}
+			
+					ngx_accept_disabled = 1;
+			
+				} else {
+
+					//因为上面执行了ngx_disable_accept_events()，因此这里使用定时器，等过一段时间对应的socket关闭后，
+					//有足够的fd时就又可以接收新的连接
+					ngx_add_timer(ev, ecf->accept_mutex_delay);
+				}
+			}
+
+		}	
+
+
+		//5) 增加当前accept连接的数量
+		#if (NGX_STAT_STUB)
+        	(void) ngx_atomic_fetch_add(ngx_stat_accepted, 1);
+		#endif
+
+		//6) 此处较为关键，前面我们在ngx_event_process_init()函数中预先创建了指定最大数量的ngx_connection_t对象，
+		//这里当空闲连接数小于总的ngx_connection_t对象数的1/8时，那么ngx_accept_disabled值将会大于0，表示当前
+		//worker工作负载较高，此种情况下后续一段时间Nginx将会放弃抢占accept_mutex锁，这样将不会再有新的客户端连接
+		//到此worker进程中; 如果ngx_accept_disabled<=0，那么表示空闲连接较多，后续会与其他worker进程来抢占accept_mutex锁
+		ngx_accept_disabled = ngx_cycle->connection_n / 8
+			- ngx_cycle->free_connection_n;
+
+
+		//7) 获取一个ngx_connection_t对象来容纳上面accept的socket
+		 c = ngx_get_connection(s, ev->log);
+
+		//8) 用于统计当前处于active状态的客户端连接数，这也包括Waiting状态的连接
+		#if (NGX_STAT_STUB)
+       		(void) ngx_atomic_fetch_add(ngx_stat_active, 1);
+		#endif
+
+		//9) 设置该ngx_connection_t对象的pool、sockaddr等
+
+
+		//10) 
+		/* set a blocking mode for iocp and non-blocking mode for others */
+		
+		if (ngx_inherited_nonblocking) {
+			if (ngx_event_flags & NGX_USE_IOCP_EVENT) {
+				if (ngx_blocking(s) == -1) {
+					ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_socket_errno,
+					ngx_blocking_n " failed");
+					ngx_close_accepted_connection(c);
+					return;
+				}
+			}
+		
+		} else {
+			if (!(ngx_event_flags & NGX_USE_IOCP_EVENT)) {
+				if (ngx_nonblocking(s) == -1) {
+					ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_socket_errno,
+					ngx_nonblocking_n " failed");
+					ngx_close_accepted_connection(c);
+					return;
+				}
+			}
+		}
+
+
+	}while(ev->available);
+}
+{% endhighlight %}
+
+
+
 
 
 <br />
@@ -363,6 +520,7 @@ ngx_event_accept(ngx_event_t *ev)
 
 2. [Nginx 事件驱动模块连接处理](https://www.xuebuyuan.com/2225396.html)
 
+3. [从EMFILE和ENFILE说起，fd limit的问题（一）](https://blog.csdn.net/sdn_prc/article/details/28661661)
 
 
 <br />
