@@ -400,7 +400,9 @@ ngx_event_accept(ngx_event_t *ev)
 			}
 
 
-			//4.2.2) 当前我们支持NGX_HAVE_ACCEPT4宏，但这里对该情况的处理，我们暂不介绍
+			//4.2.2) 当前我们支持NGX_HAVE_ACCEPT4宏，此处NGX_ENOSYS错误表示：Function not implemented 
+			// 因此这里标记use_accept4值为0，同时将ngx_inherited_nonblocking设置为0，表示不能继承非阻塞
+			//特性
 			#if (NGX_HAVE_ACCEPT4)
 				ngx_log_error(level, ev->log, err,
 					use_accept4 ? "accept4() failed" : "accept() failed");
@@ -478,7 +480,8 @@ ngx_event_accept(ngx_event_t *ev)
 		//9) 设置该ngx_connection_t对象的pool、sockaddr等
 
 
-		//10) 
+		//10) 对于当前新accept的socket，如果事件驱动机制是iocp的话，那么需要设置为阻塞模式；
+		// 其他事件驱动机制，则设置为非阻塞模式。
 		/* set a blocking mode for iocp and non-blocking mode for others */
 		
 		if (ngx_inherited_nonblocking) {
@@ -502,6 +505,16 @@ ngx_event_accept(ngx_event_t *ev)
 			}
 		}
 
+
+		//11) 设置当前新建ngx_connection_t的接收发送函数。这里默认情况下我们采用epoll事件驱动机制，因此
+		//ngx_io的值为ngx_os_io
+		c->recv = ngx_recv;
+        c->send = ngx_send;
+        c->recv_chain = ngx_recv_chain;
+        c->send_chain = ngx_send_chain;
+
+
+		//12) 
 
 	}while(ev->available);
 }
