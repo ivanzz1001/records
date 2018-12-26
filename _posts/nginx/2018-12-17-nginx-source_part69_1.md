@@ -14,7 +14,7 @@ description: nginx源代码分析
 <!-- more -->
 
 
-## 1. 
+## 1. 相关函数指针
 {% highlight string %}
 
 /*
