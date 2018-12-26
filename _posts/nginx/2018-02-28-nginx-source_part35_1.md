@@ -110,7 +110,10 @@ struct ngx_listening_s {
     unsigned            nonblocking:1;            //是否阻塞，也没用。因为nginx是异步非阻塞的
     unsigned            shared:1;                 /* shared between threads or processes ，没人用- -，毕竟worker间没联系*/
     unsigned            addr_ntop:1;              //为1的话，表示连接建立后，所建立连接的IP地址的字符串表示形式需要自行设置
-    unsigned            wildcard:1;               //表示当前监听句柄是否支持通配：主要是通配UDP等接受数据
+	
+	//表示当前监听句柄是否支持通配。因为ngx_listening_t数据结构主要是针对TCP的，对于UDP的话可能需要将此标志置为1，才会对
+	//socket进行相关的操作
+    unsigned            wildcard:1;               
 
 #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
     unsigned            ipv6only:1;
