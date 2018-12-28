@@ -641,10 +641,88 @@ ngx_event_pipe_read_upstream(ngx_event_pipe_t *p)
 			break;
 		}
 		
+		//3.2) 如果没有预先读取到包体数据(p->preread_bufs)，并且当前又读取不到新的数据，那么循环跳出
 		if (p->preread_bufs == NULL && !p->upstream->read->ready) {
 			break;
 		}
-	}
+
+		if(p->preread_bufs){
+			//3.3) 处理预先读取到的包体数据
+			chain = p->preread_bufs;
+			p->preread_bufs = NULL;
+			n = p->preread_size;
+			
+			ngx_log_debug1(NGX_LOG_DEBUG_EVENT, p->log, 0,
+				"pipe preread: %z", n);
+			
+			if (n) {
+				p->read = 1;			//此处p->read表示读取到了上游的响应
+			}
+		}else{
+
+			#if (NGX_HAVE_KQUEUE)
+
+				//3.4) kqueue notifies about the end of file or a pending error.This test allows not to 
+				//allocate a buf on these conditions and not to call c->recv_chain().
+          
+			#endif
+
+			//3.5) 对速率限制的处理
+			if (p->limit_rate) {
+				if (p->upstream->read->delayed) {
+					break;
+				}
+			
+				//这里我们看到，对速率处理的限制也比较简单，就是计算预计到当前最大接收的数据量：
+				// p->limit_rate * (ngx_time() - p->start_sec +1), 减去当前实际的数据接收量 
+				limit = (off_t) p->limit_rate * (ngx_time() - p->start_sec + 1) - p->read_length;
+			
+				//此处小于等于0， 表示超出了速率限制，将p->upstream->read->delayed置为1，进行相应的延迟
+				if (limit <= 0) {
+					p->upstream->read->delayed = 1;
+
+					//此处计算延迟读取的毫秒数(乘以1000) 
+					delay = (ngx_msec_t) (- limit * 1000 / p->limit_rate + 1);
+					ngx_add_timer(p->upstream->read, delay);
+					break;
+				}
+			
+			} else {
+				limit = 0;
+			}
+
+			//3.6) 如下是对各种情况的处理
+			if (p->free_raw_bufs){
+
+
+			}else if (p->allocated < p->bufs.num) {
+
+
+			}else if (!p->cacheable
+				&& p->downstream->data == p->output_ctx
+				&& p->downstream->write->ready
+				&& !p->downstream->write->delayed){
+
+
+			}else if (p->cacheable
+				|| p->temp_file->offset < p->max_temp_file_size){
+
+
+				
+			}else{
+				
+
+
+			}
+
+			//3.7) 
+
+			
+
+		} //end else
+
+
+	} //end for
 }
 {% endhighlight %}
 
