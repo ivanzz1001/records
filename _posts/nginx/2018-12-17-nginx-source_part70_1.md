@@ -171,7 +171,7 @@ struct ngx_event_pipe_s {
 
 * upstream_error： 表示读取上游数据出错的标记
 
-* upstream_eof: 内核网络缓冲区读取完毕
+* upstream_eof: 内核网络缓冲区读取完毕，通常是上游服务器关闭了连接
 
 * upstream_blocked: 表示暂时阻塞读取上游响应的流程。此时会先调用ngx_event_pipe_write_to_downstream()函数发送缓冲区中的数据给下游，从而腾出缓冲区空间，再调用ngx_event_pipe_read_upstream()函数读取上游数据。
 
