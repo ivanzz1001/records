@@ -1165,10 +1165,676 @@ ngx_event_pipe_write_to_downstream(ngx_event_pipe_t *p)
 static ngx_int_t
 ngx_event_pipe_write_to_downstream(ngx_event_pipe_t *p)
 {
+	//1) 多线程情况处理，目前我们不支持NGX_THREADS宏定义
+	#if (NGX_THREADS)
+		//采用多线程将相应的缓存数据写入到临时文件
+		if (p->writing) {
+			rc = ngx_event_pipe_write_chain_to_temp_file(p);
+		}
+	#endif
+
+	//2) 向下游请求端写数据
+	for(;;){
+
+		//3) 向下游请求端写数据失败，释放p->busy、p->out、p->in这些空间
+		if (p->downstream_error) {
+			return ngx_event_pipe_drain_chains(p);
+		}
+
+		//4) 此处表示发送最后一部分数据（p->upstream_eof表示上游服务器连接已经断开，再没有数据了； p->upstream_error表示读取上游服务器
+		// 响应出错，也不会再有数据了； p->upstream_done表示读取上游服务器响应完成
+		if (p->upstream_eof || p->upstream_error || p->upstream_done) {
+
+			if(p->out){
+				//4.1) 将最后一部分out数据发送给downstream
+			}
+
+			// 4.2) 如果还有临时文件中的数据也需要发送给请求端，则直接跳出跳出循环
+			if (p->writing) {
+                break;
+            }
+
+			 
+			if(p->in){
+				//4.3) 将p->in中数据通过output_filter发送到downstream
+			}
+
+			//4.4) 向downstream发送完了所有数据，跳出循环
+			p->downstream_done = 1;
+			break;
+		}
+		
+		//5) 不符合条件，不向请求端写数据
+		if (downstream->data != p->output_ctx
+			|| !downstream->write->ready
+			|| downstream->write->delayed)
+		{
+			break;
+		}
+	
+		//6) 计算当前总的busy recycled bufs所占用的总的空间大小
+		prev = NULL;
+		bsize = 0;
+		
+		for (cl = p->busy; cl; cl = cl->next) {
+		
+			if (cl->buf->recycled) {
+				if (prev == cl->buf->start) {
+					continue;
+				}
+		
+				bsize += cl->buf->end - cl->buf->start;
+				prev = cl->buf->start;
+			}
+		}
+
+		//7) 当前busy缓冲区中等待发送响应长度已经达到p->busy_size，必须等待busy缓冲区发送了足够的数据，才能继续发送out和in中的内容
+		if (bsize >= (size_t) p->busy_size) {
+			flush = 1;
+			goto flush;
+		}
+
+		//8) 发送p->out以及p->in中的数据
+		flush = 0;
+		ll = NULL;
+		prev_last_shadow = 1;
+		for(;;){
+			if(p->out){
+
+				//8.1) 处理p->out链中的缓存数据
+				cl = p->out;
+			
+				if (cl->buf->recycled) {
+					ngx_log_error(NGX_LOG_ALERT, p->log, 0,
+						"recycled buffer in pipe out chain");
+				}
+				p->out = p->out->next;
+
+			}else if (!p->cacheable && !p->writing && p->in) {
+				//8.2) 处理p->in链中的缓冲数据
+			}else{
+				break;
+			}
+
+
+			// 将上述链中的缓存链接到out链表
+			cl->next = NULL;
+			
+			if (out) {
+				*ll = cl;
+			} else {
+				out = cl;
+			}
+			ll = &cl->next;
+		}
+
+	//如下用于处理将数据通过output_filter发送给请求端
+flush:
+
+		//9) 当前p->out以及p->in中没有数据要发送
+		if (out == NULL) {
+		
+			if (!flush) {
+			
+				// 9.1) busy链中也没有数据要发送，此时flush值才会为0， 因此直接跳出循环
+				break;
+			}
+
+			/* a workaround for AIO */
+			if (flushed++ > 10) {
+				return NGX_BUSY;
+			}
+
+		}
+
+		//10) 调用output_filter向请求端发送数据
+		rc = p->output_filter(p->output_ctx, out);
+
+		//11) 将p->busy以及out链中的缓存空间释放，加入到p->free链中
+		ngx_chain_update_chains(p->pool, &p->free, &p->busy, &out, p->tag);
+
+		//12) 向下游请求端写数据失败，释放p->busy、p->out、p->in这些空间
+		if (rc == NGX_ERROR) {
+			p->downstream_error = 1;
+			return ngx_event_pipe_drain_chains(p);
+		}
+
+		for (cl = p->free; cl; cl = cl->next) {
+
+			//13) 复位p->free链表中的相关节点信息
+		}
+
+	}
+}
+{% endhighlight %}
+
+## 5. 函数ngx_event_pipe_write_chain_to_temp_file()
+{% highlight string %}
+static ngx_int_t
+ngx_event_pipe_write_chain_to_temp_file(ngx_event_pipe_t *p)
+{
+    ssize_t       size, bsize, n;
+    ngx_buf_t    *b;
+    ngx_uint_t    prev_last_shadow;
+    ngx_chain_t  *cl, *tl, *next, *out, **ll, **last_out, **last_free;
+
+#if (NGX_THREADS)
+
+    if (p->writing) {
+
+        if (p->aio) {
+            return NGX_AGAIN;
+        }
+
+        out = p->writing;
+        p->writing = NULL;
+
+        n = ngx_write_chain_to_temp_file(p->temp_file, NULL);
+
+        if (n == NGX_ERROR) {
+            return NGX_ABORT;
+        }
+
+        goto done;
+    }
+
+#endif
+
+    if (p->buf_to_file) {
+        out = ngx_alloc_chain_link(p->pool);
+        if (out == NULL) {
+            return NGX_ABORT;
+        }
+
+        out->buf = p->buf_to_file;
+        out->next = p->in;
+
+    } else {
+        out = p->in;
+    }
+
+    if (!p->cacheable) {
+
+        size = 0;
+        cl = out;
+        ll = NULL;
+        prev_last_shadow = 1;
+
+        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, p->log, 0,
+                       "pipe offset: %O", p->temp_file->offset);
+
+        do {
+            bsize = cl->buf->last - cl->buf->pos;
+
+            ngx_log_debug4(NGX_LOG_DEBUG_EVENT, p->log, 0,
+                           "pipe buf ls:%d %p, pos %p, size: %z",
+                           cl->buf->last_shadow, cl->buf->start,
+                           cl->buf->pos, bsize);
+
+            if (prev_last_shadow
+                && ((size + bsize > p->temp_file_write_size)
+                    || (p->temp_file->offset + size + bsize
+                        > p->max_temp_file_size)))
+            {
+                break;
+            }
+
+            prev_last_shadow = cl->buf->last_shadow;
+
+            size += bsize;
+            ll = &cl->next;
+            cl = cl->next;
+
+        } while (cl);
+
+        ngx_log_debug1(NGX_LOG_DEBUG_EVENT, p->log, 0, "size: %z", size);
+
+        if (ll == NULL) {
+            return NGX_BUSY;
+        }
+
+        if (cl) {
+            p->in = cl;
+            *ll = NULL;
+
+        } else {
+            p->in = NULL;
+            p->last_in = &p->in;
+        }
+
+    } else {
+        p->in = NULL;
+        p->last_in = &p->in;
+    }
+
+#if (NGX_THREADS)
+    if (p->thread_handler) {
+        p->temp_file->thread_write = 1;
+        p->temp_file->file.thread_task = p->thread_task;
+        p->temp_file->file.thread_handler = p->thread_handler;
+        p->temp_file->file.thread_ctx = p->thread_ctx;
+    }
+#endif
+
+    n = ngx_write_chain_to_temp_file(p->temp_file, out);
+
+    if (n == NGX_ERROR) {
+        return NGX_ABORT;
+    }
+
+#if (NGX_THREADS)
+
+    if (n == NGX_AGAIN) {
+        p->writing = out;
+        p->thread_task = p->temp_file->file.thread_task;
+        return NGX_AGAIN;
+    }
+
+done:
+
+#endif
+
+    if (p->buf_to_file) {
+        p->temp_file->offset = p->buf_to_file->last - p->buf_to_file->pos;
+        n -= p->buf_to_file->last - p->buf_to_file->pos;
+        p->buf_to_file = NULL;
+        out = out->next;
+    }
+
+    if (n > 0) {
+        /* update previous buffer or add new buffer */
+
+        if (p->out) {
+            for (cl = p->out; cl->next; cl = cl->next) { /* void */ }
+
+            b = cl->buf;
+
+            if (b->file_last == p->temp_file->offset) {
+                p->temp_file->offset += n;
+                b->file_last = p->temp_file->offset;
+                goto free;
+            }
+
+            last_out = &cl->next;
+
+        } else {
+            last_out = &p->out;
+        }
+
+        cl = ngx_chain_get_free_buf(p->pool, &p->free);
+        if (cl == NULL) {
+            return NGX_ABORT;
+        }
+
+        b = cl->buf;
+
+        ngx_memzero(b, sizeof(ngx_buf_t));
+
+        b->tag = p->tag;
+
+        b->file = &p->temp_file->file;
+        b->file_pos = p->temp_file->offset;
+        p->temp_file->offset += n;
+        b->file_last = p->temp_file->offset;
+
+        b->in_file = 1;
+        b->temp_file = 1;
+
+        *last_out = cl;
+    }
+
+free:
+
+    for (last_free = &p->free_raw_bufs;
+         *last_free != NULL;
+         last_free = &(*last_free)->next)
+    {
+        /* void */
+    }
+
+    for (cl = out; cl; cl = next) {
+        next = cl->next;
+
+        cl->next = p->free;
+        p->free = cl;
+
+        b = cl->buf;
+
+        if (b->last_shadow) {
+
+            tl = ngx_alloc_chain_link(p->pool);
+            if (tl == NULL) {
+                return NGX_ABORT;
+            }
+
+            tl->buf = b->shadow;
+            tl->next = NULL;
+
+            *last_free = tl;
+            last_free = &tl->next;
+
+            b->shadow->pos = b->shadow->start;
+            b->shadow->last = b->shadow->start;
+
+            ngx_event_pipe_remove_shadow_links(b->shadow);
+        }
+    }
+
+    return NGX_OK;
+}
+{% endhighlight %}
+此函数用于将```ngx_event_pipe```相关缓存中的信息写到临时文件中。下面我们详细分析一下函数的实现流程：
+{% highlight string %}
+static ngx_int_t
+ngx_event_pipe_write_chain_to_temp_file(ngx_event_pipe_t *p)
+{
+	//1) 采用多线程来将缓存数据写入到临时文件。当前我们并不支持NGX_THREADS宏定义
+	#if (NGX_THREADS)
+		if (p->writing) {
+			n = ngx_write_chain_to_temp_file(p->temp_file, NULL);
+		}
+	#endif
+
+	//2) 此处需要将p->buf_to_file以及p->bin中的数据写入到临时文件
+	if (p->buf_to_file) {
+		out = ngx_alloc_chain_link(p->pool);
+		if (out == NULL) {
+			return NGX_ABORT;
+		}
+	
+		out->buf = p->buf_to_file;
+		out->next = p->in;
+	
+	} else {
+		out = p->in;
+	}
+
+
+	//
+	if(!p->cacheable){
+		//3) 不能使用缓存，那么此种情况下会检查当前out是否已经有过多的数据。如果有太多的数据的话，还是会把部分数据写入临时文件。然后
+		// 把剩余一部分数据放回到p->in中
+	}else{
+		
+		//4) 此处标志将所有数据都写入临时文件
+		p->in = NULL;
+		p->last_in = &p->in;
+	}
+
+	//5) 此处设置写临时文件的线程相关信息
+	#if (NGX_THREADS)
+		if (p->thread_handler) {
+			p->temp_file->thread_write = 1;
+			p->temp_file->file.thread_task = p->thread_task;
+			p->temp_file->file.thread_handler = p->thread_handler;
+			p->temp_file->file.thread_ctx = p->thread_ctx;
+		}
+	#endif
+
+	//6) 将缓存信息写入到临时文件
+	 n = ngx_write_chain_to_temp_file(p->temp_file, out);
+
+
+	//7) 多线程情况下，将未写完的数据保存到p->writing中
+#if (NGX_THREADS)
+	
+	if (n == NGX_AGAIN) {
+		p->writing = out;
+		p->thread_task = p->temp_file->file.thread_task;
+		return NGX_AGAIN;
+	}
+	
+	done:
+	
+#endif
+	
+	//8) p->buf_to_file这一部分数据作为p->preread_bufs来使用
+	if (p->buf_to_file) {
+		p->temp_file->offset = p->buf_to_file->last - p->buf_to_file->pos;
+		n -= p->buf_to_file->last - p->buf_to_file->pos;
+		p->buf_to_file = NULL;
+		out = out->next;
+	}
+
+
+	if (n > 0) {
+		//此处将写入临时文件的这部分缓存数据加入到p->out链表，使得后续可以向downstream发送这一部分数据。
+	}
+
+free:
+	//9) 此处遍历到p->free_raw_bufs的末尾
+	for (last_free = &p->free_raw_bufs;
+		*last_free != NULL;
+		last_free = &(*last_free)->next)
+	{
+	/* void */
+	}
+
+	for (cl = out; cl; cl = next) {
+		//10) 将写入了临时文件的这一部分缓存加到p->free链表中
+
+		if (b->last_shadow) {
+		
+			//11) 将对应的buf加入到p->free_raw_bufs链表的表尾
+
+		}
+	}
+	
 }
 {% endhighlight %}
 
 
+## 6. 函数ngx_event_pipe_copy_input_filter()
+{% highlight string %}
+/* the copy input filter */
+
+ngx_int_t
+ngx_event_pipe_copy_input_filter(ngx_event_pipe_t *p, ngx_buf_t *buf)
+{
+    ngx_buf_t    *b;
+    ngx_chain_t  *cl;
+
+    if (buf->pos == buf->last) {
+        return NGX_OK;
+    }
+
+    cl = ngx_chain_get_free_buf(p->pool, &p->free);
+    if (cl == NULL) {
+        return NGX_ERROR;
+    }
+
+    b = cl->buf;
+
+    ngx_memcpy(b, buf, sizeof(ngx_buf_t));
+    b->shadow = buf;
+    b->tag = p->tag;
+    b->last_shadow = 1;
+    b->recycled = 1;
+    buf->shadow = b;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, p->log, 0, "input buf #%d", b->num);
+
+    if (p->in) {
+        *p->last_in = cl;
+    } else {
+        p->in = cl;
+    }
+    p->last_in = &cl->next;
+
+    if (p->length == -1) {
+        return NGX_OK;
+    }
+
+    p->length -= b->last - b->pos;
+
+    return NGX_OK;
+}
+{% endhighlight %}
+此函数较为简单，用于拷贝```buf```,并将其插入到p->in链表的表尾。
+
+
+## 7. 函数ngx_event_pipe_remove_shadow_links()
+{% highlight string %}
+static ngx_inline void
+ngx_event_pipe_remove_shadow_links(ngx_buf_t *buf)
+{
+    ngx_buf_t  *b, *next;
+
+    b = buf->shadow;
+
+    if (b == NULL) {
+        return;
+    }
+
+    while (!b->last_shadow) {
+        next = b->shadow;
+
+        b->temporary = 0;
+        b->recycled = 0;
+
+        b->shadow = NULL;
+        b = next;
+    }
+
+    b->temporary = 0;
+    b->recycled = 0;
+    b->last_shadow = 0;
+
+    b->shadow = NULL;
+
+    buf->shadow = NULL;
+}
+{% endhighlight %}
+此函数用于移除一个buf上的所有shadow
+
+## 8. 函数ngx_event_pipe_add_free_buf()
+{% highlight string %}
+ngx_int_t
+ngx_event_pipe_add_free_buf(ngx_event_pipe_t *p, ngx_buf_t *b)
+{
+    ngx_chain_t  *cl;
+
+    cl = ngx_alloc_chain_link(p->pool);
+    if (cl == NULL) {
+        return NGX_ERROR;
+    }
+
+    if (p->buf_to_file && b->start == p->buf_to_file->start) {
+        b->pos = p->buf_to_file->last;
+        b->last = p->buf_to_file->last;
+
+    } else {
+        b->pos = b->start;
+        b->last = b->start;
+    }
+
+    b->shadow = NULL;
+
+    cl->buf = b;
+
+    if (p->free_raw_bufs == NULL) {
+        p->free_raw_bufs = cl;
+        cl->next = NULL;
+
+        return NGX_OK;
+    }
+
+    if (p->free_raw_bufs->buf->pos == p->free_raw_bufs->buf->last) {
+
+        /* add the free buf to the list start */
+
+        cl->next = p->free_raw_bufs;
+        p->free_raw_bufs = cl;
+
+        return NGX_OK;
+    }
+
+    /* the first free buf is partially filled, thus add the free buf after it */
+
+    cl->next = p->free_raw_bufs->next;
+    p->free_raw_bufs->next = cl;
+
+    return NGX_OK;
+}
+{% endhighlight %}
+此函数用于将```b```添加到```p->free_raw_bufs```中。参看前面的代码，我们知道**p->free_raw_bufs**可能仍有一部分空间被使用，因此在添加```b```这一块缓存空间时要特别注意。下面我们简要分析一下此函数：
+{% highlight string %}
+ngx_int_t
+ngx_event_pipe_add_free_buf(ngx_event_pipe_t *p, ngx_buf_t *b)
+{
+	//1) 分配一个ngx_chain_t节点，以容纳b
+
+	//2) 说明参数b指向的这块缓存空间与p->buf_to_file这一块特殊空间有重叠，此时需要特殊处理
+	if (p->buf_to_file && b->start == p->buf_to_file->start) {
+		b->pos = p->buf_to_file->last;
+		b->last = p->buf_to_file->last;
+	
+	} else {
+		b->pos = b->start;
+		b->last = b->start;
+	}
+	
+	//3) 直接插入到p->free_raw_bufs即可
+	if (p->free_raw_bufs == NULL) {
+		p->free_raw_bufs = cl;
+		cl->next = NULL;
+	
+		return NGX_OK;
+	}
+
+	
+	if (p->free_raw_bufs->buf->pos == p->free_raw_bufs->buf->last) {
+		//4) 说明p->free_raw_bufs的第一个节点并没有部分被占用，此时可以直接插入到链表表头
+	}
+
+	//5) 说明p->free_raw_bufs链表第一个节点部分空间仍残留有数据，因此需要插入到p->free_raw_bufs的第一个节点之后
+
+}
+{% endhighlight %}
+
+## 9. 函数ngx_event_pipe_drain_chains()
+{% highlight string %}
+static ngx_int_t
+ngx_event_pipe_drain_chains(ngx_event_pipe_t *p)
+{
+    ngx_chain_t  *cl, *tl;
+
+    for ( ;; ) {
+        if (p->busy) {
+            cl = p->busy;
+            p->busy = NULL;
+
+        } else if (p->out) {
+            cl = p->out;
+            p->out = NULL;
+
+        } else if (p->in) {
+            cl = p->in;
+            p->in = NULL;
+
+        } else {
+            return NGX_OK;
+        }
+
+        while (cl) {
+            if (cl->buf->last_shadow) {
+                if (ngx_event_pipe_add_free_buf(p, cl->buf->shadow) != NGX_OK) {
+                    return NGX_ABORT;
+                }
+
+                cl->buf->last_shadow = 0;
+            }
+
+            cl->buf->shadow = NULL;
+            tl = cl->next;
+            cl->next = p->free;
+            p->free = cl;
+            cl = tl;
+        }
+    }
+}
+{% endhighlight %}
+本函数用于p->busy、p->out、p->in这些缓存空间释放回p->free中，并将c1->buf->shadow空间释放回p->free_raw_bufs中.
 
 <br />
 <br />
