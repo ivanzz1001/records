@@ -131,7 +131,7 @@ struct ngx_event_pipe_s {
 
 * downstream: Nginx与下游客户端之间的连接
 
-* free_raw_bufs: 空闲的用于存放原始数据的缓冲链
+* free_raw_bufs: 空闲的用于存放原始数据的缓冲链。（注意： free_raw_bufs中第一个节点可能残留有部分上次未处理的遗留数据）
 
 * in: 用于存放经过```input_filter```处理的上游服务器的响应
 
@@ -183,7 +183,7 @@ struct ngx_event_pipe_s {
 
 * aio: aio异步标记
 
-* allocated: 配置的buffer已分配使用的个数
+* allocated: 配置的buffer已分配使用的个数。参看如下```bufs```字段
 
 * bufs: 记录了接收上游响应的内存缓冲区大小，bufs.size表示每个内存缓冲区大小，bufs.num表示最多可以有num个缓冲区
 
