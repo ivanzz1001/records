@@ -229,6 +229,8 @@ union mm{
 
 ## 9. 运行示例
 
+### 9.1 运行示例1
+
 下面给出上面所讲各例子的运行示例```test.cpp```：
 {% highlight string %}
 #include <stdio.h>
@@ -308,7 +310,44 @@ size mm: 24
 </pre>
 
 
+### 9.2 运行示例2
 
+参看如下测试示例```test.c```:
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef union {
+	long a;
+	int b[5];
+	char c;
+} Date;
+
+typedef struct {
+	int a;
+	char b;
+	Date d;
+	short e;
+} Some;
+
+
+int main(int argc, char *argv[])
+{
+	printf("sizeof(Date): %d\n", sizeof(Date));
+	printf("sizeof(Some): %d\n", sizeof(Some));
+	printf("%d\n", sizeof(Date) + sizeof(Some));
+
+	return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o test test.c
+# ./test
+sizeof(Date): 24
+sizeof(Some): 40
+64
+</pre>
 
 
 
