@@ -202,7 +202,7 @@ Nginx中的event对象```ngx_event_t```提供了一种机制，能够通知程�
 
 * pending_eof: 本标志用于指示所对应socket上有未处理的EOF，即使在EOF之前可能仍存在一些可用数据。这通常是由epoll的```EPOLLRDHUP```时间产生的或者kqueue的```EV_EOF```标志产生的。
 
-* posted: 用于指示该事件是否要投递到一个队列
+* posted: 用于指示该事件是否投递到了一个队列
 
 * closed: 用于指示本事件所关联的socket句柄或文件句柄是否被关闭
 
