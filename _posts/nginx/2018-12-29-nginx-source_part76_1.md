@@ -14,6 +14,104 @@ description: nginx源代码分析
 <!-- more -->
 
 
+## 1. NGX_TEST_BUILD_EPOLL测试
+{% highlight string %}
+
+/*
+ * Copyright (C) Igor Sysoev
+ * Copyright (C) Nginx, Inc.
+ */
+
+
+#include <ngx_config.h>
+#include <ngx_core.h>
+#include <ngx_event.h>
+
+
+#if (NGX_TEST_BUILD_EPOLL)
+
+/* epoll declarations */
+
+#define EPOLLIN        0x001
+#define EPOLLPRI       0x002
+#define EPOLLOUT       0x004
+#define EPOLLRDNORM    0x040
+#define EPOLLRDBAND    0x080
+#define EPOLLWRNORM    0x100
+#define EPOLLWRBAND    0x200
+#define EPOLLMSG       0x400
+#define EPOLLERR       0x008
+#define EPOLLHUP       0x010
+
+#define EPOLLRDHUP     0x2000
+
+#define EPOLLET        0x80000000
+#define EPOLLONESHOT   0x40000000
+
+#define EPOLL_CTL_ADD  1
+#define EPOLL_CTL_DEL  2
+#define EPOLL_CTL_MOD  3
+
+typedef union epoll_data {
+    void         *ptr;
+    int           fd;
+    uint32_t      u32;
+    uint64_t      u64;
+} epoll_data_t;
+
+struct epoll_event {
+    uint32_t      events;
+    epoll_data_t  data;
+};
+
+
+int epoll_create(int size);
+
+int epoll_create(int size)
+{
+    return -1;
+}
+
+
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
+
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
+{
+    return -1;
+}
+
+
+int epoll_wait(int epfd, struct epoll_event *events, int nevents, int timeout);
+
+int epoll_wait(int epfd, struct epoll_event *events, int nevents, int timeout)
+{
+    return -1;
+}
+
+#if (NGX_HAVE_EVENTFD)
+#define SYS_eventfd       323
+#endif
+
+#if (NGX_HAVE_FILE_AIO)
+
+#define SYS_io_setup      245
+#define SYS_io_destroy    246
+#define SYS_io_getevents  247
+
+typedef u_int  aio_context_t;
+
+struct io_event {
+    uint64_t  data;  /* the data field from the iocb */
+    uint64_t  obj;   /* what iocb this event came from */
+    int64_t   res;   /* result code for this event */
+    int64_t   res2;  /* secondary result */
+};
+
+
+#endif
+#endif /* NGX_TEST_BUILD_EPOLL */
+{% endhighlight %}
+上面只是用于测试使用，这里不做介绍。
 
 
 
