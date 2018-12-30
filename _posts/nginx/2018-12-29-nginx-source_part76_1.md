@@ -1108,6 +1108,119 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
     return NGX_OK;
 }
 {% endhighlight %}
+此函数作为epoll事件驱动机制处理事件的主函数。下面我们简要分析一下函数的实现：
+{% highlight string %}
+static ngx_int_t
+ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
+{
+	//1) 等待事件的产生
+	events = epoll_wait(ep, event_list, (int) nevents, timer);
+
+	//2) 保存相应的错误信息
+	err = (events == -1) ? ngx_errno : 0;
+
+	//3) 更新Nginx缓存时间
+	if (flags & NGX_UPDATE_TIME || ngx_event_timer_alarm) {
+        ngx_time_update();
+    }
+
+	//3) 错误处理 
+	if (err){
+		if (err == NGX_EINTR) {
+
+			//SIGALRM信号产生的中断，这里我们上面已经更新了时间，因此这里直接将ngx_event_timer_alarm变量置为0
+			if (ngx_event_timer_alarm) {
+				ngx_event_timer_alarm = 0;
+				return NGX_OK;
+			}
+		}
+	}
+
+	//4) 未返回任何事件
+	if (events == 0) {
+
+		//超时导致的返回
+		if (timer != NGX_TIMER_INFINITE) {
+            return NGX_OK;
+        }
+	}
+	
+	//5) 遍历返回的事件列表
+	for (i = 0; i < events; i++) {
+		
+		if (c->fd == -1 || rev->instance != instance) {
+			//5.1） 对应的连接已经关闭(连接相关的字段都会清零)，本事件是属于一个陈旧事件
+		}
+
+		if (revents & (EPOLLERR|EPOLLHUP)) {
+			//5.2) 在对应的fd上产生了错误，这里打印错误提示信息
+		}
+
+	
+		if ((revents & (EPOLLERR|EPOLLHUP))
+			&& (revents & (EPOLLIN|EPOLLOUT)) == 0)
+		{
+			//5.3) 对应的fd上产生了错误，也没有产生读、写事件，这里为了能将相应的错误告知
+			//外层，强制revents |= EPOLLIN|EPOLLOUT;
+			
+		}
+
+		//5.4) 处理可读事件
+		if ((revents & EPOLLIN) && rev->active) {
+
+			//读取到了对端关闭
+			#if (NGX_HAVE_EPOLLRDHUP)
+	            if (revents & EPOLLRDHUP) {
+	                rev->pending_eof = 1;
+	            }
+			#endif
+
+
+			//ready置为1，表示有可读事件
+			rev->ready = 1;
+
+			// post事件或直接处理
+			if (flags & NGX_POST_EVENTS) {
+				queue = rev->accept ? &ngx_posted_accept_events
+					: &ngx_posted_events;
+			
+				ngx_post_event(rev, queue);
+			
+			} else {
+				rev->handler(rev);
+			}
+
+		}	
+
+		//5.5) 处理可写事件
+		wev = c->write;	
+		if ((revents & EPOLLOUT) && wev->active) {
+			
+			if (c->fd == -1 || wev->instance != instance) {
+				// 对应的连接已经关闭(连接相关的字段都会清零)，本事件是属于一个陈旧事件
+				continue;
+			}
+
+			//ready置为1，表示有可写事件
+			wev->ready = 1;
+			#if (NGX_THREADS)
+				wev->complete = 1;
+			#endif
+
+
+			// post事件或直接处理
+			if (flags & NGX_POST_EVENTS) {
+				ngx_post_event(wev, &ngx_posted_events);
+			
+			} else {
+				wev->handler(wev);
+			}
+
+		}
+
+	}
+}
+{% endhighlight %}
 
 
 ## 16. 函数ngx_epoll_eventfd_handler()
