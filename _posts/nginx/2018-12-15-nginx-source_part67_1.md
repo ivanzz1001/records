@@ -314,7 +314,7 @@ extern ngx_event_actions_t   ngx_event_actions;
 
 * del_conn: 从事件驱动机制中删除一个连接的读、写事件
 
-* notify: 主要是实现某种类似与```pipe```这样的通知机制。当前主要用在```nginx线程池````的实现方面，当任务处理完成，异步通知主线程。
+* notify: 主要是实现某种类似与```pipe```这样的通知机制。当前主要用在```nginx线程池```的实现方面，当任务处理完成，异步通知主线程。
 
 * process_events: 处理事件的方法。由于select、poll、epoll等不同的事件驱动机制，对事件的处理也有些不同。
 
