@@ -1111,7 +1111,7 @@ ngx_epoll_process_events(ngx_cycle_t *cycle, ngx_msec_t timer, ngx_uint_t flags)
 
 
 ## 16. 函数ngx_epoll_eventfd_handler()
-{% hightlight string %}
+{% highlight string %}
 #if (NGX_HAVE_FILE_AIO)
 
 static void
