@@ -1134,6 +1134,63 @@ ceph osd pool set rbd-01 size 3
 ceph osd pool set rbd-01 crush_ruleset 5
 {% endhighlight %}
 
+默认的pool情况如下：
+{% highlight string %}
+# ceph osd pool ls detail
+pool 12 '.rgw.root' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 392 flags hashpspool stripe_width 0
+pool 27 'default.rgw.control' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 407 owner 18446744073709551615 flags hashpspool stripe_width 0
+pool 28 'default.rgw.data.root' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 409 owner 18446744073709551615 flags hashpspool stripe_width 0
+pool 29 'default.rgw.gc' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 64 pgp_num 64 last_change 833 owner 18446744073709551615 flags hashpspool stripe_width 0
+pool 30 'default.rgw.log' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 411 owner 18446744073709551615 flags hashpspool stripe_width 0
+pool 31 'default.rgw.users.uid' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 413 flags hashpspool stripe_width 0
+pool 32 'default.rgw.users.keys' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 415 flags hashpspool stripe_width 0
+pool 34 'default.rgw.buckets.index' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 464 owner 18446744073709551615 flags hashpspool stripe_width 0
+pool 35 'default.rgw.usage' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 466 owner 18446744073709551615 flags hashpspool stripe_width 0
+pool 36 'default.rgw.buckets.data' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 512 pgp_num 512 last_change 751 flags hashpspool stripe_width 0
+pool 37 'default.rgw.buckets.non-ec' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 64 pgp_num 64 last_change 684 flags hashpspool stripe_width 0
+pool 38 'default.rgw.users.swift' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 472 flags hashpspool stripe_width 0
+pool 39 'benchmark' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 512 pgp_num 512 last_change 747 flags hashpspool stripe_width 0
+pool 40 'default.rgw.users.email' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 541 flags hashpspool stripe_width 0
+{% endhighlight %}
+
+实际我们可以参照如下建立pool:
+{% highlight string %}
+# ceph osd pool ls
+.rgw.root
+ceph-001.rgw.control
+ceph-001.rgw.data.root
+ceph-001.rgw.gc
+ceph-001.rgw.log
+ceph-001.rgw.users.uid
+ceph-001.rgw.users.keys
+ceph-001.rgw.users.email
+ceph-001.rgw.users.swift
+ceph-001.rgw.usage
+ceph-001.rgw.buckets.index
+ceph-001.rgw.buckets.data
+ceph-001.rgw.intent-log
+ceph-001.rgw.meta
+ceph-001.rgw.buckets.non-ec
+
+# ceph osd pool ls detail
+pool 38 '.rgw.root' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 32 pgp_num 32 last_change 663 flags hashpspool stripe_width 0
+pool 179 'ceph-001.rgw.control' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 5647 flags hashpspool stripe_width 0
+pool 180 'ceph-001.rgw.data.root' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 32 pgp_num 32 last_change 5665 flags hashpspool stripe_width 0
+pool 181 'ceph-001.rgw.gc' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 16 pgp_num 16 last_change 5649 flags hashpspool stripe_width 0
+pool 182 'ceph-001.rgw.log' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 5650 flags hashpspool stripe_width 0
+pool 183 'ceph-001.rgw.users.uid' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 32 pgp_num 32 last_change 5651 flags hashpspool stripe_width 0
+pool 184 'ceph-001.rgw.users.keys' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 32 pgp_num 32 last_change 5652 flags hashpspool stripe_width 0
+pool 185 'ceph-001.rgw.users.email' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 5653 flags hashpspool stripe_width 0
+pool 186 'ceph-001.rgw.users.swift' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 5654 flags hashpspool stripe_width 0
+pool 187 'ceph-001.rgw.usage' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 16 pgp_num 16 last_change 5655 flags hashpspool stripe_width 0
+pool 188 'ceph-001.rgw.buckets.index' replicated size 3 min_size 2 crush_ruleset 0 object_hash rjenkins pg_num 256 pgp_num 256 last_change 5661 flags hashpspool stripe_width 0
+pool 189 'ceph-001.rgw.buckets.data' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 2048 pgp_num 2048 last_change 5657 flags hashpspool stripe_width 0
+pool 190 'ceph-001.rgw.intent-log' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 32 pgp_num 32 last_change 5658 flags hashpspool stripe_width 0
+pool 191 'ceph-001.rgw.meta' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 5659 flags hashpspool stripe_width 0
+pool 192 'ceph-001.rgw.buckets.non-ec' replicated size 3 min_size 2 crush_ruleset 5 object_hash rjenkins pg_num 128 pgp_num 128 last_change 5860 flags hashpspool stripe_width 0
+{% endhighlight %}
+
+
 7) 使用rbd命令简单测试创建的pool是否能够正常使用
 {% highlight string %}
 rbd create rbd-01/test-image --size 4096
