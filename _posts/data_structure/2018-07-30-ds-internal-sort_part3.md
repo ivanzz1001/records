@@ -133,7 +133,7 @@ typedef struct {
 	SLCell r[MAX_SPACE];			//静态链表的可利用空间， r[0]为头节点
 	int keynum;						//记录的当前关键字个数
 	int recnum;						//静态链表的当前长度
-};
+}SLList;
 
 typedef int ArrType[RADIX];			//指针数组类型
 {% endhighlight %}
