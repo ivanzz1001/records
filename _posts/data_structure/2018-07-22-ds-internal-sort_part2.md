@@ -104,6 +104,8 @@ void QuickSort(SqList)
 }
 {% endhighlight %}
 
+注意上面递归形式的排序算法，需要注意防止栈溢出。一般需要优先对较小的划分进行排序。
+
 **2) 迭代形式快速排序**
 {% highlight string %}
 void QSort(SqList L, int low, high)
