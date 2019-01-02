@@ -140,7 +140,7 @@ void BWInsertSort(SqList *L, SqList *D)
 
 			for(j=first;j<=low-1;j++)
 			{
-				D->r[(first -1 + CAPACITY) % CAPACITY] = D->r[(first + CAPACITY) % CAPACITY].r;
+				D->r[(first -1 + CAPACITY) % CAPACITY] = D->r[(first + CAPACITY) % CAPACITY];
 			}
 			D->r[(low - 1 + CAPACITY) % CAPACITY] = L.r[i];
 			first--;
