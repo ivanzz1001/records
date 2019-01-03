@@ -142,7 +142,7 @@ description: 数据结构之2-3树
 
 ![ds-23tree-delnode-1](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_delnode_1.jpg)
 
-如上图，以关键字```a```、```c```构造一个```3-节点```，并将其作为b的左孩子
+如上图，以关键字```a```、```b```构造一个```3-节点```，并将其作为c的左孩子
 
 
 * ```情形2```: 删除节点是左孩子，中间孩子是3-节点
@@ -175,7 +175,7 @@ description: 数据结构之2-3树
 
 * ```情形1```: 删除节点是左节点，右节点是2-节点
 
-首先将其兄弟节点与父节点合并，形成一个```3-节点```（假设为P）， 此时P到根节点的高度等于 树高 减1。 将P节点作为```当前节点```，设置当前树高度为h = -1, 执行如下步骤：
+首先将其兄弟节点与父节点合并，形成一个```3-节点```（假设为P）， 此时P到根节点的高度等于 树高 减1。 将P节点作为```当前节点```，设置当前树高度为```h = -1```, 执行如下步骤：
 <pre>
  a) 如果当前节点并没有兄弟节点， 则说明已经到了根节点， 退出
 
@@ -320,6 +320,21 @@ void insert(root *r, struct node23 *node, void *value){
 	*r = rnode;
 
 	return SUCCESS;
+}
+
+void tranverse_inorder(root r)
+{
+	if(r){
+		tranverse_inorder(r->left);
+		tranverse_print(r->value);
+	
+		if(r->extra){
+			tranverse_inorder(r->middle);
+			tranverse_printf(r->extra);
+		}
+
+		tranverse_inorder(r->right);
+	}
 }
 {% endhighlight %}
 
