@@ -232,6 +232,99 @@ description: 数据结构之2-3树
 注： 如果是在```2-节点```（叶子节点）中进行删除，每次删除会减少一个分支，如果删除操作导致根节点参与合并，则2-3树会降低一层。
 
 
+## 7. 示例代码参考
+{% highlight string %}
+struct node23{
+	void *value;
+	
+	struct node23 *parent;
+	struct node23 *left;
+	struct node23 *right;
+	
+	void *extra;
+	struct node23 *middle;
+};
+
+typedef struct node23 * root;
+
+void insert(root *r, struct node23 *node, void *value){
+	struct node23 *p = node;
+
+	struct tempnode{
+		int type;		//2--二节点 3--三节点 4--四节点 其他--非法
+		void *value[3];
+		struct tempnode *children[4];
+		
+		struct node23 *origin;
+	};
+	
+	struct tempnode t = {
+		2,
+		{value, NULL, NULL},
+		{NULL, NULL, NULL, NULL},
+		NULL,
+	};
+
+	while(p){
+		if (!p->extra){
+			if (t.type == 2){
+
+			}else if(t.type == 4){
+
+			}else{
+				return ERROR;
+			}
+		
+			return SUCCESS;
+
+		}else{
+			if (t.origin == NULL){
+
+			}else if(p->left == origin){
+
+			}else if(p->right == origin){
+
+			}else{
+
+			}
+		}
+	}
+
+	newnode = (struct node23 *)malloc(sizeof(struct node23));
+	newnode->value = t.value[2];
+	newnode->left = t.children[2];
+	newnode->right = t.children[3];
+	newnode->extra = NULL;
+	newnode->middle = NULL;
+
+	origin->value = t.value[0];
+	origin->left = t.children[0];
+	origin->right = t.children[1];
+	origin->extra = NULL;
+	origin->middle = NULL;
+
+
+	rnode = (struct node23 *)malloc(sizeof(struct node23));
+	rnode->value = t.value[1];
+	rnode->left = origin;
+	rnode->right = newnode;
+	rnode->extra = NULL;
+	rnode->middle = NULL;
+	rnode->parent = NULL;
+
+	newnode->parent = origin->parent = rnode;
+
+	*r = rnode;
+
+	return SUCCESS;
+}
+{% endhighlight %}
+
+
+
+
+
+
 <br />
 <br />
 **[参看]:**
