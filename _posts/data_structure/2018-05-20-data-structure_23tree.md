@@ -278,6 +278,7 @@ void insert(root *r, struct node23 *node, void *value){
 			return SUCCESS;
 
 		}else{
+			parent = p->parent;
 			if (t.origin == NULL){
 
 			}else if(p->left == origin){
@@ -287,6 +288,8 @@ void insert(root *r, struct node23 *node, void *value){
 			}else{
 
 			}
+
+			p = parent;
 		}
 	}
 
