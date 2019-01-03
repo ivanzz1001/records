@@ -323,6 +323,9 @@ void insert(root *r, struct node23 *node, void *value){
 }
 {% endhighlight %}
 
+上述插入过程，其实可以看成是如下图所示的一个```临时节点```合并到```父节点```的过程。
+
+![ds-23tree-insertes](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_insertes.jpg)
 
 
 
