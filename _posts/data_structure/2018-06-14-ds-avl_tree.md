@@ -305,8 +305,8 @@ int insert_node(AVLTree *root, int data)
 
 	}
 
-    //update the current node height
-    (*root)->height = MAX(getheight((*root)->left), getheight((*root)->right)) + 1;
+	//update the current node height
+	(*root)->height = MAX(getheight((*root)->left), getheight((*root)->right)) + 1;
 	return 0x0;
 }
 
@@ -424,8 +424,8 @@ int remove_node(AVLTree *root, int data)
 		}
 	}
 
-    //Update the current node height
-    (*root)->height = MAX(getheight((*root)->left), getheight((*root)->right)) + 1;
+	//Update the current node height
+	(*root)->height = MAX(getheight((*root)->left), getheight((*root)->right)) + 1;
 	return 0x0;
 }
 
