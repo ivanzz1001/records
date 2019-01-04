@@ -267,8 +267,8 @@ int insert_node(AVLTree *root, int data)
 		{
 			if((*root)->right->data < data)
 			{
-			//Please reference 'AVLTree insert' chapter , this is the case 2
-			left_rotate(root);
+				//Please reference 'AVLTree insert' chapter , this is the case 2
+				left_rotate(root);
 			}
 			else{
 				//Please reference 'AVLTree insert' chapter, this is the case 4
@@ -276,7 +276,6 @@ int insert_node(AVLTree *root, int data)
 				left_rotate(root);
 			}
 		}
-
 
 	}
 	else{
@@ -509,19 +508,19 @@ void postorder_traverse(AVLTree root)
 
 int main(int argc,char *argv[])
 {
-     int a[] = {1,2,3,4,5,10,9,8,7,6};
-	 int i;
+	int a[] = {1,2,3,4,5,10,9,8,7,6};
+	int i;
 
-	 AVLTree root = NULL;
+	AVLTree root = NULL;
 
-	 for (i = 0; i < sizeof(a)/sizeof(int); i++)
-	 {
-	 	if(insert_node(&root, a[i]) != 0)
-	 	{
-	 	     printf("insert node failure\n");
-			 return -1;
-	 	}
-	 }
+	for (i = 0; i < sizeof(a)/sizeof(int); i++)
+	{
+		if(insert_node(&root, a[i]) != 0)
+		{
+			printf("insert node failure\n");
+			return -1;
+		}
+	}
 
 	inorder_traverse(root);
 	printf("\n");
