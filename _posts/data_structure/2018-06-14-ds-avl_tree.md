@@ -21,7 +21,7 @@ description: AVL树原理及实现
 **1） AVL树的定义**
 
 
-```AVL树```中任何节点的两棵子树的高度之差的绝对值不超过1，所以它也被称为高度平衡树。查找、插入和删除在平均和最坏情况下都是O(logn)。增加和删除可能需要通过一次或多次树旋转来重新平衡这棵树。AVL树得名于它的发明者```G.M. Adelson-Velsky 和 E.M. Landis```，他们在1962年论文"An algorithm for the organization of informatio"中发表了它。
+```AVL树```中任何节点的两棵子树的高度之差的绝对值不超过1，所以它也被称为高度平衡树。查找、插入和删除在平均和最坏情况下都是O(logn)。增加和删除可能需要通过一次或多次树旋转来重新平衡这棵树。AVL树得名于它的发明者```G.M. Adelson-Velsky 和 E.M. Landis```，他们在1962年论文"An algorithm for the organization of information"中发表了它。
 <pre>
 注： AVL树定义并不是说从根节点到叶子节点的最长距离比最短距离大1
 </pre>
