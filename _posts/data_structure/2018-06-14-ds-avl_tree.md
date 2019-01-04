@@ -304,7 +304,8 @@ int insert_node(AVLTree *root, int data)
 
 	}
 
-	//update the current node height
+	//update the current node height(这里其实是计算ABS(lchild_height - rchild_height) != 2时高度的变化，
+	//等于2时的情况其实在旋转时就已经计算过了）
 	(*root)->height = MAX(getheight((*root)->left), getheight((*root)->right)) + 1;
 	return 0x0;
 }
