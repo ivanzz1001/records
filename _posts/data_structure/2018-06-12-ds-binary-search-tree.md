@@ -234,7 +234,7 @@ int delete(struct BSTNode **root, int key)
           while(q->left) q=q->left;
           
           r = q->parent;
-          child = q->child;
+          child = q->right;
           parent = p->parent;
           left = p->left;
 
