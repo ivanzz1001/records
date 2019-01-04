@@ -536,6 +536,7 @@ int main(int argc,char *argv[])
 	insert_node(&root, -100);
 	insert_node(&root, -1);
 	inorder_traverse(root);
+	printf("\n");
 
 	destroy(&root);
 
