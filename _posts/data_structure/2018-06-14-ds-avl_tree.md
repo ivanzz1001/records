@@ -190,8 +190,8 @@ static int getheight(AVLTree node)
 
 static void left_rotate(AVLTree *node)
 {
-    AVLNode *p = *node;
-    AVLNode *r = p->right;
+	AVLNode *p = *node;
+	AVLNode *r = p->right;
 
 	p->right = r->left;
 	r->left = p;
@@ -265,16 +265,16 @@ int insert_node(AVLTree *root, int data)
 		//Here because we insert at the right branch, so rchild_height >= lchild_height
 		if(rchild_height - lchild_height == 2)
 		{
-		     if((*root)->right->data < data)
-		     {
-		           //Please reference 'AVLTree insert' chapter , this is the case 2
-		           left_rotate(root);
-		     }
-			 else{
-			 	   //Please reference 'AVLTree insert' chapter, this is the case 4
-			 	   right_rotate(&(*root)->right);
-				   left_rotate(root);
-			 }
+			if((*root)->right->data < data)
+			{
+				//Please reference 'AVLTree insert' chapter , this is the case 2
+				left_rotate(root);
+			}
+			else{
+				//Please reference 'AVLTree insert' chapter, this is the case 4
+				right_rotate(&(*root)->right);
+				left_rotate(root);
+			}
 		}
 
 
@@ -291,15 +291,15 @@ int insert_node(AVLTree *root, int data)
 		//Here because we insert at the left branch, so lchild_height >= rchild_height
 		if(lchild_height - rchild_height == 2)
 		{
-		    if((*root)->left->data > data)
-		    {
-		         //Please reference 'AVLTree insert' chapter, this is the case 1
-		         right_rotate(root);
-		    }
+			if((*root)->left->data > data)
+			{
+				//Please reference 'AVLTree insert' chapter, this is the case 1
+				right_rotate(root);
+			}
 			else{
-				 //Please reference 'AVLTree insert' chapter, this is the case 3
-				 left_rotate(&(*root)->left);
-				 right_rotate(root);
+				//Please reference 'AVLTree insert' chapter, this is the case 3
+				left_rotate(&(*root)->left);
+				right_rotate(root);
 			}
 		}
 
@@ -327,9 +327,9 @@ int remove_node(AVLTree *root, int data)
 	{
 
 		if((*root)->left != NULL && (*root)->right != NULL)
-	    {
-	        // the left child and the right child is not null, we find the 'next' node
-	        int key = findmin((*root)->right);
+		{
+			// the left child and the right child is not null, we find the 'next' node
+			int key = findmin((*root)->right);
 			(*root)->data = key;
 
 			//remove the 'next' node, and it will must successful
@@ -345,8 +345,8 @@ int remove_node(AVLTree *root, int data)
 				//Note: when remove, here is '>='
 				if(getheight((*root)->left->left) >= getheight((*root)->left->right))
 				{
-				    //Please reference 'AVLTree insert' chapter, this is the case 1
-				    right_rotate(root);
+					//Please reference 'AVLTree insert' chapter, this is the case 1
+					right_rotate(root);
 				}
 				else{
 					//Please reference 'AVLTree insert' chapter, this is the case 3
@@ -355,11 +355,11 @@ int remove_node(AVLTree *root, int data)
 				}
 			}
 
-	    }
+		}
 		else if((*root)->left == NULL)
 		{
-		    //Here the left branch is NULL
-		    AVLNode *node = *root;
+			//Here the left branch is NULL
+			AVLNode *node = *root;
 			*root = node->right;
 			free(node);
 			node = NULL;
@@ -376,58 +376,57 @@ int remove_node(AVLTree *root, int data)
 	}
 	else if((*root)->data < data)
 	{
-	     //find the node at the right-branch
-	     if(remove_node(&(*root)->right, data) < 0)
-		 	return -1;
+		//find the node at the right-branch
+		if(remove_node(&(*root)->right, data) < 0)
+			return -1;
 
-		 int lchild_height = getheight((*root)->left);
-		 int rchild_height = getheight((*root)->right);
+		int lchild_height = getheight((*root)->left);
+		int rchild_height = getheight((*root)->right);
 
-		 //Because we remove the node at the right-branch, so lchild_height >= rchild_height
-		 if(lchild_height - rchild_height == 2)
-		 {
-		 	  //Note: when remove, here is '>='
-		      if(getheight((*root)->left->left) >= getheight((*root)->left->right))
-		      {
-		            //Please reference 'AVLTree insert' chapter, this is the case 1
-		            right_rotate(root);
-		      }
-			  else{
-			  	   //Please reference 'AVLTree insert' chapter, this is the case 3
-			  	   left_rotate(&(*root)->left);
-				   right_rotate(root);
-			  }
-		 }
+		//Because we remove the node at the right-branch, so lchild_height >= rchild_height
+		if(lchild_height - rchild_height == 2)
+		{
+			//Note: when remove, here is '>='
+			if(getheight((*root)->left->left) >= getheight((*root)->left->right))
+			{
+				//Please reference 'AVLTree insert' chapter, this is the case 1
+				right_rotate(root);
+			}
+			else{
+				//Please reference 'AVLTree insert' chapter, this is the case 3
+				left_rotate(&(*root)->left);
+				right_rotate(root);
+			}
+		}
 	}
 	else{
-		   //find the node at the left-branch
-		   if(remove_node(&(*root)->left, data) < 0)
-		   		return -1;
+		//find the node at the left-branch
+		if(remove_node(&(*root)->left, data) < 0)
+			return -1;
 
-		   int lchild_height = getheight((*root)->left);
-		   int rchild_height = getheight((*root)->right);
+		int lchild_height = getheight((*root)->left);
+		int rchild_height = getheight((*root)->right);
 
-		   //Because we remove the node at the left-branch, so rchild_height >= lchild_height
-		   if(rchild_height - lchild_height == 2)
-		   {
-		       //Note: when remove, there is '>='
-		       if(getheight((*root)->right->right) >= getheight((*root)->right->left))
-		       {
-		       		//Please reference 'AVLTree insert' chapter, this is the case 2
-		       		left_rotate(root);
-		       }
-			   else{
-			   	    //Please reference 'AVLTree insert' chapter, this is the case 4
-			   		right_rotate(&(*root)->right);
-					left_rotate(root);
-			   }
-		   }
+		//Because we remove the node at the left-branch, so rchild_height >= lchild_height
+		if(rchild_height - lchild_height == 2)
+		{
+			//Note: when remove, there is '>='
+			if(getheight((*root)->right->right) >= getheight((*root)->right->left))
+			{
+				//Please reference 'AVLTree insert' chapter, this is the case 2
+				left_rotate(root);
+			}
+			else{
+				//Please reference 'AVLTree insert' chapter, this is the case 4
+				right_rotate(&(*root)->right);
+				left_rotate(root);
+			}
+		}
 	}
 
     //Update the current node height
     (*root)->height = MAX(getheight((*root)->left), getheight((*root)->right)) + 1;
 	return 0x0;
-
 }
 
 
