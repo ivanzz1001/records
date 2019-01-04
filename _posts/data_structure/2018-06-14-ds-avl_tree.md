@@ -267,8 +267,8 @@ int insert_node(AVLTree *root, int data)
 		{
 			if((*root)->right->data < data)
 			{
-				//Please reference 'AVLTree insert' chapter , this is the case 2
-				left_rotate(root);
+			//Please reference 'AVLTree insert' chapter , this is the case 2
+			left_rotate(root);
 			}
 			else{
 				//Please reference 'AVLTree insert' chapter, this is the case 4
