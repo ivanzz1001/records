@@ -199,6 +199,11 @@ MySQL等数据库普遍都采用```B+```树，而不是```B-树```。主要有�
 3. [B+树](https://baike.baidu.com/item/B+%E6%A0%91/7845683)
 
 4. [浅析——B树，B+树，B*树以及分析MySQL的两种引擎](https://blog.csdn.net/qq_26768741/article/details/53164202)
+
+5. [【数据结构】B-Tree, B+Tree, B*树介绍](https://www.cnblogs.com/gym333/p/6877023.html)
+
+6. [B+tree详解及实现(C语言)](https://blog.csdn.net/xiaohusaier/article/details/77101640)
+
 <br />
 <br />
 <br />
