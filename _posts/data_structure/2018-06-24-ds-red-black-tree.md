@@ -361,93 +361,93 @@ int insert_rbtree(rb_tree_t *root, rb_node_t *node)
 {% highlight string %}
 int delete_rbtree(rb_tree_t *root, int key)
 {
-    rb_node_t *p = *root;
-
-    //find the node
+	rb_node_t *p = *root;
+	
+	//find the node
 	while(p)
 	{
-	     if(p->key == key)
-		 	break;
-		 else if(p->key > key)
-		 	p = p->left;
-		 else
-		 	p = p->right;
+		if(p->key == key)
+			break;
+		else if(p->key > key)
+			p = p->left;
+		else
+			p = p->right;
 	}
-
+	
 	if(!p)
 		return -1;
 
 
-    if(p->left && p->right)
-    {
-         //get Successor node
-         rb_node_t *successor = p->right;
-
-		 while(successor->left)
-		 	successor = successor->left;
-
-		 if(p->parent)
-		 {
-		      if(p->parent->left == p)
-			      p->parent->left = successor;
-			  else
-			  	  p->parent->right = successor;
-		 }
-		 else{
-		 	  *root = successor;
-		 }
-
-		 rb_node_t *successor_child = successor->right;
-		 rb_node_t *successor_parent = successor->parent;
-		 int color = successor->color;      //save the color
-
-		 if(successor_parent == p)
-		 {
-		     successor_parent = successor;
-		 }
-		 else{
-		 	if(successor_child)
+	if(p->left && p->right)
+	{
+		//get Successor node
+		rb_node_t *successor = p->right;
+	
+		while(successor->left)
+			successor = successor->left;
+	
+		if(p->parent)
+		{
+			if(p->parent->left == p)
+				p->parent->left = successor;
+			else
+				p->parent->right = successor;
+		}
+		else{
+			*root = successor;
+		}
+	
+		rb_node_t *successor_child = successor->right;
+		rb_node_t *successor_parent = successor->parent;
+		int color = successor->color;      //save the color
+		
+		if(successor_parent == p)
+		{
+			successor_parent = successor;
+		}
+		else{
+			if(successor_child)
 				successor_child->parent = successor_parent;
-
+		
 			successor_parent->left = successor_child;
-
+		
 			successor->right = p->right;
 			p->right->parent = successor;
-		 }
+		}
 
-		 successor->parent = p->parent;
-		 successor->color = p->color;
-		 successor->left = p->left;
-		 p->left->parent = successor;
+		successor->parent = p->parent;
+		successor->color = p->color;
+		successor->left = p->left;
+		p->left->parent = successor;
+	
+		if(color == COLOR_BLACK)
+			rbtree_delete_fixup(root, successor_child, successor_parent);
+	
+		free(p);
+		return 0x0;
+	
+	}
 
-		 if(color == COLOR_BLACK)
-		 	rbtree_delete_fixup(root, successor_child, successor_parent);
 
-		 free(p);
-		 return 0x0;
-
-    }
-
-
-    rb_node_t *child = NULL;
+	rb_node_t *child = NULL;
 	rb_node_t *parent = NULL;
 	int color;
-
+	
 	if(p->left)
 		child = p->left;
 	else
 		child = p->right;
-
-
+	
+	
 	parent = p->parent;
 	color = p->color;   //save the color
-
+	
 	if(child)
 		child->parent = parent;
-
+	
 	if(parent)
 	{
-	    if(parent->left == p)
+		if(parent->left == p)
 			parent->left = child;
 		else
 			parent->right = child;
@@ -455,15 +455,14 @@ int delete_rbtree(rb_tree_t *root, int key)
 	else{
 		*root = child;
 	}
-
-
-    if(color == COLOR_BLACK)
+	
+	
+	if(color == COLOR_BLACK)
 		rbtree_delete_fixup(root, child, parent);
-
-    free(p);
-
+	
+	free(p);
+	
 	return 0x0;
-
 }
 {% endhighlight %}
 
