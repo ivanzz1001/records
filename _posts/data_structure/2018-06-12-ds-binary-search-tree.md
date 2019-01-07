@@ -241,6 +241,7 @@ int delete(struct BSTNode **root, int key)
           if(r == p)
           {
                q->left = left;
+			   left->parent = q;
                if(parent)
                {
                    if(parent->left == p)
@@ -255,6 +256,7 @@ int delete(struct BSTNode **root, int key)
           }
           else{
               q->left = left;
+			  left->parent = q;
               q->right = p->right;
               r->left = child;
               if(parent)
