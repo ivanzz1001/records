@@ -210,52 +210,18 @@ static rb_node_t *rb_rotate_left(rb_tree_t *root, rb_node_t *node)
 {% highlight string %}
 int rb_insert_fixup(rb_tree_t *root, rb_node_t *node)
 {
-    rb_node_t *parent;
+	rb_node_t *parent;
 	rb_node_t *grand_parent;
 
     //If parent exist, and the color of parent is RED
 	while((parent = node->parent) && parent->color == COLOR_RED)
 	{
-         grand_parent = parent->parent;
+		grand_parent = parent->parent;
 
-		 //parent node is grand_parent node's left child(grand_parent should not be NULL, because parent->color==COLOR_RED)
-		 if(grand_parent->left == parent)
-		 {
-		     rb_node_t *uncle = grand_parent->right;
-
-			 //Case 1: uncle is RED
-			 if(uncle && uncle->color == COLOR_RED)
-			 {
-			     parent->color = COLOR_BLACK;
-				 uncle->color = COLOR_BLACK;
-				 grand_parent->color = COLOR_RED;
-
-				 node = grand_parent;
-				 continue;
-			 }
-
-			 //Case 2: uncle is BLACK, and node is parent's right child
-			 if(parent->right == node)
-			 {
-			     rb_rotate_left(root, parent);
-
-				 // reset parent and node pointer
-				 rb_node_t *tmp;
-				 tmp = parent;
-				 parent = node;
-				 node = tmp;
-
-				 //Here successful convert Case 2 to Case3
-			 }
-
-			 //Case 3: uncle is BLACK, and node is parent's left child
-			 parent->color = COLOR_BLACK;
-			 grand_parent->color = COLOR_RED;
-			 rb_rotate_right(root, grand_parent);
-
-		 }
-		 else{
-		 	rb_node_t *uncle = grand_parent->left;
+		//parent node is grand_parent node's left child(grand_parent should not be NULL, because parent->color==COLOR_RED)
+		if(grand_parent->left == parent)
+		{
+			rb_node_t *uncle = grand_parent->right;
 
 			//Case 1: uncle is RED
 			if(uncle && uncle->color == COLOR_RED)
@@ -263,7 +229,41 @@ int rb_insert_fixup(rb_tree_t *root, rb_node_t *node)
 				parent->color = COLOR_BLACK;
 				uncle->color = COLOR_BLACK;
 				grand_parent->color = COLOR_RED;
+				
+				node = grand_parent;
+				continue;
+			}
 
+			//Case 2: uncle is BLACK, and node is parent's right child
+			if(parent->right == node)
+			{
+				rb_rotate_left(root, parent);
+				
+				// reset parent and node pointer
+				rb_node_t *tmp;
+				tmp = parent;
+				parent = node;
+				node = tmp;
+				
+				//Here successful convert Case 2 to Case3
+			}
+
+			//Case 3: uncle is BLACK, and node is parent's left child
+			parent->color = COLOR_BLACK;
+			grand_parent->color = COLOR_RED;
+			rb_rotate_right(root, grand_parent);
+
+		}
+		else{
+			rb_node_t *uncle = grand_parent->left;
+			
+			//Case 1: uncle is RED
+			if(uncle && uncle->color == COLOR_RED)
+			{
+				parent->color = COLOR_BLACK;
+				uncle->color = COLOR_BLACK;
+				grand_parent->color = COLOR_RED;
+				
 				node = grand_parent;
 				continue;
 			}
@@ -271,22 +271,22 @@ int rb_insert_fixup(rb_tree_t *root, rb_node_t *node)
 			//Case 2: uncle is BLACK, and node is parent's left child
 			if(parent->left == node)
 			{
-			     rb_rotate_right(root,parent);
-
-				 //reset parent and node pointer
-				 rb_node_t *tmp;
-				 tmp = parent;
-				 parent = node;
-				 node = tmp;
-
-				 //Here success convert Case 2 to Case 3
+			rb_rotate_right(root,parent);
+			
+				//reset parent and node pointer
+				rb_node_t *tmp;
+				tmp = parent;
+				parent = node;
+				node = tmp;
+				
+				//Here success convert Case 2 to Case 3
 			}
 
 			//Case 3: uncle is BLACK, and node is parent's right child
 			parent->color = COLOR_BLACK;
 			grand_parent->color = COLOR_RED;
 			rb_rotate_left(root, grand_parent);
-		 }
+		}
 	}
 
 	(*root)->color = COLOR_BLACK;
