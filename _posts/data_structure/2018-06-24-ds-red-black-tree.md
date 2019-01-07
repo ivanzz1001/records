@@ -606,9 +606,8 @@ static int rbtree_delete_fixup(rb_tree_t *root, rb_node_t *node, rb_node_t *pare
 				break;
 	
 			}
-			
-			
-	    }
+				
+		}
 		else{
 			//The right branch
 			brother = parent->left;
