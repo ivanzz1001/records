@@ -213,7 +213,7 @@ int rb_insert_fixup(rb_tree_t *root, rb_node_t *node)
 	rb_node_t *parent;
 	rb_node_t *grand_parent;
 
-    //If parent exist, and the color of parent is RED
+	//If parent exist, and the color of parent is RED
 	while((parent = node->parent) && parent->color == COLOR_RED)
 	{
 		grand_parent = parent->parent;
@@ -569,7 +569,7 @@ static int rbtree_delete_fixup(rb_tree_t *root, rb_node_t *node, rb_node_t *pare
 			{
 			    //1) Case 1: x's brother is COLOR_RED
 				brother->color = COLOR_BLACK;
-			    parent->color = COLOR_RED;
+				parent->color = COLOR_RED;
 				rb_rotate_left(root,node);
 				brother = parent->right;
 			}

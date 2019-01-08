@@ -305,6 +305,12 @@ losers[1]:0  --> definitely-max
 losers[0]:1  --> definitely-max
 {% endhighlight %}
 
+下面给出败者树初始化后的示意图：
+
+![ds-loser-tree](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_losertree_init.jpg)
+
+
+
 <br />
 <br />
 **[参看]:**
