@@ -81,7 +81,7 @@ int Index(SString S, SString T, int pos)
                                ↓i=11
 第六趟匹配  a b a b c a b c a c b a b
                      a b c a c
-                               ↑j=1
+                               ↑j=6
 {% endhighlight %}
 上述算法的匹配过程易于理解，且在某些应用场合，如文本编辑等，效率也较高，例如，在检查模式'STING'是否存在于下列主串中时：
 
