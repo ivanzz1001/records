@@ -112,7 +112,7 @@ Status InorderThreading(BiThrTree *Thrt, BiThrTree T)
 		Thrt->lchild = T;
 		pre = *Thrt;
 
-		InThreading(T， &pre);
+		InThreading(T, &pre);
 
 		pre->rchild = Thrt;         //最后一个节点线索化
 		pre->RTag = Thread;
@@ -126,7 +126,7 @@ void InThreading(BiThrTree p, BiThrTree *pre)
 {
 	if(p)
 	{
-		InThreading(p->lchild);			//左子树线索化
+		InThreading(p->lchild, pre);			//左子树线索化
 		if(!p->lchild)					//前驱线索
 		{
 			p->LTag = Thread;
@@ -139,7 +139,7 @@ void InThreading(BiThrTree p, BiThrTree *pre)
 		}
 		(*pre) = p;                        //保持pre指向p的前驱
 
-		InThreading(p->rchild);			//右子树线索化
+		InThreading(p->rchild, pre);			//右子树线索化
 	}
 }
 {% endhighlight %}
