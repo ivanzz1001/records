@@ -148,7 +148,14 @@ void HuffmanCoding(HuffmanTree *HT, HuffmanCode *HC,int *w, int n)
 	free(cd);			//释放工作空间
 }
 {% endhighlight %}
-向量HT的前n个分量表示叶子节点，最后一个分量表示根节点。各字符编码长度不等，所以按实际长度动态分配空间。在上面的算法中求每个字符的赫夫曼编码是从叶子到根逆向处理的。也可以从根出发，遍历整棵赫夫曼树，求得各个叶子节点所表示的字符的赫夫曼编码。如下所示：
+向量HT的前n个分量表示叶子节点，最后一个分量表示根节点。各字符编码长度不等，所以按实际长度动态分配空间。
+
+
+![ds-huffman-initial](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_huffman_initial.jpg)
+
+
+
+在上面的算法中求每个字符的赫夫曼编码是从叶子到根逆向处理的。也可以从根出发，遍历整棵赫夫曼树，求得各个叶子节点所表示的字符的赫夫曼编码。如下所示：
 {% highlight string %}
 //w存放n个字符的权值（均>0)，构造赫夫曼树HT，并求出n个字符的赫夫曼编码HC。
 void HuffmanCoding(HuffmanTree *HT, HuffmanCode *HC,int *w, int n)
