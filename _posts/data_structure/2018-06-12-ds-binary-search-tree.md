@@ -76,21 +76,19 @@ struct BSTNode *search(BSTree *root, int key)
 {% highlight string %}
 struct BSTNode *successor(BSTNode *x)
 {
-    if(x->right)
-    {
-       x = x->right;
-       while(x->left)  x=x->left;
-       return x;
-    }
-   
+	if(x->right)
+	{
+		x = x->right;
+		while(x->left)  x=x->left;
+		return x;
+	}
+
 	parent = x->parent;
-    while(parent && parent->right == x)
-    {
-        x=parent;
-        parent = parent->parent;
-    }
-
-
+	while(parent && parent->right == x)
+	{
+		x=parent;
+		parent = parent->parent;
+	}
 
     return parent;
 }
