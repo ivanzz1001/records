@@ -314,6 +314,9 @@ void get_nextval(SString T, int nextval[])
 }
 {% endhighlight %}
 
+参看如下图示：
+
+![ds-string-kmp4](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_string_kmp4.jpg)
 
 
 
