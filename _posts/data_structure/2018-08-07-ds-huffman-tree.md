@@ -185,7 +185,7 @@ void HuffmanCoding(HuffmanTree *HT, HuffmanCode *HC,int *w, int n)
 	}
 
 
-	//2) 从叶子到根逆向求每个字符的赫夫曼编码
+	//2) 无栈非递归遍历赫夫曼树，求赫夫曼编码
 	*HC = (HuffmanCode)malloc((n+1)*sizeof(char *));	//分配n个字符编码的头指针向量，0号单元未用
 	p = m;
 	cdlen = 0;
