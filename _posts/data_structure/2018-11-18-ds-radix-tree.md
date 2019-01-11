@@ -51,6 +51,10 @@ Radix tree支持插入、删除、搜索等方面的操作。```插入操作```�
 
 * function isLeaf()
 
+关于edge与node的关系，参看如下图示：
+
+![radix-tree-edge](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_radix_edge.jpg)
+
 
 {% highlight string %}
 function lookup(string x)
@@ -126,7 +130,7 @@ typedef struct radix_node_s radix_node_t;
 
 
 struct radix_edge_t{
-	radix_node_t *incommingNode;
+	radix_node_t *incommingNode;	//此处为targetNode
 	char *label;
 
 	struct radix_edge_t *next;		
