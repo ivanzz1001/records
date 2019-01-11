@@ -130,7 +130,7 @@ typedef struct radix_node_s radix_node_t;
 
 
 struct radix_edge_t{
-	radix_node_t *incommingNode;	//此处为targetNode
+	radix_node_t *incommingNode;	
 	char *label;
 
 	struct radix_edge_t *next;		
@@ -235,6 +235,7 @@ int insert_radix_tree(radix_node_t *root, char *label)
 }
 
 {% endhighlight %}
+注意，此示例代码给出的数据结构定义并不符合```3.1节```介绍的结构。本示例设计的数据结构不好，可忽略。
 
 
 ## 2. Linux基数树
