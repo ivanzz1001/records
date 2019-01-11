@@ -13,7 +13,7 @@ description: 数据结构之Radix Tree
 
 
 ## 1. radix tree定义
-在计算机科学中，radix tree(也被称为radix trie，或者compact prefix tree)用于表示一种```空间优化)的trie```(prefix tree)数据结构。 假如树中的一个节点是父节点的唯一子节点(the only child)的话，那么该子节点将会与父节点进行合并，这样就使得radix tree中的每一个内部节点最多拥有```r```个孩子， ```r```为正整数且等于```2^n```(n>=1)。不像是一般的trie树，radix tree的边沿(edges)可以是一个或者多个元素。参看如下：
+在计算机科学中，radix tree(也被称为radix trie，或者compact prefix tree)用于表示一种```空间优化的trie```(prefix tree)数据结构。 假如树中的一个节点是父节点的唯一子节点(the only child)的话，那么该子节点将会与父节点进行合并，这样就使得radix tree中的每一个内部节点最多拥有```r```个孩子， ```r```为正整数且等于```2^n```(n>=1)。不像是一般的trie树，radix tree的边沿(edges)可以是一个或者多个元素。参看如下：
 
 ![ds-radix-tree](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_radix_tree.png)
 
