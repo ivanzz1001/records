@@ -1290,7 +1290,7 @@ int main(int argc,char *argv[])
 	demo demo_objs[MAX_OBJS];
 	int i;
 	
-	for(i = 0; i<20; i++)
+	for(i = 0; i<MAX_OBJS; i++)
 	{
 		demo_objs[i] = i+1;
 		skiplist_insert(sl,i,&demo_objs[i]);
