@@ -1127,7 +1127,7 @@ void skiplist_remove(skiplist *sl, double score, int *count, void *filter)
 
 	for(i = 0;i<matches;i++)
 	{
-		/*如果传递了过滤的对象,则根据这个对象来进行过?/
+		/*如果传递了过滤的对象,则根据这个对象来进行过*/
 		if(filter)
 		{
 			if(sl->match)
