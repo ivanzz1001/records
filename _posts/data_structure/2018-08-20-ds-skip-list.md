@@ -1108,11 +1108,11 @@ static void skiplist_remove_node(skiplist *sl, skiplist_node *node)
 					sl->level--;
 			}
 		#endif
-			sl->length--;
+		sl->length--;
 
-			if(sl->free)
-				sl->free(node->obj);
-			free(node);
+		if(sl->free)
+			sl->free(node->obj);
+		free(node);
 	}
 
 }
