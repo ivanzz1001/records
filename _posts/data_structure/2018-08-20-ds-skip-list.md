@@ -364,7 +364,7 @@ int get_random_level(double p)
 	return level;
 }
 
-
+//本函数用于找出小于等于node->score，离node距离最近且level高度各不相等的节点
 static void skiplist_get_update(skiplist *sl, skiplist_node *node, skiplist_node ***update)
 {
 	int max_level = SKIPLIST_MAX_LEVEL;
