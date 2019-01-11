@@ -26,7 +26,7 @@ for sets of strings that share long prefixes.
 即元素个数不是太多，但是元素之间通常有很长的相同前缀时很适合采用radix tree来存储
 </pre>
 
-不像是平常的树结构（在进行key的比较时，是整个key从头到尾进行比较），radix key在每个节点进行key的比较时是以```chunck```为单位来进行的，每一个chunk中的bit数目等于```radix tree```的基数```r```。
+不像是平常的树结构（在进行key的比较时，是整个key从头到尾进行比较），radix key在每个节点进行key的比较时是以```bit组```(chunk-of-bits)为单位来进行的，每一个chunk中的bit数目等于```radix tree```的基数```r```。
 
 ## 2. radix tree使用场景举例
 我们经常使用Radix tree来构建key为字符串的[关联数组(associative arrays)](https://en.wikipedia.org/wiki/Associative_array)；在构建IP路由(ip-routing)的应用方面radix tree也使用广泛，因为IP通常具有大量相同的前缀； 另外radix tree在倒排索引方面也使用广泛。
