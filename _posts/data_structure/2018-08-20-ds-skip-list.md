@@ -173,7 +173,7 @@ skiplist *skiplist_create()
 
 ![ds-skip-list-search](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_skip_list_search.jpg)
 
-下面我们给出跳跃表搜索的代码(注： 当score相等时，如下搜索代码其实存在一些问题)：
+下面我们给出跳跃表搜索的代码(**注： 当score相等时，如下搜索代码其实存在一些问题**)：
 {% highlight string %}
 //这里我们参照相关代码，添加了一个内部使用的队列（实际上，我们不需要这样一个队列)
 //For internal use
@@ -234,12 +234,10 @@ static skiplist_node **skiplist_search_all(skiplist *sl, double score, int *coun
 			if(p->level[i].forward->score == score)
 			{
 				s_queue_push(queue, p->level[i].forward);
-				goto SEARCH_END;
 			}
 			p = p->level[i].forward;
 		}
 	}
-SEARCH_END:
 
 	if(*count = queue->matches)
 	{
@@ -681,14 +679,14 @@ int skiplist_insert(skiplist *sl, double score, void *obj);
 /*
  * Description: search by score
  *  1: 如果没有过滤 返回score相同所有obj
-  * 2: 如果家里filter过滤则,返回与filter匹配的结果(match返回1)
+  * 2: 如果加了filter过滤， 则返回与filter匹配的结果(match返回1)
  */
 void skiplist_search(skiplist *sl, double score, int *count, void *filter, void ***search_result);
 
 /*
  * Description: remove node by score
  * 1: 如果没有过滤 返回score相同所有obj
- * 2: 如果家里filter过滤则,返回与filter匹配的结果(match返回1)
+ * 2: 如果加了filter过滤, 则返回与filter匹配的结果(match返回1)
  */
 void skiplist_remove(skiplist *sl, double score, int *count, void *filter);
 
@@ -842,12 +840,11 @@ static skiplist_node **skiplist_search_all(skiplist *sl, double score, int *coun
 			if(p->level[i].forward->score == score)
 			{
 				s_queue_push(queue, p->level[i].forward);
-				goto SEARCH_END;
 			}
 			p = p->level[i].forward;
 		}
 	}
-SEARCH_END:
+
 
 	if(*count = queue->matches)
 	{
