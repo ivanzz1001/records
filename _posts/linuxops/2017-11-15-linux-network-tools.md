@@ -104,7 +104,7 @@ copyright (c) 2002 Paul Warren <pdw@ex-parrot.com> and contributors
 * -B: 以bytes为单位显示流量(默认是bits)
 
 iftop命令默认显示第一块网卡的流量：
-<pre>
+{% highlight string %}
 # iftop
 interface: eth0
 IP address is: 10.17.253.170
@@ -156,7 +156,7 @@ ceph001-05                                                     => 10.58.8.126   
 TX:             cum:   4.27MB   peak:   12.0Mb                                                                                             rates:   12.0Mb  12.0Mb  12.0Mb
 RX:                    3.80MB           10.1Mb                                                                                                      10.1Mb  10.1Mb  10.1Mb
 Total:                 59.4MB           38.9Mb                                                                                                      34.1Mb  33.8Mb  34.0Mb
-</pre>
+{% endhighlight %}
 
 下面简要介绍一下上面打印信息的含义。iftop的输出从整体上可以分为三大部分：
 
