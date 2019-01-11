@@ -22,6 +22,8 @@ description: 数据结构之Radix Tree
 <pre>
 This makes radix trees much more efficient for small sets (especially if the strings are long) and
 for sets of strings that share long prefixes.
+
+即元素个数不是太多，但是元素之间通常有很长的相同前缀时很适合采用radix tree来存储
 </pre>
 
 不像是平常的树结构（在进行key的比较时，是整个key从头到尾进行比较），radix key在每个节点进行key的比较时是以```chunck```为单位来进行的，每一个chunk中的bit数目等于```radix tree```的基数```r```。
