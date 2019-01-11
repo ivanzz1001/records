@@ -1258,7 +1258,7 @@ void skiplist_destroy(skiplist *sl)
 {% endhighlight %}
 
 ### 3.3 跳跃表测试
-如下是跳跃表测试代码：
+如下是跳跃表测试代码(**注： 当前在score相同时，跳跃表插入、搜索等操作有些问题**)：
 
 {% highlight string %}
 #include <stdio.h>
@@ -1271,6 +1271,7 @@ typedef struct demo{
 	int id;
 }demo;
 
+#define MAX_OBJS 40
 
 int match(void *obj_1, void *obj_2)
 {
@@ -1286,18 +1287,13 @@ int main(int argc,char *argv[])
 	skiplist *sl = skiplist_create();
 	skiplist_set_match(sl, match);
 	
-	demo *p1;
+	demo demo_objs[MAX_OBJS];
 	int i;
-	
-	p1 = (demo *)malloc(sizeof(demo));
-	if(!p1)
-		return -1;
-	p1->id = 1;
-	
 	
 	for(i = 0; i<20; i++)
 	{
-		skiplist_insert(sl,i,p1);
+		demo_objs[i] = i+1;
+		skiplist_insert(sl,i,&demo_objs[i]);
 	}
 	
 	
