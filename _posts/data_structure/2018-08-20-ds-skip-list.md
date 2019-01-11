@@ -290,10 +290,10 @@ void skiplist_search(skiplist *sl, double score, int *count, void *filter, void 
 	else{
 		free(queue->objs);
 		*search_result = NULL;
+		
 	}
 
-	free(nodes);
-	
+	free(queue);
 }
 {% endhighlight %}
 
@@ -902,8 +902,7 @@ void skiplist_search(skiplist *sl, double score, int *count, void *filter, void 
 		*search_result = NULL;
 	}
 
-	free(nodes);
-
+	free(queue);
 }
 
 
