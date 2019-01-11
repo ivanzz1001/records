@@ -1286,74 +1286,74 @@ int main(int argc,char *argv[])
 {
 	skiplist *sl = skiplist_create();
 	skiplist_set_match(sl, match);
-
+	
 	demo *p1;
 	int i;
-
+	
 	p1 = (demo *)malloc(sizeof(demo));
 	if(!p1)
 		return -1;
 	p1->id = 1;
-
-
+	
+	
 	for(i = 0; i<20; i++)
 	{
-        skiplist_insert(sl,i,p1);
-    }
-
-
+		skiplist_insert(sl,i,p1);
+	}
+	
+	
 	//1) find
 	printf("search...\n");
 	int matches;
-    void **search_result;
-    skiplist_search(sl, 2, &matches, NULL, &search_result);
-
-    printf("matches=%d\n",matches);
-    for(i=0; i<matches; i++)
+	void **search_result;
+	skiplist_search(sl, 2, &matches, NULL, &search_result);
+	
+	printf("matches=%d\n",matches);
+	for(i=0; i<matches; i++)
 	{
-        printf("id: %d\n",((demo*)search_result[i])->id);
-    }
-
-    if(matches)
-		free(search_result);
-    printf("\n");
-
-
+		printf("id: %d\n",((demo*)search_result[i])->id);
+	}
+	
+	if(matches)
+	free(search_result);
+	printf("\n");
+	
+	
 	//2) delete
-    printf("remove 5 elements \n");
-    int removes;
-    for(i=5; i<10; i++)
-    	skiplist_remove(sl,i,&removes,NULL);
-
-
- 	//3) print first 5
-    printf("print the first 5 elements\n");
-    void **objs;
-    skiplist_node  *obj;
-    skiplist_first_n(sl,5,&matches,&objs);
-    for(i=0;i<matches;i++)
+	printf("remove 5 elements \n");
+	int removes;
+	for(i=5; i<10; i++)
+		skiplist_remove(sl,i,&removes,NULL);
+	
+	
+	//3) print first 5
+	printf("print the first 5 elements\n");
+	void **objs;
+	skiplist_node  *obj;
+	skiplist_first_n(sl,5,&matches,&objs);
+	for(i=0;i<matches;i++)
 	{
-        obj = (skiplist_node*)objs[i];
-        printf("%f\n",obj->score);
-    }
-    printf("\n");
-
-
+		obj = (skiplist_node*)objs[i];
+		printf("%f\n",obj->score);
+	}
+	printf("\n");
+	
+	
 	//4) print last 5
 	printf("print the last 5 element\n");
-    skiplist_last_n(sl,5,&matches,&objs);
-    for(i=0;i<matches;i++){
-        obj = (skiplist_node*)objs[i];
-        printf("%f\n",obj->score);
-    }
+	skiplist_last_n(sl,5,&matches,&objs);
+	for(i=0;i<matches;i++){
+		obj = (skiplist_node*)objs[i];
+		printf("%f\n",obj->score);
+	}
 	printf("\n");
-
-
-    skiplist_status(sl);
-
-
- 	//5) destroy
-    skiplist_destroy(sl);
+	
+	
+	skiplist_status(sl);
+	
+	
+	//5) destroy
+	skiplist_destroy(sl);
 }
 {% endhighlight %}
 编译运行：
