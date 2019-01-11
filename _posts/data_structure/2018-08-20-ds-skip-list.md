@@ -173,7 +173,7 @@ skiplist *skiplist_create()
 
 ![ds-skip-list-search](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_skip_list_search.jpg)
 
-下面我们给出跳跃表搜索的代码：
+下面我们给出跳跃表搜索的代码(注： 当score相等时，如下搜索代码其实存在一些问题)：
 {% highlight string %}
 //这里我们参照相关代码，添加了一个内部使用的队列（实际上，我们不需要这样一个队列)
 //For internal use
