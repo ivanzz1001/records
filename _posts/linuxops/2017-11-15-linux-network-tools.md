@@ -835,7 +835,7 @@ Average:      39    0.00    0.00    0.10    0.00    0.00    0.00    0.00    0.00
 ### 8.3 sar命令
 
 sar(System Activity Reporter, 系统活动情况报告）： 用于监控Linux系统各个性能的优秀工具，包括：文件的读写情况、系统调用的使用情况、磁盘IO、CPU效率、内存使用状况、进程活动及IPC有关的活动。sar命令的基本用法如下：
-<pre>
+{% highlight string %}
 # sar --help
 Usage: sar [ options ] [ <interval> [ <count> ] ]
 Options are:
@@ -847,7 +847,7 @@ Options are:
 [ -j { ID | LABEL | PATH | UUID | ... } ]
 [ -f [ <filename> ] | -o [ <filename> ] | -[0-9]+ ]
 [ -i <interval> ] [ -s [ <hh:mm[:ss]> ] ] [ -e [ <hh:mm[:ss]> ] ]
-</pre>
+{% endhighlight %}
 下面我们简要介绍一下一些常用的选项：
 
 * -A: 所有报告的总和
