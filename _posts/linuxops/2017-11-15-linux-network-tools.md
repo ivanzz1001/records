@@ -834,6 +834,243 @@ Average:      39    0.00    0.00    0.10    0.00    0.00    0.00    0.00    0.00
 
 ### 8.3 sar命令
 
+sar(System Activity Reporter, 系统活动情况报告）： 用于监控Linux系统各个性能的优秀工具，包括：文件的读写情况、系统调用的使用情况、磁盘IO、CPU效率、内存使用状况、进程活动及IPC有关的活动。sar命令的基本用法如下：
+<pre>
+# sar --help
+Usage: sar [ options ] [ <interval> [ <count> ] ]
+Options are:
+[ -A ] [ -B ] [ -b ] [ -C ] [ -D ] [ -d ] [ -F [ MOUNT ] ] [ -H ] [ -h ]
+[ -p ] [ -q ] [ -R ] [ -r [ ALL ] ] [ -S ] [ -t ] [ -u [ ALL ] ] [ -V ]
+[ -v ] [ -W ] [ -w ] [ -y ] [ --sadc ]
+[ -I { <int> [,...] | SUM | ALL | XALL } ] [ -P { <cpu> [,...] | ALL } ]
+[ -m { <keyword> [,...] | ALL } ] [ -n { <keyword> [,...] | ALL } ]
+[ -j { ID | LABEL | PATH | UUID | ... } ]
+[ -f [ <filename> ] | -o [ <filename> ] | -[0-9]+ ]
+[ -i <interval> ] [ -s [ <hh:mm[:ss]> ] ] [ -e [ <hh:mm[:ss]> ] ]
+</pre>
+下面我们简要介绍一下一些常用的选项：
+
+* -A: 所有报告的总和
+
+* -u: 输出整体CPU使用情况的统计信息
+
+* -v: 输出inode、文件和其他内核表的统计信息
+
+* -d: 输出每一个块设备的活动信息
+
+* -r: 输出内核和交换空间统计信息
+
+* -b: 显示IO和传送速率的统计信息
+
+* -a： 文件读写情况
+
+* -c: 输出进程统计信息，每秒创建的进程数
+
+* -R: 输出内存页面的统计信息
+
+* -y: 终端设备活动情况
+
+* -w: 输出系统交换活动信息
+
+下文将说明如何使用sar获取以下性能分析数据：
+* 整体CPU使用统计
+* 各个CPU使用统计
+* 内存使用情况统计
+* 整体I/O情况
+* 各个I/O设备情况
+* 网络统计
+
+**1） 整体CPU使用统计（-u)**
+
+使用```-u```选项，sar输出整体CPU的使用情况，不加选项时，默认使用的就是```-u```选项。以下命令显示采样时间间隔为3s，采样次数为2次，整体CPU的使用情况：
+<pre>
+# sar 3 2
+Linux 4.8.0-36-generic (ubuntu)         01/12/2019      _i686_  (1 CPU)
+
+02:46:51 AM     CPU     %user     %nice   %system   %iowait    %steal     %idle
+02:46:54 AM     all      0.00      0.00      0.00      0.00      0.00    100.00
+02:46:57 AM     all      0.00      0.00      0.33      0.33      0.00     99.34
+Average:        all      0.00      0.00      0.17      0.17      0.00     99.67
+</pre>
+各字段的含义参见上面mpstat.
+
+
+**2） 各个CPU使用统计(-P)**
+
+```-P ALL```选项指示对每个内核输出统计信息：
+<pre>
+# sar -P ALL 3 2
+Linux 4.8.0-36-generic (ubuntu)         01/12/2019      _i686_  (1 CPU)
+
+02:49:16 AM     CPU     %user     %nice   %system   %iowait    %steal     %idle
+02:49:19 AM     all      0.00      0.00      0.00      0.00      0.00    100.00
+02:49:19 AM       0      0.00      0.00      0.00      0.00      0.00    100.00
+
+02:49:19 AM     CPU     %user     %nice   %system   %iowait    %steal     %idle
+02:49:22 AM     all      0.00      0.00      0.00      0.00      0.00    100.00
+02:49:22 AM       0      0.00      0.00      0.00      0.00      0.00    100.00
+
+Average:        CPU     %user     %nice   %system   %iowait    %steal     %idle
+Average:        all      0.00      0.00      0.00      0.00      0.00    100.00
+Average:          0      0.00      0.00      0.00      0.00      0.00    100.00
+</pre>
+
+
+**3) 内存使用情况统计(-r)**
+
+使用```-r```选项可显示内存统计信息:
+<pre>
+# sar -r 1 2
+Linux 4.8.0-36-generic (ubuntu)         01/12/2019      _i686_  (1 CPU)
+
+02:51:02 AM kbmemfree kbmemused  %memused kbbuffers  kbcached  kbcommit   %commit  kbactive   kbinact   kbdirty
+02:51:03 AM 6909468508349228 9226345614512488449     78.09 4221523355320324 9226345614515569168 13212300813261298768     74.16 2722098733442124 9226345614512488448 13212300813261298768
+02:51:04 AM 6909468508349228 9226345614512488449     78.09 4221523355320324 9226345614515569168 13212300813261298752     74.16 2722098733442124 9226345614512488448 13212300813261298752
+Average:       451372   1608736     78.09     81924    982900   3080720     74.16    844876    633788         0
+</pre>
+下面我们简单介绍一下各字段的含义：
+
+* kbmemfree： 处于空闲状态的可用内存数量(单位: KB)
+
+* kbmemused: 当前已使用的内存数量（单位: KB)。注意，这里并没有包含kernel本身所使用的内存
+
+* %memused： 所使用内存占总内存大小的百分比
+
+* kbbuffer: 表示作为**buffer cache**的内存数量,从磁盘读入的数据可能被保持在**buffer cache**中，以便下一次快速访问；
+
+* kbcached: 表示作为**page cache**的内存数量，待写入磁盘的数据首先被放到**page cache**中，然后由磁盘中断程序写入磁盘.
+
+* kbcommit: 当前工作负载所需要的内存总数(单位: KB)。 This is an estimate of how much RAM/swap is needed to guarantee that there never is out of memory.
+
+* %commit: 当前工作负载所需要的内存占总内存大小（RAM+swap)的百分比。This number may be greater than 100% because the kernel usually overcommits memory.
+
+
+
+**4) 整体I/O情况(-b)**
+
+使用```-b```选项，可以显示磁盘I/O的使用情况:
+<pre>
+# sar -b 3 2 
+Linux 4.8.0-36-generic (ubuntu)         01/12/2019      _i686_  (1 CPU)
+
+02:54:07 AM       tps      rtps      wtps   bread/s   bwrtn/s
+02:54:10 AM      0.00      0.00      0.00      0.00      0.00
+02:54:13 AM      0.00      0.00      0.00      0.00      0.00
+Average:         0.00      0.00      0.00      0.00      0.00
+</pre>
+
+输出项说明：
+
+* tps: 每秒向磁盘设备请求数据的次数，包括读、写请求，为rtps与wtps的和。出于效率考虑，每一次IO下发后并不是立即处理请求，而是将请求合并(merge)，这里tps指请求合并后的请求计数。
+
+* rtps: 每秒向磁盘设备的读请求次数
+
+* wtps: 每秒向磁盘设备的写请求次数
+
+* bread/s：每秒钟从物理设备读入的数据量，单位: 块/s
+
+* bwrtn/s：每秒钟向物理设备写入的数据量，单位: 块/s
+
+**5) 各个I/O设备情况(-d)**
+
+使用```-d```选项可以显示各个磁盘的统计信息，再增加```-p```选项可以以```sdX```的形式显示设备名称:
+<pre>
+# sar -d -p 3 2 
+Linux 4.8.0-36-generic (ubuntu)         01/12/2019      _i686_  (1 CPU)
+
+02:56:22 AM       DEV       tps  rd_sec/s  wr_sec/s  avgrq-sz  avgqu-sz     await     svctm     %util
+02:56:25 AM       sr0      0.00      0.00      0.00      0.00      0.00      0.00      0.00      0.00
+02:56:25 AM       sr1      0.00      0.00      0.00      0.00      0.00      0.00      0.00      0.00
+02:56:25 AM       sda      0.00      0.00      0.00      0.00      0.00      0.00      0.00      0.00
+
+02:56:25 AM       DEV       tps  rd_sec/s  wr_sec/s  avgrq-sz  avgqu-sz     await     svctm     %util
+02:56:28 AM       sr0      0.00      0.00      0.00      0.00      0.00      0.00      0.00      0.00
+02:56:28 AM       sr1      0.00      0.00      0.00      0.00      0.00      0.00      0.00      0.00
+02:56:28 AM       sda      0.00      0.00      0.00      0.00      0.00      0.00      0.00      0.00
+
+Average:          DEV       tps  rd_sec/s  wr_sec/s  avgrq-sz  avgqu-sz     await     svctm     %util
+Average:          sr0      0.00      0.00      0.00      0.00      0.00      0.00      0.00      0.00
+Average:          sr1      0.00      0.00      0.00      0.00      0.00      0.00      0.00      0.00
+Average:          sda      0.00      0.00      0.00      0.00      0.00      0.00      0.00      0.00
+</pre>
+
+输出项说明：
+* rd_sec/s: 每秒从设备读取的扇区数
+
+* wr_sec/s: 每秒往设备写入的扇区数
+
+* avgrq-sz: 发送给设备的请求的平均大小（以扇区为单位）
+
+* avgqu-sz: 发送给设备的请求队列的平均长度
+
+* await ：服务等待I/O请求的平均时间，包括请求队列等待时间 (单位毫秒)
+
+* svctm ：设备处理I/O请求的平均时间，不包括请求队列等待时间 (单位毫秒)
+
+* %util ：一秒中有百分之多少的时间用于 I/O 操作，即被io消耗的cpu百分比
+
+{% highlight string %}
+备注：
+
+- 如果 %util 接近 100%，说明产生的I/O请求太多，I/O系统已经满负荷，该磁盘可能存在瓶颈。
+
+- 如果 svctm 比较接近 await，说明 I/O 几乎没有等待时间；如果 await 远大于 svctm，说明I/O 队列太长，io响应太慢，
+  则需要进行必要优化。
+
+- 如果avgqu-sz比较大，也表示有当量io在等待。
+{% endhighlight %}
+
+
+**6) 网络统计(-n)**
+
+使用```-n```选项可以对网络使用情况进行显示，```-n```后接关键词**DEV**可显示eth0、eth1等网卡的信息:
+<pre>
+# sar -n DEV 1 1
+Linux 4.8.0-36-generic (ubuntu)         01/12/2019      _i686_  (1 CPU)
+
+03:01:47 AM     IFACE   rxpck/s   txpck/s    rxkB/s    txkB/s   rxcmp/s   txcmp/s  rxmcst/s   %ifutil
+03:01:48 AM     ens33      1.00      0.00      0.06      0.00      0.00      0.00      0.00      0.00
+03:01:48 AM     ens34      0.00      0.00      0.00      0.00      0.00      0.00      0.00      0.00
+03:01:48 AM        lo      0.00      0.00      0.00      0.00      0.00      0.00      0.00      0.00
+
+Average:        IFACE   rxpck/s   txpck/s    rxkB/s    txkB/s   rxcmp/s   txcmp/s  rxmcst/s   %ifutil
+Average:        ens33      1.00      0.00      0.06      0.00      0.00      0.00      0.00      0.00
+Average:        ens34      0.00      0.00      0.00      0.00      0.00      0.00      0.00      0.00
+Average:           lo      0.00      0.00      0.00      0.00      0.00      0.00      0.00      0.00
+</pre>
+
+以上主要输出含义如下：
+
+* IFACE: 网卡接口的名称
+
+* rxpck/s: 每秒接收数据包的总数
+
+* txpck/s: 每秒发送数据包的总数
+
+* rxkB/s: 每秒接收数据包的总字节数(单位：kB/s)
+
+* txkB/s: 每秒发送数据包的总字节数(单位:kB/s)
+
+* rxcmp/s: 每秒接收到的```压缩包```(compressed packets)的数量。(for cslip etc.).
+
+* txcmp/s: 每秒发送的```压缩包```(compressed packets)的数量。
+
+* rxmcst/s: 每秒接收到的多播(multicast)数据包的数量
+
+
+**7) sar日志保存(-o)**
+
+最后讲一下如何保存sar日志，使用```-o```选项，我们可以把sar统计信息保存到一个指定的文件，对于保存的日志，我们可以使用```-f```选项读取：
+
+<pre>
+# sar -n DEV 1 10 -o sar.out
+
+# sar -d 1 10 -f sar.out //查看历史的IO
+
+# sar -u 1 10 -f sar.out //查看历史的cpu,单位1s, 采样10次
+</pre>
+
+相比将结果重定向到一个文件，使用-o选项，可以保存更多的系统资源信息
 
 
 
@@ -855,6 +1092,8 @@ Average:      39    0.00    0.00    0.10    0.00    0.00    0.00    0.00    0.00
 6. [lsof 命令用法：查看已删除空间却没有释放的进程](https://blog.csdn.net/xyajia/article/details/80222825)
 
 7. [Linux IO实时监控iostat命令详解](https://www.cnblogs.com/ggjucheng/archive/2013/01/13/2858810.html)
+
+8. [Linux使用sar进行性能分析](https://blog.csdn.net/xusensen/article/details/54606401)
 
 <br />
 <br />
