@@ -573,7 +573,7 @@ sysstat功能强大并且在不断增强，每个版本提供了一些不同的�
 
 ### 8.2 iostat命令
 iostat是IO statistics的缩写，iostat工具将对系统的磁盘操作活动进行监视。iostat首次运行时显示自系统启动开始的各项统计信息，之后运行iostat将显示自上次运行该命令以后的统计信息。用户可以通过指定统计的次数和时间来获得所需的统计信息。iostat也有一个弱点，就是它不能对某个进程进行深入分析，仅对系统的整体情况进行分析。iostat命令的基本用法如下：
-<pre>
+{% highlight string %}
 # iostat --help
 Usage: iostat [ options ] [ <interval> [ <count> ] ]
 Options are:
@@ -581,7 +581,7 @@ Options are:
 [ -j { ID | LABEL | PATH | UUID | ... } ]
 [ [ -H ] -g <group_name> ] [ -p [ <device> [,...] | ALL ] ]
 [ <device> [...] | ALL ]
-</pre>
+{% endhighlight %}
 下面简要介绍一下几个常用选项的含义：
 
 * -d: 显示设备（磁盘）使用状态
