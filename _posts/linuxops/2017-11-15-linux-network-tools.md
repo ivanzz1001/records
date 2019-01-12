@@ -12,9 +12,365 @@ Linux提供了很多有用的工具，以方便开发人员调试和测评服务
 
 <!-- more -->
 
+## 1. lsof命令
+lsof(list open file)是一个列出当前系统打开的文件描述符的工具。通过它，我们可以了解感兴趣的进程打开了哪些文件描述符，或者我们感兴趣的文件描述符被哪些进程打开了。
+
+lsof命令常用的选项包括：
+
+* -i: 显示socket文件描述符。该选项的使用方法是
+<pre>
+# lsof -i [4|6] [protocol] [@hostname|ipaddr][:service|port]
+</pre>
+其中，4表示IPv4协议，6表示IPv6协议； protocol指定传输层协议，可以是TCP或者UDP； hostname指定主机名；ipaddr指定主机的IP地址；service指定服务名； port指定端口号。比如，要显示所有连接到主机**192.168.1.108**的ssh服务的socket文件描述符，可以使用命令：
+<pre>
+# lsof -i@192.168.10.129:22
+COMMAND  PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+sshd    5274 root    3u  IPv4  41450      0t0  TCP 192.168.10.129:ssh->192.168.10.1:1131 (ESTABLISHED)
+</pre>
+如果```-i```选项后不指定任何参数，则lsof命令将会显示所有socket文件描述符
+
+* -u: 显示指定用户启动的所有进程打开的所有文件描述符
+
+* -c: 显示指定的命令打开的所有文件描述符。比如，要查看websrv程序打开了哪些文件描述符，可以使用如下命令
+<pre>
+# lsof -c websrv
+</pre>
+
+* -p: 显示指定进程打开的所有文件描述符
+
+* -t：仅显示打开了目标文件描述符的进程的PID
+
+我们还可以直接将文件名作为lsof命令的参数，以查看哪些进程打开了该文件。例如：
+{% highlight string %}
+# vi workspace/test.c
+# lsof workspace/.test.c.swp 
+lsof: WARNING: can't stat() fuse.gvfsd-fuse file system /run/user/1000/gvfs
+      Output information may be incomplete.
+COMMAND  PID USER   FD   TYPE DEVICE SIZE/OFF    NODE NAME
+vi      6284 root    4u   REG    8,1    12288 2097196 workspace/.test.c.swp
+
+# lsof -e /run/user/1000/gvfs workspace/.test.c.swp 
+COMMAND  PID USER   FD   TYPE DEVICE SIZE/OFF    NODE NAME
+vi      6433 root    4u   REG    8,1    12288 2097196 workspace/.test.c.swp
+
+# ll /proc/6433/fd
+total 0
+dr-x------ 2 root root  0 Jan 12 01:11 ./
+dr-xr-xr-x 9 root root  0 Jan 12 01:11 ../
+lrwx------ 1 root root 64 Jan 12 01:11 0 -> /dev/pts/6
+lrwx------ 1 root root 64 Jan 12 01:11 1 -> /dev/pts/6
+lrwx------ 1 root root 64 Jan 12 01:11 2 -> /dev/pts/6
+lrwx------ 1 root root 64 Jan 12 01:11 4 -> /root/workspace/.test.c.swp
+{% endhighlight %}
+
+上面注意两点：
+<pre>
+1) 通过vi命令打开一个文件时，并不是直接打开，而是会生成一个swp文件；
+
+2) lsof 默认检查所有挂载的文件系统包括FUSE（这种文件系统使用用户空间实现，但却有指定的访问权限），
+  因此打印出了上面的警告信息，我们通过添加'-e /run/usr/1000/gvfs'来剔除检查该类型的文件系统.
+</pre>
+
+通过上面所示，lsof命令的输出内容相当丰富，其中每行内容都包含如下字段：
+
+* COMMAND: 执行程序所使用的终端命令（默认仅显示前9个字符）
+
+* PID: 文件描述符所属进程的PID
+
+* USER: 拥有该文件描述符的用户的用户名
+
+* FD: 对于文件描述符的描述。其中，```cwd```表示进程的工作目录；```rtd```表示用户的根目录；```txt```表示进程运行的程序代码；```mem```表示直接映射到内存的文件。有的FD是以```'数字+访问权限'```表示的，其中数字是文件描述符的具体数值，访问权限包括```r```(可读)、```w```(可写）和```u```(读写）。
+
+* TYPE: 文件描述符的类型。其中DIR是目录，REG是普通文件，CHR是字符设备文件，IPv4是IPv4类型的socket文件描述符，0000是未知类型。更多文件描述符的类型请参考lsof命令的man手册，这里不再赘述。
+
+* DEVICE: 文件所属设备。对于字符设备和块设备，其表示方法是```主设备号，次设备号```。我们上面的示例中```.test.c.swp```存放在设备```8,1```中。其中```8```表示这是一个SCSI硬盘，```1```表示这是该硬盘上的第一个分区，即sda1。更多其他类型的设备编码，请参看[Linux官方设备](http://www.kernel.org/pub/linux/docs/lanana/device-list/devices-2.6.txt)。对于FIFO类型的文件，比如管道和socket，该字段将显示一个内核引用目标文件的地址，或者是其```i节点号```。
 
 
-## 1. ifstat命令
+* SIZE/OFF: 文件大小或者偏移值。如果该字段显示为```0t*```或者```0x*```,就表示这是一个偏移值，否则就表示这是一个文件大小。对于字符设备或者FIFO类型的文件，定义文件大小是没有意义的，所以该字段将显示一个偏移值。
+
+* NODE: 文件的i节点号。对于socket，则显示为协议类型，如TCP
+
+* NAME: 文件的名字 
+
+
+
+## 2. nc命令
+nc(netcat)命令短小精干、功能强大，有着```瑞士军刀```的美誉。它主要被用来快速构建网络连接。我们可以让它以服务器方式运行，监听某个端口并接受客户连接，因此它可用来调试客户端程序；我们也可以使之以客户端方式运行，向服务器发起连接并收发数据，因此它可以用来调试服务器程序，此时它有点像telnet程序。
+
+nc命令的基本用法如下：
+{% highlight string %}
+# nc -h
+OpenBSD netcat (Debian patchlevel 1.105-7ubuntu1)
+This is nc from the netcat-openbsd package. An alternative nc is available
+in the netcat-traditional package.
+usage: nc [-46bCDdhjklnrStUuvZz] [-I length] [-i interval] [-O length]
+          [-P proxy_username] [-p source_port] [-q seconds] [-s source]
+          [-T toskeyword] [-V rtable] [-w timeout] [-X proxy_protocol]
+          [-x proxy_address[:port]] [destination] [port]
+        Command Summary:
+                -4              Use IPv4
+                -6              Use IPv6
+                -b              Allow broadcast
+                -C              Send CRLF as line-ending
+                -D              Enable the debug socket option
+                -d              Detach from stdin
+                -h              This help text
+                -I length       TCP receive buffer length
+                -i secs         Delay interval for lines sent, ports scanned
+                -j              Use jumbo frame
+                -k              Keep inbound sockets open for multiple connects
+                -l              Listen mode, for inbound connects
+                -n              Suppress name/port resolutions
+                -O length       TCP send buffer length
+                -P proxyuser    Username for proxy authentication
+                -p port         Specify local port for remote connects
+                -q secs         quit after EOF on stdin and delay of secs
+                -r              Randomize remote ports
+                -S              Enable the TCP MD5 signature option
+                -s addr         Local source address
+                -T toskeyword   Set IP Type of Service
+                -t              Answer TELNET negotiation
+                -U              Use UNIX domain socket
+                -u              UDP mode
+                -V rtable       Specify alternate routing table
+                -v              Verbose
+                -w secs         Timeout for connects and final net reads
+                -X proto        Proxy protocol: "4", "5" (SOCKS) or "connect"
+                -x addr[:port]  Specify proxy address and port
+                -Z              DCCP mode
+                -z              Zero-I/O mode [used for scanning]
+        Port numbers can be individual or ranges: lo-hi [inclusive]
+{% endhighlight %}
+下面我们简要介绍几个常用的选项：
+
+* -i: 设置数据包传送的时间间隔
+
+* -l: 以服务器方式运行，监听指定的端口。nc命令默认以客户端方式运行
+
+* -k: 重复接受并处理某个端口上的所有连接，必须与```-l```选项一起使用
+
+* -n: 使用IP地址表示主机，而不是主机名；使用数字表示端口号，而不是服务名称
+
+* -p: 当nc命令以客户端方式运行时，强制其使用指定的端口号
+
+* -s: 设置本地主机发送出的数据包的IP地址
+
+* -C: 将CR和LF两个字符作为行结束符
+
+* -U: 使用Unix本地域协议通信
+
+* -u: 使用UDP协议。nc命令默认使用的传输层协议时TCP协议
+
+* -w: 如果nc客户端在指定的时间内未检测到任何输入，则退出
+
+* -X: 当nc客户端和代理服务器通信时，该选项指定它们之间使用的通信协议。目前nc支持的代理协议包括```SOCKS v.4```、```SOCKs v.5```和```connect```(HTTPS proxy)。nc默认使用的代理协议时```SOCKS v.5```。
+
+* -x: 指定目标代理服务器的IP地址和端口号。比如，要从**Kongming20**连接到**ernest-laptop**上的squid代理服务器，并通过它来访问**www.baidu.com**的Web服务，可以使用如下命令
+<pre>
+# nc -x ernest-laptop:1080 -X connect www.baidu.com 80
+</pre>
+
+* -z: 扫描目标机器上的某个或某些服务是否开启（端口扫描）。比如，要扫描机器**ernest-laptop**上端口号在20~50之间的服务，可以使用如下命令
+<pre>
+# nc -z ernest-laptop 20-50
+</pre>
+
+举例来说，我们可以使用如下方式来连接```websrv```服务器并向它发送数据：
+{% highlight string %}
+# nc -C 127.0.0.1 13579   (服务器监听端口13579)
+GET http://localhost/a.html HTTP/1.1(回车)
+Host: localhost(回车)
+(回车)
+HTTP/1.1 404 Not found
+Content-Length: 49
+Connection: close
+
+The requested file was not found on this server.
+{% endhighlight %}
+
+这里我们使用```-C```选项，这样每次我们按下回车键向服务器发送一行数据时，nc客户端程序都会给服务器额外发送一个```<CR><LF>```，而这正是```websrv```服务器期望的HTTP行结束符。发送完第三行数据之后，我们得到了服务器的响应，内容正是我们所期望的： 服务器没有找到被请求的资源文件a.html。可见，nc命令是一个很方便的快速测试工具，通过它我们能很快找出服务器的逻辑错误。
+
+
+
+
+
+## 3. strace命令
+strace是测试服务器性能的重要工具。它跟踪程序运行过程中执行的系统调用和接收到的信号，并将系统调用名、参数、返回值及信号名输出到标准输出或者指定的文件中。
+
+strace命令常用的选项包括：
+
+* -c: 统计每个系统调用执行时间、执行次数和出错次数
+
+* -f: 跟踪由fork调用生成的子进程
+
+* -t: 在输出的每一行信息前加上时间信息
+
+* -e: 指定一个表达式，用来控制如何跟踪系统调用（或接收到的信号），其格式为
+<pre>
+[qualifier]=] [!]value1[,value2]...
+</pre>
+
+qualifier可以是trace、abbrev、verbose、raw、signal、read和write中之一，默认是trace。value是用于进一步限制被跟踪的系统调用的符号或数值。它的两个特殊取值是```all```和```none```，分别表示跟踪所有由qualifier指定类型的系统调用和不跟踪任何该类型的系统调用。关于value的其他取值，我们下面简单例举一些：
+{% highlight string %}
+1) -e trace=set: 只跟踪指定的系统调用。例如， -e trace=open,close,read,write表示只跟踪open、
+   close、read和write这四种系统调用。
+
+2) -e trace=file: 只跟踪与文件操作相关的系统调用
+
+3) -e trace=process: 只跟踪与进程控制相关的系统调用
+
+4） -e trace=network: 只跟踪与网络相关的系统调用
+
+5) -e trace=signal: 只跟踪与信号相关的系统调用
+
+6) -e trace=ipc: 只跟踪与进程间通信相关的系统调用
+
+7) -e signal=set: 只跟踪指定的信号。比如， -e signal=!SIGIO表示跟踪除SIGIO之外的所有信号
+
+8) -e read=set: 输出从指定文件中读入的数据。例如， -e read=3,5表示输出所有从文件描述符3和5读入的数据
+
+{% endhighlight %}
+
+* -o: 将strace的输出写入指定的文件
+
+* -p: 指定要跟踪的进程号
+
+strace命令的每一行输出都包含这些字段：系统调用名称、参数和返回值。例如下面的示例：
+<pre>
+# strace cat /dev/null
+open("/dev/null", O_RDONLY|O_LARGEFILE) = 3
+</pre>
+这行输出表示： 程序```cat /dev/null```在运行过程中执行了open()系统调用。open调用以只读的方式打开了大文件/dev/null，然后返回了一个值为3的文件描述符。需要注意的是，其实上面示例命令将输出很多内容，这里我们忽略了很多次要的信息。
+
+当系统调用发生错误时，strace命令将输出错误标识和描述，比如下面的示例：
+<pre>
+# strace cat /foo/bar 
+open("/foo/bar", O_RDONLY|O_LARGEFILE)  = -1 ENOENT (No such file or directory)
+</pre>
+
+
+
+
+## 4. netstat命令
+netstat是一个功能很强大的网络信息统计工具。它可以打印本地网卡接口上的全部连接、路由表信息、网卡接口信息等。这里我们主要用netstat命令来获取连接信息。毕竟，对于要获取路由表和网卡接口信息，我们可以使用输出内容更丰富的route和ifconfig命令。
+
+netstat命令常用选项包括：
+
+* -n: 使用IP地址表示主机，而不是主机名；使用数字表示端口号，而不是服务名称
+
+* -a: 显示结果中也包含监听socket（default: connected)
+
+* -t: 仅显示TCP连接
+
+* -r: 显示路由信息
+
+* -i: 显示网卡接口的数据流量
+
+* -c: 每隔1秒输出一次
+
+* -o: 显示socket定时器（如包活定时器）的信息
+
+* -p: 显示socket所属的进程的PID和名字
+
+* -l: 仅显示处于listen状态的服务器socket
+
+参看如下示例：
+<pre>
+# netstat -nat
+Active Internet connections (servers and established)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State      
+tcp        0      0 127.0.1.1:53            0.0.0.0:*               LISTEN     
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN     
+tcp        0      0 192.168.10.129:22       192.168.10.130:4046     ESTABLISHED
+tcp        0     52 192.168.10.129:22       192.168.10.1:1131       ESTABLISHED
+tcp6       0      0 :::22                   :::*                    LISTEN  
+</pre>
+由以上结果可知，netstat的每行输出都包含如下6个字段（默认情况）:
+
+* Proto: 协议名
+
+* Recv-Q: socket内核接收缓冲区中尚未被应用程序读取的数据量
+
+* Send-Q: 尚未被对方确认的数据量
+
+* Local Address: 本段的IP地址和端口号
+
+* Foreign Address: 对方的IP地址和端口号
+
+* State: socket的状态。对于无状态协议，比如UDP协议，这一字段将显示为空。而对面向连接的协议而言，netstat支持的State包括ESTABLISHED、SYN_SENT、SYN_RCVD、FIN_WAIT1、FIN_WAIT2、TIME_WAIT、CLOSE、CLOSE_WAIT、LAST_ACK、LISTEN、CLOSING、UKNOWN。
+
+
+## 5. vmstat命令
+vmstat是virtual memory statistics的缩写，它能实时输出系统的各种资源的使用情况，比如进程信息、内存使用、CPU使用率以及IO使用情况。vmstat命令的基本用法如下：
+{% highlight string %}
+# vmstat --help
+
+Usage:
+ vmstat [options] [delay [count]]
+
+Options:
+ -a, --active           active/inactive memory
+ -f, --forks            number of forks since boot
+ -m, --slabs            slabinfo
+ -n, --one-header       do not redisplay header
+ -s, --stats            event counter statistics
+ -d, --disk             disk statistics
+ -D, --disk-sum         summarize disk statistics
+ -p, --partition <dev>  partition specific statistics
+ -S, --unit <char>      define display unit
+ -w, --wide             wide output
+ -t, --timestamp        show timestamp
+
+ -h, --help     display this help and exit
+ -V, --version  output version information and exit
+
+For more details see vmstat(8).
+{% endhighlight %}
+下面简单介绍一下各选项及参数的含义：
+
+
+* -f: 显示系统自启动以来执行的fork次数
+
+* -s: 显示内存相关的统计信息以及多种系统活动的数量（比如CPU上下文切换次数）
+
+* -d: 显示硬盘相关统计信息
+
+* -p: 显示指定磁盘分区的统计信息
+
+* -S: 使用指定的单位来显示。参数k、K、m、M分别代表1000、1024、1000000和1048576字节
+
+* delay: 采样间隔（单位： 秒），即每隔delay的时间输出一次统计信息
+
+* count: 采样次数，即共输出count次统计信息
+
+默认情况下```vmstat```命令输出的内容相当丰富。请参看如下示例：
+<pre>
+//每隔5秒输出一次，共输出三次
+# vmstat 5 3
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ 0  0      0 519648  78076 982796    0    0   419   442  319  335 58 11 28  3  0
+ 1  0      0 519452  78076 982796    0    0     0     0   46  120  1  1 98  0  0
+ 0  0      0 519420  78076 982796    0    0     0     2   52  142  1  1 97  0  0
+</pre>
+注意，第一行输出是自系统启动以来的平均结果，而后面的输出则是采样间隔内的平均结果。vmstat的每条输出都包含6个字段，它们的含义分别是：
+
+* procs：进程信息。```r```表示等待运行的进程数目，```b```表示处于不可中断睡眠状态的进程数目
+
+* memory: 内存信息，各项的单位是KB。```swpd```表示虚拟内存的使用数量；```free```表示空闲内存的数量；```buff```表示作为**buffer cache**的内存数量,从磁盘读入的数据可能被保持在**buffer cache**中，以便下一次快速访问；```cache```表示作为**page cache**的内存数量，待写入磁盘的数据首先被放到**page cache**中，然后由磁盘中断程序写入磁盘.
+
+* swap: 交换分区（虚拟内存）的使用信息，各项的单位都是```KB/s```。```si```表示数据由磁盘交换至内存的速率；```so```表示数据由内存交换至磁盘的速率。如果这两个值经常发生变化，则说明内存不足
+
+* io: 块设备的使用信息，单位是```block/s```。```bi```表示从块设备读入块的速率；```bo```表示向块设备写入块的速率。
+
+* system: 系统信息。```in```表示每秒发生的中断次数；```cs```表示每秒发生的上下文切换（进程切换）次数
+
+* cpu： CPU使用信息。```us```表示系统所有进程运行在用户空间的时间占CPU总运行时间的比例；```sy```表示系统所有进程运行在内核空间的时间占CPU总运行时间的比例；```id```表示CPU处于空闲状态的时间占CPU总运行时间的比例；```wa```表示CPU等待IO事件的时间占CPU总运行时间的比例
+
+不过，我们可以使用iostat命令获得磁盘使用情况的更多信息，也可以使用mpstat命令获得CPU使用情况的更多信息。vmstat命令主要用于查看系统内存的使用情况。
+
+
+## 6. ifstat命令
 ifstat是interface statistics的缩写，它是一个简单的网络流量监测工具。常用的选项和参数包括：
 
 * -a: 监测系统上的所有网卡接口
@@ -48,7 +404,7 @@ eth3               1121M 1K        1008M 1K      899871K 442K    399558K 455K
 </pre>
 
 
-## 2. iftop命令
+## 7. iftop命令
 iftop是一款实时流量监测工具，监控TCP/IP连接等，缺点是无报表功能。必须以root身份才能运行。下面简单介绍一下该工具的使用：
 <pre>
 # iftop -h
@@ -169,7 +525,7 @@ Total:                 59.4MB           38.9Mb                                  
 
 
 
-## 3. Linux性能监控工具sysstat
+## 8. Linux性能监控工具sysstat
 
 sysstat提供了Linux性能监控的工具集，包括： sar、sadf、mpstat、iostat、pidstat等，这些工具可以监控系统性能和实用情况。各工具的作用如下：
 
@@ -198,7 +554,7 @@ sysstat功能强大并且在不断增强，每个版本提供了一些不同的�
 
 
 
-### 3.1 sysstat工具集的安装
+### 8.1 sysstat工具集的安装
 
 通常情况下，我们在Centos操作系统上可以直接通过如下的命令进行安装：
 <pre>
@@ -215,8 +571,103 @@ sysstat功能强大并且在不断增强，每个版本提供了一些不同的�
 # make install
 </pre>
 
+### 8.2 iostat命令
+iostat是IO statistics的缩写，iostat工具将对系统的磁盘操作活动进行监视。iostat首次运行时显示自系统启动开始的各项统计信息，之后运行iostat将显示自上次运行该命令以后的统计信息。用户可以通过指定统计的次数和时间来获得所需的统计信息。iostat也有一个弱点，就是它不能对某个进程进行深入分析，仅对系统的整体情况进行分析。iostat命令的基本用法如下：
+<pre>
+# iostat --help
+Usage: iostat [ options ] [ <interval> [ <count> ] ]
+Options are:
+[ -c ] [ -d ] [ -h ] [ -k | -m ] [ -N ] [ -t ] [ -V ] [ -x ] [ -y ] [ -z ]
+[ -j { ID | LABEL | PATH | UUID | ... } ]
+[ [ -H ] -g <group_name> ] [ -p [ <device> [,...] | ALL ] ]
+[ <device> [...] | ALL ]
+</pre>
+下面简要介绍一下几个常用选项的含义：
 
-### 3.2 mpstate命令
+* -d: 显示设备（磁盘）使用状态
+
+* -c: 显示CPU的使用状况
+
+* -k: 以KB/s为单位来显示统计信息
+
+* -p: 显示某一块设备的使用状况。如sda、sdb
+
+* -x: 显示更详细的扩展信息
+
+参看如下示例：
+<pre>
+//每隔1s显示一次，总共显示2次
+# iostat -d -k 1 2
+Linux 4.8.0-36-generic (ubuntu)         01/12/2019      _i686_  (1 CPU)
+
+Device:            tps    kB_read/s    kB_wrtn/s    kB_read    kB_wrtn
+scd0              0.00         0.00         0.00         64          0
+scd1              0.00         0.00         0.00         76          0
+sda               1.58        25.91        28.56     619695     683108
+
+Device:            tps    kB_read/s    kB_wrtn/s    kB_read    kB_wrtn
+scd0              0.00         0.00         0.00          0          0
+scd1              0.00         0.00         0.00          0          0
+sda               0.00         0.00         0.00          0          0
+</pre>
+上面总共有6列，我们简单介绍一下各列的含义：
+
+* Device: 设备名
+
+* tps: 该设备每秒的传输次数。```一次传输```意思是一次IO请求。多个逻辑请求可能会被合并为一次IO请求。```一次传输```请求的大小是未知的。
+
+* kB_read/s: 每秒从设备读取的数据量
+
+* kB_wrtn/s: 每秒向设备写入的数据量
+
+* kB_read: 读取的总数据量
+
+* kB_wrtn: 写入的总数据量
+
+如果我们使用```-x```选项，则可以获取更详细的信息：
+
+<pre>
+# iostat -d -k -x 1 2
+Linux 4.8.0-36-generic (ubuntu)         01/12/2019      _i686_  (1 CPU)
+
+Device:         rrqm/s   wrqm/s     r/s     w/s    rkB/s    wkB/s avgrq-sz avgqu-sz   await r_await w_await  svctm  %util
+scd0              0.00     0.00    0.00    0.00     0.00     0.00     6.74     0.00   96.00   96.00    0.00  96.00   0.01
+scd1              0.00     0.00    0.00    0.00     0.00     0.00     5.85     0.00   68.62   68.62    0.00  68.62   0.01
+sda               0.02     0.68    1.23    0.31    25.37    27.97    69.02     0.11   69.43   26.03  239.55   8.53   1.32
+
+Device:         rrqm/s   wrqm/s     r/s     w/s    rkB/s    wkB/s avgrq-sz avgqu-sz   await r_await w_await  svctm  %util
+scd0              0.00     0.00    0.00    0.00     0.00     0.00     0.00     0.00    0.00    0.00    0.00   0.00   0.00
+scd1              0.00     0.00    0.00    0.00     0.00     0.00     0.00     0.00    0.00    0.00    0.00   0.00   0.00
+sda               0.00     0.00    0.00    0.00     0.00     0.00     0.00     0.00    0.00    0.00    0.00   0.00   0.00
+</pre>
+下面我们简要介绍一下各字段的含义：
+
+* rrqm/s: 设备相关的读取请求每秒有多少被Merge了（当系统调用需要读取数据的时候，VFS将请求发到各个FS，如果FS发现不同的读取请求读取相同的Block的数据，FS会将这个请求合并)；
+
+* wrqm/s：设备相关的写入请求每秒有多少被Merge了。
+
+* rsec/s: 每秒读取的扇区数；
+
+* wsec/s: 每秒写入的扇区数；
+
+* rKB/s: 设备每秒中处理的读请求数
+
+* wKB/s: 设备每秒处理的写请求数
+
+* avgrq-sz: 平均请求扇区的大小
+
+* avgqu-sz: 平均请求队列的长度。毫无疑问，队列长度越短越好。
+
+* await: 每一个IO请求处理的平均时间（单位：毫秒）。这里可以理解为IO的响应时间，一般系统IO响应时间应该低于5ms，如果大于10ms就比较大了。这个时间包括了队列时间和服务时间，也就是说，一般情况下，await大于svctm，它们的差值越小，则说明队列时间越短，反之差值越大，队列时间越长，说明系统出了问题。
+
+    
+* svctm: 表示平均每次设备I/O操作的服务时间（单位： 毫秒）。如果svctm的值与await很接近，表示几乎没有I/O等待，磁盘性能很好，如果await的值远高于svctm的值，则表示I/O队列等待太长，系统上运行的应用程序将变慢。
+
+* %util: 在统计时间内所有处理IO的时间，除以总共统计时间。例如，如果统计间隔为1秒，该设备有0.8秒在处理IO，而0.2秒闲置，那么该设备的**%util=0.8/1=80%**，所以该参数暗示了设备的繁忙程度。一般地，如果该参数是100%表示设备已经接近满负荷运行了（当然如果是多磁盘，即使%util是100%，因为磁盘的并发能力，所以磁盘使用未必就到了瓶颈）。
+
+
+
+### 8.2 mpstate命令
 mpstat是multi-processor statistics的缩写，它能实时监测多处理器系统上每个CPU的实用情况。mpstat命令的典型用法是：
 <pre>
 # mpstat [ -A ] [ -u ] [ -V ] [ -I { SUM | CPU | SCPU | ALL } ] [ -P { cpu [,...] | ON | ALL } ] [ interval [ count ] ]
@@ -381,6 +832,8 @@ Average:      39    0.00    0.00    0.10    0.00    0.00    0.00    0.00    0.00
 
 在所有这些输出字段中，我们最关心的是```%usr```、```%sys```以及```%idle```。它们基本上反映了我们的代码中业务逻辑代码和系统调用所占的比例，以及系统还能承受多大的负载。很显然，在上面的输出中，执行系统调用占用CPU的时间，以及用户业务逻辑调用占用的CPU时间都是极低的。
 
+### 8.3 sar命令
+
 
 
 
@@ -398,6 +851,10 @@ Average:      39    0.00    0.00    0.10    0.00    0.00    0.00    0.00    0.00
 4. [查看CPU性能参数（mpstat, iostat, sar、vmstat）等命令详解](https://blog.csdn.net/kangshuo2471781030/article/details/79319089)
 
 5. [sysstat官网](http://sebastien.godard.pagesperso-orange.fr/)
+
+6. [lsof 命令用法：查看已删除空间却没有释放的进程](https://blog.csdn.net/xyajia/article/details/80222825)
+
+7. [Linux IO实时监控iostat命令详解](https://www.cnblogs.com/ggjucheng/archive/2013/01/13/2858810.html)
 
 <br />
 <br />
