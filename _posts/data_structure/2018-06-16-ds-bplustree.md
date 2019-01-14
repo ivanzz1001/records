@@ -212,7 +212,7 @@ MySQL等数据库普遍都采用```B+```树，而不是```B-树```。主要有�
 
 10. [B+-trees](https://www.cs.helsinki.fi/u/mluukkai/tirak2010/B-tree.pdf)
 
-11. [B+ tree](https://en.wikipedia.org/wiki/B+_tree)
+11. [wiki: B+ tree](https://en.wikipedia.org/wiki/B+_tree)
 
 12. [B树和B+树的插入、删除图文详解](https://www.cnblogs.com/nullzx/p/8729425.html)
 
