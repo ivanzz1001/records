@@ -187,6 +187,8 @@ main ...
 1. [网络带宽的测试算法研究](http://www.docin.com/p-575514222.html)
 
 2. [C++静态变量内存分配，编译阶段，解密 ](http://blog.163.com/lucky_jeck/blog/static/12711474201311182464554/)
+
+3. [C 语言标准库实现](https://ftp.gnu.org/gnu/glibc/)
 <br />
 <br />
 <br />
