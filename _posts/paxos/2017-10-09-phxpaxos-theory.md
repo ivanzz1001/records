@@ -44,6 +44,30 @@ Paxos协议是分布式系统设计中的一个非常重要的协议，本文转
 
 ![paxos-max-vote](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_max_vote.jpg)
 
+最重要的定义```MaxVote```的提出。要尝试解决多轮投票带来的冲突问题，必然要去建立多轮投票之间的联系，```MaxVote```是一个联系。
+
+```MaxVote```通过给出一个编号，以及成员，可以在多轮投票里面找到这些成员小于这个**编号**的所有投票当中，最大编号的那个投票。然后我们希望用到这次投票对应的提议。仔细阅读样例表格里面的每个```MaxVote```，从而去理解这个定义。
+
+![paxos-bal-limit](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_bal_limit.jpg)
+
+在提出了所有数学定义后，就可以去理解这最优美的三个约束条件了。正是通过这三个约束，使得多轮投票的冲突问题得到解决。
+
+
+
+第一点很好理解，要求每轮投票的编号唯一。第二点要求任意两轮投票的```Bqrm```交集不为空，其实意思很明确，就是要求```Bqrm```超过半数的意思。第三点是解决冲突的关键所在，它强行约束了每轮投票的提议，使得这轮投票的提议不与之前的产生冲突。通俗一点讲就是，一旦我发现在我之前已经有人投过某个提议的票，那我就要用这个提议，并且是我之前最大编号的投票对应的提议，作为我这次的提议。
+
+![paxos-multi-vote-limit](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_multi_vote_limit.jpg)
+
+这是在三个约束条件之下的多轮投票过程。反复阅读这两页，从而理解```约束条件3```。注意在约束条件下，提议内容的变化。
+
+
+![paxos-vote-consistency](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_vote_consistency.jpg)
+
+看似这个投票过程可以引出最终一致性的提议内容，但严格的算法推导必然需要严格的证明。这里提出反证法。
+
+
+
+
 
 
 <br />
