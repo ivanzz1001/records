@@ -28,6 +28,13 @@ Paxos协议是分布式系统设计中的一个非常重要的协议，本文转
 
 ![paxos-verify-value](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_verify_value.jpg)
 
+在正式开始讲解之前，希望抛开所有对Paxos的展开，而回到最朴素的Paxos。最朴素的Paxos解决什么问题？ 这里举个例子：三个人分别只允许呆在不同的三个城市，他们手上有一张纸和一支笔，他们可以在纸上写下任何内容，但是，当他们停下他们的笔之后，我们希望三个人最后写下的内容都是一样的。
+
+这个就是最朴素的Paxos尝试解决的问题，确定一个值。暂时千万别去想更多的东西，聚焦在确定一个值这么一个看似非常简单的事情身上。
+
+![paxos-define](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_define.jpg)
+
+
 
 
 
