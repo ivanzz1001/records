@@ -24,6 +24,11 @@ Paxos协议是分布式系统设计中的一个非常重要的协议，本文转
 
 ![part-time-parliament](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_part_1.jpg)
 
+上面这是PPT的题图，摆在中间的正是Paxos最为重要的三条约束，掌握这三条约束，即可掌握朴素Paxos。
+
+![paxos-verify-value](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_verify_value.jpg)
+
+
 
 
 <br />
