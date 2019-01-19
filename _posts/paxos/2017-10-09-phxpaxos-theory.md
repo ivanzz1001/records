@@ -65,7 +65,40 @@ Paxos协议是分布式系统设计中的一个非常重要的协议，本文转
 
 看似这个投票过程可以引出最终一致性的提议内容，但严格的算法推导必然需要严格的证明。这里提出反证法。
 
+![paxos-prove-process](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_prove_process.jpg)
 
+
+上图我们已将证明过程简化，相信经过你们认真的推敲，可定是可以搞明白的。注意表格里面的样例，当编号为```2```的这轮投票通过后，又出现了一轮编号为```3```的投票（2和3之间不可能存在一轮投票），提议跟之前的冲突。我们通过推导得出这个情况是不存在的。
+
+![paxos-get-maxvote](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_get_maxvote.jpg)
+
+
+前面只是提出```MaxVote```的定义，这里解释计算这个```MaxVote```的实际操作过程。其实就是我们惯用的轮询法，逐个问呗。只要每次发起投票前，都向多数派的成员逐一询问它们比我当前这轮投票编号小的最大编号投票，即可获得整个集合的```MaxVote```，从而确定当前这轮投票的提议。
+
+![paxos-wrong-maxvote](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_wrong_maxvote.jpg)
+
+如上图所示，聪明的读者可能早已经发现了问题，我们上文所说的多轮投票，似乎编号都是严格递增的，但是现实情况完全不是这样，现实的多轮投票往往都是乱序的，这个大家应该毫无疑问。那么在这种情况下，```MaxVote```的值可能会是错的。想象一下，在算出一个```MaxVote(5,...)```之后，才出现一个编号比5小的投票，那么这个投票很可能会影响到这个```MaxVote```的值。也就是一个先来后到的乱序问题。而如果```MaxVote```是错的，我们的证明就失效了。
+
+![paxos-maxvote-revolution](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_maxvote_revolution.jpg)
+
+如上图所示，为了满足这个约束，我们需要对```MaxVote```的计算过程进行约束。看过Paxos算法过程的，且是聪明的读者，看到这可能会想起，哦原来Prepare的Promise要求是这么来的。
+
+![paxos-alg-standard](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_alg_standard.jpg)
+
+到这里算法已经是非常完善了，剩下就是怎么将这个算法引申到计算机上，在计算机层面上提出算法的过程。大家可以看到实际的算法过程，很多角色都是与我们刚刚描述的东西相对应的。
+
+
+![paxos-alg-note](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_alg_note.jpg)
+
+正式算法过程，也就是**Lamport**论文```Paxos Made Simple```提出的。我希望大家再回头来看这个算法过程的时候，知道每一步的含义，以及本后的本质。
+
+![paxos-alg-display](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_alg_display.jpg)
+
+上图为一个过程的演示，这里就不多解释了。（上图中```before_res```是**before response**的缩写）
+
+
+## 2. 总结
+朴素Paxos算法不容易，需要反复推敲，建议有耐心的读者多看几遍，只要有耐心，肯定是可以弄懂的。关于这个算法有什么用？ 如何去实现？ 我们后面会再进行讲解。
 
 
 
@@ -76,9 +109,8 @@ Paxos协议是分布式系统设计中的一个非常重要的协议，本文转
 
 1. [Paxos从理论到实践](https://mp.weixin.qq.com/s/WEi2kojApSP8PBupdP_8yw)
 
-1. [phxpaxos](https://github.com/Tencent/phxpaxos/blob/master/README.zh_CN.md)
+2. [phxpaxos](https://github.com/Tencent/phxpaxos/blob/master/README.zh_CN.md)
 
-2. [Paxos从理论到实践](http://mp.weixin.qq.com/s/WEi2kojApSP8PBupdP_8yw)
 
 3. [Paxos算法](https://zh.wikipedia.org/zh-cn/Paxos%E7%AE%97%E6%B3%95)
 
