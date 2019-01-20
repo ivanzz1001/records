@@ -582,7 +582,8 @@ crushmap{
 	tunables;    //用于控制crushmap映射的一些变量
 	devices;	 //用于存储数据的osd，如osd.0、osd.1、osd.2
 	types;		 //用于将devices进行逻辑分布划分的概念，如host-domain、replica-domain
-	buckets;	 //逻辑上的一个buckets概念，其实就是types的一个具体实例，用于从更高一层次管理devices
+	buckets;	 //逻辑上的一个buckets概念，其实就是types的一个具体实例，用于从更高一层次管理devices。
+				 //buckets具有层级结构，其下层可以是另一个buckets(id<0)，也可以是devices(id>0)
 	rules;		 //用于控制如何将PG映射到各个devices上
 
 };
