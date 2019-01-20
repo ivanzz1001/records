@@ -576,7 +576,17 @@ key::step:steps:rule:rules:type[2]="host-domain"
 key::step:steps:rule:rules:op[6]="emit" 
 </pre>
 
-如上，对于device id用正数表示，对于buckets id用负数表示。
+如上，对于device id用正数表示，对于buckets id用负数表示。从上面我们看出，一个```crushmap```主要包含如下几个方面：
+{% highlight string %}
+crushmap{
+	tunables;    //用于控制crushmap映射的一些变量
+	devices;	 //用于存储数据的osd，如osd.0、osd.1、osd.2
+	types;		 //用于将devices进行逻辑分布划分的概念，如host-domain、replica-domain
+	buckets;	 //逻辑上的一个buckets概念，其实就是types的一个具体实例，用于从更高一层次管理devices
+	rules;		 //用于控制如何将PG映射到各个devices上
+
+};
+{% endhighlight %}
 
 
 ## 4. crushmap.txt生成crushmap过程分析
