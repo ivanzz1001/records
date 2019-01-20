@@ -652,6 +652,8 @@ crush对应的```rule```如下：
 
 上图表格中定义的**rule**以```crush层次结构```图的**root**作为起点。首先使用**select(1,row)**来选择```1```个类型为```row```的bucket(这里选择的是```row2```)； 接下来的**select(3,cabinet)**从```row2```中选择类型为```cabinet```的3个不同的item(这里选择的是cab21、cab23、cab24)； 最后一个**select(1,disk)**会遍历前面所选中的三个```cabinet```，并分别从中选出一个类型为```disk```的item。
 
+<br />
+
 3.2.1） **Collisions, Failure，and Overload**
 
 select(n,t)操作可能会遍历```存储层次结构```(storage hierarchy)的多层，以找出类型为```t```的```n```个不同的Item。在这一过程中，**CRUSH**可能会拒绝并使用一个修正的输入```r'```来重新选择items，这主要有如下三个原因：
@@ -663,6 +665,8 @@ select(n,t)操作可能会遍历```存储层次结构```(storage hierarchy)的�
 * 某一个device当前已经处于overload状态
 
 对于在crushmap中标记为```Failed```以及```Overload```状态的device，热门仍然会被保留在层次结构(hierarchy)中，以避免不必要的数据移动。CRUSH会选择性的拒绝一部分数据存放到处于```Overload```状态的设备上。对于```Failed```以及```Overload```状态的设备，CRUSH都按统一的方式进行处理：从头开始重新递归的分配items到整个存储集群（参看**Algorithm 1**的第11行）。而对于```collision```这一情形，另外一个值```r'```会被使用以尝试在buckets内层做一个本地搜索，这样可以避免切换bucket带来的更大冲突的可能（即不跳到外层来切换bucket,参看**Algorithm 1**的第14行)
+
+<br />
 
 3.2.2) **Replica Ranks**
 
