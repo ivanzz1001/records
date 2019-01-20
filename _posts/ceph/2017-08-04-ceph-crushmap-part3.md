@@ -168,29 +168,60 @@ rule replicated_rule-5 {
 # end crush map
 </pre>
 
-## 1. CRUSH算法
+### 1. crushmap算法
+
+crushmap是由```devices```与```buckets```组成的，都关联有一个```数字标识符```(numerical identifiers)和```权重```(weight)。其中```buckets```可以包含任何数量的**devices**或者**其他buckets**，这样就可以形成一个层次结构，注意devices只能处于最下层，即叶子节点。
+
+
+下面给出crushmap算法的伪代码：
+
 ![crushmap3-alg](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap3_alg.png)
 
-上面是CRUSH算法实现的一个伪代码。通常情况下CRUSH函数的输入参数是一个对象名或其他标识符。
 
-1） TAKE(a)操作会在整个存储拓扑结构中选择一个item(通常是一个bucket)，然后会将其指定给一个vector。该vector作为后续操作的一个输入。
+参看上面伪代码，CRUSH函数的输入```x```是一个整数，通常可以是一个object name或者其他标识符（当前ceph，一般是一个pg号）。**take(a)**操作用于从```存储层次结构```(storage hierarchy)中选择一个item(通常是一个bucket)并将其存放到```vector i```中，以作为后续操作的输入； **select(n,t)**操作会遍历```vector i```中的每一个元素，并从以该节点为根的子树中选择类型为```t```的```n```个不同的item。
 
-2) SELECT(n,t)操作会遍历上述vector中的每一个元素，并且会在以该元素作为根的子树中选择类型为t的n个不同的item。存储设备均有一个已知的、固定的类型，并且系统中的每一个bucket均有一个类型字段以反映bucket的不同层级结构。
+![crushmap-alg-note1](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crush_alg_note1.jpg)
 
 
-crush算法的基本思想就是：从```step take```根开始逐级遍历bucket层级结构，直到找到指定数量的副本节点或者失败退出。 
+3.1.1) **crush映射示例**
+
+示例对应的```crush层次结构```如下：
+
+![crushmap-alg-layer](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crush_eg_layer.jpg)
+
+crush对应的```rule```如下：
+
+![crushmap-alg-eg](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crush_alg_eg.jpg)
+
+上图表格中定义的**rule**以```crush层次结构```图的**root**作为起点。首先使用**select(1,row)**来选择```1```个类型为```row```的bucket(这里选择的是```row2```)； 接下来的**select(3,cabinet)**从```row2```中选择类型为```cabinet```的3个不同的item(这里选择的是cab21、cab23、cab24)； 最后一个**select(1,disk)**会遍历前面所选中的三个```cabinet```，并分别从中选出一个类型为```disk```的item。
+
 <br />
+
+3.2.1） **Collisions, Failure，and Overload**
+
+select(n,t)操作可能会遍历```存储层次结构```(storage hierarchy)的多层，以找出类型为```t```的```n```个不同的Item。在这一过程中，**CRUSH**可能会拒绝并使用一个修正的输入```r'```来重新选择items，这主要有如下三个原因：
+
+* 当前选中的Item已经处于选中集合（即产生了```冲突```)
+
+* 某一个device当前已经处于failed状态
+
+* 某一个device当前已经处于overload状态
+
+对于在crushmap中标记为```Failed```以及```Overload```状态的device，热门仍然会被保留在层次结构(hierarchy)中，以避免不必要的数据移动。CRUSH会选择性的拒绝一部分数据存放到处于```Overload```状态的设备上。对于```Failed```以及```Overload```状态的设备，CRUSH都按统一的方式进行处理：从头开始重新递归的分配items到整个存储集群（参看**Algorithm 1**的第11行）。而对于```collision```这一情形，另外一个值```r'```会被使用以尝试在buckets内层做一个本地搜索，这样可以避免切换bucket带来的更大冲突的可能（即不跳到外层来切换bucket,参看**Algorithm 1**的第14行)
+
 <br />
 
-**Collisions, Failure, and Overload**
+3.2.2) **Replica Ranks**
 
-在select(n,t)操作当中，为了选出n个t类型的不同的item，其会不断的进行递归。 在该递归操作当中，CRUSH通过一个被修正过的r'来拒绝或选择item。之所有采用修正的r'(而不是当前的简单的副本编号）主要有如下3个原因：
-* 该item已经处于当前被选中的集合中（发生了碰撞---select(n,t)算出来的结果必须必须不能冲突）
-* 一个设备(device)处于failed状态
-* 一个设备处于overloaded状态（负载过重）
+在```奇偶纠删编码模式```(Parity and erasure coding schemes)下数据的存放要求与单纯的多副本相比有细微的不同。在主拷贝副本模式下(primary copy replication schemes)，假如有一个副本失败，那么另外一个副本可以成为新的```primary```。在这种情形下，**CRUSH**可以使用```first n```通过```r' = r + f```来重新选择合适的targets，在这里```f```是当前**select(n,t)**尝试映射存储地址失败的次数（参看**Algorithm 1**的第16行）。
 
-Failed及Overloaded状态的设备均会在cluster map中进行标记，但会被保留在设备层级结构中以避免不必要的数据迁移。CRUSH会选择性的转移一部分负载过高的设备上的数据，这可以通过伪随机的拒绝一些的PG映射。针对Failed及Overloaded状态的设备，CRUSH算法会统一的在storage cluster的其他分支（跨storage cluster)来选择最后的映射（参看算法1第11行）；而对于collisions，一个新的r'会被用于下一次的递归搜索（参看算法1第14行），这样可以避免总体数据分步偏离更大可能发生碰撞的子树。
+而在```奇偶纠删编码模式```下，存储设备的rank或者position在**CRUSH**输出中是很关键的，因为每一个target存放对象数据(data object)的不同比特位。特别是，假如某一个存储设备失效（failed),其应该由CRUSH中的```R'```来进行替换，这样列表中其他的设备就可以保持相同的rank（请参看下图）：
 
+![crushmap-first-n](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crush_first_n.jpg)
+
+在这种情况下，**CRUSH**会使用```r'=r + fr *n```来重新选择一个target，这里```fr```是在```r```上失败的次数。
+
+与其他已存在的hash分布函数相比，**CRUSH**对于那些失效的存储设备并没有一些特殊的处理，**CRUSH**只是隐式的假定使用```first n```来跳过那些失效的设备，使他们不出现在CRUSH映射结果中。
 
 
 ## 2. CRUSH算法源代码解析
@@ -621,69 +652,7 @@ rule replicated_ruleset {
 
 
 
-## 3. crush_choose_firstn()分析
-
-在具体分析crush_choose_firstn()函数实现之前，我们先来从整体上分析一下crushmap算法。
-
-### 3.1 crushmap算法
-
-crushmap是由```devices```与```buckets```组成的，都关联有一个```数字标识符```(numerical identifiers)和```权重```(weight)。其中```buckets```可以包含任何数量的**devices**或者**其他buckets**，这样就可以形成一个层次结构，注意devices只能处于最下层，即叶子节点。
-
-
-下面给出crushmap算法的伪代码：
-
-![crushmap3_choose_first_n](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crushmap3_choose_first_n.png)
-
-
-参看上面伪代码，CRUSH函数的输入```x```是一个整数，通常可以是一个object name或者其他标识符（当前ceph，一般是一个pg号）。**take(a)**操作用于从```存储层次结构```(storage hierarchy)中选择一个item(通常是一个bucket)并将其存放到```vector i```中，以作为后续操作的输入； **select(n,t)**操作会遍历```vector i```中的每一个元素，并从以该节点为根的子树中选择类型为```t```的```n```个不同的item。
-
-![crushmap-alg-note1](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crush_alg_note1.jpg)
-
-
-3.1.1) **crush映射示例**
-
-示例对应的```crush层次结构```如下：
-
-![crushmap-alg-layer](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crush_eg_layer.jpg)
-
-crush对应的```rule```如下：
-
-![crushmap-alg-eg](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crush_alg_eg.jpg)
-
-上图表格中定义的**rule**以```crush层次结构```图的**root**作为起点。首先使用**select(1,row)**来选择```1```个类型为```row```的bucket(这里选择的是```row2```)； 接下来的**select(3,cabinet)**从```row2```中选择类型为```cabinet```的3个不同的item(这里选择的是cab21、cab23、cab24)； 最后一个**select(1,disk)**会遍历前面所选中的三个```cabinet```，并分别从中选出一个类型为```disk```的item。
-
-<br />
-
-3.2.1） **Collisions, Failure，and Overload**
-
-select(n,t)操作可能会遍历```存储层次结构```(storage hierarchy)的多层，以找出类型为```t```的```n```个不同的Item。在这一过程中，**CRUSH**可能会拒绝并使用一个修正的输入```r'```来重新选择items，这主要有如下三个原因：
-
-* 当前选中的Item已经处于选中集合（即产生了```冲突```)
-
-* 某一个device当前已经处于failed状态
-
-* 某一个device当前已经处于overload状态
-
-对于在crushmap中标记为```Failed```以及```Overload```状态的device，热门仍然会被保留在层次结构(hierarchy)中，以避免不必要的数据移动。CRUSH会选择性的拒绝一部分数据存放到处于```Overload```状态的设备上。对于```Failed```以及```Overload```状态的设备，CRUSH都按统一的方式进行处理：从头开始重新递归的分配items到整个存储集群（参看**Algorithm 1**的第11行）。而对于```collision```这一情形，另外一个值```r'```会被使用以尝试在buckets内层做一个本地搜索，这样可以避免切换bucket带来的更大冲突的可能（即不跳到外层来切换bucket,参看**Algorithm 1**的第14行)
-
-<br />
-
-3.2.2) **Replica Ranks**
-
-在```奇偶纠删编码模式```(Parity and erasure coding schemes)下数据的存放要求与单纯的多副本相比有细微的不同。在主拷贝副本模式下(primary copy replication schemes)，假如有一个副本失败，那么另外一个副本可以成为新的```primary```。在这种情形下，**CRUSH**可以使用```first n```通过```r' = r + f```来重新选择合适的targets，在这里```f```是当前**select(n,t)**尝试映射存储地址失败的次数（参看**Algorithm 1**的第16行）。
-
-而在```奇偶纠删编码模式```下，存储设备的rank或者position在**CRUSH**输出中是很关键的，因为每一个target存放对象数据(data object)的不同比特位。特别是，假如某一个存储设备失效（failed),其应该由CRUSH中的```R'```来进行替换，这样列表中其他的设备就可以保持相同的rank（请参看下图）：
-
-![crushmap-first-n](https://ivanzz1001.github.io/records/assets/img/ceph/crushmap/crush_first_n.jpg)
-
-在这种情况下，**CRUSH**会使用```r'=r + fr *n```来重新选择一个target，这里```fr```是在```r```上失败的次数。
-
-与其他已存在的hash分布函数相比，**CRUSH**对于那些失效的存储设备并没有一些特殊的处理，**CRUSH**只是隐式的假定使用```first n```来跳过那些失效的设备，使他们不出现在CRUSH映射结果中。
-
-
-
-
-### 3.2 crush_choose_firstn()代码分析
+## 3 crush_choose_firstn()代码分析
 
 上面我们在进行CRUSHMAP映射时，调用到了crush_choose_firstn()函数，该函数较为复杂，我们下边来分析该函数：
 {% highlight string %}
