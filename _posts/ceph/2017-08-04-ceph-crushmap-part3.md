@@ -621,7 +621,7 @@ rule replicated_ruleset {
 
 
 
-## 3. 分析crush_choose_firstn()
+## 3. crush_choose_firstn()分析
 
 在具体分析crush_choose_firstn()函数实现之前，我们先来从整体上分析一下crushmap算法。
 
