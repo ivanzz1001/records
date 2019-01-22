@@ -84,6 +84,36 @@ func Printf(format string, a ...interface{}) (n int, err error)
 {% endhighlight %}
 
 
+## 2. Program Structure
+
+本节我们会简单介绍一下Golang中的基本数据类型，赋值，类型声明等。
+
+### 2.1 Names
+golang的命名规范与C语言类似，这里不进行细说。golang中有25个关键字：
+<pre>
+break     default       func    interface    select
+case      defer         go      map          struct
+chan      else          goto    package      switch
+const     fallthrough   if      range        type
+continue  for           import  return       var
+</pre>
+另外，还有如下三种系统预定义的```names```:
+<pre>
+Constants:  true  false  iota  nil
+
+Types:      int  int8  int16  int32  int64
+            uint  uint8  uint16  uint32  uint64  uintptr
+            float32  float64  complex128  complex64
+            bool  byte  rune  string  error
+
+Functions:  make  len  cap  new  append  copy  close  delete
+            complex  real  imag
+            panic  recover
+</pre>
+
+
+
+
 <br />
 <br />
 **[参看]：**
