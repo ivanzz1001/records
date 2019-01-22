@@ -58,7 +58,30 @@ hello,world
 # go get gopl.io/ch1/helloworld
 </pre>
 
+### 1.2 golang语法说明
 
+Golang在每一条**语句**(statement)或**声明**(declaration)的末尾并不需要添加一个```;```，除非在同一行上有多条语句或声明。例如：
+{% highlight string %}
+func main(){
+	fmt.Printf("First Line\n"); fmt.Printf("Second Line\n")
+}
+{% endhighlight %}
+事实上，处于**语句**或**声明**末尾的```newlines```都会被转换成semicolons，因此```newlines```所在的位置会影响到Golang代码的解析。例如，一个函数的左括号```{```必须与该函数处于同一行； 而对于表达式```x+y```，```newlines```只能出现在```+```号后面。
+
+### 1.3 ```go doc```命令
+我们可以使用**go doc**命令来查看go标准库中某个函数或全局变量的帮助信息。例如：
+{% highlight string %}
+E:\Workspace\go>go doc os.Args
+var Args []string
+    Args hold the command-line arguments, starting with the program name.
+
+
+E:\Workspace\go>go doc fmt.Printf
+func Printf(format string, a ...interface{}) (n int, err error)
+    Printf formats according to a format specifier and writes to standard
+    output. It returns the number of bytes written and any write error
+    encountered.
+{% endhighlight %}
 
 
 <br />
