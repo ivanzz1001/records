@@ -112,6 +112,20 @@ Functions:  make  len  cap  new  append  copy  close  delete
 </pre>
 
 
+## 3. 基本数据类型
+Golang中数据类型基本可以分为如下四大类：
+
+* basic types： 如numbers、strings、booleans等类型
+
+* aggregate types: 如arrays、structs等类型
+
+* reference types: 如pointers、slices、maps、functions、channels
+
+* interface types
+
+说明：与C语言相比，在golang中有一个新的运算符```&^```(bit clear)，用于清除某一个bit位。另外，对于```^```运算符，若作为**双目**运算符时，其表示```按位异或```； 若作为**单目**运算符时，其表示按位取反。
+
+
 
 
 <br />
