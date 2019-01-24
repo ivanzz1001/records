@@ -31,11 +31,19 @@ description: 字符编码
 
 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx     65536−0x10ffff    (other values unused)
 </pre>
-例如，对于```国```，其Unicode-32值为```\u56fd```，那么编码为utf-8后，其对应的字节为：
+例如，对于```国```，其Unicode-16值为```\u56fd```，那么编码为utf-8后，其对应的字节为：
 
 ![cb-utf8-guo](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_utf8_guo.jpg)
 
+<pre>
+说明： unicode-16表示形式为\uhhhh，unicode-32表示形式为\Uhhhhhhhh(注意这里为大写的U)
 
+对于如下均表示同一字符串：
+"世界"
+"\xe4\xb8\x96\xe7\x95\x8c"
+"\u4e16\u754c"
+"\U00004e16\U0000754c"
+</pre>
 
 
 <br />
@@ -45,7 +53,7 @@ description: 字符编码
 
 1. [查看字符编码(UTF-8)](http://www.mytju.com/classcode/tools/encode_utf8.asp)
 
-
+2. [The Go programing language(p68)](http://golang.org)
 
 <br />
 <br />
