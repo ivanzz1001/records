@@ -31,7 +31,9 @@ description: 字符编码
 
 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx     65536−0x10ffff    (other values unused)
 </pre>
+例如，对于```国```，其Unicode-32值为```\u56fd```，那么编码为utf-8后，其对应的字节为：
 
+![cb-utf8-guo](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_utf8_guo.jpg)
 
 
 
