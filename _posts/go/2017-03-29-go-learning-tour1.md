@@ -126,7 +126,7 @@ Golang中数据类型基本可以分为如下四大类：
 说明：与C语言相比，在golang中有一个新的运算符```&^```(bit clear)，用于清除某一个bit位。另外，对于```^```运算符，若作为**双目**运算符时，其表示```按位异或```； 若作为**单目**运算符时，其表示按位取反。
 
 ## 4. Composite Types
-本节我们会介绍arrays、structs、slices、maps这4种复合类型。在Golang中，array类型并不是一种```reference```类型。
+本节我们会介绍arrays、structs、slices、maps这4种复合类型。在Golang中，array类型并不是一种```reference```类型, slice也不纯粹是一个```reference```类型，因为当其长度发生改变时，可能会指向一个新的内存空间。
 
 ### 4.1 arrays
 
@@ -196,6 +196,7 @@ var slice_b []int = a[:]
 
 5. 通过强制装换来创建
 var s []int = []int(nil)
+var runes []rune = []rune("Hello,世界")
 </pre>
 
 
