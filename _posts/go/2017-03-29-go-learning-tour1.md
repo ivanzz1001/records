@@ -117,7 +117,7 @@ Golang中数据类型基本可以分为如下四大类：
 
 * basic types： 如numbers、strings、booleans等类型
 
-* aggregate types: 如arrays、structs等类型
+* aggregate types: 如arrays、structs、slices、maps等类型
 
 * reference types: 如pointers、slices、maps、functions、channels
 
@@ -125,6 +125,78 @@ Golang中数据类型基本可以分为如下四大类：
 
 说明：与C语言相比，在golang中有一个新的运算符```&^```(bit clear)，用于清除某一个bit位。另外，对于```^```运算符，若作为**双目**运算符时，其表示```按位异或```； 若作为**单目**运算符时，其表示按位取反。
 
+## 4. Composite Types
+本节我们会介绍arrays、structs、slices、maps这4种复合类型。在Golang中，array类型并不是一种```reference```类型。
+
+### 4.1 arrays
+
+**1) 数组的定义**
+{% highlight string %}
+
+1. 直接定义并默认初始化为0
+var a [3]int
+
+2. 直接定义，并赋值
+var a [20]int = [20]int{1,2,3}
+b := [...]int{1,2,3}
+{% endhighlight %} 
+
+
+### 4.2 slice类型
+slice与array类型紧密关联。slice类型的写法为**[]Type**，其由3个组件所组成： pointer、length、capacity。 我们不能够像```array```那样通过```==```来比较两个slice是否相同，而是需要我们自己遍历来进行比较，例如：
+{% highlight string %}
+func equal(x,y []string) bool{
+
+	if len(x) != len(y){
+		return false;
+	}
+
+	for i, _ := range x{
+
+		if x[i] != y[i]{
+			return false;
+		}
+	}
+
+	return true;
+}
+{% endhighlight %}
+对于```slice```，我们只能将其与```nil```进行比较，以判断是否为**空**。例如：
+<pre>
+if summer == nil{ /* ... */ }
+</pre>
+这里需要指出的是，对于一个```slice```，若其为nil，那么len(slice)为0，cap(slice)也为0； 但是len(slice)为0且cap(slice)也为0的slice并不一定为nil， 比如**[]int{}**或**make([]int,3)[3:]**。对于为nil的slice，其实质是没有指向一个有效的地址空间。例如：
+{% highlight string %}
+var s []int         // len(s) == 0, s == nil
+
+s = nil             // len(s) == 0, s == nil
+
+s = []int(nil)      // len(s) == 0, s == nil
+
+s = []int{}         // len(s) == 0, s != nil
+{% endhighlight %}
+因此，假如你需要判断一个slice，其是否有元素，那么使用len(slice)来进行判断。
+
+
+**1) slice的创建**
+<pre>
+1. 直接定义
+var a []int
+
+2. 直接定义并初始化
+var a []int = {1,2,3}
+
+3. 通过make来创建
+var a []int = make([]int,3)       //len(a) = cap(a) = 3
+var b []int = make([]int,3, 9)    //len(b) = 3, cap(b) = 9
+
+4. 基于数组来创建
+var a [5]int
+var slice_b []int = a[:]
+
+5. 通过强制装换来创建
+var s []int = []int(nil)
+</pre>
 
 
 
