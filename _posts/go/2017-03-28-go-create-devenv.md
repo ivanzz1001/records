@@ -23,10 +23,26 @@ description: go开发环境的搭建
 * ```GOARCH：``` 指定系统环境，i386表示x86，amd64表示x64
 * ```PATH：``` 一般需要导出GOROOT,GOROOT下的bin两个目录
 
-例如：
+例如，我们可以在```/etc/profile```文件中定义如下：
 
 ![go-env](https://ivanzz1001.github.io/records/assets/img/go/go-env.png)
 
+
+另外，我们还可以针对自己的工程(project)建立一个局部的配置```env.cfg```：
+<pre>
+# pwd
+/home/ivanzz1001/Go/oss
+# ls
+env.cfg  src
+# cat env.cfg
+export GOROOT=/usr/local/go/
+export GOPATH=/home/ivanzz1001/Go/oss/
+export GOBIN=/usr/local/go/
+</pre>
+
+这样在每一次需要进行编译时，先执行```source env.cfg```将相应的全局配置更改称为当前项目所需的配置。
+
+<br />
 
 IDE工具：**JetBrains Gogland**
 
