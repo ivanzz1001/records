@@ -201,6 +201,137 @@ var runes []rune = []rune("Hello,世界")
 
 
 
+## 3. 示例
+### 3.1 一个任务队列的实现
+{% highlight string %}
+package queue
+
+import (
+	"container/list"
+	"sync"
+)
+
+type TaskQueue struct{
+	buffer *list.List
+	lock    sync.Mutex
+	popable *sync.Cond
+}
+
+
+func CreateTaskQueue() *TaskQueue{
+	taskQueue := &TaskQueue{
+		buffer: list.New(),
+	}
+	taskQueue.popable = sync.NewCond(&taskQueue.lock)
+
+	return taskQueue
+}
+
+func (queue *TaskQueue)Pop()(* interface{}, int){
+	length := 0
+
+	queue.lock.Lock()
+	for queue.buffer.Len() == 0{
+		queue.popable.Wait()
+	}
+	element := queue.buffer.Front()
+
+	task := element.Value
+	queue.buffer.Remove(element)
+	length = queue.buffer.Len()
+
+	queue.lock.Unlock()
+
+	return &task, length
+}
+
+func (queue *TaskQueue)TryPop()(interface{}, bool){
+	queue.lock.Lock()
+
+	if queue.buffer.Len() > 0{
+		element := queue.buffer.Front()
+		task := element.Value
+		queue.buffer.Remove(element)
+
+		queue.lock.Unlock()
+		return task, true
+	}
+
+	queue.lock.Unlock()
+	return nil, false
+}
+
+/*
+ * returns current message count
+ */
+func (queue *TaskQueue)Push(task interface{})int{
+	length := 0
+
+	queue.lock.Lock()
+	if queue.buffer.Len() == 0{
+		queue.buffer.PushBack(task)
+		queue.popable.Signal()
+	}else{
+		queue.buffer.PushBack(task)
+	}
+	length = queue.buffer.Len()
+	queue.lock.Unlock()
+
+	return length
+}
+
+func (queue *TaskQueue)Length()int{
+	length := 0
+
+	queue.lock.Lock()
+	length = queue.buffer.Len()
+	queue.lock.Unlock()
+
+	return length
+}
+
+{% endhighlight %}
+
+测试示例：
+{% highlight string %}
+package queue
+
+import(
+	"testing"
+	"fmt"
+)
+
+func TestTaskQueuev1(t *testing.T){
+
+	type Task_Work struct{
+		name string
+		content string
+	}
+
+	taskQueue := CreateTaskQueue()
+	work1 := Task_Work{
+		"work1",
+		"work1_content",
+	}
+	work2 := Task_Work{
+		"work2",
+		"work2_content",
+	}
+	taskQueue.Push(work1)
+	taskQueue.Push(work2)
+
+
+	outwork1, _:= taskQueue.Pop()
+	if outwork1 != nil{
+		outRealWork := (*outwork1).(Task_Work)
+		fmt.Printf("name: %s content: %s\n", outRealWork.name, outRealWork.content)
+
+	}
+
+}
+{% endhighlight %}
+
+
 <br />
 <br />
 **[参看]：**
