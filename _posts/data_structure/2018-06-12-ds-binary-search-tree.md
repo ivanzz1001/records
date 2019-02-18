@@ -90,7 +90,7 @@ struct BSTNode *successor(BSTNode *x)
 		parent = parent->parent;
 	}
 
-    return parent;
+	return parent;
 }
 {% endhighlight %}
 
