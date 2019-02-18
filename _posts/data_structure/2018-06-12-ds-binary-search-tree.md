@@ -96,20 +96,23 @@ struct BSTNode *successor(BSTNode *x)
 
 **2) x节点的前驱**
 
-下面我们考虑如何求解一个```节点x```的前驱。对于```节点x```，如果它是其双亲节点的右节点，则直接前驱为其双亲节点。而如果x其父节点的左节点， 那么其前驱必然是x的最```底层```的祖先，并且前驱的```右孩子```也是x的祖先， 因此为了知道这样的前驱节点， 只需要从x沿着树向上移动， 知道遇到一个节点，这个节点是其双亲的右孩子。（例如： 上图中的节点10的前驱节点是9）
+下面我们考虑如何求解一个```节点x```的前驱。对于```节点x```，如果它是其双亲节点的右节点，则直接前驱为其双亲节点。而如果x其父节点的左节点， 那么其前驱必然是x的最```底层```的祖先，并且前驱的```右孩子```也是x的祖先， 因此为了知道这样的前驱节点， 只需要从x沿着树向上移动， 直到遇到一个节点，这个节点是其双亲的右孩子。（例如： 上图中的节点10的前驱节点是9）
 
 下面给出求前驱节点的伪代码：
 {% highlight string %}
 struct BSTNode *predecessor(BSTNode *x)
 {
-   parent = x->parent;
-   while(parent && parent->left == x)
-   {
-        x = parent;
-        parent = parent->parent;
-   }
+	if(x->left)
+		return x->left;
+	
+	parent = x->parent;
+	while(parent && parent->left == x)
+	{
+		x = parent;
+		parent = parent->parent;
+	}
 
-   return parent;
+	return parent;
 }
 {% endhighlight %}
 
