@@ -47,20 +47,20 @@ struct BSTNode *search(BSTNode *root, int key)
 
 2) 非递归算法
 {% highlight string %}
-struct BSTNode *search(BSTree *root, int key)
+struct BSTNode *search(BSTNode *root, int key)
 {
 	BSTNode *p = root;
-    while(p)
-    {
-         if(p->key == key)
-            return p;
-         else if(p->key > key)
-            p = p->left;
-         else
-            p = p->right;
-    }
+	while(p)
+	{
+		if(p->key == key)
+			return p;
+		else if(p->key > key)
+			p = p->left;
+		else
+			p = p->right;
+	}
 
-    return p;
+	return p;
 }
 {% endhighlight %}
 
