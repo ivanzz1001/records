@@ -67,6 +67,40 @@ void MergeSort(SqList *L)
 {% endhighlight %}
 值得提醒的是，```递归形式```的算法在形式上较简洁，但实用性很差。与```快速排序```相比,归并排序的最大特点是： 它是一种稳定的排序方法。一般情况下，很少利用```2-路```归并排序算法进行内部排序。
 
+下面给出归并排序的```迭代形式```:
+{% highlight string %}
+void MergeSort(SqList *L)
+{
+	if(L.length <= 1)
+		return;
+		
+	distance = 1;
+
+	src = L.r;
+	dst = TR;
+	
+	while(distance < L.length){
+	
+		for(i = 1; i + distance <= L.length; i = i+2*distance){
+		
+			Merge(src, dst, i, i+distance-1, i+2*distance-1);
+		}
+		if (i <= L.length){
+		
+			copy(dst, src, i, L.length);
+		}
+		
+		src = dst;
+		dst = src;
+		distance *= 2;
+	}
+	
+	if(src != L.r){
+		copy(L.r, src, L.length)
+	}
+}
+{% endhighlight %}
+
 
 ## 2. 基数排序
 ```基数排序```(Radix Sorting)是和前面所述各类排序方法完全不相同的一种排序方法。从前面的讨论可见，实现排序主要是通过关键字间的比较和移动记录这两种操作，而实现基数排序不需要进行记录关键字间的比较。基数排序是一种借助多关键字排序的思想对单逻辑关键字进行排序的方法。
