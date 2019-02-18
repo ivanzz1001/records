@@ -265,6 +265,7 @@ void insert(root *r, struct node23 *node, void *value){
 		NULL,
 	};
 
+	//将p与t节点进行合并
 	while(p){
 		if (!p->extra){
 			if (t.type == 2){
