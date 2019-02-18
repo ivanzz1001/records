@@ -131,7 +131,7 @@ struct BSTNode *insert(BSTNode **root, struct BSTNode *node)
        if(p->key == node->key)
           return p;
        else if(p->key > node->key)
-	   {
+       {
           q = p;
           p = p->left;
        }
