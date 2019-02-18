@@ -323,6 +323,58 @@ void postorder_tranverse(struct BSTNode *root)
 }
 {% endhighlight %}
 
+### 6.1 二叉树的非递归遍历
+下面我们给出二叉树```中序遍历```的非递归形式：
+{% highlight string %}
+void inorder_tranverse(struct BSTNode *root)
+{
+	//采用二叉链表存储结构，中序遍历二叉树root
+	InitStack(S);
+	Push(S, root);
+	
+	while(!StackEmpty(S))
+	{
+		//向左走到尽头
+		while(GetTop(S, p) && p) Push(S, p->left);
+
+		//空指针退栈
+		Pop(S, p);
+		
+		//访问节点，向右一步
+		if(!StackEmpty(S))
+		{
+			Pop(S,p);
+			print_node(p);
+			Push(S,p->right);
+		}
+		
+	}
+}
+
+//方式2
+void inorder_tranverse(struct BSTNode *root)
+{
+	InitStack(S);
+	p = root;
+	
+	while(p || !StackEmpty(S))
+	{
+		if(p){
+			//根指针进栈，遍历左子树
+			
+			Push(S, p);
+			p = p->left;
+		}else{
+			//根指针退栈，访问根节点，遍历右子树
+			
+			Pop(S,p);
+			print_node(p);
+			p = p->rchild;
+		}
+	}
+}
+{% endhighlight %}
+
 
 <br />
 <br />
