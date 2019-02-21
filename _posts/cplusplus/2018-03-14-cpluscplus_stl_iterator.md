@@ -117,11 +117,197 @@ next iter: 400
 
 
  
-## 3. 
+## 3. C++标准模板库(STL)迭代器的原理及实现
+迭代器(iterator)是一种抽象的设计理念，通过迭代器可以在不了解容器内部原理的情况下遍历容器。除此之外，STL中迭代器一个最重要的作用就是作为容器(vector、list等)与STL算法的```粘结剂```，只要容器提供迭代器的接口，同一套算法代码可以利用在完全不同的容器中，这是抽象思想的经典应用。
+
+### 3.1 使用迭代器遍历不同的容器
+如下所示的代码演示了迭代器是如何将容器和算法结合在一起的，其中使用了3种不同的容器，```.begin()```和```.end()```方法返回一个指向容器第一个元素和一个指向容器**最后一个元素后面一个位置**的迭代器，也就是说begin()和end()返回的迭代器是一个前闭后开的，一般用**[begin, end)** 表示。对于不同的容器，我们都使用同一个**accumulate()**函数，原因就在于**acccumulate()**函数的实现无需考虑容器的种类，只需要容器传入的begin()和end()迭代器能够完成标准迭代器的要求即可。
+{% highlight string %}
+std::vector<int> vec{1,2,3};
+std::list<int> lst{4,5,6};
+std::deque<int> deq{7,8,9};
+
+std::cout<<std::accumulate(vec.begin(), vec.end(), 0) << std::endl;
+std::cout<<std::accumulate(lst.begin(), lst.end(), 0) << std::endl;
+std::cout<<std::accumulate(deq.begin(), deq.end(), 0) << std::endl;
+{% endhighlight %}
+
+### 3.2 迭代器的实现
+迭代器的作用就是提供一个遍历容器内部所有元素的接口，因此迭代器的内部必须保存一个与容器相关联的指针，然后重载各种运算操作来方便遍历，其中最重要的就是```* 运算符```和```-> 运算符```，以及```++```、```--```等可能需要的运算符重载。实际上这和C++标准库的智能指针(smart pointer)很像，智能指针也是将一个指针封装，然后通过引用计数或是其他方法完成自动释放内存的功能，为了达到和原有指针一样的功能，也需要对```*```、```->```等运算符进行重载。下面参照智能指针实现一个简单vector迭代器，其中几个**typedef**暂时不用管，我们后面会提到。vecIter主要作用就是包裹一个指针，不同容器内部数据结构不相同，因此迭代器操作符重载的实现也会不同。比如```++```操作符。对于线性分配内存的数组来说，直接对指针执行```++```操作即可； 但是如果容器是List就需要采用元素内部的方法，比如```ptr->next()```之类的方法访问下一个元素。因此，STL容器都实现了自己的专属迭代器。
+
+下面我们给出一个普通数组的迭代器的实现(array_iterator.cpp)：
+{% highlight string %}
+#include <iostream>
+#include <numeric>
+
+template<class Item>
+class vecIter{
+	Item *ptr;
+	
+public:
+	typedef std::forward_iterator_tag iterator_category;
+	typedef Item value_type;
+	typedef Item *pointer;
+	typedef Item &reference;
+	typedef std::ptrdiff_t difference_type;
+	
+public:
+	vecIter(Item *p = 0):ptr(p){}
+	
+	Item & operator*() const{
+		return *ptr;
+	}
+	
+	Item * operator->() const{
+		return ptr;
+	}
+	
+	//pre
+	vecIter &operator++(){
+		++ptr;
+		
+		return *this;
+	}
+	
+	vecIter operator++(int){
+		vecIter tmp = *this;
+		++*this;
+		
+		return tmp;
+	}
+	
+	bool operator==(const vecIter &iter){
+		return ptr == iter.ptr;
+	}
+	
+	bool operator!=(const vecIter &iter){
+		return !(*this == iter);
+	}
+};
+
+int main(int argc, char *argv[])
+{
+	int a[] = {1,2,3,4};
+	
+	std::cout<<std::accumulate(vecIter<int>(a), vecIter<int>(a+4), 0)<<std::endl;
+	
+	return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o array_iterator array_iterator.cpp -lstdc++
+# ./array_iterator 
+10
+</pre>
+
+### 3.3 迭代器的相应型别
+我们都知道```type_traits```可以萃取出类型的型别，根据不同的型别可以执行不同的处理流程。那么对于迭代器来说，是否有针对不同特性迭代器的优化方法呢？ 答案是肯定的。拿一个STL算法库中的distance()函数来说，distance函数接受两个迭代器参数，然后计算两者之间的距离。显然，对于不同的迭代器计算效率差别很大。比如对于vector容器来说，由于内存是连续分配的，因此指针直接相减即可获得两者的距离；而list容器是链表结构，内存一般都不是连续分配，因此只能通过一级一级调用next()或者其他函数，每调用一次再判断迭代器是否相等来计算距离。vector迭代器计算distance的效率为**O(1)**，而list则为**O(n)**，n为距离的大小。
+
+因此，根据迭代器不同的特性，将迭代器分为5类：
+
+* Input Iterator: 这种迭代器所指的对象为只读的
+
+* Output Iterator: 所指的对象只能进行写入操作
+
+* Forward Iterator: 该类迭代器可以在一个正确的区间中进行读写操作，它拥有Input Iterator的所有特性，和Output Iterator的部分特性，以及单步```向前```迭代元素的能力
+
+* Bidirectional Iterator: 该类迭代器是在Forward Iterator的基础上提供了单步```向后```迭代元素的能力，从而使得可以双向移动
+
+* Random Access Iterator： 前4种迭代器只提供部分指针算术能力（前3种支持```++```运算符，后一种还支持```--```运算符)，而本迭代器则支持所有指针的算术运算，包括```p+n```、```p-n```、```p[n]```、```p1-p2```、```p1<p2```
+
+上述5种迭代器的继承关系如下图所示：
+
+![cpp-iterator-top](https://ivanzz1001.github.io/records/assets/img/cplusplus/cpp_iterator_top.jpg)
+
+了解了迭代器的类型，我们就能解释vector的迭代器和list迭代器的区别了。显然，vector迭代器具有所有指针算术运算能力，而list由于是双向链表，因此只有双向读写不能随机访问元素。故vector的迭代器种类为**Random Access Iterator**，而list的迭代器种类为**Bidirectional Iterator**。我们只需要根据不同的迭代器种类，利用```traits```编程技巧萃取出迭代器型别，然后由C++重载机制就能够对不同型别的迭代器采用不同的处理流程了。为此，对于每个迭代器都必须定义型别```iterator_category```，也就是上文代码中的**typedef std:forward_iterator_tag iterator_category**，实际上可以直接继承STL中定义的iterator模板，模板后三个参数都有默认值，因此继承时只需要指定前两个模板参数即可。如下所示，STL定义了5个空类型作为迭代器的标签：
+{% highlight string %}
+template<class Category,class T,class Distance = ptrdiff_t,class Pointer=T*,class Reference=T&>
+class iterator{
+    typedef Category iterator_category;
+    typedef T        value_type;
+    typedef Distance difference_type;
+    typedef Pointer  pointer;
+    typedef Reference reference;
+};
+
+struct input_iterator_tag{};
+struct output_iterator_tag{};
+struct forward_iterator_tag:public input_iterator_tag{};
+struct bidirectional_iterator_tag:public forward_iterator_tag{};
+struct random_access_iterator_tag:public bidirectional_iterator_tag{};
+{% endhighlight %}
+
+### 3.4 利用迭代器种类更有效的实现distance函数
+回到distance函数，有了前面的基础，我们可以根据不同迭代器种类实现distance函数（distance.cpp)：
+{% highlight string %}
+#include <iostream>
+#include <vector>
+#include <list>
+
+
+template <class _InputIterator, class _Distance>
+inline void __distance(_InputIterator __first, _InputIterator __last,
+                       _Distance& __n, std::input_iterator_tag)
+{
+  while (__first != __last) { ++__first; ++__n; }
+}
+
+template <class _RandomAccessIterator, class _Distance>
+inline void __distance(_RandomAccessIterator __first, 
+                       _RandomAccessIterator __last, 
+                       _Distance& __n, std::random_access_iterator_tag)
+{
+  __n += __last - __first;
+}
+
+template <class _InputIterator, class _Distance>
+inline void distance(_InputIterator __first, 
+                     _InputIterator __last, _Distance& __n)
+{
+ typedef typename std::iterator_traits<_InputIterator>::iterator_category _Category;
+  __distance(__first, __last, __n, _Category());
+}
 
 
 
 
+int main(int argc, char *argv[])
+{
+
+	int a[] = {1,2,3,4};
+	std::vector<int> vec;
+	vec.push_back(1);
+	vec.push_back(2);
+	vec.push_back(3);
+	vec.push_back(4);
+	
+	std::list<int> lst;
+	lst.push_back(1);
+	lst.push_back(2);
+	lst.push_back(3);
+	lst.push_back(4);
+	
+
+	int vec_distance = 0, lst_distance = 0, carr_distance = 0;
+	distance(vec.begin(), vec.end(), vec_distance);
+	distance(lst.begin(), lst.end(), lst_distance);
+	distance(a, a + sizeof(a)/sizeof(*a), carr_distance);
+	
+	std::cout<<"vec distance:"<<vec_distance<<std::endl;
+	std::cout<<"lst distance:"<<lst_distance<<std::endl;
+	std::cout<<"c-array distance:"<<carr_distance<<std::endl;
+	
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o distance distance.cpp -lstdc++
+# ./distance 
+vec distance:4
+lst distance:4
+c-array distance:4
+</pre>
 
 
 
