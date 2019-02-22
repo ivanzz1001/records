@@ -245,7 +245,7 @@ struct random_access_iterator_tag:public bidirectional_iterator_tag{};
 #include <vector>
 #include <list>
 
-
+# if 0
 template <class _InputIterator, class _Distance>
 inline void __distance(_InputIterator __first, _InputIterator __last,
                        _Distance& __n, std::input_iterator_tag)
@@ -268,8 +268,30 @@ inline void distance(_InputIterator __first,
  typedef typename std::iterator_traits<_InputIterator>::iterator_category _Category;
   __distance(__first, __last, __n, _Category());
 }
+#else
+//注： 这里需要放在一个新的namespace中，否则可能会与STL中的相冲突	
+namespace DT{
+template<class InputIterator>
+inline typename std::iterator_traits<InputIterator>::difference_type distance(InputIterator first, InputIterator last){
+	typedef typename std::iterator_traits<InputIterator>::iterator_category _Category;
+	return __distance(first, last, _Category());
+}
+template<class InputIterator>
+inline typename std::iterator_traits<InputIterator>::difference_type __distance(InputIterator first, InputIterator last, std::input_iterator_tag){
+	typename std::iterator_traits<InputIterator>::difference_type n = 0;
+	while (first != last){
+		++first; ++n;
+	}
+	return n;
+}
 
-
+template<class InputIterator>
+inline typename std::iterator_traits<InputIterator>::difference_type \
+__distance(InputIterator first, InputIterator last, std::random_access_iterator_tag){
+	return last - first;
+}
+}	
+#endif
 
 
 int main(int argc, char *argv[])
@@ -289,14 +311,20 @@ int main(int argc, char *argv[])
 	lst.push_back(4);
 	
 
-	int vec_distance = 0, lst_distance = 0, carr_distance = 0;
-	distance(vec.begin(), vec.end(), vec_distance);
-	distance(lst.begin(), lst.end(), lst_distance);
-	distance(a, a + sizeof(a)/sizeof(*a), carr_distance);
-	
-	std::cout<<"vec distance:"<<vec_distance<<std::endl;
-	std::cout<<"lst distance:"<<lst_distance<<std::endl;
-	std::cout<<"c-array distance:"<<carr_distance<<std::endl;
+	# if 0
+		int vec_distance = 0, lst_distance = 0, carr_distance = 0;
+		distance(vec.begin(), vec.end(), vec_distance);
+		distance(lst.begin(), lst.end(), lst_distance);
+		distance(a, a + sizeof(a)/sizeof(*a), carr_distance);
+		
+		std::cout<<"vec distance:"<<vec_distance<<std::endl;
+		std::cout<<"lst distance:"<<lst_distance<<std::endl;
+		std::cout<<"c-array distance:"<<carr_distance<<std::endl;
+	#else
+		std::cout<<"vec distance:"<<DT::distance(vec.begin(), vec.end())<<std::endl;
+		std::cout<<"lst distance:"<<DT::distance(lst.begin(), lst.end())<<std::endl;
+		std::cout<<"c-array distance:"<<DT::distance(a, a + sizeof(a)/sizeof(*a))<<std::endl;
+	#endif
 	
 }
 {% endhighlight %}
@@ -308,6 +336,69 @@ vec distance:4
 lst distance:4
 c-array distance:4
 </pre>
+
+上面通过STL定义的```iterator_traits```模板可以萃取不同种类的迭代器特性，```iterator_traits```还对指针和常量指针有特化版本，因此也可以萃取原生指针的特性。具体实现如下：
+{% highlight string %}
+template <class _Iterator>
+struct iterator_traits {
+  typedef typename _Iterator::iterator_category iterator_category;
+  typedef typename _Iterator::value_type        value_type;
+  typedef typename _Iterator::difference_type   difference_type;
+  typedef typename _Iterator::pointer           pointer;
+  typedef typename _Iterator::reference         reference;
+};
+
+template <class _Tp>
+struct iterator_traits<_Tp*> {
+  typedef random_access_iterator_tag iterator_category;
+  typedef _Tp                         value_type;
+  typedef ptrdiff_t                   difference_type;
+  typedef _Tp*                        pointer;
+  typedef _Tp&                        reference;
+};
+
+template <class _Tp>
+struct iterator_traits<const _Tp*> {
+  typedef random_access_iterator_tag iterator_category;
+  typedef _Tp                         value_type;
+  typedef ptrdiff_t                   difference_type;
+  typedef const _Tp*                  pointer;
+  typedef const _Tp&                  reference;
+};
+{% endhighlight %}
+
+### 3.5 小结
+
+STL使用迭代器算法和容器结合，利用迭代器```型别```可以针对不同迭代器编写更加高效的算法，这一点很重要的思想就是： 利用C++重载机制和参数推导机制将```运行期```决议问题提前到```编译期```决议，也就是说，我们不需要在运行时判断迭代器的类型，而是在编译期就已经决定。这很符合C++模板编程的理念。在后续STL学习中，我们会实现自己的各种容器，也必须实现各种各样的迭代器，因此迭代器的学习还远没有停止。
+
+
+## 4. C++中模板使用时候typename和class的区别
+在C++ Template中很多地方都用到了```typename```与```class```这两个关键字，而且好像可以替换，是不是这两个关键字完全一样呢？ 相信学习C++的人对```class```这个关键字都非常明白，class用于定义类，在C++中引入模板后，最初定义模板的方法为：
+{% highlight string %}
+template<class T>....
+{% endhighlight %}
+
+在这里```class```关键字表明```T```是一个类型，后来为了避免class在这两个地方的使用可能给人带来混淆，所以引入```typename```这个关键字，它的作用同class一样表明后面的符号为一个类型，这样在定义模板的时候就可以使用下面的方式了：
+{% highlight string %}
+template<typename T>...
+{% endhighlight %}
+在模板定义语法中关键字```class```与```typename```的作用完全一样。
+
+```typename```难道仅仅在模板定义中起作用吗？ 其实不是这样，```typename```另外一个作用为： 使用嵌套依赖类型(nested depended name), 如下所示
+{% highlight string %}
+class MyArray{
+public:
+	typedef int LengthType;
+	....
+};
+
+template<class T>
+void MyMethod(T myarr){
+	typedef typename T::LengthType LengthType;
+	LengthType length = myarr.GetLength();
+}
+{% endhighlight %}
+这个时候```typename```的作用就是告诉C++编译器，typename后面的字符串为一个类型名称，而不是成员函数或者成员变量。这个时候如果前面没有```typename```，编译器没有任何办法知道T::LengthType是一个类型还是一个成员名称(静态数据成员或者静态函数），所以编译不能够通过。
 
 
 
@@ -325,6 +416,10 @@ c-array distance:4
 4. [SGI STL](https://github.com/steveLauwh/SGI-STL)
 
 5. [STL源代码下载](http://labmaster.mi.infn.it/Laboratorio2/serale/www.sgi.com/tech/stl/download.html)
+
+6. [土木硕士转行互联网小结](https://blog.csdn.net/wutao1530663/article/details/78022572)
+
+7. [c++中模板使用时候typename和class的区别](https://blog.csdn.net/u011619422/article/details/44218473)
 
 <br />
 <br />
