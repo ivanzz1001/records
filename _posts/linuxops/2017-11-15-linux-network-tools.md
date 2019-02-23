@@ -1242,7 +1242,7 @@ KiB Swap:  2094076 total,  2094076 free,        0 used.  1412768 avail Mem
   988  1021 ?        00:00:00 gdbus
 </pre>
 
-* 使用proc文件系统，具体用法是```cat /proc/<pid>/status
+* 使用proc文件系统，具体用法是```cat /proc/<pid>/status```
 {% highlight string %}
 # cat /proc/988/status
 Name:   lightdm
