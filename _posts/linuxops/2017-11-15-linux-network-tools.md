@@ -1072,6 +1072,232 @@ Average:           lo      0.00      0.00      0.00      0.00      0.00      0.0
 
 相比将结果重定向到一个文件，使用-o选项，可以保存更多的系统资源信息
 
+### 8.4 pidstat命令
+pidstat命令被用于监视当前由Linux内核所管理的单个任务。下面简要说明一下pidstat命令的用法：
+
+{% highlight string %}
+# pidstat --help
+Usage: pidstat [ options ] [ <interval> [ <count> ] ]
+Options are:
+[ -d ] [ -h ] [ -I ] [ -l ] [ -R ] [ -r ] [ -s ] [ -t ] [ -U [ <username> ] ]
+[ -u ] [ -V ] [ -v ] [ -w ] [ -C <command> ] [ -G <process_name> ]
+[ -p { <pid> [,...] | SELF | ALL } ] [ -T { TASK | CHILD | ALL } ]
+
+Options:
+  -C comm: 只显示出任务所对应的执行命令
+ 
+  -d: 用于报告IO信息。使用此选项时会打印如下字段
+      UID   ---  所监视任务的实际用户ID
+      USER  ---  所监视任务的实际用户名称
+      PID   ---  所监视任务的进程ID
+      kB_rd/s
+      kB_wr/s
+      kB_ccwr/s
+      iodelay --- 所监视任务的IO延迟，以clock ticks为单位。
+      command
+
+   -G process_name: 只打印那些执行命令名包含process_name的进程信息。假如和-t选项搭配使用的话，则
+      还会打印属于该进程的线程信息
+
+   -I: 对于SMP(多处理器)系统，本选项用于指明任务的CPU使用率应该除以当前的CPU总数
+
+   -l: 用于显示该任务所对应的执行命令的名称及其参数
+
+   -p {pid [,...] | SELF | ALL}: 用于选择监视哪些执行进程
+
+   -R: 用于报告实时优先级和调用策略信息
+
+   -r: 用于报告page faults以及内存使用信息
+
+   -s: 用于报告栈使用信息
+
+   -t: 打印所指定任务的线程信息
+
+   -u: 报告CPU的使用信息
+{% endhighlight %}
+
+
+下面给出一个示例：
+{% highlight string %}
+# pidstat
+Linux 2.6.32-642.4.2.el6.x86_64 (wille)     06/06/2018  _x86_64_    (4 CPU)
+
+09:01:45 AM       PID    %usr %system  %guest    %CPU   CPU  Command
+09:01:45 AM         1    0.00    0.00    0.00    0.00     1  init
+09:01:45 AM      2033    0.00    0.00    0.00    0.00     0  sshd
+09:01:45 AM      2044    0.00    0.00    0.00    0.00     0  ntpd
+09:01:45 AM      2123    0.00    0.00    0.00    0.00     0  master
+09:01:45 AM      2132    0.00    0.00    0.00    0.00     2  qmgr
+09:01:45 AM      2137    0.00    0.00    0.00    0.00     0  crond
+09:01:45 AM     15667    0.01    0.01    0.00    0.02     2  java
+09:01:45 AM     19061    0.00    0.00    0.00    0.00     0  sshd
+{% highlight string %}
+下面对上述各行的含义进行一个简单的说明：
+
+* 第一行显示服务器内核信息、主机名、日期和CPU个数
+
+* PID: 被监控任务的进程号
+
+* Command: 这个任务的命令名称
+
+1) **CPU统计数据(-u)**
+
+* ```%usr```: 当在用户层执行（应用程序时）这个任务的CPU使用率，和nice优先级无关。注意这个字段计算的CPU时间不包括在虚拟处理器中花去的时间。
+
+* ```%system```: 这个任务在系统层使用时的CPU使用率
+
+* ```%guest```: 任务花费在虚拟机上的CPU使用率（运行在虚拟处理器）
+
+* ```%cpu```: 任务总的CPU使用率。在SMP(多处理器）中，如果在命令行中输入```-I```参数的话，CPU使用率会除以你的CPU数量。
+
+* CPU: 正在运行这个任务的处理器编号
+
+2) **IO统计数据(-d)**
+
+* kB_rd/s: 每秒进程从磁盘读取的数据量(以kB为单位)
+
+* kB_rw/s: 每秒进程向磁盘写的数据量(以kB为单位)
+
+* kB_ccwr/s: 任务写入磁盘被取消的速率(kb)
+
+3) **内存使用统计(-r)**
+
+* minflt/s: 每秒次缺页错误次数（minor page faults)，次缺页错误次数即虚拟内存地址映射成物理内存地址产生的Page fault次数。
+
+* majflt/s: 每秒主缺页错误次数（major page faults)，当虚拟内存地址映射物理内存地址时，相应的page在swap中，这样的page在swap中，这样的page fault为major page fault，一般在内存使用紧张时产生。
+
+* VSZ: 该进程所使用的虚拟内存(以kB为单位）
+
+* RSS: 该进程所使用的物理内存（以kB为单位）
+
+* ```%MEM```: 该进程使用内存的百分比
+
+4) **上下文切换情况(-w)**
+
+* cswch/s： 每秒任务主动(自愿的)切换上下文的次数，当某一任务处于阻塞等待状态，将主动让出自己的CPU资源。
+
+* nvcswch/s: 每秒任务被动(不自愿的）切换上下文的次数，CPU分配给某一任务的时间片已经用完，因此将强迫该进程让出CPU的执行权。
+
+<pre>
+多处理器时我们可以添加-I参数，显示各个CPU的使用率。如: pidstat -w -I -G testp 1 10
+</pre> 
+
+## 4. 统计一个进程的线程数
+
+* 使用top命令，具体用法是**top -H**。加上这个选项，top的每一行就不是现实一个进程，而是一个线程。
+<pre>
+# top -H
+
+top - 23:59:52 up  3:52,  3 users,  load average: 0.00, 0.00, 0.00
+Threads: 430 total,   1 running, 429 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  0.3 us,  0.7 sy,  0.0 ni, 99.0 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+KiB Mem :  2060812 total,  1014004 free,   387972 used,   658836 buff/cache
+KiB Swap:  2094076 total,  2094076 free,        0 used.  1412768 avail Mem 
+
+  PID USER      PR  NI    VIRT    RES    SHR S %CPU %MEM     TIME+ COMMAND                
+ 4610 root      20   0    8244   3524   2960 R  1.0  0.2   0:00.06 top                    
+    1 root      20   0   23932   4900   3688 S  0.0  0.2   0:03.58 systemd                
+    2 root      20   0       0      0      0 S  0.0  0.0   0:00.00 kthreadd               
+    3 root      20   0       0      0      0 S  0.0  0.0   0:01.81 ksoftirqd/0            
+    5 root       0 -20       0      0      0 S  0.0  0.0   0:00.00 kworker/0:0H
+</pre>
+
+此外，还可以通过```top -H -p <pid>```的方式查看某一个进程的线程信息。
+
+* 使用ps命令，具体用法是**ps -xH**。这样可以查看所有存在的线程，也可以使用grep作进一步的过滤
+{% highlight string %}
+# ps -xH
+  PID TTY      STAT   TIME COMMAND
+    1 ?        Ss     0:03 /sbin/init auto noprompt
+    2 ?        S      0:00 [kthreadd]
+    3 ?        S      0:01 [ksoftirqd/0]
+    5 ?        S<     0:00 [kworker/0:0H]
+    7 ?        S      0:00 [rcu_sched]
+    8 ?        S      0:00 [rcu_bh]
+    9 ?        S      0:00 [migration/0]
+   10 ?        S<     0:00 [lru-add-drain]
+   11 ?        S      0:00 [watchdog/0]
+   12 ?        S      0:00 [cpuhp/0]
+   13 ?        S      0:00 [kdevtmpfs]
+  988 ?        SLsl   0:00 /usr/sbin/lightdm
+  988 ?        SLsl   0:00 /usr/sbin/lightdm
+  988 ?        SLsl   0:00 /usr/sbin/lightdm
+{% endhighlight %}
+
+* 使用ps命令，具体用法是**ps -mp pid**，这样可以看到指定进程产生的线程数目
+<pre>
+# ps -mp 988
+  PID TTY          TIME CMD
+  988 ?        00:00:00 lightdm
+    - -        00:00:00 -
+    - -        00:00:00 -
+    - -        00:00:00 -
+</pre>
+其实也可以通过**ps -T -p pid**命令来查看某一个进程所创建的所有线程：
+<pre>
+# ps -T -p 988
+  PID  SPID TTY          TIME CMD
+  988   988 ?        00:00:00 lightdm
+  988  1019 ?        00:00:00 gmain
+  988  1021 ?        00:00:00 gdbus
+</pre>
+
+* 使用proc文件系统，具体用法是```cat /proc/<pid>/status
+{% highlight string %}
+# cat /proc/988/status
+Name:   lightdm
+Umask:  0022
+State:  S (sleeping)
+Tgid:   988
+Ngid:   0
+Pid:    988
+PPid:   1
+TracerPid:      0
+Uid:    0       0       0       0
+Gid:    0       0       0       0
+FDSize: 256
+Groups:
+NStgid: 988
+NSpid:  988
+NSpgid: 988
+NSsid:  988
+VmPeak:    38540 kB
+VmSize:    37600 kB
+VmLck:        32 kB
+VmPin:         0 kB
+VmHWM:      7636 kB
+VmRSS:      7636 kB
+RssAnon:             708 kB
+RssFile:            6928 kB
+RssShmem:              0 kB
+VmData:    25420 kB
+VmStk:       136 kB
+VmExe:       284 kB
+VmLib:      9748 kB
+VmPTE:        56 kB
+VmPMD:        12 kB
+VmSwap:        0 kB
+HugetlbPages:          0 kB
+Threads:        3
+SigQ:   0/15793
+SigPnd: 0000000000000000
+ShdPnd: 0000000000000000
+SigBlk: 0000000000000000
+SigIgn: 0000000000001000
+SigCgt: 0000000180014a03
+CapInh: 0000000000000000
+CapPrm: 0000003fffffffff
+CapEff: 0000003fffffffff
+CapBnd: 0000003fffffffff
+CapAmb: 0000000000000000
+Seccomp:        0
+Cpus_allowed:   ff
+Cpus_allowed_list:      0-7
+Mems_allowed:   1
+Mems_allowed_list:      0
+voluntary_ctxt_switches:        136
+nonvoluntary_ctxt_switches:     76
+{% endhighlight %}
 
 
 <br />
@@ -1094,6 +1320,8 @@ Average:           lo      0.00      0.00      0.00      0.00      0.00      0.0
 7. [Linux IO实时监控iostat命令详解](https://www.cnblogs.com/ggjucheng/archive/2013/01/13/2858810.html)
 
 8. [Linux使用sar进行性能分析](https://blog.csdn.net/xusensen/article/details/54606401)
+
+9. [pidstat（Linux 进程使用资源情况采样）](https://www.jianshu.com/p/348b6a81810d)
 
 <br />
 <br />
