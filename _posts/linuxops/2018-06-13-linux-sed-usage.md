@@ -190,7 +190,7 @@ This is a different line.
  
 # sed -n 's/test/trial/p' data6
 This is a trial line.
-{% endhighligt %}
+{% endhighlight %}
 上面```-n```选项禁止sed编辑器输出。但```p```替换标记会输出修改过的行。将二者配合使用则会只输出被substitute命令修改过的行。
 
 **4) 'w'替换标记**
