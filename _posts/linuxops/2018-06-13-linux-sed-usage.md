@@ -180,7 +180,7 @@ This is the second trial of the trial script.
 **3) 'p'替换标记**
 
 ```p```替换标记会打印包含与substitute命令中指定的模式匹配的行。则通常会和sed的```-n```选项一起使用：
-<pre>
+{% highlight string %}
 # tee data6 <<EOF
 > This is a test line.
 > This is a different line.
@@ -190,7 +190,7 @@ This is a different line.
  
 # sed -n 's/test/trial/p' data6
 This is a trial line.
-</pre>
+{% endhighligt %}
 上面```-n```选项禁止sed编辑器输出。但```p```替换标记会输出修改过的行。将二者配合使用则会只输出被substitute命令修改过的行。
 
 **4) 'w'替换标记**
