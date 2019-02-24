@@ -327,11 +327,57 @@ The quick green fox jumps over the active dog.
 {% endhighlight %}
 sed编辑器会将所有命令作用到该地址范围内的所有行上。
 
+### 2.3 删除行
+文本替换命令不是sed编辑器中的唯一命令。如果需要删除文本流中的特定行，可以用删除(delete)命令。
 
+删除命令```d```名副其实，它会删除匹配指定寻址模式的所有行。使用删除命令时要特别小心，因为你忘记了加一个寻址模式的话，流中的所有文本行都会被删除：
+{% highlight string %}
+# cat data1
+The quick brown fox jumps over the lazy dog.
+The quick brown fox jumps over the lazy dog.
+The quick brown fox jumps over the lazy dog.
+The quick brown fox jumps over the lazy dog.
 
+# sed 'd' data1
+{% endhighlight %}
+很明显，删除命令在和指定地址一起使用使用时最有用。则允许你从数据流中删除特定的文本行，不管是通过行号指定：
+{% highlight string %}
+# tee data7 <<EOF
+> This is line number 1
+> This is line number 2
+> This is line number 3
+> This is line number 4
+> EOF
+This is line number 1
+This is line number 2
+This is line number 3
+This is line number 4
 
+# sed '3d' data7
+This is line number 1
+This is line number 2
+This is line number 4
+{% endhighlight %}
 
-
+还可以通过特定行范围指定：
+<pre>
+# sed '2,3d' data7
+This is line number 1
+This is line number 4
+</pre>
+或是通过文件尾特殊字符：
+<pre>
+# sed '3,$d' data7
+This is line number 1
+This is line number 2
+</pre>
+sed编辑器的模式匹配特性也适用于删除命令：
+{% highlight string %}
+# sed '/number 1/d' data7
+This is line number 2
+This is line number 3
+This is line number 4
+{% endhighlight %}
 
 
 
