@@ -123,9 +123,9 @@ drm               filelock    header_event  irq_vectors  migrate  net     power 
 
 2. [Linux kernel profiling with perf](https://perf.wiki.kernel.org/index.php/Tutorial)
 
-3. []()
+3. [Perf使用教程](http://blog.chinaunix.net/uid-10540984-id-3854969.html)
 
-
+4. [perf命令](https://www.cnblogs.com/xiaogongzi/p/8473821.html)
 
 <br />
 <br />
