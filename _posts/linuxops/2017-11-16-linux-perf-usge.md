@@ -127,6 +127,8 @@ drm               filelock    header_event  irq_vectors  migrate  net     power 
 
 4. [perf命令](https://www.cnblogs.com/xiaogongzi/p/8473821.html)
 
+5. [<<Linux Perf Master>>电子书](https://cloud.tencent.com/developer/article/1019745)
+
 <br />
 <br />
 <br />
