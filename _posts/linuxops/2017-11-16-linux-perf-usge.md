@@ -43,6 +43,10 @@ drm               filelock    header_event  irq_vectors  migrate  net     power 
 {% endhighlight %}
 
 
+### 1.2 硬件之cache
+内存读写是很快的，但是还是无法和处理器指令执行速度相比。为了从内存中读取指令和数据，处理器需要等待，用处理器时间来衡量，这种等待非常漫长。cache是一种SRAM，读写速度非常快，能和处理器相匹配。因此，将常用的数据保存在cache中，处理器便无需等待，从而提高性能。cache的尺寸一般都很小，充分利用cache是软件调优非常重要的部分。
+
+## 2. 主要关注点
 
 
 
