@@ -447,6 +447,166 @@ Thread 1 (Thread 0x7f14b5459740 (LWP 30811)):
 {% endhighlight %}
 从上面我们也可以看到相应的死锁方面的信息。
 
+## 6. 利用valgrind(DRD+Helgrind)来分析死锁
+下面我们将介绍如何使用valgrind来排查死锁问题。我们先构造一个死锁场景(dead_lock.c)：
+{% highlight string %}
+#include <pthread.h>
+ 
+pthread_mutex_t s_mutex_a;
+pthread_mutex_t s_mutex_b;
+pthread_barrier_t s_barrier;
+ 
+void lock() {
+    pthread_mutex_lock(&s_mutex_b);
+    {
+        pthread_barrier_wait(&s_barrier);			//10行
+ 
+        pthread_mutex_lock(&s_mutex_a);
+        pthread_mutex_unlock(&s_mutex_a);
+    }
+    pthread_mutex_unlock(&s_mutex_b);
+}
+ 
+static void* thread_routine(void* arg) {
+    pthread_mutex_lock(&s_mutex_a);
+    {
+        pthread_barrier_wait(&s_barrier);		//21行
+ 
+        pthread_mutex_lock(&s_mutex_b);
+        pthread_mutex_unlock(&s_mutex_b);
+    }
+    pthread_mutex_unlock(&s_mutex_a);
+}
+ 
+int main(int argc, char** argv) {
+    pthread_t tid;
+ 
+    pthread_mutex_init(&s_mutex_a, 0);
+    pthread_mutex_init(&s_mutex_b, 0);
+    pthread_barrier_init(&s_barrier, 0, 2);
+ 
+    pthread_create(&tid, 0, &thread_routine, 0);
+ 
+    lock();
+ 
+    pthread_join(tid, 0);
+    pthread_cancel(tid);
+ 
+    pthread_barrier_destroy(&s_barrier);
+    pthread_mutex_destroy(&s_mutex_a);
+    pthread_mutex_destroy(&s_mutex_b);
+ 
+    return 0;
+}
+{% endhighlight %}
+上面这段代码我们只要关注lock和thread_routine两个方法。lock()方法在主线程中执行，它先给```s_mutex_b```上锁，然后通过屏障```s_barrier```等待线程也执行到屏障处（第21行)；thread_routine()是线程函数，它先给s_mutex_a上锁，然后通过屏障s_barrier等待
+主线程也执行到屏障处（第10行）。
+
+主线程和子线程都执行到屏障处后，屏障被打开，它们继续向下执行： 主线程执行到第12行试图获取```s_mutex_a```；子线程执行到第23行试图获取```s_mutex_b```。由于这两个互斥量已经被占用，所以产生死锁。
+
+这是通过代码分析出来的，但是对于比较大的工程项目，我们则需要通过工具来分析。下面我们使用valgrind来分析:
+<pre>
+# gcc -g -o dead_lock dead_lock.c -lpthread
+# valgrind --tool=drd --trace-mutex=yes ./dead_lock
+==9373== drd, a thread error detector
+==9373== Copyright (C) 2006-2015, and GNU GPL'd, by Bart Van Assche.
+==9373== Using Valgrind-3.11.0 and LibVEX; rerun with -h for copyright info
+==9373== Command: ./dead_lock
+==9373== 
+==9373== [1] mutex_init      mutex 0x6010c0
+==9373== [1] mutex_init      mutex 0x601120
+==9373== [1] mutex_init      mutex 0xffeffff10
+==9373== [1] mutex_ignore_ordering mutex 0xffeffff10
+==9373== [1] mutex_trylock   mutex 0xffeffff10 rc 0 owner 0
+==9373== [1] post_mutex_lock mutex 0xffeffff10 rc 0 owner 0
+==9373== [1] mutex_unlock    mutex 0xffeffff10 rc 1
+==9373== [2] mutex_trylock   mutex 0xffeffff10 rc 0 owner 1
+==9373== [2] post_mutex_lock mutex 0xffeffff10 rc 0 owner 1
+==9373== [2] mutex_unlock    mutex 0xffeffff10 rc 1
+==9373== [2] mutex_trylock   mutex 0x6010c0 rc 0 owner 0
+==9373== [2] post_mutex_lock mutex 0x6010c0 rc 0 owner 0
+==9373== [1] mutex_trylock   mutex 0xffeffff10 rc 0 owner 2
+==9373== [1] post_mutex_lock mutex 0xffeffff10 rc 0 owner 2
+==9373== [1] mutex_unlock    mutex 0xffeffff10 rc 1
+==9373== [1] mutex_destroy   mutex 0xffeffff10 rc 0 owner 1
+==9373== [1] mutex_trylock   mutex 0x601120 rc 0 owner 0
+==9373== [1] post_mutex_lock mutex 0x601120 rc 0 owner 0
+==9373== [1] mutex_trylock   mutex 0x6010c0 rc 1 owner 2			//18行
+==9373== [2] mutex_trylock   mutex 0x601120 rc 1 owner 1			//19行
+</pre>
+通过使用上面的指令，让valgrind把互斥量相关的信息打印出来了。
+
+第18行显示```线程1```试图给0x6010c0互斥量上锁，但是该互斥量的所有者(owner)是线程2；
+
+第19行显示```线程2```试图该0x601120互斥量上锁，但是该互斥量的所有者(owner)是线程1；
+
+如此，我们便可以确定这段程序卡住是因为死锁导致的。但是DRD有个问题，不能指出发生死锁的位置。这个时候```Helgrind```就该出场了：
+<pre>
+# valgrind --tool=helgrind ./dead_lock 
+==14606== Helgrind, a thread error detector
+==14606== Copyright (C) 2007-2015, and GNU GPL'd, by OpenWorks LLP et al.
+==14606== Using Valgrind-3.11.0 and LibVEX; rerun with -h for copyright info
+==14606== Command: ./dead_lock
+==14606== 
+</pre>
+```helgrind```执行时，如果发生死锁，需要ctrl+c来终止运行，于是可以得到如下结果：
+{% highlight string %}
+^C==14606== 
+==14606== Process terminating with default action of signal 2 (SIGINT)
+==14606==    at 0x4E471BD: __lll_lock_wait (in /usr/lib64/libpthread-2.17.so)
+==14606==    by 0x4E42D01: _L_lock_791 (in /usr/lib64/libpthread-2.17.so)
+==14606==    by 0x4E42C06: pthread_mutex_lock (in /usr/lib64/libpthread-2.17.so)
+==14606==    by 0x4C2BC4B: mutex_lock_WRK (hg_intercepts.c:894)
+==14606==    by 0x4C2FB0D: pthread_mutex_lock (hg_intercepts.c:917)
+==14606==    by 0x400947: lock (dead_lock.c:12)
+==14606==    by 0x400A03: main (dead_lock.c:38)
+==14606== ---Thread-Announcement------------------------------------------
+==14606== 
+==14606== Thread #1 is the program's root thread
+==14606== 
+==14606== ----------------------------------------------------------------
+==14606== 
+==14606== Thread #1: Exiting thread still holds 1 lock
+==14606==    at 0x4E471BD: __lll_lock_wait (in /usr/lib64/libpthread-2.17.so)
+==14606==    by 0x4E42D01: _L_lock_791 (in /usr/lib64/libpthread-2.17.so)
+==14606==    by 0x4E42C06: pthread_mutex_lock (in /usr/lib64/libpthread-2.17.so)
+==14606==    by 0x4C2BC4B: mutex_lock_WRK (hg_intercepts.c:894)
+==14606==    by 0x4C2FB0D: pthread_mutex_lock (hg_intercepts.c:917)
+==14606==    by 0x400947: lock (dead_lock.c:12)						//22行
+==14606==    by 0x400A03: main (dead_lock.c:38)
+==14606== 
+==14606== ---Thread-Announcement------------------------------------------
+==14606== 
+==14606== Thread #2 was created
+==14606==    at 0x514C72E: clone (in /usr/lib64/libc-2.17.so)
+==14606==    by 0x4E3FF79: do_clone.constprop.4 (in /usr/lib64/libpthread-2.17.so)
+==14606==    by 0x4E41468: pthread_create@@GLIBC_2.2.5 (in /usr/lib64/libpthread-2.17.so)
+==14606==    by 0x4C2E64A: pthread_create_WRK (hg_intercepts.c:427)
+==14606==    by 0x4C2F728: pthread_create@* (hg_intercepts.c:460)
+==14606==    by 0x4009F9: main (dead_lock.c:36)
+==14606== 
+==14606== ----------------------------------------------------------------
+==14606== 
+==14606== Thread #2: Exiting thread still holds 1 lock
+==14606==    at 0x4E471BD: __lll_lock_wait (in /usr/lib64/libpthread-2.17.so)
+==14606==    by 0x4E42D01: _L_lock_791 (in /usr/lib64/libpthread-2.17.so)
+==14606==    by 0x4E42C06: pthread_mutex_lock (in /usr/lib64/libpthread-2.17.so)
+==14606==    by 0x4C2BC4B: mutex_lock_WRK (hg_intercepts.c:894)
+==14606==    by 0x4C2FB0D: pthread_mutex_lock (hg_intercepts.c:917)
+==14606==    by 0x400987: thread_routine (dead_lock.c:23)					//43行
+==14606==    by 0x4C2E83E: mythread_wrapper (hg_intercepts.c:389)
+==14606==    by 0x4E40DC4: start_thread (in /usr/lib64/libpthread-2.17.so)
+==14606==    by 0x514C76C: clone (in /usr/lib64/libc-2.17.so)
+==14606== 
+==14606== 
+==14606== For counts of detected and suppressed errors, rerun with: -v
+==14606== Use --history-level=approx or =none to gain increased speed, at
+==14606== the cost of reduced accuracy of conflicting-access information
+==14606== ERROR SUMMARY: 2 errors from 2 contexts (suppressed: 2 from 2)
+已杀死
+{% endhighlight %}
+第22行和第43行分别显示了主线程和子线程在中断之前，都锁在哪一行。这样就更容易定位问题了。
+
 
 <br />
 <br />
