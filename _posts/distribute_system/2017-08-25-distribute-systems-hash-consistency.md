@@ -110,7 +110,7 @@ Hash算法的一个很亮指标是```单调性```(Monotonicity)，定义如下�
 
 ## 5. 一致性Hash原理
 
-一致性哈希算法(Consistent Hashing)最早在论文[《Consistent Hashing and Random Trees: Distributed Caching Protocols for Relieving Hot Spots on the World Wide Web》](https://dl.acm.org/citation.cfm?id=258660)中被提出。简单来说，一致性哈希将整个哈希值空间组织成一个虚拟的圆环，如假设某哈希函数```H```的值空间为```[0,2^32-1]```（即哈希值是一个32位无符号整形），整个哈希空间环如下：
+一致性哈希算法(Consistent Hashing)最早在论文[<<Consistent Hashing and Random Trees: Distributed Caching Protocols for Relieving Hot Spots on the World Wide Web>>](https://dl.acm.org/citation.cfm?id=258660)中被提出。简单来说，一致性哈希将整个哈希值空间组织成一个虚拟的圆环，如假设某哈希函数```H```的值空间为```[0,2^32-1]```（即哈希值是一个32位无符号整形），整个哈希空间环如下：
 
 ![hc-figure-3](https://ivanzz1001.github.io/records/assets/img/distribute/hc_figure_3.png)
 
