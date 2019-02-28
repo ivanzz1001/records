@@ -187,6 +187,15 @@ rados -p benchmark cleanup
 ceph osd pool delete benchmark benchmark --yes-i-really-really-mean-it
 {% endhighlight %}
 
+
+<br />
+<br />
+
+**[参看]:**
+
+1. [Ceph存储与S3对象存储性能优化.pdf](https://max.book118.com/html/2018/0331/159524779.shtm)
+
+
 <br />
 <br />
 <br />
