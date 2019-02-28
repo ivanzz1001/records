@@ -74,7 +74,24 @@ Hash算法的一个很亮指标是```单调性```(Monotonicity)，定义如下�
 
 ![hc-figure-1](https://ivanzz1001.github.io/records/assets/img/distribute/hc_figure_1.png)
 
+从上图的状态中添加一台memcached服务器。余数分布式算法由于保存键的服务器会发生巨大变化而影响缓存的命中率，但Consistent Hashing中，只有在圆(continuum)上增加服务器的地点逆时针方向的第一台服务器上的键会受到影响，如下图所示：
 
+![hc-figure-2](https://ivanzz1001.github.io/records/assets/img/distribute/hc_figure_2.png)
+
+
+## 4. 一致性Hash性质
+考虑到分布式系统每个节点都有可能失效，并且新的节点很可能动态的增加进来，如何保证当系统的节点数目发生变化时仍然能够对外提供良好的服务，这是值得考虑的，尤其是在设计分布式缓存系统时，如果某台服务器失效，对于整个系统来说如果不采用合适的算法来保证一致性，那么缓存于系统中的所有数据都都可能会失效（即由于系统节点数目变少，客户端在请求某一对象时需要重新计算其hash值（通常与系统中的节点数目有关），由于hash值已经改变，所以很可能找不到保存该对象的服务器节点），因此一致性hash就显得至关重要，良好的分布式cache系统中的一致性hash算法应该满足以下几个方面：
+
+
+* **平衡性(Balance)**
+
+
+* **单调性(Monotonicity)**
+
+
+* **分散性(Spread)**
+
+* **负载(Load)**
 
 
 
