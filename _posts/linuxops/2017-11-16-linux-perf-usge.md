@@ -583,6 +583,14 @@ void longa()
 		j=i; 			//am I silly or crazy? I feel boring and desperate. 
 } 
 
+void foo1() 
+{ 
+	int i; 
+	
+	for(i = 0; i< 100; i++) 
+		longa(); 
+}
+
 void foo2() 
 { 
 	int i; 
@@ -591,13 +599,6 @@ void foo2()
 		longa(); 
 } 
 
-void foo1() 
-{ 
-	int i; 
-	
-	for(i = 0; i< 100; i++) 
-		longa(); 
-} 
 
 int main(int argc, char *argv[]) 
 { 
@@ -669,6 +670,61 @@ Some events weren't counted. Try disabling the NMI watchdog:
         perf stat ...
         echo 1 > /proc/sys/kernel/nmi_watchdog
 {% endhighlight %}
+
+
+## 6. 使用perf record/report
+使用perf top和perf stat之后，您可能已经大致有数了。要进一步分析，便需要一些粒度更细的信息。比如说你已经断定目标程序计算量较大，也许是因为有些代码写的不够精简。那么面对长长的代码文件，究竟哪几行代码需要进一步修改呢？ 这便需要使用```perf record```记录单个函数级别的统计信息，并使用```perf report```来显示统计结果。
+
+
+您的调优应该将注意力集中到百分比高的热点代码片段上，假如一段代码只占用整个程序运行时间的0.1%，即使你将其优化到仅剩一条机器指令，恐怕也只能将整体程序的性能提高0.1%。俗话说，好钢用在刀刃上，不必我多说了。下面我们用```perf record```来运行上述```perf_test2.c```程序：
+<pre>
+# perf record -e cpu-clock ./perf_test2     // 默认导出的文件名为perf.data， 也可以使用-o选项来指定导出的文件
+[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 0.044 MB perf.data (801 samples) ]
+</rpe>
+接着，我们用```perf report```来分析：
+<pre>
+# perf report -i ./perf.data 
+Samples: 801  of event 'cpu-clock', Event count (approx.): 200250000                                                                                                       
+Overhead  Command     Shared Object  Symbol                                                                                                                                
+ 100.00%  perf_test2  perf_test2     [.] longa   
+</pre>
+
+不出所料，hot spot 是 longa() 函数。但是，代码是非常复杂难说的，```perf_test2```程序中的foo1()也是一个潜在的调优对象，为什么要调用100次那个无聊的longa()函数呢？ 但我们在上图中无法发现foo1()和foo2()，更无法了解他们的区别了。我曾发现自己写的一个程序居然有近一半的时间花费在string类的几个方法上， string是C++标准库函数，我绝不可能写出比STL更好的代码了。因此我只有找到自己程序中过多使用string的地方。因此我很需要按照调用关系进行显示的统计信息。
+
+
+使用perf record的```-g```选项便可以得到需要的信息：
+<pre>
+# perf record -e cpu-clock -g ./perf_test2
+[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 0.081 MB perf.data (803 samples) ]
+</pre>
+再接着使用```perf report```来进行分析：
+<pre>
+# perf report -i perf.data
+Samples: 803  of event 'cpu-clock', Event count (approx.): 200750000                                                                                                       
+  Children      Self  Command     Shared Object      Symbol                                                                                                                
++   99.88%    99.88%  perf_test2  perf_test2         [.] longa                                                                                                             
++   99.88%     0.00%  perf_test2  libc-2.17.so       [.] __libc_start_main                                                                                                 
++   99.88%     0.00%  perf_test2  perf_test2         [.] main                                                                                                              
++   90.91%     0.00%  perf_test2  perf_test2         [.] foo1                                                                                                              
++    8.97%     0.00%  perf_test2  perf_test2         [.] foo2                                                                                                              
+     0.12%     0.12%  perf_test2  [kernel.kallsyms]  [k] _raw_spin_unlock_irqrestore                                                                                       
+     0.12%     0.00%  perf_test2  [kernel.kallsyms]  [k] system_call_fastpath                                                                                              
+     0.12%     0.00%  perf_test2  [kernel.kallsyms]  [k] sys_exit_group                                                                                                    
+     0.12%     0.00%  perf_test2  [kernel.kallsyms]  [k] do_group_exit                                                                                                     
+     0.12%     0.00%  perf_test2  [kernel.kallsyms]  [k] do_exit                                                                                                           
+     0.12%     0.00%  perf_test2  [kernel.kallsyms]  [k] mmput                                                                                                             
+     0.12%     0.00%  perf_test2  [kernel.kallsyms]  [k] exit_mmap                                                                                                         
+     0.12%     0.00%  perf_test2  [kernel.kallsyms]  [k] tlb_finish_mmu                                                                                                    
+     0.12%     0.00%  perf_test2  [kernel.kallsyms]  [k] tlb_flush_mmu.part.61                                                                                             
+     0.12%     0.00%  perf_test2  [kernel.kallsyms]  [k] free_pages_and_swap_cache                                                                                         
+     0.12%     0.00%  perf_test2  [kernel.kallsyms]  [k] release_pages
+</pre>
+上面通过对calling graph的分析，能很方便的看到90.91%的时间都花费在foo1()函数中，因为它调用了100次 longa() 函数，因此假如longa()是个无法优化的函数，那么程序员就应该考虑优化foo1()函数，减少对longa()函数的调用次数。
+
+
+
 
 <br />
 <br />
