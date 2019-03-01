@@ -681,7 +681,7 @@ Some events weren't counted. Try disabling the NMI watchdog:
 # perf record -e cpu-clock ./perf_test2     // 默认导出的文件名为perf.data， 也可以使用-o选项来指定导出的文件
 [ perf record: Woken up 1 times to write data ]
 [ perf record: Captured and wrote 0.044 MB perf.data (801 samples) ]
-</rpe>
+</pre>
 接着，我们用```perf report```来分析：
 <pre>
 # perf report -i ./perf.data 
@@ -694,11 +694,11 @@ Overhead  Command     Shared Object  Symbol
 
 
 使用perf record的```-g```选项便可以得到需要的信息：
-<pre>
+{% highlight string %}
 # perf record -e cpu-clock -g ./perf_test2
 [ perf record: Woken up 1 times to write data ]
 [ perf record: Captured and wrote 0.081 MB perf.data (803 samples) ]
-</pre>
+{% endhighlight %}
 再接着使用```perf report```来进行分析：
 <pre>
 # perf report -i perf.data
