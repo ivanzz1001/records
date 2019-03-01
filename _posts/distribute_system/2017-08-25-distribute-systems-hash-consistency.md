@@ -156,9 +156,316 @@ Hash算法的一个很亮指标是```单调性```(Monotonicity)，定义如下�
 
 同时数据定位算法不变，只是多了一步虚拟节点到实际节点的映射。例如定位到```Node A#1```、```Node A#2```、```Node A#3```三个虚拟节点的数据均定位到```Node A```上。这样就解决了服务节点少时数据倾斜的问题。在实际应用中，通常将虚拟节点数设置为32甚至更大，因此即使很少的服务节点也能做到相对均匀的数据分布。
 
+## 5. 一致性哈希的Java实现
+
+### 5.1 简单情况
+Java实现中用什么表示Hash环好呢？ 经对比，用TreeMap的时间复杂度是O(logN)，相对效率比较高，因为TreeMap使用了红黑树结构存储实体对象。
+
+Hash算法的选择上，首先我们考虑简单的String.HashCode()方法，这个算法的缺点是，相似的字符串如N0(10.0.0.0:91001)、N1(10.0.0.0:91002)、N2(10.0.0.0:91003)，哈希值也很接近，造成的结果是节点在Hash环上的分布很紧密，导致大部分key值落到N0上，节点资源分布不均。一般我们采用```FNV1_32_HASH```、```KETAMA_HASH```等算法，KETAMA_HASH是MemCache集群默认的实现方法，这些算法效果要好很多，会使N0、N1、N2的Hash值更均匀的分布在环上。
 
 
+下面我们用```KETAMA_HASH```算法实现一致性哈希（无虚拟节点方式），如下代码所示(```SimpleHashConsistency.java```)：
+{% highlight string %}
+package simple_hc;
 
+
+import java.io.UnsupportedEncodingException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.TreeMap;
+
+
+/**
+ * Created by markcd on 2018/2/28.
+ */
+public class SimpleHashConsistency {
+
+    private TreeMap<Long, String> realNodes = new TreeMap<>();
+    private String[] nodes;
+
+    
+    public SimpleHashConsistency(String[] nodes){
+        this.nodes = Arrays.copyOf(nodes, nodes.length);
+        initalization();
+    }
+
+    
+    /**
+     * 初始化哈希环
+     * 循环计算每个node名称的哈希值，将其放入treeMap
+     */
+    private void initalization(){
+        for (String nodeName: nodes) {
+            realNodes.put(hash(nodeName, 0), nodeName);
+        }
+    }
+
+    
+    /**
+     * 根据资源key选择返回相应的节点名称
+     * @param key
+     * @return 节点名称
+     */
+    public String selectNode(String key){
+        Long hashOfKey = hash(key, 0);
+        if (! realNodes.containsKey(hashOfKey)) {
+               //ceilingEntry()的作用是得到比hashOfKey大的第一个Entry
+            Map.Entry<Long, String> entry = realNodes.ceilingEntry(hashOfKey);
+            if (entry != null)
+                return entry.getValue();
+            else
+                return nodes[0];
+        }else
+            return realNodes.get(hashOfKey);
+    }
+
+    
+    private Long hash(String nodeName, int number) {
+        byte[] digest = md5(nodeName);
+        return (((long) (digest[3 + number * 4] & 0xFF) << 24)
+                | ((long) (digest[2 + number * 4] & 0xFF) << 16)
+                | ((long) (digest[1 + number * 4] & 0xFF) << 8)
+                | (digest[number * 4] & 0xFF))
+                & 0xFFFFFFFFL;
+    }
+
+    
+    /**
+     * md5加密
+     *
+     * @param str
+     * @return
+     */
+    public byte[] md5(String str) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            md.reset();
+            md.update(str.getBytes("UTF-8"));
+            return md.digest();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            return null;
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    
+    private void printTreeNode(){
+        if (realNodes != null && ! realNodes.isEmpty()){
+            realNodes.forEach((hashKey, node) ->
+                    System.out.println(
+                            new StringBuffer(node)
+                            .append(" ==> ")
+                            .append(hashKey)
+                    )
+            );
+        }else
+            System.out.println("Cycle is Empty");
+    }
+    
+    
+
+    public static void main(String[] args){
+        String[] nodes = new String[]{"192.168.2.1:8080", "192.168.2.2:8080", "192.168.2.3:8080", "192.168.2.4:8080"};
+        SimpleHashConsistency consistentHash = new SimpleHashConsistency(nodes);
+        consistentHash.printTreeNode();
+    }
+}
+{% endhighlight %}
+main()方法执行结果如下，可以看到，hash值分布的距离比较开阔:
+{% highlight string %}
+192.168.2.3:8080 ==> 1182102228
+192.168.2.4:8080 ==> 1563927337
+192.168.2.1:8080 ==> 2686712470
+192.168.2.2:8080 ==> 3540412423
+{% endhighlight %}
+
+
+```KETAMA_HASH```解决了hash值分布不均匀的问题，但还存在一个问题，如下图所示，在没有```Node3```节点时，资源相对均匀的分布在{Node0, Node1, Node2}上。增加了Node3节点后，Node1到Node3节点中间的所有资源从Node2迁移到了Node3上。这样，Node0、Node1存储的资源多，Node2、Node3存储的资源少，资源分布不均匀。
+
+![hc-figure-9](https://ivanzz1001.github.io/records/assets/img/distribute/hc_figure_9.png)
+
+
+### 5.2 带虚拟节点的一致性哈希
+上面我们提到了资源分布不均匀的问题，要如何解决呢？ 我们引入虚拟节点概念，如将一个真实节点Node 0映射成100个虚拟节点分布在Hash环上，与这100个虚拟节点根据```KETAMA_HASH```哈希环相匹配的资源都存到真实节点```Node0```上。{Node0,Node1,Node2}以相同的方式拆分虚拟节点映射到Hash环上。当集群增加节点```Node3```时，在Hash环上增加Node3拆分的100个虚拟节点，这新增的100个虚拟节点更均匀的分布在了哈希环上，可能承担了{Node0,Node1,Node2}每个节点的部分资源，资源分布仍然保持均匀。
+
+
+每个真实节点应该拆分成多少个虚拟节点？ 数量要合适才能保证负载分布的均匀，有一个大致的规律，如下图所示，```Y轴```表示真实节点的数目，```X轴```表示需拆分的虚拟节点数目：
+
+![hc-figure-10](https://ivanzz1001.github.io/records/assets/img/distribute/hc_figure_10.png)
+
+真实节点越少，所需拆分的虚拟节点越多。比如有10个真实节点，每个节点所需要拆分的虚拟节点个数可能是100~200个，才能达到真正的负载均衡。
+
+下面贴出使用了虚拟节点的算法实现(```VirtualNodeHashConsistency.java```):
+{% highlight string %}
+package vnode_hc;
+
+import java.io.UnsupportedEncodingException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.TreeMap;
+
+/**
+ * Created by markcd on 2018/2/28.
+ */
+public class VirtualNodeHashConsistency {
+
+    private TreeMap<Long, String> virtualNodes = new TreeMap<>();
+    private LinkedList<String> nodes;
+        //每个真实节点对应的虚拟节点数
+    private final int replicCnt;
+    
+
+    public VirtualNodeHashConsistency(LinkedList<String> nodes, int replicCnt){
+        this.nodes = nodes;
+        this.replicCnt = replicCnt;
+        initalization();
+    }
+
+    /**
+     * 初始化哈希环
+     * 循环计算每个node名称的哈希值，将其放入treeMap
+     */
+    private void initalization(){
+        for (String nodeName: nodes) {
+            for (int i = 0; i < replicCnt/4; i++) {
+                String virtualNodeName = getNodeNameByIndex(nodeName, i);
+                for (int j = 0; j < 4; j++) {
+                    virtualNodes.put(hash(virtualNodeName, j), nodeName);
+                }
+            }
+        }
+    }
+
+    private String getNodeNameByIndex(String nodeName, int index){
+        return new StringBuffer(nodeName)
+                .append("&&")
+                .append(index)
+                .toString();
+    }
+
+    /**
+     * 根据资源key选择返回相应的节点名称
+     * @param key
+     * @return 节点名称
+     */
+    public String selectNode(String key){
+        Long hashOfKey = hash(key, 0);
+        if (! virtualNodes.containsKey(hashOfKey)) {
+            Map.Entry<Long, String> entry = virtualNodes.ceilingEntry(hashOfKey);
+            if (entry != null)
+                return entry.getValue();
+            else
+                return nodes.getFirst();
+        }else
+            return virtualNodes.get(hashOfKey);
+    }
+
+    private Long hash(String nodeName, int number) {
+        byte[] digest = md5(nodeName);
+        return (((long) (digest[3 + number * 4] & 0xFF) << 24)
+                | ((long) (digest[2 + number * 4] & 0xFF) << 16)
+                | ((long) (digest[1 + number * 4] & 0xFF) << 8)
+                | (digest[number * 4] & 0xFF))
+                & 0xFFFFFFFFL;
+    }
+
+    /**
+     * md5加密
+     *
+     * @param str
+     * @return
+     */
+    public byte[] md5(String str) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            md.reset();
+            md.update(str.getBytes("UTF-8"));
+            return md.digest();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            return null;
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public void addNode(String node){
+        nodes.add(node);
+        
+        for (int i = 0; i < replicCnt/4; i++) {
+        	String virtualNodeName = getNodeNameByIndex(node, i);
+        	
+            for (int j = 0; j < 4; j++) {
+                virtualNodes.put(hash(virtualNodeName, j), node);
+            }
+        }
+    }
+
+    public void removeNode(String node){
+        nodes.remove(node);
+       
+        for (int i = 0; i < replicCnt/4; i++) {
+        	 String virtualNodeName = getNodeNameByIndex(node, i);
+        	 
+            for (int j = 0; j < 4; j++) {
+                virtualNodes.remove(hash(virtualNodeName, j), node);
+            }
+        }
+    }
+
+    private void printTreeNode(){
+        if (virtualNodes != null && ! virtualNodes.isEmpty()){
+            virtualNodes.forEach((hashKey, node) ->
+                    System.out.println(
+                            new StringBuffer(node)
+                                    .append(" ==> ")
+                                    .append(hashKey)
+                    )
+            );
+        }else
+            System.out.println("Cycle is Empty");
+    }
+
+    
+    public static void main(String[] args){
+        LinkedList<String> nodes = new LinkedList<>();
+        nodes.add("192.168.2.1:8080");
+        nodes.add("192.168.2.2:8080");
+        nodes.add("192.168.2.3:8080");
+        nodes.add("192.168.2.4:8080");
+        VirtualNodeHashConsistency consistentHash = new VirtualNodeHashConsistency(nodes, 160);
+        consistentHash.printTreeNode();
+    }
+}
+{% endhighlight %}
+
+以上main方法执行的结果如下：
+{% highlight string %}
+192.168.2.4:8080 ==> 18075595
+192.168.2.1:8080 ==> 18286704
+192.168.2.1:8080 ==> 35659769
+192.168.2.2:8080 ==> 43448858
+192.168.2.1:8080 ==> 44075453
+192.168.2.3:8080 ==> 47625378
+192.168.2.4:8080 ==> 52449361
+192.168.2.2:8080 ==> 53176589
+192.168.2.4:8080 ==> 53206362
+192.168.2.2:8080 ==> 54789163
+192.168.2.3:8080 ==> 78933624
+192.168.2.2:8080 ==> 84809132
+192.168.2.1:8080 ==> 116518130
+192.168.2.2:8080 ==> 116682394
+....
+....
+{% endhighlight %}
 
 
 <br />
