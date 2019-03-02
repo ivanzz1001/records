@@ -24,7 +24,7 @@ KiB Mem:   8093596 total,  7201400 used,   892196 free,     1000 buffers
 KiB Swap:  8000508 total,      880 used,  7999628 free.  1732676 cached Mem
 
   PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
- 2079 midea     20   0 1598784 124000  71432 S   1.3  1.5   8:59.30 compiz
+ 2079 root     20   0 1598784 124000  71432 S   1.3  1.5   8:59.30 compiz
     1 root      20   0   33760   4256   2728 S   0.0  0.1   0:01.33 init
     2 root      20   0       0      0      0 S   0.0  0.0   0:00.02 kthreadd
     3 root      20   0       0      0      0 S   0.0  0.0   0:00.94 ksoftirqd/0
