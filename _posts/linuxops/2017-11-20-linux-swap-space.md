@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Linux Swap交换分区介绍总结(转)
+title: Linux swap交换分区介绍总结(转)
 tags:
 - LinuxOps
 categories: linuxOps

@@ -184,6 +184,15 @@ KiB Swap:  8000508 total,      880 used,  7999628 free.  1732676 cached Mem
 * **COMMAND:** 启动该任务所使用的命令行
 
 
+
+<br />
+<br />
+
+**[参看]:**
+
+1. [linux TOP命令各参数详解](http://www.cnblogs.com/sbaicl/articles/2752068.html)
+
+
 <br />
 <br />
 <br />
