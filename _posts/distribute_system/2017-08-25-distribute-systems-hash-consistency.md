@@ -2,9 +2,9 @@
 layout: post
 title: 分布式一致性哈希算法原理
 tags:
-- 分布式系统一致性哈希算法原理
+- 分布式系统理论
 categories: distribute-systems
-description: 分布式系统理论
+description: 分布式系统一致性哈希算法原理
 ---
 
 本文我们介绍一下分布式一致性哈希算法的基本原理。
