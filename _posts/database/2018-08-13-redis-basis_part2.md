@@ -392,6 +392,8 @@ config get maxclients
 
 3. [redis在线测试](http://try.redis.io/)
 
+4. [redis的持久化方式RDB和AOF的区别](https://blog.csdn.net/m0_38110132/article/details/76906422)
+
 <br />
 <br />
 <br />
