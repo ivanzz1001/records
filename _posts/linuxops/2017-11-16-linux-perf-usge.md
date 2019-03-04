@@ -521,7 +521,7 @@ perf stat [-e <EVENT> | --event=EVENT] [-a] — <command> [<options>]
 
 * page_faults: 缺页异常的次数。当应用程序请求的页面尚未建立、请求的页面不在内存中，或者请求的页面虽然在内存中，但物理地址和虚拟地址的映射关系尚未建立时，都会触发一次缺页中断异常。另外，TLB不命中，页面访问权限不匹配等情况也会触发缺页异常。
 
-* cycles: 消耗的处理器周期数。如果我们执行```perf stat ls``
+* cycles: 消耗的处理器周期数。如果我们执行```perf stat ls```
 <pre>
 # perf stat ls
 b2      bjam   boost-build.jam  boost.css  bootstrap.bat  bootstrap.sh  index.htm   INSTALL  libs             more                rst.css  status
