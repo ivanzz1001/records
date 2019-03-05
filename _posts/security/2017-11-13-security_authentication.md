@@ -44,7 +44,7 @@ description: 安全认证之kerberos协议
 * Message B: ```Ticket-Granting-Ticket```(TGT,里面通常含有client ID，client network address，ticket validity period, and client/TGS session key), 其用TGS的secret key进行了加密。
 
 
-3) 一旦客户端收到Message A 和 Message B，就会使用客户端输入的password产生的secret来对Message A进行解密。假如用户输入的密码并不匹配AS数据库中保存的密码，则产生的客户端secret key将会不同，因此就不能对Message A进行解密； 假如用户输入了正确的password，则可以产生正确的secret key，然后用该secret key可以成功的对Message A进行解密以获取到```Client/TGS Session Key```。该session key被用于后续与TGS进行通信。(注意：客户端并不能够对Message B进行解密，因为它是使用TGS的secret key进行过加密）到此为止，客户端已经有足够的信息来向TGS来认证自己。
+3) 一旦客户端收到Message A 和 Message B，就会使用客户端输入的password产生的secret key来对Message A进行解密。假如用户输入的密码并不匹配AS数据库中保存的密码，则产生的客户端secret key将会不同，因此就不能对Message A进行解密； 假如用户输入了正确的password，则可以产生正确的secret key，然后用该secret key可以成功的对Message A进行解密以获取到```Client/TGS Session Key```。该session key被用于后续与TGS进行通信。(注意：客户端并不能够对Message B进行解密，因为它是使用TGS的secret key进行过加密）到此为止，客户端已经有足够的信息来向TGS来认证自己。
 
 <br />
 
@@ -52,9 +52,9 @@ description: 安全认证之kerberos协议
 
 1) 当要请求```services```的时候，客户端发送如下消息到TGS
 
-* Message C: 将Message B返回过来的加密过的TGT以及所请求service的ID打包在一起
+* Message C: 将Message B返回过来的加密过的TGT以及所请求service的ID(service-id)打包在一起
 
-* Message D: 使用```Client/TGS Session Key```加密过的Authenticator(包含了client ID以及timestamp)
+* Message D: 使用```Client/TGS Session Key```加密过的Authenticator(包含了client ID以及timestamp信息)
 
 
 2) 当TGS收到Message C和Message D之后，TGS首先从Message C中分离出Message B，然后使用TGS的```secret key```对Message B进行解密，这样就可以获得其中的```client/TGS session key```。然后TGS使用该key值来对Message D(Authenticator)进行解密，并且对比来自Message C和Message D中的client ID，假如匹配的话则发送如下两个消息到客户端：
