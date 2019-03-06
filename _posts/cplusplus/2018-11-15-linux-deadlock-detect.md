@@ -448,7 +448,7 @@ Thread 1 (Thread 0x7f14b5459740 (LWP 30811)):
 从上面我们也可以看到相应的死锁方面的信息。
 
 ## 6. 利用valgrind(DRD+Helgrind)来分析死锁
-下面我们将介绍如何使用valgrind来排查死锁问题。我们先构造一个死锁场景(dead_lock.c)：
+下面我们将介绍如何使用valgrind来排查死锁问题（说明： 这里DRD是Data Race Detection的缩写)。我们先构造一个死锁场景(dead_lock.c)：
 {% highlight string %}
 #include <pthread.h>
  
