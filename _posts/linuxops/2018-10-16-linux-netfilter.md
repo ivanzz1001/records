@@ -125,16 +125,41 @@ iptables并不能跟踪数据包之间的联系，也不会对数据包的内容
 
 接着我们介绍一下从本主机向外发送一个数据包所经过的步骤：
 
+![outgoing-pkg](https://ivanzz1001.github.io/records/assets/img/linuxops/netfilter_outgoing_pkg.jpg)
 
 
 
+接着我们来看一下，通过本主机来转发数据包其所经过的步骤：
+
+![forwarded-pkg](https://ivanzz1001.github.io/records/assets/img/linuxops/netfilter_forwarded_pkg.jpg)
+
+正如上面你所看到，数据包可能会经过很多步骤。数据包可能在任何一个```iptables chains```上面被终止。
+<pre>
+注意： 对于forward这一情况（即转发数据包），请不要使用INPUT chain。因为INPUT chain主要被用于发送到本主机的
+数据包。
+</pre>
+
+
+下面我们给出一张数据包通过iptables时的图示：
 
 ![tables-traverse](https://ivanzz1001.github.io/records/assets/img/linuxops/tables_traverse.jpg)
+
+假若我们有一个数据包进入第一个路由判决之后，发现其目的地址并不是本主机，那么其将会被路由到```FORWARD链```，否则数据则会被发送到本主机上的```INPUT链```.
+
 
 下面我们再给出一张简化版本示意图：
 
 ![tables-traverse-simple](https://ivanzz1001.github.io/records/assets/img/linuxops/tables_traverse_simple.jpg)
 
+### 2.2 Mangle表
+
+### 2.3 Nat表
+
+### 2.4 Raw表
+
+### 2.5 Filter表
+
+### 2.6 用户自定义的chain
 
 
 
