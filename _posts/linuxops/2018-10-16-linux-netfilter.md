@@ -24,7 +24,7 @@ Netfilter是Linux操作系统核心层内部的一个数据包处理模块，它
 
 * 数据包过滤(防火墙功能)
 
-* 网络地址装换(NAT/NAPT)
+* 网络地址装换(NAT/NAPT): 源网络地址装换(SNAT -- Source Network Address Translation)和目标地址转换(DNAT -- Destination Network Address Translation) 
 
 * 数据包伪装(packet mangling)
 
@@ -53,6 +53,26 @@ iptables ----|------IP table ---|------ rule(classifier_1 classififer_2 ... acti
                                 |------ rule(classifier_1 classififer_2 ... action)
 
 {% endhighlight %}
+
+**iptables** 和**netfilter**主要工作在```OSI网络7层参考模型```中的网络层和传输层。
+
+
+
+### 1.2 ip filtering 介绍
+本章我们会介绍一下ip filter的理论细节： IP filter工作原理、firewall的工作层级、policies等。
+
+1) **What is an IP filter**
+
+很重要的一点是我们必须要完全弄明白一个```IP filter```到底是什么。其实```Iptables```就是一个IP Filter，假如不能完全理解这一点的话，当我们在未来设计防火墙的时候将会碰到严重的问题。
+
+一个```IP Filter```主要工作在TCP/IP网络协议栈中的**传输层**，而```iptables```可以工作在**传输层**和**网络层**。假如IP Filter的实现严格按照定义来的话，其只能够基于IP头(IP Headers)来进行包过滤。然而，由于iptables并不是严格的按照定义来实现的，导致IP filter也能够基于其他的Header来进行数据包过滤，例如TCP头、UDP头或者是MAC源地址。
+
+
+iptables并不能跟踪数据包之间的联系，也不会对数据包的内容进行解析，因为这可能会耗费大量的内存及CPU。
+
+
+2) **IP filtering相关术语**
+
 
 
 
