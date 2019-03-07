@@ -123,7 +123,7 @@ iptables并不能跟踪数据包之间的联系，也不会对数据包的内容
 ![incomming-pkg](https://ivanzz1001.github.io/records/assets/img/linuxops/netfilter_incomming_pkg.jpg)
 
 
-
+![tables-traverse](https://ivanzz1001.github.io/records/assets/img/linuxops/tables_traverse.jpg)
 
 
 <br />
@@ -143,6 +143,7 @@ iptables并不能跟踪数据包之间的联系，也不会对数据包的内容
 
 6. [iptables 设置端口转发/映射](https://blog.csdn.net/light_jiang2016/article/details/79029661)
 
+7. [iptables详解](https://www.cnblogs.com/metoy/p/4320813.html)
 
 <br />
 <br />
