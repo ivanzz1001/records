@@ -123,7 +123,19 @@ iptables并不能跟踪数据包之间的联系，也不会对数据包的内容
 ![incomming-pkg](https://ivanzz1001.github.io/records/assets/img/linuxops/netfilter_incomming_pkg.jpg)
 
 
+接着我们介绍一下从本主机向外发送一个数据包所经过的步骤：
+
+
+
+
+
 ![tables-traverse](https://ivanzz1001.github.io/records/assets/img/linuxops/tables_traverse.jpg)
+
+下面我们再给出一张简化版本示意图：
+
+![tables-traverse-simple](https://ivanzz1001.github.io/records/assets/img/linuxops/tables_traverse_simple.jpg)
+
+
 
 
 <br />
