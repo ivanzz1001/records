@@ -153,14 +153,69 @@ iptables并不能跟踪数据包之间的联系，也不会对数据包的内容
 
 ### 2.2 Mangle表
 
+该表的主要用途就是对数据包进行伪装。换句话说，你可以mangle表中自由的使用```mangle targets```，来改变数据包的TOS等字段。
+<pre>
+注意： 强烈建议不要使用此表来做任何的Filtering，DNAT、SNAT或者Masquerading通常也不会工作在此表
+</pre>
+
+如下的一些targets只有在```mangle```表中才是有效的，它们不可以被用在```mangle```表之外的其他表中：
+
+* TOS: 本target会被用于设置或修改数据包的TOS字段。这可以被用于为数据包的路由建立相应的策略。值得注意的是本target并没有被很好的实现，建议不要使用
+
+* TTL: 本target被用于修改数据包的TTL字段。我们可以将数据包的TTL字段设置为一个特定的值。
+
+* MARK： 本target会被用于为packet设置特定的mark值。这些```标记```(marks)可以被iproute2应用程序所识别，并以此来做不同的路由。我们也可以基于这些```标记```(marks)来做带宽限制和```分类队列```(Class Based Queuing)
+
+* SECMARK: 本target可以用于为单个的数据包设置```安全上下文标记```(security context marks)，这些标记可以被SELinux与其他的一些安全系统所识别
+
+* CONNSECMARK: 本target被用于从单个数据包中复制```安全上下文```到整个连接(connection)中(或者相反方向的复制），这些标记可以被SELINUX与其他一下安全系统所识别，从而可以在整个Connection级别获得更好的安全性。
+
+
 ### 2.3 Nat表
 
+本表只会被用于NAT数据包。换句话说，它只能被用于转换数据包的```源地址```或者```目的地址```。值得注意的是，一个数据流中只有第一个数据包会命中本表，之后该数据流中的所有数据包将会自动的获得与第一个数据包相同的操作(action)。实际的targets可能会做如下一些类型的事情：
+
+* DNAT: 本target的使用场景通常为————你有一个公网IP地址，然后需要将相应的访问请求转发到防火墙之后的其他主机上（如DMZ区域的主机）。换句话说，我们修改数据包的目的地址，然后重新路由到目标主机。
+
+* SNAT: 本target主要被用于修改数据包源地址。大部分情况下你会隐藏本地网络或DMZ网络。一个很好的例子就是，我们只知道一个防火墙的外部IP地址，但是需要将我们本地网络的IP地址替换为该外部地址。通过本target，防火墙将会自动的对数据包进行SNAT与De-SNAT操作，这样就使得可以从本地局域网向外网Internet建立连接。
+
+* MASQUERADE: 本target的用法与```SNAT```很相似，只是```MASQUERADE target```会耗费等多的一些资源来进行计算。原因在于，每当一个数据包命中本target，其都会自动的检查所使用的IP地址，而不是直接像SNAT那样仅仅使用一个单独的配置IP。```MASQUERADE target```使得其能够与DHCP搭配来工作。
+
+* REDIRECT
+
+
 ### 2.4 Raw表
+raw表主要被用于做一件事情，就是在数据包上设置标志，使得其不会被```连接跟踪系统```(connection tracking system)所处理。这可以通过使用```NOTRACK target```来完成。假如某一个连接匹配了```NOTRACK target```，则conntrack系统将不会对该连接进行跟踪。因为raw表是唯一一个在```连接跟踪```之前的表，如果没有本表的话，将不能对```连接跟踪```做任何的控制。
+
+Raw table只有```PREROUTING```以及```OUTPUT```两个链。
+<pre>
+注意：
+1. 如果要让此表工作，则必须要加载iptable_raw模块。假如iptables以 '-t raw' 选项启动的话，若系统中有iptable_raw模块的话，
+   则该模块会被自动加载
+
+2. raw表是iptables及内核中相对新的一个东西，在Linux2.6内核版本之前可能不能够使用
+</pre>
+
 
 ### 2.5 Filter表
+filter表主要被用于对数据包进行过滤。我们可以匹配数据包，然后对其进行过滤。这是我们通常对数据包进行操作的地方，在此我们检查数据包的相关内容来对数据包进行DROP或者ACCEPT。当然我们可以在此表之前进行过滤，但是通常不会这么做，因为本表才是专门设计被用来过滤数据包的。几乎所有的targets都可以在本表中被使用。
+
+filter表是进行数据包过滤的```主要地方```。
+
 
 ### 2.6 用户自定义的chain
+假如一个数据包进入了```filter table```中的**INPUT**链中，我们可以指定一个```jump```规则让其跳到同一个表的不同链中。这条新的```链```(chain)必须是用户指定的，不能是系统内置的链，比如```INPUT```、```FORWARD```链。假如我们将chain看成是指向```规则```的指针，那么该指针从上到下将一条一条规则(rule)连接起来，直到遇到一个target或者main chain为止(此时，将会使用内置链的默认策略)。
 
+假如一条规则匹配指向了一条```用户自定链```(userspecified chain)，则指针会跳转到该链，然后开始从上到下的遍历该链。例如，上图中从```chain1```的**规则3**跳转到了```chain2```.
+
+![table-subtraverse](https://ivanzz1001.github.io/records/assets/img/linuxops/table_subtraverse.jpg)
+
+
+<pre>
+注意： Userspecified chain在链尾不能有默认的策略，只有内置链才可以有。我们通常可以在用户自定义链的末尾添加一条单独的规则，使
+其不会有任何的匹配，这样看起来就像是一条默认的策略。假如在userspecified 链中没有任何规则匹配到，则默认的行为将会跳回到原来的链中。
+如上图所示，从chain2的rule3又跳回到了chain1的rule4。
+</pre>
 
 
 <br />
