@@ -81,7 +81,57 @@ HTTP状态码(HTTP status code)是用以表示网页服务器超文本传输协�
 
 当且仅当后续的请求所使用的方法是GET或者HEAD时，用户浏览器才可以在没有用户介入的情况下自动提交所需要的后续请求。客户端应当自动监测无限循环重定向（例如：A->A，或者A->B->C->A)，因为这会导致服务器和客户端大量不必要的资源消耗。按照HTTP/1.0版规范的建议，浏览器不应自动访问超过5次的重定向。
 
-1) **304 Not Modified**
+1） **302 Move temporarily**
+
+请求的资源临时从不同的URI响应请求。由于这样的重定向是临时的，客户端应当继续向原有地址发送以后的请求。只有在```Cache-Control```或者```Expires```中进行了指定的情况下，这个响应才是可缓存的。
+
+如果这不是一个GET或HEAD请求，那么浏览器禁止自动进行重定向，除非得到用户的确认，因为请求的条件可能因此发生变化。
+
+注意：虽然RFC 1945和RFC 2068规范不允许客户端在重定向时改变请求的方法，但是很多现存的浏览器将302响应试作303响应，并且使用GET方式访问在Location中规定的URI，而无视原先请求的方法。状态码303和307被添加了进来，用以明确服务器期待客户端进行何种反应。
+
+下面我们来看一下通过Chrome浏览器向```http://www.baidu.com```发起请求的场景，然后通过```Fiddler```进行抓包。如下是HTTP请求：
+{% highlight string %}
+GET http://www.baidu.com/ HTTP/1.1
+Host: www.baidu.com
+Connection: keep-alive
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8
+Accept-Encoding: gzip, deflate
+Accept-Language: zh-CN,zh;q=0.9
+{% endhighlight %}
+
+如下是返回的响应：
+{% highlight string %}
+HTTP/1.1 302 Found
+Connection: Keep-Alive
+Content-Length: 225
+Content-Type: text/html
+Date: Fri, 08 Mar 2019 06:34:47 GMT
+Location: https://www.baidu.com/
+P3p: CP=" OTI DSP COR IVA OUR IND COM "
+Server: BWS/1.1
+Set-Cookie: BAIDUID=D389251314805B518EDC730B18F6CEF1:FG=1; expires=Thu, 31-Dec-37 23:55:55 GMT; max-age=2147483647; path=/; domain=.baidu.com
+Set-Cookie: BIDUPSID=D389251314805B518EDC730B18F6CEF1; expires=Thu, 31-Dec-37 23:55:55 GMT; max-age=2147483647; path=/; domain=.baidu.com
+Set-Cookie: PSTM=1552026887; expires=Thu, 31-Dec-37 23:55:55 GMT; max-age=2147483647; path=/; domain=.baidu.com
+Set-Cookie: BD_LAST_QID=15083339198343949115; path=/; Max-Age=1
+X-Ua-Compatible: IE=Edge,chrome=1
+
+<html>
+<head><title>302 Found</title></head>
+<body bgcolor="white">
+<center><h1>302 Found</h1></center>
+<hr><center>5291656f5c4a71bf0ac4c2afdd3e6ada7f9111f6
+Time : Mon Mar  4 15:58:43 CST 2019</center>
+</body>
+</html>
+{% endhighlight %}
+
+
+
+
+
+2) **304 Not Modified**
 
 如果客户端发送了一个带条件的 GET 请求且该请求已被允许，而文档的内容（自上次访问以来或者根据请求的条件）并没有改变，则服务器应当返回这个状态码。304响应禁止包含消息体，因此始终以消息头后的第一个空行结尾。
 
@@ -91,7 +141,20 @@ HTTP状态码(HTTP status code)是用以表示网页服务器超文本传输协�
 
 ### 2.4 请求错误
 
+这类的状态码代表了客户端看起来可能发生了错误，妨碍了服务器的处理。除非响应的是一个```HEAD```请求，否则服务器就应该返回一个解释当前错误状态的实体，以及这是临时的还是永久性的状况。这些状态码适用于任何请求方法。浏览器应当向用户显示任何包含在此类错误响应中的实体内容。
+
+如果错误发生时客户端正在传送数据，那么使用TCP的服务器实现应当仔细确保在关闭客户端与服务器之间的连接之前，客户端已经收到了包含错误信息的数据包。如果客户端在收到错误信息后继续向服务器发送数据，服务器的TCP栈将向客户端发送一个```重置```(rst)数据包，以清除该客户端所有还未识别的输入缓冲，以免这些数据被服务器上的应用程序读取并干扰后者。
+
+
+
+
+
+
 ### 2.5 服务器错误
+该类状态码代表了服务器在处理请求的过程中有错误或者异常状态发生，也有可能是服务器意识到以当前的软硬件资源无法完成对请求的处理。除非这是一个```HEAD```请求，否则服务器应当包含一个解释当前错误状态以及这个状况是临时的还是永久的解释信息实体。浏览器应当向用户展示任何在当前响应中被包含的实体。
+
+这些状态码适用于任何响应方法。
+
 
 
 
