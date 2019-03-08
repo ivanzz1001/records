@@ -55,7 +55,36 @@ HTTP因为存在以上三大安全风险，所以才有了HTTPS的出现。HTTPS
 
 ![https-signature](https://ivanzz1001.github.io/records/assets/img/http/https_signature.jpg)
 
+说明： Bob的内容实质上是明文传输的，所以这个过程是可以被人截获和窥探的，但是Bob不担心被人窥探，他担心的是内容被人篡改或者有人冒充自己跟Susan通信。这里其实涉及到了计算机安全学中的认证概念，Bob要向Susan证明通信的对方是Bob本人，另外也需要确保自己的内容是完整的。
 
+
+
+5. Susan接收到了Bob的信，首先用Bob给的公钥对签名做了解密处理，得到了哈希值A，然后Susan用了同样的Hash算法对信的内容做了一次哈希处理，得到了另外一个哈希值B，对比A和B，如果这两个值是相同的，那么可以确认信就是Bob本人写的，并且内容没有被篡改过。
+
+![https-signature-check](https://ivanzz1001.github.io/records/assets/img/http/https_signature_check.jpg)
+
+说明： 4跟5其实构成了一次完整的通过数字签名进行认证的过程。数字签名的过程简述为：发送方通过不可逆算法对内容```text1```进行处理（哈希），得到的结果值为```hash1```，然后用私钥加密```hash1```得到结果值```encry1```; 对方接收到```text1```和```encry1```，用公钥解密```encry1```得到```hash1```，然后用```text1```进行相同的不可逆处理得到```hash2```，对```hash1```和```hash2```进行对比即可认证发送方。
+
+6. 此时，另外一种比较复杂的情况出现了，Bob是通过网络把公钥寄送给他的三个好朋友的，有一个不怀好意的家伙```Jerry```截获了Bob给Doug的公钥。Jerry开始伪装成Bob跟Doug通信，Doug感觉通信的对象不像是Bob，但是他又无法确认。
+
+![https-cheat](https://ivanzz1001.github.io/records/assets/img/http/https_cheat.jpg)
+
+
+7. Bob最终发现了自己的公钥被Jerry截获了，他感觉自己的公钥通过网络传输给自己的小伙伴似乎也是不安全的，不怀好意的家伙可以截获这个明文传输的公钥。为此，他想到了去第三方权威机构```证书中心```(Certificate Authority,简称CA）做认证。证书中心用自己的私钥对Bob的公钥和其他信息做了一次加密。这样Bob通过网络将数字证书传递给他的小伙伴后，小伙伴们先用CA给的公钥解密证书，这样就可以安全获取Bob的公钥了。
+
+![https-sign-data](https://ivanzz1001.github.io/records/assets/img/http/https_sign_data.jpg)
+
+
+## 2. HTTPS通信过程
+
+通过Bob与他的小伙伴的通信，我们已经可以大致了解一个安全通信的过程，也可以了解基本的加密、解密、认证等概念。HTTPS就是基于这样一个逻辑设计的。
+
+首先看看组成HTTPS的协议： HTTP协议和SSL/TLS协议。HTTP协议就不用讲了，而SSL/TLS就是负责加密解密等安全处理的模块，所以HTTPS的核心在SSL/TLS上面。整个通信过程如下：
+
+![https-work-flow](https://ivanzz1001.github.io/records/assets/img/http/https_work_flow.jpg)
+
+
+1. 
 
 
 <br />
