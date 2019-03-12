@@ -391,6 +391,7 @@ collect2: error: ld returned 1 exit status
 
 2. [GCC常用参数详解](https://www.cnblogs.com/zhangsir6/articles/2956798.html)
 
+3. [gcc编译工具生成动态库和静态库之一----介绍](https://www.cnblogs.com/fnlingnzb-learner/p/8059251.html)
 
 <br />
 <br />
