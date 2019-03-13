@@ -1242,6 +1242,13 @@ KiB Swap:  2094076 total,  2094076 free,        0 used.  1412768 avail Mem
   988  1021 ?        00:00:00 gdbus
 </pre>
 
+还可以通过**ps -o nlwp <pid>**命令来统计某一个进程所创建的线程数(这里,nlwp是number of light-weight process的缩写）：
+<pre>
+# ps -o nlwp 2270921
+NLWP
+130666
+</pre>
+
 * 使用proc文件系统，具体用法是```cat /proc/<pid>/status```
 {% highlight string %}
 # cat /proc/988/status
@@ -1299,6 +1306,21 @@ voluntary_ctxt_switches:        136
 nonvoluntary_ctxt_switches:     76
 {% endhighlight %}
 
+
+* 使用```pstree -p <pid>```命令也可以打印某一个进程的线程：
+<pre>
+# pstree -p 11542 | less
+radosgw(11542)-+-{radosgw}(11543)
+               |-{radosgw}(11545)
+               |-{radosgw}(11546)
+               |-{radosgw}(11547)
+               |-{radosgw}(11548)
+               |-{radosgw}(11549)
+               |-{radosgw}(11550)
+               |-{radosgw}(11551)
+               |-{radosgw}(11552)
+               |-{radosgw}(11557)
+</pre>
 
 <br />
 <br />
