@@ -650,7 +650,7 @@ sda               0.00     0.00    0.00    0.00     0.00     0.00     0.00     0
 
 * wsec/s: 每秒写入的扇区数；
 
-* rKB/s: 设备每秒中处理的读请求数
+* rKB/s: 设备每秒处理的读请求数
 
 * wKB/s: 设备每秒处理的写请求数
 
@@ -667,7 +667,7 @@ sda               0.00     0.00    0.00    0.00     0.00     0.00     0.00     0
 
 
 
-### 8.2 mpstate命令
+### 8.2 mpstat命令
 mpstat是multi-processor statistics的缩写，它能实时监测多处理器系统上每个CPU的实用情况。mpstat命令的典型用法是：
 <pre>
 # mpstat [ -A ] [ -u ] [ -V ] [ -I { SUM | CPU | SCPU | ALL } ] [ -P { cpu [,...] | ON | ALL } ] [ interval [ count ] ]
@@ -1266,7 +1266,7 @@ KiB Swap:  4095996 total,  4095996 free,        0 used. 14957729+avail Mem
   988  1021 ?        00:00:00 gdbus
 </pre>
 
-还可以通过**ps -o nlwp <pid>**命令来统计某一个进程所创建的线程数(这里,nlwp是number of light-weight process的缩写）：
+还可以通过```ps -o nlwp <pid>```命令来统计某一个进程所创建的线程数(这里,nlwp是number of light-weight process的缩写）：
 <pre>
 # ps -o nlwp 2270921
 NLWP
