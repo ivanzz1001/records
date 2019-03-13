@@ -293,7 +293,7 @@ tcp6       0      0 :::22                   :::*                    LISTEN
 
 * Send-Q: 尚未被对方确认的数据量
 
-* Local Address: 本段的IP地址和端口号
+* Local Address: 本端的IP地址和端口号
 
 * Foreign Address: 对方的IP地址和端口号
 
