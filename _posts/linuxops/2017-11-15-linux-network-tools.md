@@ -1203,6 +1203,30 @@ KiB Swap:  2094076 total,  2094076 free,        0 used.  1412768 avail Mem
 </pre>
 
 此外，还可以通过```top -H -p <pid>```的方式查看某一个进程的线程信息。
+{% highlight string %}
+# top -H -p 11542
+top - 10:40:01 up 302 days, 20:16,  1 user,  load average: 0.00, 0.04, 0.05
+Threads: 11294 total,   0 running, 11294 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  0.2 us,  0.2 sy,  0.0 ni, 99.6 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+KiB Mem : 16449097+total, 81671952 free, 12521416 used, 70297600 buff/cache
+KiB Swap:  4095996 total,  4095996 free,        0 used. 14957729+avail Mem 
+
+  PID USER      PR  NI    VIRT    RES    SHR S %CPU %MEM     TIME+ COMMAND                                                                                                 
+11543 root      20   0 86.671g 710276   7408 S  0.6  0.4  34:13.06 log                                                                                                     
+21823 root      20   0 86.671g 710276   7408 S  0.3  0.4   0:23.52 safe_timer                                                                                              
+24262 root      20   0 86.671g 710276   7408 S  0.3  0.4   5:48.86 ms_pipe_write                                                                                           
+24330 root      20   0 86.671g 710276   7408 S  0.3  0.4   4:06.08 radosgw                                                                                                 
+24340 root      20   0 86.671g 710276   7408 S  0.3  0.4   4:08.46 radosgw                                                                                                 
+11542 root      20   0 86.671g 710276   7408 S  0.0  0.4   0:00.67 radosgw                                                                                                 
+11545 root      20   0 86.671g 710276   7408 S  0.0  0.4   1:16.85 service                                                                                                 
+11546 root      20   0 86.671g 710276   7408 S  0.0  0.4   0:00.00 admin_socket                                                                                            
+11547 root      20   0 86.671g 710276   7408 S  0.0  0.4   7:29.43 radosgw                                                                                                 
+11548 root      20   0 86.671g 710276   7408 S  0.0  0.4   0:10.06 ms_dispatch                                                                                             
+11549 root      20   0 86.671g 710276   7408 S  0.0  0.4   0:00.00 ms_local                                                                                                
+11550 root      20   0 86.671g 710276   7408 S  0.0  0.4   0:05.58 ms_reaper                                                                                               
+11551 root      20   0 86.671g 710276   7408 S  0.0  0.4   0:24.16 safe_timer                                                                                              
+11552 root      20   0 86.671g 710276   7408 S  0.0  0.4   0:00.00 fn_anonymous 
+{% endhighlight %}
 
 * 使用ps命令，具体用法是**ps -xH**。这样可以查看所有存在的线程，也可以使用grep作进一步的过滤
 {% highlight string %}
