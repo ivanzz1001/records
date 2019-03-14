@@ -334,7 +334,31 @@ ClassName::virtualFunctionName(void)"
 
 非对称加密算法： RSA、Elgamal、背包算法、Rabin、D-H（Diffie-Hellman）、ECC(椭圆曲线加密算法)
 
+7） **如下代码会有什么问题？**
 
+编写如下代码(test.cpp):
+{% highlight string %}
+#include <iostream>
+#include <string>
+#include <string.h>
+
+int main(int argc, char *argv[])
+{
+    std::string sString;
+
+    memset(&sString, 0x0, sizeof(sString));
+
+    std::cout<<"sString: "<<sString<<std::endl;
+
+    return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o test test.cpp -lstdc++
+# ./test
+段错误
+</pre>
 
 
 <br />
