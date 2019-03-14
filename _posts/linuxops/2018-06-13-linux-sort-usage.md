@@ -36,6 +36,7 @@ Linux sz-oss-01.localdomain 3.10.0-514.el7.x86_64 #1 SMP Tue Nov 22 16:42:41 UTC
 
 1. [sort命令文件过滤分割与合并](http://man.linuxde.net/sort)
 
+2. [linux sort 命令整理](https://www.jianshu.com/p/c4d159a98dd8)
 
 
 <br />
