@@ -372,7 +372,7 @@ index:10
 
 **19) 去除文件中的"\r"换行**
 {% highlight string %}
-# cat midea_id.txt | while read line; do awk 'BEGIN{FS="\r"} {print $1}' >> def.txt; done
+# cat test_id.txt | while read line; do awk 'BEGIN{FS="\r"} {print $1}' >> def.txt; done
 {% endhighlight %}
 
 **20) 遍历指定的文件是否存在**
@@ -443,6 +443,35 @@ DESCRIPTION
 hello,world 0
 hello,world 1
 </pre>
+
+**24） 计算一个文本文件中所有数字之和**
+{% highlight string %}
+# cat qq.txt
+100,200,300,400
+200,300
+
+# cat ./qq.txt | awk -F ',' 'BEGIN{s=0} {for(i=1;i<=NF;i++) {s+=$i}} END{print s}' 
+1500
+# awk -F ',' 'BEGIN{s=0} {for(i=1;i<=NF;i++) {s+=$i}} END{print s}' qq.txt
+1500
+{% endhighlight %}
+
+**25) 统计一个文本中数字出现的次数，并按出现次数从大到小排序**
+{% highlight string %}
+# cat test.txt
+100
+200
+300
+400
+200
+300
+
+# sort ./test.txt | uniq -c | sort -rn     //当重复的行并不相邻时，uniq 命令是不起作用的，因此需要先进行排序
+      2 300
+      2 200
+      1 400
+      1 100
+{% endhighlight %}
 
 
 <br />
