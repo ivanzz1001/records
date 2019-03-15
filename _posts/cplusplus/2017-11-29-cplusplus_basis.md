@@ -177,6 +177,68 @@ main ...
 </pre>
 由此我们得出，类的静态成员初始化时间发生在： ```从静态存储区加载到内存时```
 
+## 4. 栈的生长方向
+
+在常见的x86中内存中栈的增长方向就是从高地址向低地址增长，但也有些不常用的处理器可能不同。有多种方法可以获得栈的生长方向。下面我们简单介绍：
+
+1) **通过递归函数调用**
+
+我们可以通过递归函数调用来获得栈的生长方向。参看如下示例：
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+static int stack_dir;
+
+static void find_stack_direction()
+{
+    static char *addr = NULL;
+
+    char dummy;
+
+    if(!addr)
+    {
+        addr = &dummy;
+        find_stack_direction();
+    }
+    else{
+        if((uintptr_t)(char *)&dummy > (uintptr_t)addr)
+        {
+            stack_dir = 1;           //向高地址方向生长
+        }else{
+            stack_dir = -1;          //向低地址方向生长
+        }
+    }
+
+}
+
+int main(int argc,char *argv[])
+{
+    find_stack_direction();
+
+    if(stack_dir > 0)
+        printf("向高地址方向生长\n");
+    else
+        printf("向低地址方向生长\n");
+
+    return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o test test.c 
+# ./test
+向低地址方向生长
+</pre>
+
+
+2) **直接阅读汇编指令**
+我们可以通过直接阅读汇编指令来判断。例如，在```IA-32```中，如果在一个过程的开始阶段（准备段）出现类似```sub $0x10,%esp```,说明栈顶指针(%esp)是变小的，因此栈是向低地址增长的。
+
+3) **显示栈顶指针寄存器的内容**
+
+我们可以通过GDB等工具，在某个过程开始阶段和结束阶段分别显示栈顶指针寄存器的内容，比较它们的大小。若开始处的值比结束处的大，则说明是向低地址增长的。
 
 
 <br />
@@ -189,6 +251,13 @@ main ...
 2. [C++静态变量内存分配，编译阶段，解密 ](http://blog.163.com/lucky_jeck/blog/static/12711474201311182464554/)
 
 3. [C 语言标准库实现](https://ftp.gnu.org/gnu/glibc/)
+
+4. [栈增长方向与大端/小端问题](https://www.cnblogs.com/xkfz007/archive/2012/06/22/2558935.html)
+
+
+
+
+
 <br />
 <br />
 <br />
