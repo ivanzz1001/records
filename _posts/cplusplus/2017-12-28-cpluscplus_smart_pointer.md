@@ -30,6 +30,8 @@ description: C++智能指针
 1. [C++中的三种智能指针分析（RAII思想）](https://blog.csdn.net/GangStudyIT/article/details/80645399)
 
 2. [C++中的RAII介绍](https://www.cnblogs.com/jiangbin/p/6986511.html)
+
+3. [](https://blog.csdn.net/qq_34992845/article/details/69218843)
 <br />
 <br />
 <br />
