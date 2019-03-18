@@ -256,7 +256,7 @@ int main(int argc,char *argv[])
 
 5. [leetcode](https://leetcode.com/problems/word-break-ii/)
 
-
+6. [leetcode刷题](http://www.cnblogs.com/grandyang/p/4606334.html)
 
 <br />
 <br />
