@@ -217,7 +217,7 @@ hello world
 
 2. [Extending NGINX](https://www.nginx.com/resources/wiki/extending/)
 
-2. [nginx代理tcp协议连接mysql](https://www.cnblogs.com/heruiguo/p/8962243.html)
+3. [nginx代理tcp协议连接mysql](https://www.cnblogs.com/heruiguo/p/8962243.html)
 
 <br />
 <br />
