@@ -1,6 +1,6 @@
 ---
 layout: post
-title: mysql数据库基础（二）
+title: mysql数据类型
 tags:
 - database
 categories: database

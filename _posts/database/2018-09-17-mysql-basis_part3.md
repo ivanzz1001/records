@@ -1,6 +1,6 @@
 ---
 layout: post
-title: mysql数据库基础（三）
+title: mysql字符集与校对集
 tags:
 - database
 categories: database

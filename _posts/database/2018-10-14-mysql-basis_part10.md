@@ -1,6 +1,6 @@
 ---
 layout: post
-title: mysql数据库基础（十）
+title: mysql主从复制(三)
 tags:
 - database
 categories: database

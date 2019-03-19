@@ -1,6 +1,6 @@
 ---
 layout: post
-title: mysql数据库基础（七）
+title: SQL联接
 tags:
 - database
 categories: database

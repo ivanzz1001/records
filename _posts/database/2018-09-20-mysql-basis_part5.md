@@ -1,6 +1,6 @@
 ---
 layout: post
-title: mysql数据库基础（五）
+title: mysql常用函数及操作符
 tags:
 - database
 categories: database

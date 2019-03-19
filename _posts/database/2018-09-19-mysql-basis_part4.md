@@ -1,6 +1,6 @@
 ---
 layout: post
-title: mysql数据库基础（四）
+title: MySQL服务器模式及相关内置变量
 tags:
 - database
 categories: database
