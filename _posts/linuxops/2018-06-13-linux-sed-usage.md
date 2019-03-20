@@ -379,7 +379,11 @@ This is line number 3
 This is line number 4
 {% endhighlight %}
 
-
+sed编辑器会删掉包含匹配指定模式的文本行。
+<pre>
+说明： 记住，sed编辑器不会修改原始文件。你删除的行只是从sed编辑器的输出中消失了。原始文件仍然包含那些
+      “删掉” 的行
+</pre>
 
 
 
