@@ -33,6 +33,8 @@ CentOS Linux release 7.3.1611 (Core)
 
 3. [编写第一个Nginx模块](https://segmentfault.com/a/1190000016856451)
 
+4. [Nginx 虚拟主机配置的三种方式](https://blog.csdn.net/liupeifeng3514/article/details/79007051)
+
 <br />
 <br />
 <br />
