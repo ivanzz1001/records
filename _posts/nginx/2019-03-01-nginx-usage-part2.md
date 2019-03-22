@@ -290,6 +290,8 @@ objs/addon/nginx-hello-world-module/ngx_http_hello_world_module.o:	$(ADDON_DEPS)
 
 4. [Nginx 虚拟主机配置的三种方式](https://blog.csdn.net/liupeifeng3514/article/details/79007051)
 
+5. [Nginx-编写自己的http模块](https://blog.csdn.net/weixin_36816337/article/details/85175602)
+
 <br />
 <br />
 <br />
