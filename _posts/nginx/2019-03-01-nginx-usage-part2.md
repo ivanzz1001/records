@@ -275,6 +275,72 @@ objs/addon/nginx-hello-world-module/ngx_http_hello_world_module.o:	$(ADDON_DEPS)
 
 
 ### 1.3 验证
+编译安装完之后，我们重新配置nginx.conf文件：
+<pre>
+worker_processes  1;
+
+#error_log  logs/error.log  notice;
+
+
+#pid        logs/nginx.pid;
+
+load_module modules/ngx_http_hello_world_module.so;
+
+events {
+    worker_connections  1024;
+}
+
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    #log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+    #                  '$status $body_bytes_sent "$http_referer" '
+    #                  '"$http_user_agent" "$http_x_forwarded_for"';
+
+    #access_log  logs/access.log  main;
+
+    sendfile        on;
+    #tcp_nopush     on;
+
+    #keepalive_timeout  0;
+    keepalive_timeout  65;
+
+    #gzip  on;
+
+    server {
+        listen       80;
+        server_name  localhost;
+
+        #access_log  logs/host.access.log  main;
+
+        location / {
+            hello_world;
+        }
+
+        #error_page  404              /404.html;
+
+        # redirect server error pages to the static page /50x.html
+        #
+        error_page   500 502 503 504  /50x.html;
+        location = /50x.html {
+            root   html;
+        }
+
+    }
+}
+</pre>
+重新加载nginx，并测试验证：
+<pre>
+# /usr/local/nginx/sbin/nginx -t
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+
+# /usr/local/nginx/sbin/nginx -s reload
+# curl -X GET http://127.0.0.1:80/
+hello world
+</pre>
 
 
 <br />
