@@ -8,7 +8,14 @@ description: nginx使用基础
 ---
 
 
-本章我们讲述一下nginx的location匹配规则。
+location指令的作用是根据用户请求的URI来执行不同的应用，也就是根据用户请求的网站URL进行匹配，匹配成功即进行相关的操作。因此本章就来讲述一下nginx的location匹配规则，主要包括如下两个方面：
+
+* location语法
+
+* pcre正则表达式
+
+
+<br />
 
 
 <!-- more -->
