@@ -358,6 +358,8 @@ hello world
 
 5. [Nginx-编写自己的http模块](https://blog.csdn.net/weixin_36816337/article/details/85175602)
 
+6. [nginx](https://cloud.tencent.com/developer/section/1259213)
+
 <br />
 <br />
 <br />
