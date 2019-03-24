@@ -283,14 +283,42 @@ location ~ /images/abc/ {
 * ```(?e)```: 将替换的字符串作为表达式使用
 
 例如下面可以匹配以Hel开头的单词（忽略大小写):
-{% highlight string %}
+<pre>
 char src[] = "hello,world, I am looking a job";
 char pattern[] = "(?i)\\AHel";
-{% endhighlight %}
+</pre>
 
 
 ### 2.1 实例
+{% highlight string %}
+location /proxy {
+    internal;
 
+    if ($request_uri ~* "(/\w+)+/upload/([^/]+)/([^/]+)(/.*)") {
+            set $modified_uri /$3$4;
+            proxy_pass http://rgw$modified_uri;
+            break;
+    }
+
+    if ($request_uri ~* "(/\w+)+/uploadpart/([^/]+)/([^/]+)(/.*)") {
+            set $modified_uri /$3$4;
+            proxy_pass http://rgw$modified_uri;
+            break;
+    }
+
+    if ($request_uri ~* "(/\w+)+/download/([^/]+)/([^/]+)(/.*)") {
+            proxy_pass http://rgw/$3$4;
+            break;
+    }
+    
+    if ($request_uri ~* "/userDownload/([^/]+)/([^/]+)(/.*)") {
+            proxy_pass http://rgw/$2$3;
+            break;
+    }
+
+}
+
+{% endhighlight %}
 
 <br />
 <br />
