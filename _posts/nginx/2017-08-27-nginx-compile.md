@@ -58,6 +58,7 @@ description: nginx源代码编译安装
 
 * ```--with-ld-opt=parameters:``` 设置链接时候的一些额外的参数。当在FreeBSD系统下使用PCRE库时，应该指定```--with-ld-opt```="-L /usr/local/lib"。
 
+* ```--with-debug```: 将Nginx需要打印debug调试级别日志的代码编译进Nginx。这样可以在Nginx运行时通过修改配置文件来使其打印调试日志，这对于研究、定位Nginx问题非常有帮助
 <br />
 如下是一个例子（所有参数都应该处于同一行）：
 {% highlight string %}
