@@ -147,7 +147,11 @@ conditions require more than default value (180000).
 ### 2.2 网络问题定位思路
 参考 [前篇笔记](https://blog.csdn.net/slvher/article/details/8941873) 开始处描述的线上实际问题，收到某台机器无法对外建立新连接的报警时，排查定位问题过程如下：
 
-用**netstat -nat | grep TIME_WAIT**统计发现，当时出问题的那台机器上共有10W+处于```TIME_WAIT```状态的TCP连接，进一步分析发现，由报警模块引起的TIME_WAIT连接有2W+。将netstat输出的统计结果重定位到文件中继续分析，一般会看到本机的port被大量占用。
+用如下命令
+<pre>
+# netstat -nat | grep TIME_WAIT
+</pre>
+统计发现，当时出问题的那台机器上共有10W+处于```TIME_WAIT```状态的TCP连接，进一步分析发现，由报警模块引起的TIME_WAIT连接有2W+。将netstat输出的统计结果重定位到文件中继续分析，一般会看到本机的port被大量占用。
 
 由本文前面介绍的系统配置项可知，tcp_max_tw_buckets默认值为18W，而ip_local_port_range范围不到3W，大量的```TIME_WAIT```状态使得local port在```TIME_WAIT```持续期间不能被再次分配，即没有可用的local port，这将是导致新建连接失败的最大原因。
 
