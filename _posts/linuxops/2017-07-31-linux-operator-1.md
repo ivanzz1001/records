@@ -80,7 +80,7 @@ socket就是主板上的CPU插槽; Core就是socket里独立的一组程序执�
 Thread：就是超线程hyperthread的概念，逻辑的执行单元，独立的执行上下文，但是共享core内的寄存器和计算单元。
 {% endhighlight %}
 
-### 1.2 
+### 1.2 查看逻辑CPU信息
 
 cpu信息记录在/proc/cpuinfo中，但信息比较多：
 <pre>
@@ -357,6 +357,8 @@ Num  Test              Status                 segment  LifeTime  LBA_first_err [
 # 3  Background short  Completed                   -       2                 - [-   -    -]
 Long (extended) Self Test duration: 47220 seconds [787.0 minutes]
 </pre>
+
+上面我们看到采用的是```SAS```接口的希捷硬盘。
 
 接着使用```lsblk```或```fdisk -l```命令来查看分区信息：
 <pre>
