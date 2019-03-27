@@ -13,6 +13,43 @@ description: Linux运维方面知识
 
 ## 1. 查看Linux下cpu信息
 
+### 1.1 查看物理CPU信息
+我们可以通过```lscpu```命令来获取实际的物理CPU信息：
+<pre>
+# lscpu
+Architecture:          x86_64
+CPU op-mode(s):        32-bit, 64-bit
+Byte Order:            Little Endian
+CPU(s):                56
+On-line CPU(s) list:   0-55
+Thread(s) per core:    2
+Core(s) per socket:    14
+Socket(s):             2
+NUMA node(s):          2
+Vendor ID:             GenuineIntel
+CPU family:            6
+Model:                 79
+Model name:            Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz
+Stepping:              1
+CPU MHz:               1250.531
+BogoMIPS:              4794.42
+Virtualization:        VT-x
+L1d cache:             32K
+L1i cache:             32K
+L2 cache:              256K
+L3 cache:              35840K
+NUMA node0 CPU(s):     0-13,28-41
+NUMA node1 CPU(s):     14-27,42-55
+</pre>
+下面我们解释一下各字段的含义：
+
+* Architecture: 用于只是CPU架构。当前我们使用的CPU架构为x86_64
+
+* CPU op-mode(s): CPU可运行的模式
+
+
+
+
 cpu信息记录在/proc/cpuinfo中，但信息比较多：
 <pre>
 [root@ceph001-node1 ~ ]$ more /proc/cpuinfo
