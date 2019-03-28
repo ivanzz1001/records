@@ -1326,6 +1326,14 @@ ceph-mon: created monfs at /var/lib/ceph/mon/ceph-ceph001-node4 for mon.ceph001-
 这里注意需要将上面的```admin.keyring```也拷贝到```/etc/ceph/ceph.client.admin.keyring```。
 
 
+
+<br />
+<br />
+**[参看]:**
+
+1. [zphj1987博客](http://www.zphj1987.com/archives/)
+
+
 <br />
 <br />
 <br />
