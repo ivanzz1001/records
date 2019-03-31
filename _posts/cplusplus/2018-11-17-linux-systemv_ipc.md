@@ -55,7 +55,115 @@ semget系统调用创建一个新的```信号量集```,或者获取一个已存�
 int semget(key_t key, int num_sems, int sem_flags);
 {% endhighlight %}
 
-key参数是一个键值，用来标识
+* key参数是一个键值，用来标识一个全局的信号量集，就像文件名全局唯一地标识一个文件一样。要通过信号量通信的进程需要使用相同的键值来创建/获取该信号量。
+
+* num_sems参数指定要创建/获取的信号量集中信号量的数目。如果是创建信号量，则该值必须被指定； 如果是获取已存在的信号量，则可以设置为0.
+
+* sem_flags参数指定一组标志。它低端的9个比特是该信号量的权限，其格式和含义都与系统调用open()的mode参数相同。此外，它还可以和```IPC_CREAT```标志做```按位或```运算以创建新的信号量集。此时即使信号量已存在，semget()也不会产生错误。我们还可以联合使用```IPC_CREAT```和```IPC_EXCL```标志来确保创建一组新的、唯一的信号量集。在这种情况下，如果信号量集已经存在，则semget()返回错误并设置errno为```EEXIST```。这种创建信号量的行为与用```O_CREAT```和```O_EXCL```标志调用open()来排他式地打开一个文件相似。
+
+semget()成功时返回一个正整数值，它是信号量集的标识符；semget()失败时返回-1，并设置errno。
+
+如果semget()用于创建信号量集，则与之关联的内核数据结构```semid_ds```将被创建并初始化。semid_ds结构体的定义如下：
+{% highlight string %}
+#include <sys/sem.h>
+
+/*该结构体用于描述IPC对象（信号量、共享内存和消息队列）的权限*/
+struct ipc_perm
+{
+	key_t key;      /*键值*/
+	uid_t uid;      /*所有者的有效用户ID*/
+	gid_t gid;      /*所有者的有效组ID*/
+	uid_t cuid;     /*创建者的有效用户ID*/
+	gid_t cgid;     /*创建者的有效组ID*/
+	mode_t mode;    /*访问权限*/
+
+	...             /*省略其他填充字段*/
+};
+
+struct semid_ds
+{
+	struct ipc_perm sem_perm;     /*信号量的操作权限*/
+	unsigned long int sem_nsems;  /*该信号量集的信号量数目*/
+	time_t sem_otime;             /*最后一次调用semop()的时间*/
+	time_t sem_ctime;             /*最后一次电泳semctl()的时间*/
+
+	...                           /*省略其他填充字段*/
+};
+{% endhighlight %}
+semget()对semid_ds结构体的初始化包括：
+
+* 将sem_perm.cuid和sem_perm.uid设置为调用进程的有效用户ID
+
+* 将sem_perm.cgid和sem_perm.gid设置为调用进程的有效组ID
+
+* 将sem_perm.mode的最低9位设置为sem_flags参数的最低9位
+
+* 将sem_nsems设置为num_sems
+
+* 将sem_otime设置为0
+
+* 将sem_ctime设置为当前系统时间
+
+### 1.3 senio系统调用
+semop系统调用改变信号量的值，即执行P、V操作。在讨论semop()之前，我们需要先介绍与每个信号量关联的一些重要内核变量：
+<pre>
+unsigned short semval;      /*信号量的值*/
+unsigned short semzcnt;     /*等待信号量值变为0的进程数量*/
+unsigned short semncnt;     /*等待信号量值增加的进程数量*/
+pid_t sempid;               /*最后一次执行semop操作的进程ID*/
+</pre>
+
+semop()对信号量的操作实际上就是对这些内核变量的操作。semop()的定义如下：
+{% highlight string %}
+#include <sys/sem.h>
+
+int semop(int sem_id, struct sembuf *sem_ops, size_t num_sem_ops);
+{% endhighlight %}
+
+1) **sem_id参数**
+
+sem_id参数是由semget()调用返回的信号量集标识符，用以指定被操作的目标信号量集。
+
+
+2) **sem_ops参数**
+
+sem_ops参数指向一个sembuf结构体类型的数组，sembuf结构体的定义如下：
+{% highlight string %}
+struct sembuf{
+	unsigned short int sem_num;
+	short int sem_op;
+	short int sem_flg;
+};
+{% endhighlight %}
+其中，sem_num成员是信号量集中信号量的编号，0表示信号量集中的第一个信号量。sem_op成员指定操作类型，其可选值为正整数、0和负整数。每种类型的操作的行为又受到sem_flg成员的影响。sem_flg的可选值为```IPC_NOWAIT```和```SEM_UNDO```。IPC_NOWAIT的含义是，无论信号量操作是否成功，semop()操作都将立即返回，则类似于非阻塞IO操作。SEM_UNDO的含义是，当进程退出时取消正在进行的semop()操作。具体来说，sem_op和sem_flg将按照如下方式来影响semop()的行为：
+
+* 如果sem_op大于0，则semop()将被操作的信号量的值```semval```增加sem_op。该操作要求调用进程对被操作的信号量集拥有写权限。此时若设置了SEM_UNDO标志，则系统将更新进程的```semadj```变量（用以跟踪进程对信号量的修改情况）
+
+* 如果sem_op等于0，则表示这是一个```等待0```(wait-for-zero)操作。该操作要求要求调用进程对被操作信号量集拥有读权限。如果此时信号量的值是0，则调用立即成功返回。如果信号量的值不为0，则semop()失败返回或者阻塞进程以等待信号量变为0.在这种情况下，当```IPC_NOWAIT```标志被指定时，semop()立即返回一个错误，并设置errno为EAGAIN。如果未指定IPC_NOWAIT标志，则信号量的```semzcnt```值加1，进程被投入睡眠直到下列3个条件之一发生：
+<pre>
+1. 信号量的值semval变为0，此时系统将该信号量的semzcnt减1；
+
+2. 被操作信号量所在的信号量集被进程移除，此时semop()调用失败返回，errno被设置为EIDRM;
+
+3. 调用被信号中断，此时semop()调用失败返回，errno被设置为EINTR，同时系统将该信号量的semzcnt值减1；
+</pre>
+
+* 如果sem_op小于0，则表示对信号量值进行减操作，即期望获得信号量。该操作要求调用进程对被操作信号量集拥有写权限。如果信号量的值semval大于或等于sem_op的值，则semop()操作成功，调用进程立即获得信号量，并且将该信号量的```semval```值减去sem_op的绝对值。此时如果设置了SEM_UNDO标志，则系统将更新进程的semadj变量。如果信号量的值semval小于sem_op的绝对值，则semop()失败返回或者阻塞以等待信号量可用。在这种情况下，当IPC_NOWAIT标志被指定时，semop()立即返回一个错误，并设置errno为EAGAIN。如果未指定IPC_NOWAIT标志，则信号量的```semncnt```值加1，进程被投入睡眠直到下列3个条件之一发生：
+<pre>
+1. 信号量的值semval变得大于或等于sem_op的绝对值，此时系统将该信号量的semncnt值减1，并将semval减去
+   sem_op的绝对值，同时，如果SEM_UNDO标志被设置，则系统更新semadj变量；
+
+2. 被操作信号量所在的信号量集被进程移除，此时semop()调用失败返回，errno被设置为EIDRM;
+
+3. 调用被信号中断，此时semop()调用失败返回，errno被设置为EINTR，同时系统将该信号量的semncnt值减1；
+</pre>
+
+3） **num_sem_ops参数**
+
+semop()系统调用的第3个参数num_sem_ops指定要执行的操作个数，即sem_ops数组中元素的个数。semop()对数组sem_ops中的每个成员按照数组依次执行操作，并且该过程是原子操作，以避免别的进程在同一时刻按照不同的顺序对该信号量集中的信号量执行semop()操作导致竞态条件。
+
+semop()成功时返回0，失败则返回-1并设置errno。失败的时候，sem_ops数组中指定的所有操作都不被执行。
+
 
 
 
