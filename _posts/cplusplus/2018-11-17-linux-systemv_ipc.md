@@ -389,7 +389,33 @@ int shmget(key_t key, size_t size, int shmflg);
 {% endhighlight %}
 和semget()系统调用一样，key参数是一个键值，用来标识一段全局唯一的共享内存。size参数指定共享内存的大小，单位是字节。如果是创建新的共享内存，则size值必须被指定。如果是获取已存在的共享内存，则可以把size设置为0.
 
+shmflg参数的使用和含义与semget()系统调用的```semflg```参数相同。不过shmget()支持两个额外的标志————SHM_HUGETLB和SHM_MORESERVE。它们的含义如下：
 
+* SHM_HUGETLB: 类似于mmap()的MAP_HUGETLB标志，系统将使用```大页面```来为共享内存分配空间
+
+* SHM_MORESERVE: 类似于mmap()的MAP_MORESERVE标志，不为共享内存保留交换分区(swap空间)。这样，当物理内存不足的时候，对该共享内存执行写操作将触发SIGSEGV信号。
+
+shmget()成功时返回一个正整数值，它是共享内存的标识符。shmget()失败时返回-1，并设置errno。
+
+如果shmget()用于创建共享内存，则这段共享内存的所有字节都被初始化为0，与之关联的内核数据结构shmid_ds将被创建并初始化。shmid_ds结构体的定义如下：
+{% highlight string %}
+struct shmid_ds {
+	struct ipc_perm shm_perm;    /* 共享内存的操作权限*/
+	size_t          shm_segsz;   /* 共享内存的大小，单位为字节 */
+	time_t          shm_atime;   /* 对这段共享内存最后一次调用shmat()的时间*/
+	time_t          shm_dtime;   /* 对这段共享内存最后一次调用shmdt()的时间*/
+	time_t          shm_ctime;   /* 对这段共享内存最后一次电泳shmctl()的时间*/
+	pid_t           shm_cpid;    /* 创建者的PID*/
+	pid_t           shm_lpid;    /* 最后一次执行shmat()或shmdt()操作的进程的PID*/
+	shmatt_t        shm_nattch;  /* 目前关联到此共享内存的进程数量*/
+	...                          /* 省略一些填充字段*/
+};
+{% endhighlight %}
+shmget()对shmid_ds结构体的初始化包括：
+
+* 将shm_perm.cuid和shm_perm.uid设置为调用进程的有效用户ID
+
+* 将shm_perm.cgid和shm_perm.gid
 
 
 
