@@ -415,10 +415,66 @@ shmget()对shmid_ds结构体的初始化包括：
 
 * 将shm_perm.cuid和shm_perm.uid设置为调用进程的有效用户ID
 
-* 将shm_perm.cgid和shm_perm.gid
+* 将shm_perm.cgid和shm_perm.gid设置为调用进程的有效组ID
 
+* 将shm_perm.mode的最低9位设置为shmflg参数的最低9位
 
+* 将shm_segsz设置为size
 
+* 将shm_lpid、shm_nattach、shm_atime、shm_dtime设置为0
+
+* 将shm_ctime设置为当前时间
+
+### 2.2 shmat和shmdt系统调用
+共享内存被创建/获取之后，我们不能立即访问它，而是需要先将它关联到进程的地址空间中。使用完共享内存之后，我们也需要将它从进程地址空间中分离。这两项任务分别由如下两个系统调用实现：
+{% highlight string %}
+#include <sys/types.h>
+#include <sys/shm.h>
+
+void *shmat(int shmid, const void *shmaddr, int shmflg);
+
+int shmdt(const void *shmaddr);
+{% endhighlight %}
+其中```shmid```是由shmget()调用返回的共享内存标识符。shmaddr参数指定将共享内存关联到进程的哪块地址空间，最终的效果还受到shmflg参数的可选标志SHM_RND的影响：
+
+* 如果shmaddr为NULL，则被关联的地址由操作系统选择。这是推荐做法，以确保代码的可移植性
+
+* 如果shmaddr非空，并且SHM_RND标志未被设置，则共享内存被关联到addr指定的地址处。
+
+* 如果shmaddr非空，并且设置了SHM_RND标志，则被关联的地址是[shmaddr-(shmaddr % SHMLBA)]。SHMLBA的含义是“段低端边界地址倍数”(Segment Low Boundary Address Multiple)，它必须是内存页面大小(PAGE_SIZE)的整数倍。现在的Linux内核中，它等于一个内存页面大小。SHM_RND的含义是圆整(round)，即将共享内存被关联的地址向下圆整到离shmaddr最近的SHMLBA的整数倍地址处。
+
+除了SHM_RND标志外，shmflg参数还支持如下标志：
+
+* SHM_RDONLY: 进程只能读取共享内存中的内容。若没有指定该标志，则进程可同时对共享内存进行读写操作（当然，还需要在创建共享内存的时候指定其读写权限）
+
+* SHM_REMAP: 如果地址shmaddr已经被关联到一段共享内存上，则重新关联
+
+* SHM_EXEC: 它指定对共享内存段的执行权限。对共享内存而言，执行权限实际上和读权限是一样的。
+
+shmat()成功时返回共享内存被关联到的地址，失败时则返回(void *)-1并设置errno。shmat()成功时，将修改内核数据结构shmid_ds的部分字段，如下：
+
+* 将shm_nattach加1
+
+* 将shm_lpid设置为调用进程的PID
+
+* 将shm_atime设置为当前时间
+
+shmdt()函数将关联到shmaddr处的共享内存从进程中分离。它成功时返回0，失败时则返回-1并设置errno。shmdt()在成功调用时将修改内核数据结构shmid_ds的部分字段，如下：
+
+* 将shm_nattach减1
+
+* 将shm_lpid设置为调用进程的PID
+
+* 将shm_dtime设置为当前时间
+
+### 2.3 shmctl系统调用
+shmctl()系统调用控制共享内存的某些属性，其定义如下：
+{% highlight string %}
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+int shmctl(int shmid, int cmd, struct shmid_ds *buf);
+{% endhighlight %}
 
 
 
