@@ -50,16 +50,18 @@ Linux信号量的API都定义在sys/sem.h头文件中，主要包含3个系统�
 ### 1.2 semget系统调用
 semget系统调用创建一个新的```信号量集```,或者获取一个已存在的信号量集。其定义如下：
 {% highlight string %}
+#include <sys/types.h>
+#include <sys/ipc.h>
 #include <sys/sem.h>
 
-int semget(key_t key, int num_sems, int sem_flags);
+int semget(key_t key, int nsems, int semflg);
 {% endhighlight %}
 
 * key参数是一个键值，用来标识一个全局的信号量集，就像文件名全局唯一地标识一个文件一样。要通过信号量通信的进程需要使用相同的键值来创建/获取该信号量。
 
-* num_sems参数指定要创建/获取的信号量集中信号量的数目。如果是创建信号量，则该值必须被指定； 如果是获取已存在的信号量，则可以设置为0.
+* nsems参数指定要创建/获取的信号量集中信号量的数目。如果是创建信号量，则该值必须被指定； 如果是获取已存在的信号量，则可以设置为0.
 
-* sem_flags参数指定一组标志。它低端的9个比特是该信号量的权限，其格式和含义都与系统调用open()的mode参数相同。此外，它还可以和```IPC_CREAT```标志做```按位或```运算以创建新的信号量集。此时即使信号量已存在，semget()也不会产生错误。我们还可以联合使用```IPC_CREAT```和```IPC_EXCL```标志来确保创建一组新的、唯一的信号量集。在这种情况下，如果信号量集已经存在，则semget()返回错误并设置errno为```EEXIST```。这种创建信号量的行为与用```O_CREAT```和```O_EXCL```标志调用open()来排他式地打开一个文件相似。
+* semflg参数指定一组标志。它低端的9个比特是该信号量的权限，其格式和含义都与系统调用open()的mode参数相同。此外，它还可以和```IPC_CREAT```标志做```按位或```运算以创建新的信号量集。此时即使信号量已存在，semget()也不会产生错误。我们还可以联合使用```IPC_CREAT```和```IPC_EXCL```标志来确保创建一组新的、唯一的信号量集。在这种情况下，如果信号量集已经存在，则semget()返回错误并设置errno为```EEXIST```。这种创建信号量的行为与用```O_CREAT```和```O_EXCL```标志调用open()来排他式地打开一个文件相似。
 
 semget()成功时返回一个正整数值，它是信号量集的标识符；semget()失败时返回-1，并设置errno。
 
@@ -104,7 +106,7 @@ semget()对semid_ds结构体的初始化包括：
 
 * 将sem_ctime设置为当前系统时间
 
-### 1.3 senio系统调用
+### 1.3 semop系统调用
 semop系统调用改变信号量的值，即执行P、V操作。在讨论semop()之前，我们需要先介绍与每个信号量关联的一些重要内核变量：
 <pre>
 unsigned short semval;      /*信号量的值*/
@@ -115,19 +117,21 @@ pid_t sempid;               /*最后一次执行semop操作的进程ID*/
 
 semop()对信号量的操作实际上就是对这些内核变量的操作。semop()的定义如下：
 {% highlight string %}
+#include <sys/types.h>
+#include <sys/ipc.h>
 #include <sys/sem.h>
 
-int semop(int sem_id, struct sembuf *sem_ops, size_t num_sem_ops);
+int semop(int semid, struct sembuf *sops, unsigned nsops);
 {% endhighlight %}
 
-1) **sem_id参数**
+1) **semid参数**
 
 sem_id参数是由semget()调用返回的信号量集标识符，用以指定被操作的目标信号量集。
 
 
-2) **sem_ops参数**
+2) **sops参数**
 
-sem_ops参数指向一个sembuf结构体类型的数组，sembuf结构体的定义如下：
+sops参数指向一个sembuf结构体类型的数组，sembuf结构体的定义如下：
 {% highlight string %}
 struct sembuf{
 	unsigned short int sem_num;
@@ -158,19 +162,85 @@ struct sembuf{
 3. 调用被信号中断，此时semop()调用失败返回，errno被设置为EINTR，同时系统将该信号量的semncnt值减1；
 </pre>
 
-3） **num_sem_ops参数**
+3） **nsops参数**
 
-semop()系统调用的第3个参数num_sem_ops指定要执行的操作个数，即sem_ops数组中元素的个数。semop()对数组sem_ops中的每个成员按照数组依次执行操作，并且该过程是原子操作，以避免别的进程在同一时刻按照不同的顺序对该信号量集中的信号量执行semop()操作导致竞态条件。
+semop()系统调用的第3个参数nsops指定要执行的操作个数，即```sops```数组中元素的个数。semop()对数组```sops```中的每个成员按照数组依次执行操作，并且该过程是原子操作，以避免别的进程在同一时刻按照不同的顺序对该信号量集中的信号量执行semop()操作导致竞态条件。
 
-semop()成功时返回0，失败则返回-1并设置errno。失败的时候，sem_ops数组中指定的所有操作都不被执行。
+semop()成功时返回0，失败则返回-1并设置errno。失败的时候，```sops```数组中指定的所有操作都不被执行。
 
-
-
-
-### 1.3 semop系统调用
 
 ### 1.4 semctl系统调用
+semctl系统调用允许调用者对信号量进行直接控制。其定义如下：
+{% highlight string %}
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
 
+int semctl(int semid, int semnum, int cmd, ...);
+{% endhighlight %}
+semid参数是由semget()调用返回的信号量集标识符，用以指定被操作的信号量集。semnum参数指定被操作的信号量在信号量集中的编号。cmd参数指定要执行的命令。有的命令需要调用者传递第4个参数。第4个参数的类型由用户自己定义，但```sys/sem.h```头文件给出了它的推荐格式：
+{% highlight string %}
+union semun {
+	int              val;    /*用于SETVAL命令*/
+	struct semid_ds *buf;    /*用于IPC_STAT和IPC_SET命令*/
+	unsigned short  *array;  /*用于GETALL和SETALL命令*/
+	struct seminfo  *__buf;  /*用与IPC_INFO命令*/
+};
+
+struct  seminfo {
+	int semmap;    /*在信号量map中有多少信号量集，当前Linux内核没有使用*/
+	int semmni;    /*系统最多可允许的信号量集数目*/
+	int semmns;    /*系统最多可拥有的信号量数目(所有信号量集中信号量的总数目）*/
+	int semmnu;    /*系统级别所支持的最大undo数目，Linux内核没有使用*/
+	int semmsl;    /*一个信号量集中最多允许包含的信号量数目*/
+	int semopm;    /*semop一次最多能执行的sem_op操作数目*/
+	int semume;    /*一个进程所支持的最大undo数目，Linux内核没有使用*/
+	int semusz;    /*sem_undo结构体的大小*/
+	int semvmx;    /*最大所允许的信号量值*/
+	int semaem;    /*最多允许的undo次数（带SEM_UNDO 标志的semop操作的次数)*/
+};
+{% endhighlight %}
+
+semctl支持的所有命令如下所示：
+<pre>
+   命令                                    含义                                     semctl成功时的返回值
+--------------------------------------------------------------------------------------------------------------
+IPC_STAT       将信号量集关联的内核数据结构复制到semun.buf中                                  0
+IPC_SET        将semun.buf中的部分成员复制到信号量集关联的内核数据结构中，同时内核               0
+               数据中的semid_ds.sem_ctime被更新                
+
+IPC_RMID       立即移除信号量集，唤醒所有等待该信号量集的进程(semop返回错误，并设置               0
+               errno为EIDRM)
+
+IPC_INFO       获取系统信号量资源配置信息，将结果存储在semun.__buf中，这些信息的含义       内核信号量集数组中已被使用的项
+               见结构体seminfo的注释部分                                              的最大索引值
+
+SEM_INFO       与IPC_INFO类似，不过semun.__buf.semusz被设置为系统目前所拥有的信号量      同IPC_INFO
+               集数目，而semun.__buf.semaem被设置为系统目前拥有的信号量数目 
+
+SEM_STAT       与IPC_STAT类似，不过此时semid参数不是用来表示信号量集标识符，而是内核       内核信号量集数组中索引值为semid
+               中信号量集数组的索引（系统中所有信号量集都是该数组中的一项)                 的信号量集的标识符
+
+GETALL         将由semid标识的信号量集中的所有信号量的semval值导出到semun.array中         0
+GETNCNT        获取信号量的semncnt值                                                  信号量的semncnt值
+
+GETPID         获取信号量的sempid值                                                   信号量的sempid值
+GETVAL         获取信号量的semval值                                                   信号量的semval值
+GETZCNT        获取信号量的semzcnt值                                                  信号量的semzcnt值
+
+SETALL         用semun.array中的数据填充由semid标识的信号量集中所有信号量的semval         0
+               值，同时内核数据中的semid_ds.sem_ctime被更新
+
+SETVAL         将信号量的semval值设置为semun.val，同时内核数据中的semid_ds.sem_ctime     0
+               被更新
+----------------------------------------------------------------------------------------------------------------
+
+
+注意： 这些操作中，GETNCNT、GETPID、GETVAL、GETZCNT和SETVAL操作的是单个信号量，它是由标识符semid指定的信号量集中第semnum
+      个信号量；而其他操作针对的是整个信号量集，此时semctl的参数sem_num被忽略。
+</pre>
+
+semctl成功时的返回值取决于cmd参数，如上表所示。semctl失败时，返回-1，并设置errno。
 
 
 
