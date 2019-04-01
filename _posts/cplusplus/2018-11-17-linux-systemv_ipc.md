@@ -478,9 +478,9 @@ int shmctl(int shmid, int cmd, struct shmid_ds *buf);
 其中，shmid参数是由shmget()调用返回的共享内存标识符。cmd参数指定要执行的命令。shmctl()支持的所有命令如下表所示：
 <pre>
    命令                                    含义                                              shmctl成功时的返回值
---------------------------------------------------------------------------------------------------------------
-IPC_STAT            将共享内存相关的内核数据结构复制到buf(第3个参数，下同）中                              0
-IPC_SET             将buf中的部分成员复制到共享内存相关的内核数据结构中，同时内核数据结构                    0
+--------------------------------------------------------------------------------------------------------------------------
+IPC_STAT            将共享内存相关的内核数据结构复制到buf(第3个参数，下同）中                               0
+IPC_SET             将buf中的部分成员复制到共享内存相关的内核数据结构中，同时内核数据结构                     0
                     中的shmid_ds.shm_ctime将被更新 
 
 IPC_RMID            将共享内存打上删除标记。这样当最后一个使用它的进程调用shmdt()将它从进程                  0
@@ -504,8 +504,61 @@ shmctl()成功时的返回值取决于cmd参数, 如上表所示。shmctl()失�
 
 ### 2.4 共享内存的POSIX方法
 
+我们知道mmap()，可以利用它的MAP_ANONYMOUS标志我们可以实现父、子进程之间的匿名内存共享。通过打开同一个文件，mmap()也可以实现无关进程之间的内存共享。Linux提供了另外一种利用mmap()在无关进程之间共享内存的方式。这种方式无须任何文件支持，但它需要先使用如下函数来创建或打开一个POSIX共享内存对象：
+{% highlight string %}
+#include <sys/mman.h>
+#include <sys/stat.h>        /* For mode constants */
+#include <fcntl.h>           /* For O_* constants */
 
+int shm_open(const char *name, int oflag, mode_t mode);
+{% endhighlight %}
+shm_open()的使用方法与open()系统调用完全相同。name参数指定要创建/打开的共享内存对象。从可移植性的角度考虑，该参数应该使用```/somename```格式： 以```/```开始，后接多个字符，且这些字符都不是```/```；以```\0```结尾，长度不超过NAME_MAX(通常是255)
 
+oflag参数指定创建方式。它可以是下列标志中的一个或多个的按位或：
+
+* O_RDONLY: 以只读方式打开共享内存对象
+
+* O_RDWR: 以可读、可写方式打开共享内存对象
+
+* O_CREAT: 如果共享内存对象不存在，则创建之。此时mode参数的最低9位将指定该共享内存对象的访问权限。共享内存对象被创建的时候，其初始长度为0
+
+* O_EXCL: 和O_CREAT一起使用，如果由name指定的共享内存对象已经存在，则shm_open()调用返回错误，否则就创建一个新的共享内存对象。
+
+* O_TRUNC: 如果共享内存对象已经存在，则把它截断，使其长度为0
+
+shm_open()调用成功时返回一个文件描述符。该文件描述符可用于后续的mmap()调用，从而将共享内存关联到调用进程。shm_open()失败时返回-1，并设置errno。
+
+和打开的文件最后需要关闭一样，由shm_open()创建的共享内存对象使用完之后也需要被删除，这个过程是通过如下函数实现的：
+{% highlight string %}
+#include <sys/mman.h>
+#include <sys/stat.h>        /* For mode constants */
+#include <fcntl.h>           /* For O_* constants */
+
+int shm_unlink(const char *name);
+{% endhighlight %}
+
+该函数将name参数指定的共享内存对象标记为等待删除。当所有使用该共享内存对象的进程都使用unmap()将它从进程中分离之后，系统将销毁这个共享内存对象所占据的资源。
+
+如果代码中使用了上述POSIX共享内存函数，则编译的时候需要指定链接选项```-lrt```。
+
+## 3. 消息队列
+消息队列是在两个进程之间传递二进制块数据的一种简单有效的方式。每个数据块都有一个特定的类型，
+{% highlight string %}
+struct msqid_ds {
+	struct ipc_perm msg_perm;     /* Ownership and permissions */
+	time_t          msg_stime;    /* Time of last msgsnd(2) */
+	time_t          msg_rtime;    /* Time of last msgrcv(2) */
+	time_t          msg_ctime;    /* Time of last change */
+	unsigned long   __msg_cbytes; /* Current number of bytes in
+	                                queue (nonstandard) */
+	msgqnum_t       msg_qnum;     /* Current number of messages
+	                                in queue */
+	msglen_t        msg_qbytes;   /* Maximum number of bytes
+	                                allowed in queue */
+	pid_t           msg_lspid;    /* PID of last msgsnd(2) */
+	pid_t           msg_lrpid;    /* PID of last msgrcv(2) */
+};
+{% endhighlight %}
 
 
 
