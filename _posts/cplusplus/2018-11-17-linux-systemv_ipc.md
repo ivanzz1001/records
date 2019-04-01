@@ -242,6 +242,179 @@ SETVAL         将信号量的semval值设置为semun.val，同时内核数据�
 
 semctl成功时的返回值取决于cmd参数，如上表所示。semctl失败时，返回-1，并设置errno。
 
+### 1.5 特殊键值IPC_PRIVATE
+semget()的调用者可以给其key参数传递一个特殊的键值IPC_PRIVATE（其值为0），这样无论该信号量是否已经存在，semget()都将创建一个新的信号量。使用该键值创建的信号量并非像它的名字声称的那样是进程私有的。其他进程，尤其是子进程，也有方法访问这个信号量。所以semget()的man手册的BUGS部分上说，使用名字IPC_PRIVATE有些误导（历史原因），应该称为IPC_NEW。比如下面的代码就在父、子进程间使用一个IPC_PRIVATE信号量来同步(ipc_private.c)：
+{% highlight string %}
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <errno.h>
+
+
+union semun {
+	int              val;
+	struct semid_ds *buf;
+	unsigned short  *array;
+	struct seminfo  *__buf;
+};
+
+
+/*
+ * op为-1时执行P操作，op为1时执行V操作
+ */
+int pv(int semid, int op){
+	struct sembuf sem_b;
+
+	sem_b.sem_num = 0;
+	sem_b.sem_op = op;
+	sem_b.sem_flg = SEM_UNDO;
+
+	return semop(semid, &sem_b, 1);
+}
+
+int main(int argc, char *argv[]){
+	union semun sem_un;
+	int ret;
+	pid_t pid;
+
+	int semid = semget(IPC_PRIVATE, 1, 0666);
+	if (semid < 0){
+		printf("create semphore failure(%d)\n", errno);
+		return -1;
+	}
+
+	sem_un.val = 1;
+	ret = semctl(semid, 0, SETVAL, sem_un);
+	if (ret < 0){
+		printf("set semphore value failure(%d)\n", errno);
+		goto END;
+	}
+
+
+	pid = fork();
+	if(pid == 0){
+		//child process
+		printf("child try to get binary sem\n");
+
+		/*
+		 * 在父子进程间共享IPC_PRIVATE信号量的关键就在于二者都
+		 * 可以操作该信号量的标识符semid
+		 */
+
+		ret = pv(semid, -1);
+		if (ret < 0){
+			printf("child get sem failure(%d: %d)\n", ret, errno);
+			exit(-1);
+		}
+		printf("child get the sem and would release it after 5 seconds\n");
+		sleep(5);
+
+		ret = pv(semid, 1);
+		if(ret < 0){
+			printf("child release sem failure(%d: %d)\n", ret, errno);
+			exit(-1);
+		}
+		printf("child success release the sem\n");
+
+		exit(0);
+
+	}else if(pid > 0){
+		//parent process
+		printf("parent try to get binary sem\n");
+
+		ret = pv(semid, -1);
+		if (ret < 0){
+			printf("parent get sem failure(%d: %d)\n", ret, errno);
+			exit(-1);
+		}
+		printf("parent get the sem and would release it after 5 seconds\n");
+		sleep(5);
+
+		ret = pv(semid, 1);
+		if(ret < 0){
+			printf("parent release sem failure(%d: %d)\n", ret, errno);
+			exit(-1);
+		}
+		printf("parent success release the sem\n");
+
+		exit(0);
+
+	}else{
+		printf("fork failure(%d)", errno);
+		goto END;
+	}
+	waitpid(pid, NULL, 0);
+
+END:
+	ret = semctl(semid, 0, IPC_RMID, sem_un);
+	if (ret < 0){
+		printf("remove semphore failure(%d)\n", errno);
+		return -1;
+	}
+
+	return 0x0;
+}
+
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o ipc_private ipc_private.c
+# ./ipc_private 
+parent try to get binary sem
+child try to get binary sem
+child get the sem and would release it after 5 seconds
+child success release the sem
+parent get the sem and would release it after 5 seconds
+parent success release the sem
+</pre>
+
+另外一个例子是： 工作在prefork模式下的httpd网页服务器程序使用1个IPC_PRIVATE信号量来同步各子进程对epoll_wait()的调用权限。
+
+## 2. 共享内存
+共享内存是最高效的IPC机制，因为它不涉及进程之间的任何数据传输。这种高效率带来的问题是，我们必须使用其他辅助手段来同步对共享内存的访问，否则会产生竞态条件。因此，共享内存通常和其他进程间通信方式一起使用。
+
+Linux共享内存API都定义在sys/shm.h头文件中，包括4个系统调用： shmget、shmat、shmdt和shmctl。我们将依次讨论之。
+
+### 2.1 shmget系统调用
+shmget()系统调用创建一段新的共享内存，或者获取一段已存在的共享内存。其定义如下：
+{% highlight string %}
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+int shmget(key_t key, size_t size, int shmflg);
+{% endhighlight %}
+和semget()系统调用一样，key参数是一个键值，用来标识一段全局唯一的共享内存。size参数指定共享内存的大小，单位是字节。如果是创建新的共享内存，则size值必须被指定。如果是获取已存在的共享内存，则可以把size设置为0.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
