@@ -37,7 +37,7 @@ V(SV): 如果有其他进程因为等待SV而挂起，则唤醒之； 如果没�
 
 信号量的取值可以是任何自然数。但最常用的、最简单的信号量是二进制信号量，它只能取0和1两个数值。这里我们也仅讨论二进制信号量。使用二进制信号量同步两个进程，以确保关键代码段的独占式访问的一个典型例子如下图所示：
 
-
+![cpp-linux-semphore](https://ivanzz1001.github.io/records/assets/img/cplusplus/cpp_linux_semphore.jpg)
 
 在上图中，当关键代码段可用时，二进制信号量SV的值为1，进程A和B都有机会进入关键代码段。如果此时进程A执行了```P(SV)```操作将SV减1，则进程B若再执行```P(SV)```操作就会被挂起。直到进程A离开关键代码段，并执行```V(SV)```操作将SV加1，关键代码段才重新变得可用。如果此时进程B因为等待SV而处于挂起状态，则它将被唤醒，并进入关键代码段。同样，这时进程A如果再执行```P(SV)```操作，则也只能被操作系统挂起以等待进程B退出关键代码段。
 {% highlight string %}
@@ -682,7 +682,113 @@ MSG_STAT           与IPC_STAT类似，不过此时msgid参数不是用来表示
 </pre>
 msgctl()成功时的返回值取决于cmd参数，如上表所示。msgctl()函数失败时返回-1，并设置errno。
 
-### 3.5 
+### 3.5 消息队列使用示例
+消息发送端(msgqueue_send.c):
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/msg.h>
+#include <sys/ipc.h>
+#include <errno.h>
+
+
+struct msg_st{
+	long mtype;
+	char mtext[BUFSIZ];   /*BUFSIZ: default 8192*/
+};
+
+int main(int argc, char *argv[]){
+	int msgid;
+	struct msg_st data;
+
+	key_t key = ftok("/tmp", 66);
+	msgid = msgget(key, IPC_CREAT | IPC_EXCL | 0666);
+	if (msgid == -1){
+		printf("create msg queue(%d) failure(%d)\n",key, errno);
+		return -1;
+	}
+
+	while(1){
+		char msg[512];
+		memset(msg, 0x0, sizeof(msg));
+		data.mtype = 1;
+
+		printf("input message: ");
+		fgets(msg, sizeof(msg), stdin);
+		strcpy(data.mtext, msg);
+
+		if(msgsnd(msgid, &data, strlen(msg) + 1, 0) < 0){
+			printf("send msg failure(%d)\n", errno);
+			break;
+		}
+
+		if(strncmp(msg, "QUIT", 4) == 0)
+			break;
+	}
+
+	if(msgctl(msgid, IPC_RMID, NULL) < 0){
+		printf("remove msg failure(%d)\n", errno);
+		return -1;
+	}
+
+	return 0x0;
+}
+{% endhighlight %}
+消息接收端(msgqueue_recv.c):
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/msg.h>
+#include <sys/ipc.h>
+#include <errno.h>
+
+
+struct msg_st{
+	long mtype;
+	char mtext[BUFSIZ];   /*BUFSIZ: default 8192*/
+};
+
+int main(int argc, char *argv[]){
+	int msgid;
+	struct msg_st data;
+
+	key_t key = ftok("/tmp", 66);
+	msgid = msgget(key, IPC_EXCL | 0666);
+	if (msgid == -1){
+		printf("get msg queue(%d) failure(%d)\n",key, errno);
+		return -1;
+	}
+
+	while(1){
+		if(msgrcv(msgid, &data, BUFSIZ, 1, 0x0) < 0){
+			printf("recv msg failure(%d)\n", errno);
+			break;
+		}
+		printf("data: %s\n", data.mtext);
+		if (strncmp(data.mtext, "QUIT", 4) == 0)
+			break;
+	}
+	return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o msgqueue_send msgqueue_send.c 
+# gcc -o msgqueue_recv msgqueue_recv.c 
+# ./msgqueue_send
+input message: hello
+input message: world
+input message: QUIT
+
+# ./msgqueue_recv
+data: hello
+
+data: world
+
+data: QUIT
+</pre>
 
 ## 4. IPC命令
 上述三种System V IPC进程间通信方式都使用一个全局唯一的键值（key)来描述一个共享资源。当程序调用semget()、shmget()或者msgget()时，就创建了这些共享资源的一个实例。Linux提供了```ipcs```命令，以观察当前系统上拥有哪些共享资源实例。例如：
