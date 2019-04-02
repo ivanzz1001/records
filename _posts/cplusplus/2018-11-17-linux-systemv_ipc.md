@@ -542,27 +542,120 @@ int shm_unlink(const char *name);
 如果代码中使用了上述POSIX共享内存函数，则编译的时候需要指定链接选项```-lrt```。
 
 ## 3. 消息队列
-消息队列是在两个进程之间传递二进制块数据的一种简单有效的方式。每个数据块都有一个特定的类型，
+消息队列是在两个进程之间传递二进制块数据的一种简单有效的方式。每个数据块都有一个特定的类型，接收方可以根据类型来有选择地接收数据，而不一定像管道和命名管道那样必须以先进先出的方式接收数据。
+
+Linux消息队列的API都定义在sys/msg.h头文件中，包括4个系统调用： msgget()、msgsnd()、msgrcv()和msgctl()。我们将依次讨论之。
+
+### 3.1 msgget系统调用
+msgget()系统调用创建一个消息队列，或者获取一个已有的消息队列。其定义如下：
+{% highlight string %}
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+
+int msgget(key_t key, int msgflg);
+{% endhighlight %}
+和semget()系统调用一样，key参数是一个键值，用来标识一个全局唯一的消息队列。msgflg参数的使用和含义与semget()系统调用的```semflg```参数相同。
+
+msgget()成功时返回一个正整数值，它是消息队列的标识符。msgget()失败时返回-1，并设置errno。
+
+如果msgget()用于创建消息队列，则与之关联的内核数据结构msgid_ds将被创建并初始化。msgid_ds结构体的定义如下：
 {% highlight string %}
 struct msqid_ds {
-	struct ipc_perm msg_perm;     /* Ownership and permissions */
-	time_t          msg_stime;    /* Time of last msgsnd(2) */
-	time_t          msg_rtime;    /* Time of last msgrcv(2) */
-	time_t          msg_ctime;    /* Time of last change */
-	unsigned long   __msg_cbytes; /* Current number of bytes in
-	                                queue (nonstandard) */
-	msgqnum_t       msg_qnum;     /* Current number of messages
-	                                in queue */
-	msglen_t        msg_qbytes;   /* Maximum number of bytes
-	                                allowed in queue */
-	pid_t           msg_lspid;    /* PID of last msgsnd(2) */
-	pid_t           msg_lrpid;    /* PID of last msgrcv(2) */
+	struct ipc_perm msg_perm;     /*消息队列的操作权限*/
+	time_t          msg_stime;    /*最后一次调用msgsnd()的时间*/
+	time_t          msg_rtime;    /*最后一次调用msgrcv()的时间*/
+	time_t          msg_ctime;    /*最后一次被修改的时间*/
+	unsigned long   __msg_cbytes; /*消息队列中已有的字节数*/
+	msgqnum_t       msg_qnum;     /*消息队列中已有的消息数*/
+
+	msglen_t        msg_qbytes;   /*消息队列允许的最大字节数*/
+	pid_t           msg_lspid;    /*最后执行msgsnd()的进程的PID*/
+	pid_t           msg_lrpid;    /*最后执行msgrcv()的进程的PID*/
 };
 {% endhighlight %}
 
+### 3.2 msgsnd系统调用
+msgsnd()系统调用把一条消息添加到消息队列中。其定义如下：
+{% highlight string %}
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+
+int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
+{% endhighlight %}
+msgid参数是由msgget()调用返回的消息队列标识符。```msgp```参数指向一个准备发送的消息，消息必须被定义为如下类型：
+{% highlight string %}
+struct msgbuf {
+	long mtype;       /* 消息类型*/
+	char mtext[1];    /* 消息数据*/
+};
+{% endhighlight %}
+其中mtype成员指定消息的类型，它必须是一个正整数。ntext是消息数据。msgsz参数是消息的数据部分(mtext)的长度。这个长度可以为0，表示没有消息数据。
+
+msgflg参数控制msgsnd()的行为。它通常仅支持IPC_NOWAIT标志，即以非阻塞的方式发送消息。默认情况下，发送消息时如果消息队列满了，则msgsnd()将阻塞。若IPC_NOWAIT标志被指定，则msgsnd()将立即返回并设置errno为EAGAIN。
+
+处于阻塞状态的msgsnd()调用可能被如下两种异常情况所中断：
+
+* 消息队列被移除，此时msgsnd()调用将立即返回并设置errno为EIDRM
+
+* 程序接收到信号，此时msgsnd()调用立即返回并设置errno为EINTR
+
+msgsnd()成功时返回0，失败则返回-1并设置errno。msgsnd()成功时将修改内核数据结构msgid_ds的部分字段，如下所示：
+
+* 将msg_qnum加1
+
+* 将msg_lspid设置为调用进程的PID
+
+* 将msg_stime设置为当前的时间
 
 
+### 3.3 msgrcv系统调用
+msgrcv()系统调用从消息队列中获取消息。其定义如下：
+{% highlight string %}
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
 
+
+ssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp,
+              int msgflg);
+{% endhighlight %}
+msgid参数是由msgget()调用返回的消息队列标识符。```msgp```参数用于存储接收的消息， msgsz参数指的是消息数据部分的长度。msgtyp参数指定接收何种类型的消息。我们可以使用如下几种方式来指定消息类型：
+
+* msgtyp等于0： 读取消息队列中的第一个消息
+
+* msgtyp大于0： 读取消息队列中第一个类型为msgtyp的消息（除非指定了标志MSG_EXCEPT，见后文）
+
+* msgtyp小于0： 读取消息队列中第一个类型值比msgtyp绝对值小的消息；
+
+参数msgflg控制msgrcv()函数的行为，它可以是如下一些标志的按位或：
+
+* IPC_NOWAIT: 如果消息队列中没有消息，则msgrcv调用立即返回并设置errno为EAGAIN;
+
+* MSG_EXCEPT: 如果msgtyp大于0，则接收消息队列中第一个非msgtyp类型的消息；
+
+* MSG_NOERROR: 如果消息数据部分的长度超过了msg_sz，就将它截断
+
+处于阻塞状态的msgrcv调用还可能被如下两种异常情况所中断：
+
+* 消息队列被移除，此时msgrcv()调用将立即返回并设置errno为EIDRM
+
+* 程序接收到信号，此时msgrcv()调用立即返回并设置errno为EINTR
+
+msgrcv()成功时返回实际接收的消息长度(接收进mtext数组中数据的字节数），失败则返回-1并设置errno。msgrcv()成功时将修改内核数据结构msgid_ds的部分字段，如下所示：
+
+* 将msg_qnum减1
+
+* 将msg_lspid设置为调用进程的PID
+
+* 将msg_rtime设置为当前的时间
+
+
+### 3.4 msgctl系统调用
+msgctl系统调用控制消息队列的某些属性。其定义如下：
+{% highlight string %}
+{% endhighlight %}
 
 
 
