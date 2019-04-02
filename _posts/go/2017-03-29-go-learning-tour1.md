@@ -583,13 +583,22 @@ func TestTaskQueuev1(t *testing.T){
 	if outwork1 != nil{
 		outRealWork, ok := (*outwork1).(Task_Work)
 		if !ok{
-			fmt.Printf("not expected type")
+			fmt.Printf("not expected type\n")
 			return
 		}
 		fmt.Printf("name: %s content: %s\n", outRealWork.name, outRealWork.content)
 
 	}
 
+	outwork2, ok := taskQueue.TryPop()
+	if ok{
+		outRealWork2, ok := outwork2.(Task_Work)
+		if !ok{
+			fmt.Printf("not expected type\n")
+			return
+		}
+		fmt.Printf("name: %s content: %s\n", outRealWork2.name, outRealWork2.content)
+	}
 }
 {% endhighlight %}
 
