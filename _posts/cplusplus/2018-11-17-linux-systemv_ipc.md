@@ -655,7 +655,57 @@ msgrcv()成功时返回实际接收的消息长度(接收进mtext数组中数据
 ### 3.4 msgctl系统调用
 msgctl系统调用控制消息队列的某些属性。其定义如下：
 {% highlight string %}
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+
+int msgctl(int msqid, int cmd, struct msqid_ds *buf);
 {% endhighlight %}
+msgid参数是由msgget()调用返回的消息队列标识符。cmd参数指定要执行的命令。msgctl()所支持的命令如下表所示：
+<pre>
+   命令                                    含义                                              msgctl成功时的返回值
+--------------------------------------------------------------------------------------------------------------------------
+IPC_STAT           将消息队列关联的内核数据结构复制到buf(第3个参数，下同）中                            0
+IPC_SET            将buf中的部分成员复制到消息队列关联的内核数据结构中，同时内核数据结构中的              0
+                   msgid_ds.msg_ctime被更新
+
+IPC_RMID           立即移除消息队列，唤醒所有等待读消息和写消息的进程（这些调用立即返回并设置              0
+                   errno为EIDRM)
+
+IPC_INFO           获取系统消息队列资源配置信息，将结果存储在buf中。应用程序需要将buf转换成         内核消息队列数组中已经被使用的项的
+                   msginfo结构体类型来读取这些系统信息。msginfo结构体与seminfo类似，这里          最大索引值
+                   不再赘述
+
+MSG_INFO           与IPC_INFO类似。不过buf返回的是已经分配的消息队列占用的资源信息                     同IPC_INFO
+MSG_STAT           与IPC_STAT类似，不过此时msgid参数不是用来表示消息队列标识符，而是内核消息       内核消息队列信息数组中索引值为msgid
+                   队列信息数组的索引（每个消息队列的信息都是该数组中的一项）                      的消息队列的标识符
+</pre>
+msgctl()成功时的返回值取决于cmd参数，如上表所示。msgctl()函数失败时返回-1，并设置errno。
+
+### 3.5 
+
+## 4. IPC命令
+上述三种System V IPC进程间通信方式都使用一个全局唯一的键值（key)来描述一个共享资源。当程序调用semget()、shmget()或者msgget()时，就创建了这些共享资源的一个实例。Linux提供了```ipcs```命令，以观察当前系统上拥有哪些共享资源实例。例如：
+<pre>
+# ipcs
+
+------ Message Queues --------
+key        msqid      owner      perms      used-bytes   messages    
+
+------ Shared Memory Segments --------
+key        shmid      owner      perms      bytes      nattch     status      
+0x00000000 196608     ivan1001   600        524288     2          dest         
+0x00000000 229377     ivan1001   600        4194304    2          dest         
+0x00000000 327682     ivan1001   600        4194304    2          dest         
+0x00000000 360451     ivan1001   600        1048576    2          dest         
+
+------ Semaphore Arrays --------
+key        semid      owner      perms      nsems     
+0x00000000 0          root       666        1 
+</pre>
+输出结果分段显示了系统拥有的消息队列、共享内存和信号量资源。可见该系统尚未使用任何消息队列，却使用了一组键值为0(IPC_PRIVATE)的共享内存和信号量。
+
+此外，我们可以使用ipcrm命令来删除遗留在系统中的共享资源。
 
 
 
