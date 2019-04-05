@@ -381,11 +381,148 @@ This is line number 4
 
 sed编辑器会删掉包含匹配指定模式的文本行。
 <pre>
-说明： 记住，sed编辑器不会修改原始文件。你删除的行只是从sed编辑器的输出中消失了。原始文件仍然包含那些
-      “删掉” 的行
+说明： 记住，sed编辑器不会修改原始文件。你删除的行只是从sed编辑器的输出中消失了。
+原始文件仍然包含那些“删掉” 的行
 </pre>
 
+你可以用两个文本模式来删除某个范围的行，但是这么做时要小心。你指定的第一个模式会“打开”行删除功能，第二个模式会“关闭”行删除功能。sed编辑器会删除两个指定行之间的所有行（包括指定的行）：
+<pre>
+# cat data6
+This is line number 1.
+This is line number 2.
+This is line number 3.
+This is line number 4.
+# sed '/1/,/3/d' data6
+This is line number 4.
+</pre>
 
+除此之外，你要特别小心，因为只要sed编辑器在数据流中匹配到了开始模式，删除功能就会打开。则可能会导致意外的结果：
+<pre>
+# cat data8
+This is line number 1.
+This is line number 2.
+This is line number 3.
+This is line number 4.
+This is line number 1 again.
+This is text you want to keep.
+This is the last line in the file.
+# sed '/1/,/3/d' data8
+This is line number 4
+</pre>
+第二个出现数字```1```的行再次触发了删除命令，删除了数据流中的剩余行，因为停止模式再没找到。当然，如果你指定了一个从未在文本中出现的停止模式，会出现另一个明显的问题：
+<pre>
+# sed '/1/,/5/d' data8
+</pre>
+因为删除功能在匹配到第一个模式的时候打开了，但一直没匹配到结束模式，所以整个数据流都被删掉了。
+
+### 2.4 插入和附加文本
+如你所期望的，跟其他编辑器类似，sed编辑器允许你向数据流插入和附加文本行。两个操作的区别可能比较费解：
+
+* 插入(insert)命令```i```会在指定的行前增加一个新行
+
+* 追加(append)命令```a```会在指定行后增加一个新行
+
+这两条命令的费解之处在于它们的格式。不能在单个命令行上使用这两条命令。你必须指定是要将行插入还是附加到另一行。格式如下：
+<pre>
+sed '[address]command\new line'
+</pre>
+上面new line中的文本将会出现在sed编辑器输出中你指定的位置。记住，当使用插入命令时，文本会出现在数据流文本的前面：
+{% highlight string %}
+# echo "This is line 2" | sed 'i\This is line 1'
+This is line 1
+This is line 2
+{% endhighlight %}
+当使用附加命令时，文本会出现在数据流文本的后面：
+{% highlight string %}
+# echo "This is line 2" | sed 'a\This is line 1'
+This is line 2
+This is line 1
+{% endhighlight %}
+在命令行界面提示符上使用sed编辑器时，你会看到次提示符来提醒输入新的行数据。你必须在该行完成sed编辑器命令。一旦你输入了结尾的单引号，bash shell就会执行该命令了：
+{% highlihgt string %}
+# echo "This is line 2" | sed 'i\
+> This is line 1.'
+This is line 1.
+This is line 2
+{% endhighlight %}
+这样能够给数据流中的文本前面或后面添加文本，但是如果要添加到数据流里面呢？
+
+要给数据流行中插入或附加数据，你必须用寻址来告诉sed编辑器你想让数据出现在什么位置。你可以在用这些命令时只指定一个行地址。可以匹配一个数字行号或文本模式，但不能用地址区间。这符合逻辑，因为你只能将文本插入或附加到单个行的前面或后面，而不能是行区间的前面或后面。
+
+下面是将一个新行插入到数据流第3行前面的例子：
+<pre>
+# cat data10
+This is line number 1.
+This is line number 2.
+This is line number 3.
+This is line number 4.
+# cat data10 | sed '3i\This is a insert line.'
+This is line number 1.
+This is line number 2.
+This is a insert line.
+This is line number 3.
+This is line number 4.
+</pre>
+
+下面是将一个新行附加到数据流中第3行后面的例子：
+<pre>
+# sed '3a\This is a insert line.' data10
+This is line number 1.
+This is line number 2.
+This is line number 3.
+This is a insert line.
+This is line number 4.
+</pre>
+它使用跟插入命令相同的过程，只是将新文本行方放到了指定行号的后面。如果你有一个多行数据流，你要将新行附加到数据流的末尾，只要用代表数据最后一行的美元符号($)就可以了：
+<pre>
+# sed '$a\This is a insert line.' data10
+This is line number 1.
+This is line number 2.
+This is line number 3.
+This is line number 4.
+This is a insert line.
+</pre>
+同样的方法也适用于你要再数据流开始的地方增加一个新行。只要在第一行之前插入新行就可以了。
+
+要插入或附加多行文本，你必须对新行文本中的每一行使用反斜线，直到你要插入或附加的文本的最后一行：
+{% highlight string %}
+# sed '$a^Chis is an insert line.' data10
+root@ubuntu:~/workspace# sed '1i\
+> This is one line of new text.\
+> This is another line of new text.' data10
+This is one line of new text.
+This is another line of new text.
+This is line number 1.
+This is line number 2.
+This is line number 3.
+This is line number 4.
+{% endhighlight %}
+指定的两行都会添加到数据流中。
+
+### 2.5 修改行
+修改(change)命令允许修改数据流中整行文本的内容。它跟插入和附加命令的工作机制一样，你必须在sed命令中单独指定新行：
+{% highlight string %}
+# cat data10
+This is line number 1.
+This is line number 2.
+This is line number 3.
+This is line number 4.
+# sed '3c\
+> This is a changed line of text' data10
+This is line number 1.
+This is line number 2.
+This is a changed line of text
+This is line number 4.
+{% endhighlight %}
+在这个例子中，sed编辑器会修改第3行中的文本。你也可以用文本模式来寻址：
+{% highlight string %}
+# sed '/number 3/c\
+This is a changed line of text.' data10
+This is line number 1.
+This is line number 2.
+This is a changed line of text.
+This is line number 4.
+{% endhighlight %}
 
 
 
