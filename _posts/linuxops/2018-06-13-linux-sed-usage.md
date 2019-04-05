@@ -439,7 +439,7 @@ This is line 2
 This is line 1
 {% endhighlight %}
 在命令行界面提示符上使用sed编辑器时，你会看到次提示符来提醒输入新的行数据。你必须在该行完成sed编辑器命令。一旦你输入了结尾的单引号，bash shell就会执行该命令了：
-{% highlihgt string %}
+{% highlight string %}
 # echo "This is line 2" | sed 'i\
 > This is line 1.'
 This is line 1.
@@ -487,7 +487,7 @@ This is a insert line.
 要插入或附加多行文本，你必须对新行文本中的每一行使用反斜线，直到你要插入或附加的文本的最后一行：
 {% highlight string %}
 # sed '$a^Chis is an insert line.' data10
-root@ubuntu:~/workspace# sed '1i\
+# sed '1i\
 > This is one line of new text.\
 > This is another line of new text.' data10
 This is one line of new text.
