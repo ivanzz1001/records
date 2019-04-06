@@ -523,8 +523,126 @@ This is line number 2.
 This is a changed line of text.
 This is line number 4.
 {% endhighlight %}
+文本模式修改命令会修改它匹配的数据流中的任意文本行：
+{% highlight string %}
+# cat data8
+This is line number 1.
+This is line number 2.
+This is line number 3.
+This is line number 4.
+This is line number 1 again.
+This is text you want to keep.
+This is the last line in the file.
 
+# sed '/number 1/c\
+> This is a changed line of text' data8
+This is a changed line of text
+This is line number 2.
+This is line number 3.
+This is line number 4.
+This is a changed line of text
+This is text you want to keep.
+This is the last line in the file.
+{% endhighlight %}
 
+你可以在修改命令中使用地址区间，但结果可能并不是你想要的：
+{% highlight string %}
+# cat data7
+This is line number 1
+This is line number 2
+This is line number 3
+This is line number 4
+
+# sed '2,3c\
+> This is a changed line of text.' data7
+This is line number 1
+This is a changed line of text.
+This is line number 4
+{% endhighlight %}
+sed编辑器会用这一行文本来替换数据流中的两行文本，而不是逐一修改那两行文本。
+
+## 2.6 转换命令
+转换(transform,y)命令是唯一可以处理单个字符的sed编辑器命令。转换命令格式如下：
+<pre>
+[address]y/inchars/outchars/
+</pre>
+转换命令会进行inchars和outchars值的一对一映射。inchars中第一个字符会被转换为outchars中第一个字符，第二个字符会被转换成outchars中的第二个字符。这个映射会一直持续到处理完指定字符。如果inchars和outchars长度不同，sed编辑器会产生一条错误消息。
+
+如下有个使用转换命令的简单例子：
+{% highlight string %}
+# cat data8
+This is line number 1.
+This is line number 2.
+This is line number 3.
+This is line number 4.
+This is line number 1 again.
+This is text you want to keep.
+This is the last line in the file.
+
+# sed 'y/123/789/' data8
+This is line number 7.
+This is line number 8.
+This is line number 9.
+This is line number 4.
+This is line number 7 again.
+This is text you want to keep.
+This is the last line in the file
+{% endhighlight %}
+
+如你在输出中看到的，inchars模式中指定字符的每个实例都会被替换成outchars模式中相同位置的那个字符。
+
+转换命令是一个全局命令，也就是说，它会自动替换文本行中找到的指定字符的所有实例，而不会考虑它们出现的位置：
+{% highlight string %}
+# echo "This 1 is a test of 1 try." | sed 'y/123/456/'
+This 4 is a test of 4 try.
+{% endhighlight %}
+sed编辑器替换了文本行中匹配到的字符“1”的两个实例。你无法限定只更改该字符出现的某个地方。
+
+### 2.7 回顾打印
+我们在前面2.1节中介绍了如何使用```p标记```和替换命令显示sed编辑器修改过的行。这里有3条也能用来打印数据流中的信息的命令：
+
+* 小写p命令用来打印文本行
+
+* 等号（=）命令用来打印行号
+
+* l(小写L）命令用来列出行
+
+1） **打印行**
+
+跟替换命令中的p标记类似，p命令可以打印sed编辑器输出输出中的一行。如果只用这个命令，也没什么特别：
+{% highlight string %}
+# echo "This is a test." | sed 'p'
+This is a test.
+This is a test.
+{% endhighlight %}
+它打印出的数据文本是你已经知道的。打印命令最常见的用法是打印包含匹配文本模式的行：
+{% highlight string %}
+# cat data7
+This is line number 1
+This is line number 2
+This is line number 3
+This is line number 4
+
+# sed -n '/number 3/p' data7
+This is line number 3
+{% endhighlight %}
+在命令行上用```-n```选项，你就能禁止其他行，只打印包含匹配文本模式的行。
+
+你也可以用它来快速打印数据流中的一些行:
+{% highlight string %}
+# sed -n '2,3p' data7
+This is line number 2
+This is line number 3
+{% endhighlight %}
+如果需要在修改之前查看行，那么你可以使用打印命令，比如与替换或修改命令一起使用。你可以创建一个脚本来在修改行之前显示该行：
+{% highlight string %}
+# sed -n '/3/{
+> p
+> s/line/test/p
+> }' data7
+This is line number 3
+This is test number 3
+{% endhighlight %}
 
 
 <br />
