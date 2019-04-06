@@ -644,6 +644,174 @@ This is line number 3
 This is test number 3
 {% endhighlight %}
 
+sed编辑器命令会查找包含数字“3”的行，然后执行两条命令。首先，脚本用p命令来打印出该行原来的版本；然后它用s命令替换文本，并用p标记打印出了最终文本。输出同时显示了原来的行文本和新的行文本。
+
+2） **打印行号**
+
+等号(=)命令会打印行在数据流中的当前行号。行号由数据流中的换行符决定。每次数据流中出现一个换行符，sed编辑器会认为它结束了一行文本：
+{% highlight string %}
+# sed '=' data1
+1
+The quick brown fox jumps over the lazy dog.
+2
+The quick brown fox jumps over the lazy dog.
+3
+The quick brown fox jumps over the lazy dog.
+4
+The quick brown fox jumps over the lazy dog.
+{% endhighlight %}
+sed编辑器在实际的文本行出现前打印了行号。如果你要在数据流中查找特定文本模式的话，等号命令能派得上用场：
+{% highlight string %}
+# cat data7
+This is line number 1
+This is line number 2
+This is line number 3
+This is line number 4
+
+# sed -n '/number 4/{
+> =
+> p
+> }' data7
+4
+This is line number 4
+{% endhighlight %}
+使用了```-n```选项，你就能让sed编辑器只显示包含匹配文本模式的行号和文本。
+
+3) **列出行**
+
+列出命令(l)允许打印数据流中的文本和不可打印的ASCII字符。任何不可打印字符都用它们的八进制值前加一个反斜线或标准C风格的命名法（用于常见的不可打印字符），比如```\t```来代表制表符：
+{% highlight string %}
+# cat data9
+This    line    contains 
+# sed -n 'l' data9
+This\tline\tcontains\ttabs.$
+{% endhighlight %}
+
+制表符的位置显示的是```\t```。行尾的美元符表明这里是换行符。如果数据流包含了转义字符，则list命令会用八进制码来显示它。
+
+### 2.8 用sed和文件一起工作
+替换命令包含允许你和文件一起工作的标记。还有一些sed编辑器命令也允许你这么做，而不用替换文本。
+
+1） **向文件写入**
+
+```w命令```用来向文件写入行，命令的格式如下：
+<pre>
+[address]w filename
+</pre>
+filename可以指定为相对路径或绝对路径，但不管是哪种，运行sed编辑器的人都必须有文件的写权限。地址可以是sed中支持的任意类型的寻址方式，例如单个行号、文本模式或一系列行号或文本模式。
+
+下面是将数据流中的前两行打印到一个文本文件中的例子：
+{% highlight string %}
+# cat data7
+This is line number 1
+This is line number 2
+This is line number 3
+This is line number 4
+# sed '1,2w test' data7 
+This is line number 1
+This is line number 2
+This is line number 3
+This is line number 4
+# cat test
+This is line number 1
+This is line number 2
+{% endhighlight %}
+当然，如果你不想让行显示到STDOUT上，你可以用```-n```选项。
+
+如果你要基于一些公共文本值从主文件创建一份数据文件，比如下面的邮件列表中的，那么它会非常好用：
+{% highlight string %}
+# cat data11
+Blum.Katie      Chicago. IL
+Mullen.Riley    West Lafayette. IN
+Snell.Haley     Ft.Wayne. IN
+Woenker.Matthew         Springfield. IL
+Wisecarver.Emma         Grant Park.  IL
+
+
+# sed -n '/IN/w incustomers' data11
+# cat incustomers 
+Mullen.Riley    West Lafayette. IN
+Snell.Haley     Ft.Wayne. IN
+{% endhighlight %}
+sed编辑器会只将包含文本模式的数据行写入目标文件。
+
+2） **从文件读取数据**
+
+你已经了解了如何在sed命令行上向数据流中插入或附加文本。读取命令(r)允许你将一个独立文件中的数据插入到数据流中。
+
+读取命令的格式如下：
+<pre>
+[address]r filename
+</pre>
+filename参数指定了数据文件的绝对或相对路径名。你不能对读取命令使用地址区间，而只能指定单独一个行号或文本模式地址。sed编辑器会将文件中的文本插入到地址后：
+{% highlight string %}
+# cat data12
+This is an add line.
+This is the second line.
+
+# sed '3r data12' data7
+This is line number 1
+This is line number 2
+This is line number 3
+This is an add line.
+This is the second line.
+This is line number 4
+{% endhighlight %}
+sed编辑器将数据文件中的所有文本行插入到数据流中了。同样的方法在使用文本模式地址时也适用：
+{% highlight string %}
+# sed '/number 3/r data12' data7
+This is line number 1
+This is line number 2
+This is line number 3
+This is an add line.
+This is the second line.
+This is line number 4
+{% endhighlight %}
+如果你要在数据流的末尾添加文本，只要用美元符($)就行了：
+{% highlight string %}
+# sed '$r data12' data7
+This is line number 1
+This is line number 2
+This is line number 3
+This is line number 4
+This is an add line.
+This is the second line.
+{% endhighlight %}
+读取命令的另一个很好的用途是，将它和删除命令一起使用来用另一文件中的数据替换文件中的占位文本。例如，假如你有个这样的保存在文本文件中的套用信件：
+{% highlight string %}
+# cat letter
+Would the following people:
+LIST
+please report to the office.
+{% endhighlight %}
+
+套用信件将通用占位文本LIST放在名单的位置。要在占位文本后插入名单，你只要用读取命令就可以了。但这样的话，占位文本仍然会留在输出中。要删除占位文本，你可以用删除命令。结果看起来如下：
+{% highlight string %}
+# cat data11
+Blum.Katie      Chicago. IL
+Mullen.Riley    West Lafayette. IN
+Snell.Haley     Ft.Wayne. IN
+Woenker.Matthew         Springfield. IL
+Wisecarver.Emma         Grant Park.  IL
+
+# sed '/LIST/{
+> r data11
+> d
+> }' letter
+Would the following people:
+Blum.Katie      Chicago. IL
+Mullen.Riley    West Lafayette. IN
+Snell.Haley     Ft.Wayne. IN
+Woenker.Matthew         Springfield. IL
+Wisecarver.Emma         Grant Park.  IL
+please report to the office.
+{% endhighlight %}
+现在占位文本已经被替换成了数据文件中的名单。
+
+
+
+
+
 
 <br />
 <br />
