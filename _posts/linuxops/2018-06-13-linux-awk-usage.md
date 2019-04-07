@@ -276,6 +276,96 @@ This conludes the listing.
 
 
 
+## 2. gawk进阶
+
+### 2.1 使用变量
+
+所有编程语言共有的一个重要特性是使用变量来存取值。gawk编程语言支持两种不同类型的变量：
+
+* 内建变量
+
+* 自定义变量
+
+gawk有一些内建变量。这些变量存放用来处理数据文件中的数据字段和数据行的信息。你也可以在gawk程序里创建你自己的变量。下面我们将逐步介绍gawk程序里如何使用变量。
+
+1) **内建变量**
+
+gawk程序使用内建变量来引用程序数据里的一些特殊功能。本节将介绍gawk程序中可用的内建变量并演示如何使用它们。
+
+* 字段和数据行分隔符变量
+
+在上面我们```gawk基础```中我们演示了gawk中的一种内建变量类型————数据字段变量。数据字段变量允许你使用美元符号($)和数据字段在数据行中的位置对应的数值来引用该数据行中的字段。因此，要引用数据行中的第一个数据字段，就用变量$1； 要引用第二个字段，就用$2；依次类推。
+
+字段是由字段分隔符来划定的。默认情况下，字段分隔符是一个空白符，也就是空格符或者制表符(tab)。在上面```gawk基础```中，我们讲了如何在命令行下使用命令行参数```-F```或者在gawk程序中使用特殊的内建变量FS来更改字段分隔符。
+
+内建变量FS是控制gawk如何处理输入输出数据中的字段和数据行的一组变量中的一个。下面列出了改组内建变量：
+<pre>
+                 表： gawk数据字段和数据行变量
+
+  变 量                    描述
+--------------------------------------------------------------------
+ FIELDWIDTHS      由空格分隔开的定义了每个数据字段确切宽度的一列数字
+
+   FS             输入字段分隔符
+   RS             输入数据行分隔符
+   OFS            输出字段分隔符
+   ORS            输出数据行分隔符
+</pre>
+
+变量FS和OFS定义了gawk如何处理数据流中的数据字段。你已经了解了如何使用变量FS来定义什么字符分隔数据行中的字段。变量OFS具备相同的功能，不过是用在print命令的输出上。
+
+默认情况下，gawk将OFS设置为一个空格，所以如果你用命令：
+{% highlight string %}
+print $1,$2,$3
+{% endhighlight %}
+你会看到如下输出：
+<pre>
+field1 field2 field3
+</pre>
+在下面的例子里，你能看到这点：
+{% highlight string %}
+# cat data1
+data11,data12,data13,data14,data15
+data21,data22,data23,data24,data25
+data31,data32,data33,data34,data35
+# gawk 'BEGIN{FS=","} {print $1,$2,$3}' data1
+data11 data12 data13
+data21 data22 data23
+data31 data32 data33
+{% endhighlight %}
+
+print命令会自动将OFS变量的值放置在输出的每个字段间。通过设置OFS变量，你可以在输出中使用任意字符（串）来分隔字段：
+{% highlight string %}
+# gawk 'BEGIN{FS=","; OFS="-"} {print $1,$2,$3}' data1
+data11-data12-data13
+data21-data22-data23
+data31-data32-data33
+# gawk 'BEGIN{FS=","; OFS="--"} {print $1,$2,$3}' data1
+data11--data12--data13
+data21--data22--data23
+data31--data32--data33
+# gawk 'BEGIN{FS=","; OFS="<-->"} {print $1,$2,$3}' data1
+data11<-->data12<-->data13
+data21<-->data22<-->data23
+data31<-->data32<-->data33
+{% endhighlight %}
+
+
+```FIELDWIDTHS```变量允许你读取数据行，而不用字段分隔符来划分字段。在一些应用程序中，不用字段分隔符，数据是被放置在数据行的某些列中的。这种情况下，你必须设定```FIELDWIDTHS```变量来匹配数据在数据行中的位置。
+
+一旦设置了```FIELDWIDTHS```变量，gawk就会忽略FS变量，而根据提供的字段宽度大小来计算字段。下面是个采用字段宽度而非字段分隔符的例子：
+{% highlight string %}
+# cat data2
+1005.3247596.37
+115-2.349194.00
+05810.1298100.1
+# gawk 'BEGIN{FIELDWIDTHS="3 5 2 5"} {print $1,$2,$3,$4}' data2
+100 5.324 75 96.37
+115 -2.34 91 94.00
+058 10.12 98 100.1
+{% endhighlight %}
+
+
 ## 1. awk
 
 向awk传递参数：
