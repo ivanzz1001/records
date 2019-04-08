@@ -518,12 +518,133 @@ FNR变量的值在gawk处理第二个数据文件时被重置了，而NR变量�
 
 2） **自定义变量**
 
+跟任何其他经典编程语言一样，gawk允许你定义自己的变量来在程序代码中使用。gawk自定义变量名可以是任意数目的字母、数字和下划线，但不能以数字开头。还有，要记住gawk变量名区分大小写。
 
+* 在脚本中给变量赋值
 
+在gawk程序中给变量赋值跟在shell脚本中赋值类似，都用```赋值语句```:
+{% highlight string %}
+# gawk 'BEGIN{testing="This is a test"; print testing}'
+This is a test
+{% endhighlight %}
+print语句的输出是testing变量的当前值。跟shell脚本变量一样，gawk变量可以保存数值和文本值：
+{% highlight string %}
+# gawk 'BEGIN{
+> testing="This is a test"
+> print testing
+> testing=45
+> print testing
+> }' 
+This is a test
+45
+{% endhighlight %}
+在上面这个例子中，testing变量的值会从文本值变成数值。赋值语句还可以包含数学算式来处理数字值：
+{% highlight string %}
+gawk 'BEGIN{x=4; x = x * 2 + 3; print x}'
+11
+{% endhighlight %}
+如你在这个例子中看到的，gawk编程语言包含了用来处理数字值的标准数学操作符。其中包括求余符号(%)和幂运算符号(```^或**```)
 
+* 在命令行上给变量赋值
 
+你也可以用gawk命令行来给程序中的变量赋值。这允许你在普通代码的外面赋值，即时改变变量的值。这里有个使用命令行变量来显示文件中特定数据字段的例子：
+{% highlight string %}
+# cat script1 
+BEGIN{
+FS="."
+}
+{
+print $n
+}
+# gawk -f ./script1 n=2 data1
+data12
+data22
+data32
 
+//例子2
+# for i in {1..9}; do echo $i | gawk '{print disk, "\t", $0}' disk=disk_$i; done
+disk_1   1
+disk_2   2
+disk_3   3
+disk_4   4
+disk_5   5
+disk_6   6
+disk_7   7
+disk_8   8
+disk_9   9
+{% endhighlight %}
+这个特性允许你改变脚本的行为而不需要修改实际的脚本代码。第一个例子显示了文件的第二个数据字段， 而第二个例子传递了```disk_$i```参数。
 
+使用命令行参数来定义变量值会有个问题。在你设置了变量后，这个值在代码的```BEGIN```部分不可用：
+{% highlight string %}
+# cat data1
+data11.data12.data13.data14.data15
+data21.data22.data23.data24.data25
+data31.data32.data33.data34.data35
+
+# cat script2
+BEGIN{
+print "The starting value is", n
+FS="."
+}
+{
+print $n
+}
+
+# gawk -f ./script2 n=3 data1
+The starting value is 
+data13
+data23
+data33
+{% endhighlight %}
+你可以使用```-v```命令行参数来解决这个问题。它允许你指定在BEGIN代码部分之前设定的变量。在命令行上，```-v```命令行参数必须放在脚本代码之前。
+{% highlight string %}
+# gawk -v n=3 -f ./script2 data1
+The starting value is 3
+data13
+data23
+data33
+{% endhighlight %}
+现在n变量在BEGIN代码部分中已经含有命令行上设的值了。
+
+### 2.2 处理数组
+许多编程语言都提供数组来在单个变量中存储多个值。gawk编程语言使用```关联数组```来提供数组功能。
+
+关联数组跟数字数组不同之处在于它的索引值可以是任意文本字符串。你不需要用连续的数字来标识数组中的数据元素。相反，关联数组用各种字符串来引用值。每个索引字符串都必须是唯一的，并唯一地标识赋给它的数据元素。如果你熟悉其他编程语言的话，这跟哈希表和字典是同一个概念。
+
+后面几节将会带你逐步熟悉在gawk程序中使用关联数组。
+
+1） **定义数组变量**
+
+你可以用标准赋值语句来定义数组变量。数组变量赋值的格式如下：
+{% highlight string %}
+var[index] = element
+{% endhighlight %}
+其中```var```是变量名，index是关联数组的索引值，element是数据元素值。这里有些gawk中数组变量的例子：
+<pre>
+capital["Illinois"] = "Springfield"
+capital["Indiana"] = "Indianapolis"
+capital["Ohio"] = "Columbus"
+</pre>
+在引用数组变量时，必须包含索引值来提取相应的数据元素值：
+{% highlight string %}
+# gawk 'BEGIN{
+> capital["Illinois"] = "Springfield"
+> print capital["Illinois"]
+> }'
+Springfield
+{% endhighlight %}
+在引用数组变量时，数据元素的值会出现。数据元素值是数字值时也一样：
+{% highlight string %}
+# gawk 'BEGIN{
+> var[1]=34
+> var[2]=3
+> total = var[1] + var[2]
+> print total
+> }'
+37
+{% endhighlight %}
+如你在这个例子中看到的，可以像使用gawk程序中的其他变量一样使用数组变量。
 
 
 <br />
