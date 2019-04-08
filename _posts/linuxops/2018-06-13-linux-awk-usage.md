@@ -300,7 +300,7 @@ gawk程序使用内建变量来引用程序数据里的一些特殊功能。本�
 
 内建变量FS是控制gawk如何处理输入输出数据中的字段和数据行的一组变量中的一个。下面列出了改组内建变量：
 <pre>
-                 表： gawk数据字段和数据行变量
+     表： gawk数据字段和数据行变量
 
   变 量                    描述
 --------------------------------------------------------------------
@@ -365,13 +365,87 @@ data31<-->data32<-->data33
 058 10.12 98 100.1
 {% endhighlight %}
 
+```FIELDWIDTHS```变量定义了4个字段，gawk依此来解析数据行。每个数据行中用以表示数字的字符串根据定义好的字段宽度值来分割。
+<pre>
+警告： 一定要记住，一旦设定了FIELDWIDTHS变量的值，就不能改变了。这种方法并不适用于变长的字段
+</pre>
 
-## 1. awk
+变量```RS```和```ORS```定义了gawk程序如何处理数据流中的数据行。默认情况下，gawk将RS和ORS设为换行符。默认的RS值表明，输入数据流中的每行新文本就是一个新数据行。
 
-向awk传递参数：
+
+有时，你会碰到在数据流中字段占了多行的情况。经典的例子是包含地址和电话号码的数据，其中地址和电话号码各占一行：
 {% highlight string %}
-for i in sda sdb sdc sdd sde sdf sdg sdh sdi sdj sdk; do path=`udevadm info -q path -n /dev/$i`; udevadm info -q env -p $path | grep ID_WWN= | awk 'BEGIN{FS="="} {print disk,"win-"$2}' disk=$i;done >> ./disk-id.txt
+Riley Mullen
+123 Main Street
+Chicago. IL 60601
+(312)555-1234
 {% endhighlight %}
+如果你用默认的FS和RS变量值来读取这组数据，gawk 就会把每行误读为一个单独的数据行，并把数据行中的每个空格当做字段分隔符。这绝非你想要的。
+
+要解决这个问题，只需把FS变量设置成换行符。这就表明数据流中的每行都是一个单独的字段，每行上的所有数据都属于同一个字段。但现在令你头疼的是无从判断一个新的数据行从何开始。
+
+要解决这个问题，只需把RS变量设置成空字符串，然后在数据行间留一个空白行。gawk会把每个空白行当作一个数据行分隔符。下面就是个使用这种方法的例子：
+{% highlight string %}
+# cat data2
+Riley Mullen
+123 Main Street
+Chicago. IL 60601
+(312)555-1234
+
+Frank Williams
+456 Oak Streat
+Indianapolis. IN 46201
+(317)555-9876
+
+Haley Snell
+4231 Elm Streat 
+Detroit. MI 48201
+(313)555-4938
+# gawk 'BEGIN{FS="\n"; RS=""} {print $1,"\t", $4}' data2
+Riley Mullen     (312)555-1234
+Frank Williams   (317)555-9876
+Haley Snell      (313)555-4938
+{% endhighlight %}
+太好了，现在gawk把文件中的每行都当成一个字段，把空白行当做数据行分隔符。
+
+* 数据变量
+
+除了字段和数据行分隔符变量外，gawk还提供了一些其他的内建变量来帮助你了解数据发生了什么变化并提取shell环境信息。下表列出了gawk中的其他内建变量：
+<pre>
+         更多的gawk内建变量
+
+ 变 量                   描述
+--------------------------------------------------------------------
+ARGC            当前命令行参数个数
+ARGIND          当前文件在ARGV中的位置
+ARGV            包含命令行参数的数组
+CONVFMT         数字的转换格式（参见printf语句）；默认值为%.6g
+ENVIRON         当前shell环境变量及其值组成的关联数组
+ERRNO           当读取或关闭输入文件发生错误时的系统错误号
+FILENAME        用作gawk输入数据的数据文件的文件名
+FNR             当前数据文件中的数据行数
+IGNORECASE      设成非零值时，忽略gawk命令中出现的字符串的字符大小写
+NF              数据文件中的字段总数
+NR              已处理的输入数据行数目
+OFMT            数字的输出格式；默认值为%.6g
+RLENGTH         由match函数所匹配的子字符串的长度
+RSTART          由match函数所匹配的子字符串的起始位置
+</pre>
+你应该能从shell脚本编程中认识上面的一些变量。ARGC和ARGV变量允许从shell中获得命令行参数的总数以及它们的值。但这可能有点麻烦，因为gawk并不会将程序脚本当成命令行参数的一部分：
+{% highlight string %}
+# cat data1
+line 1
+line 2
+# gawk -v lines=2 'BEGIN{print ARGC; for(i=0;i<ARGC;i++) print ARGV[i];}' data1
+2
+gawk
+data1
+{% endhighlight %}
+
+
+
+
+
 
 
 
