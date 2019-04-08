@@ -423,10 +423,10 @@ CONVFMT         数字的转换格式（参见printf语句）；默认值为%.6g
 ENVIRON         当前shell环境变量及其值组成的关联数组
 ERRNO           当读取或关闭输入文件发生错误时的系统错误号
 FILENAME        用作gawk输入数据的数据文件的文件名
-FNR             当前数据文件中的数据行数
+FNR             当前数据文件中处理过的数据行数
 IGNORECASE      设成非零值时，忽略gawk命令中出现的字符串的字符大小写
 NF              数据文件中的字段总数
-NR              已处理的输入数据行数目
+NR              已处理的输入数据行总数目
 OFMT            数字的输出格式；默认值为%.6g
 RLENGTH         由match函数所匹配的子字符串的长度
 RSTART          由match函数所匹配的子字符串的起始位置
@@ -441,9 +441,82 @@ line 2
 gawk
 data1
 {% endhighlight %}
+ARGC变量表明命令行上有两个参数。这包括gawk命令和data1参数（记住，程序脚本并不算参数）。ARGV数组从代表该命令的索引0开始。第一个数组值是gawk命令后的第一个命令行参数。
+<pre>
+说明： 注意，跟shell变量不同，在脚本中引用gawk变量时，变量名前不加美元符
+</pre>
+```ENVIRON```变量看起来可能有点陌生。它使用关联数组来提取shell环境变量。关联数组用文本作为数组的索引值，而不用数值。
 
+数组索引中的文本是shell环境变量，而数组的值则是shell环境变量的值。下面有个例子：
+{% highlight string %}
+# gawk 'BEGIN{
+> print ENVIRON["HOME"]
+> print ENVIRON["PATH"]
+> }'
+/root
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin
+{% endhighlight %}
+ENVIRON["HOME"]变量从shell中提取了HOME环境变量的值。类似地，ENVIRON["PATH"]提取了PATH环境变量的值。你可以用这种方法来从shell中提取任何环境变量的值来在gawk程序中使用。
 
+当你要在gawk程序中记录数据字段和数据行时，FNR、NF和NR变量就能派上用场。有时你不知道数据行中到底有多少个数据字段。NF变量允许你指定数据行中的最后一个数据字段，而不用知道它的具体位置：
+{% highlight string %}
+# gawk 'BEGIN{FS=":"; OFS=":"} {print $1,$NF}' /etc/passwd
+root:/bin/bash
+bin:/sbin/nologin
+daemon:/sbin/nologin
+adm:/sbin/nologin
+lp:/sbin/nologin
+sync:/bin/sync
+shutdown:/sbin/shutdown
+halt:/sbin/halt
+mail:/sbin/nologin
+operator:/sbin/nologin
+games:/sbin/nologin
+...
+{% endhighlight %}
 
+NF变量含有数据文件中最后一个数据字段的数字值。你可以在它前面加个美元符将它用作字段变量。
+
+FNR和NR变量彼此类似，但略有不同。FNR变量含有处理过的当前数据文件中的数据行总数，而NR变量则含有处理过的所有数据行总数。让我们看几个例子来了解一下这个差别：
+{% highlight string %}
+# cat data1
+data11 data12 data13 data14 data15
+data21 data22 data23 data24 data25
+data31 data32 data33 data34 data35
+# gawk '{print $1, "FNR="FNR}' data1 data1
+data11 FNR=1
+data21 FNR=2
+data31 FNR=3
+data11 FNR=1
+data21 FNR=2
+data31 FNR=3
+{% endhighlight %}
+在这个例子中，gawk程序的命令行定义了两个输入文件（它两次指定了同样的输入文件）。这个脚本会打印第一个数据字段的值和FNR变量的当前值。注意，当gawk程序处理第二个数据文件时，FNR值被设回1了。
+
+现在，让我们加上NR变量看看会输出什么：
+{% highlight string %}
+# cat data1
+data11 data12 data13 data14 data15
+data21 data22 data23 data24 data25
+data31 data32 data33 data34 data35
+# gawk '{print $1, "FNR="FNR, "NR="NR} END{print "There were", NR, "records processed"} ' data1 data1
+data11 FNR=1 NR=1
+data21 FNR=2 NR=2
+data31 FNR=3 NR=3
+data11 FNR=1 NR=4
+data21 FNR=2 NR=5
+data31 FNR=3 NR=6
+There were 6 records processed
+{% endhighlight %}
+FNR变量的值在gawk处理第二个数据文件时被重置了，而NR变量则在进入第二个数据文件后继续计数。结果是，如果只使用一个数据文件作为输入，那么FNR和NR的值将会相同。如果使用多个数据文件作为输入，那么FNR的值会在处理每个数据文件时被重置，而NR的值则会继续计数知道处理完所有的数据文件。
+<pre>
+说明： 在使用gawk时你可能会注意到，gawk脚本通常会比shell脚本中其他部分还要大一些。在上面的例子中，为了简单起见，我们利用shell
+的多行功能直接在命令行上运行了gawk脚本。当你在shell脚本中使用gawk时，你应该将不同的gawk命令放到不同的行，这样会比较容易阅读和
+理解，而不要在shell脚本中将所有的命令都塞到同一行。还有，如果你发现在不同的shell脚本中用到了同样的gawk脚本，记得将这段gawk脚本
+放到一个单独的文件中，并用-f参数来在shell脚本中引用它。
+</pre>
+
+2） **自定义变量**
 
 
 
