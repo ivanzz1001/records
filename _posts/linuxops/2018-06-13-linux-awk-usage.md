@@ -646,6 +646,75 @@ Springfield
 {% endhighlight %}
 如你在这个例子中看到的，可以像使用gawk程序中的其他变量一样使用数组变量。
 
+2） **遍历数组变量**
+
+关联数组变量的问题在于你可能无法知晓索引值是什么。跟使用连续数字作为索引值的数字数组不同，关联数组的索引可以是任何东西。
+
+如果要在gawk中遍历一个关联数组，你可以用for语句的一种特殊形式：
+{% highlight string %}
+for (var in array)
+{
+	statements
+}
+{% endhighlight %}
+
+这个for语句会在每次将关联数组array的下一个索引值赋给变量var时，执行一遍statements。重要的是记住这个变量是索引值而不是数组元素值。你可以将这个变量用作数组的索引，轻松的取出数据元素值：
+{% highlight string %}
+# gawk 'BEGIN{
+> var["a"] = 1
+> var["g"] = 2
+> var["m"] = 3
+> var["u"] = 4
+>
+> for (test in var)
+> {
+> print "index:", test, " - value:", var[test];
+> }
+> }'
+index: u  - value: 4
+index: m  - value: 3
+index: a  - value: 1
+index: g  - value: 2
+{% endhighlight %}
+
+注意，索引值不会按任何特定顺序返回，但它们每个都会有个对应的数据元素值。明白这点很重要，因为你不能指望着返回的值都是按顺序的，你只能确定索引值和数据值是对应的。
+
+3) **删除数组变量**
+
+从关联数组中删除数组索引要用一个特别的命令：
+<pre>
+delete array[index]
+</pre>
+删除命令会从数组中删除关联索引值和相关的数据元素值。
+{% highlight string %}
+# gawk 'BEGIN{
+> var["a"] = 1
+> var["g"] = 2
+> for (test in var)
+> {
+> print "index:", test, " - value:", var[test];
+> }
+> delete var["g"]
+> 
+> print "---------------------"
+> for (test in var)
+> {
+> print "index:", test, " - value:", var[test];
+> }
+> }'
+index: a  - value: 1
+index: g  - value: 2
+---------------------
+index: a  - value: 1
+{% endhighlight %}
+一旦从关联数组中删除了索引值，你就没法再提取它了。
+
+### 2.3 使用模式
+
+
+
+
+
 
 <br />
 <br />
