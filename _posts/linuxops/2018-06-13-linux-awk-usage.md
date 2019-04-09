@@ -1219,10 +1219,204 @@ split(s, a [,r])       将s用FS字符或正则表达式r（如果提供了的�
 
 sprintf(format, variables)  用提供的format和variables返回一个类似于printf输出的字符串
 
-sub(r,s [,t])          
+sub(r,s [,t])          在变量$0或目标字符串t中查找正则表达式r的匹配。如果找到了，就用字符串s替换掉第一处匹配
 
+substr(s, i [,n])      返回s中从索引值i开始的n个字符组成的子字符串。如果未提供n，则返回s剩下的部分。
 
+tolower(s)             将s中的所有字符串转换成小写
+
+toupper(s)             将s中的所有字符串转换成大写
 </pre>
+一些字符串函数相对来说显而易见：
+{% highlight string %}
+# gawk 'BEGIN{x="testing"; print toupper(x); print length(x)}'
+TESTING
+7
+{% endhighlight %}
+但一些字符串函数会相当复杂。asort()和asorti()函数是新加的gawk函数，允许你基于数据元素值(asort)或索引值(asorti)对数组变量进行排序。这里有个使用asort()的例子：
+{% highlight string %}
+# gawk 'BEGIN{
+> var["a"] = 1
+> var["u"] = 4
+> var["m"] = 3
+> var["g"] = 2
+> asort(var,test)
+> for(i in test)
+> {
+>     print "index:"i, " - value:"test[i]
+> }
+> }'
+index:1  - value:1
+index:2  - value:2
+index:3  - value:3
+index:4  - value:4
+{% endhighlight %}
+新数组test含有排序后的原数组中的数据元素，但索引值现在变为表明正确顺序的数字值了。
+
+split函数是将数据字段放到数组中以进一步处理的好办法：
+{% highlight string %}
+# gawk 'BEGIN{FS=","} {
+> split($0,var)
+> print var[1], var[5]
+> }' data1
+data11 data15
+data21 data25
+data31 data35
+{% endhighlight %}
+新数组使用连续数字作为数组索引，从含有第一个数据字段的索引值1开始。
+
+
+3） **时间函数**
+
+gawk编程语言包含一些函数来帮助处理时间值，如下表所示：
+<pre>
+         表： gawk的时间函数
+
+函 数                            描述
+--------------------------------------------------------------------------------------
+mktime(datespec)             将一个按YYYY MM DD HH MM SS [DST]格式指定的日期转换成时间戳值
+
+strftime(format [,timestamp] 将当前时间的时间戳或timestamp(如果提供了的话）转化成shell函数格式
+                             date()的格式化日期
+
+systime()                    返回当前时间的时间戳
+</pre>
+时间函数通常用来处理日志文件，日志文件通常含有需要进行比较的日期。通过将日期的文本表示转换成epoch时间（自1970-01-01 00:00:00 UTC到现在的秒数），你可以轻松的比较日期。
+
+下面是个在gawk程序中使用时间函数的例子：
+{% highlight string %}
+# gawk 'BEGIN{
+> date = systime()
+> day = strftime("%A, %B %d, %Y", date)
+> print day
+> }'
+Tuesday, April 09, 2019
+{% endhighlight %}
+这个例子用systime函数来从系统获取当前的epoch时间戳，然后用strftime()函数来将它转换成人类可读的方式，转换过程中使用了shell的date命令的日期格式化符。
+
+
+### 2.7 自定义函数
+你并未被限定只能用gawk的内建函数。你可以在gawk程序中创建自定义函数。本节将会介绍如何在gawk程序中定义和使用自定义函数。
+
+1) **定义函数**
+
+要定义自己的函数，你必须用function关键字：
+{% highlight string %}
+function name([variables])
+{
+	statements
+}
+{% endhighlight %}
+
+函数名必须能够唯一标识函数。你可以在调用的gawk程序中传递给这个函数一个或多个变量：
+{% highlight string %}
+function printthird()
+{
+	print $3
+}
+{% endhighlight %}
+这个函数会打印数据行中的第3个数据字段。
+
+函数还能用return语句返回值：
+{% highlight string %}
+return value
+{% endhighlight %}
+
+值可以是变量，或者最终能计算出值的算式：
+{% highlight string %}
+function myrand(limit)
+{
+	return int(limit*rand())
+}
+{% endhighlight %}
+你可以将函数的返回值赋给gawk程序中的一个变量：
+{% highlight string %}
+x = myrand(100)
+{% endhighlight %}
+这个变量最终会含有函数的返回值。
+
+2） **使用自定义函数**
+
+在定义函数时，它必须出现在所有代码块之前（包括BEGIN代码块）。乍一看这可能有点怪异，但它有助于将函数代码和gawk程序的其他部分分开：
+{% highlight string %}
+# cat data2
+Riley Mullen
+123 Main Street
+Chicago. IL 60601
+(312)555-1234
+
+Frank Williams
+456 Oak Streat
+Indianapolis. IN 46201
+(317)555-9876
+
+Haley Snell
+4231 Elm Streat 
+Detroit. MI 48201
+(313)555-4938
+
+# gawk '   
+function myprint()
+{
+    printf "%-16s - %s\n", $1, $4
+}
+
+BEGIN{FS="\n"; RS=""}
+{
+    myprint()
+}' data2
+Riley Mullen     - (312)555-1234
+Frank Williams   - (317)555-9876
+Haley Snell      - (313)555-4938
+{% endhighlight %}
+这段代码定义了mprint()函数，它会格式化数据行中第1个和第4个数据字段供打印用。然后，gawk程序用该函数显示了数据文件中的数据。
+
+一旦定义了函数，你就能在程序的代码中随便使用了。在使用很长的算法时，这会节省许多工作。
+
+3） **创建函数库**
+
+显而易见地，每次使用时都重写一遍函数并不美妙。不过，gawk提供了一种途径来将函数放到一个库文件中，这样你就能在所有的gawk编程中使用了。
+
+首先，你需要创建一个存储所有gawk函数的文件：
+{% highlight string %}
+# cat funclib 
+function myprint()
+{
+    printf "%-16s - %s\n", $1, $4
+}
+
+function myrand(limit)
+{
+    return int(limit * rand())
+}
+
+function printthird()
+{
+    print $3
+}
+{% endhighlight %}
+
+funclib文件含有3个函数定义。要使用它们，你需要用```-f```命令行参数。很遗憾，你不能将```-f```命令行参数和内联gawk脚本放到一起使用，不过你可以在同一个命令行中使用多个```-f```参数。
+
+因此，要使用库，只要创建一个含有你的gawk程序的文件，然后在命令行上同时指定库文件和程序文件：
+{% highlight string %}
+# cat script4
+BEGIN{FS="\n"; RS=""}
+
+{
+   myprint()
+}
+
+
+# gawk -f ./funclib -f ./script4 data2
+Riley Mullen     - (312)555-1234
+Frank Williams   - (317)555-9876
+Haley Snell      - (313)555-4938
+{% endhighlight %}
+你要做的是当需要使用库中定义的函数时，将funclib文件加到你的gawk命令行上就可以了。
+
+
+
 
 
 
