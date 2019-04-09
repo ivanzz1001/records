@@ -1005,7 +1005,78 @@ Average: 176.667
 <pre>
 printf "format string", var1, var2, ...
 </pre>
-format string是格式化输出的关键。
+format string是格式化输出的关键。它会用文本元素和```格式化控制符```来具体指定如何呈现格式化输出。格式化控制符是一种特殊的代码，它会指明什么类型的变量可以显示以及如何显示。gawk程序会将每个格式化控制符作为命令中列出的每个变量的占位符使用。第一个格式化控制符会匹配列出的第一个变量，第二个会匹配第二个变量，依次类推。
+
+格式化控制符采用如下格式：
+<pre>
+%[modifier]control-letter
+</pre>
+其中control-letter是指明显示什么类型数据值的单字符码，而modifier定义了另一个可选的格式话特性。下表列出了可用在格式化控制符中的控制字母：
+<pre>
+                 表： 格式化控制符的控制字母
+
+控制字母                      描述
+------------------------------------------------------------------------
+  c                 将一个变量作为ASCII字符显示
+  d                 显示一个整数值
+  i                 显示一个整数值（与d一样）
+  e                 用科学计数法显示一个数
+  f                 显示一个浮点值
+  g                 用科学计数法或浮点数中较短的显示
+  o                 显示一个八进制值
+  s                 显示一个文本字符串
+  x                 显示一个十六进制值
+  X                 显示一个十六进制值，但用大写字母A~F
+</pre>
+因此，如果你需要显示一个字符串变量，你可以用格式化控制符```%s```；如果你需要显示一个整数值，你可以用```%d```或者```%i```(%d是C风格中用来显示十进制数的）。如果你要用科学计数法显示很大的值，你会用```%e```格式化控制符：
+{% highlight string %}
+# gawk 'BEGIN{
+> x = 10 * 100
+> printf "The answer is: %e\n", x
+> }'
+The answer is: 1.000000e+03
+{% endhighlight %}
+除了控制字母外，还有3种修饰符可以用来进一步控制输出：
+
+* width： 指定了输出字段最小宽度的数字值。如果输出短于这个值，printf会向右对齐，并用空格来填充这段空间。如果输出比指定的宽度还要长，它会覆盖width值
+
+* prec: 指定了浮点数中小数点后面位数的数字值，或者文本字符串中显示的最大字符数；
+
+* -(减号): 减号指明在向格式化空间中放入数据时采用左对齐而不是右对齐
+
+在使用printf语句时，你对输出如何呈现有着完全的控制权。举个例子，在前面我们用```print```命令来显示数据行中的数据字段：
+{% highlight string %}
+# cat data2
+Riley Mullen
+123 Main Street
+Chicago. IL 60601
+(312)555-1234
+
+Frank Williams
+456 Oak Streat
+Indianapolis. IN 46201
+(317)555-9876
+
+Haley Snell
+4231 Elm Streat 
+Detroit. MI 48201
+(313)555-4938
+# gawk 'BEGIN{FS="\n"; RS=""} {print $1,"\t", $4}' data2
+Riley Mullen     (312)555-1234
+Frank Williams   (317)555-9876
+Haley Snell      (313)555-4938
+{% endhighlight %}
+
+你可以用```printf```命令来帮助格式化输出，使得输出看起来好一些。首先，让我们将print命令换成printf命令并看看那么做会怎样：
+{% highlight string %}
+# gawk 'BEGIN{FS="\n"; RS=""} {printf "%s\t%s\n",$1,$4}' data2
+Riley Mullen    (312)555-1234
+Frank Williams  (317)555-9876
+Haley Snell     (313)555-4938
+{% endhighlight %}
+它会产生跟print命令相同的输出。printf命令用```%s```格式化控制符来作为这两个字符串值占位符。
+
+
 
 
 <br />
