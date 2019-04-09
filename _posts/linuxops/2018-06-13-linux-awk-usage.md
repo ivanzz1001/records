@@ -1076,6 +1076,22 @@ Haley Snell     (313)555-4938
 {% endhighlight %}
 它会产生跟print命令相同的输出。printf命令用```%s```格式化控制符来作为这两个字符串值占位符。
 
+注意你需要在printf命令的末尾手动添加换行符来生成新行。没加的话，printf命令会继续用同一行来打印后续输出。
+
+如果你需要用几个单独的printf命令来在同一行上打印多个输出，它会非常有用：
+{% highlight string %}
+# cat data1
+data11,data12,data13,data14,data15
+data21,data22,data23,data24,data25
+data31,data32,data33,data34,data35
+[root@localhost workspace]# cat data1
+data11,data12,data13,data14,data15
+data21,data22,data23,data24,data25
+data31,data32,data33,data34,data35
+# gawk 'BEGIN{FS=","} {printf "%s ", $1} END{printf "\n"}' data1
+data11 data21 data31 
+{% endhighlight %}
+每个printf的输出都会出现在同一行上。为了终止该行，END部分打印了一个换行符。
 
 
 
