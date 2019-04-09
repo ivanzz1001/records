@@ -820,8 +820,192 @@ gawk编程语言支持常见的结构化编程命令。本节将会介绍每个�
 
 1) **if语句**
 
+gawk编程语言支持标准的if-then-else格式的if语句。你必须为if语句定义一个评估条件，并将其用圆括号括起来。如果条件评估为TRUE，紧跟在if语句后的语句会执行。如果条件评估为FALSE，那这条语句就会被跳过。可以用这种格式：
+<pre>
+if(condition)
+	statement1
+</pre>
+或者你可以将它放在一行上，像这样：
+<pre>
+if(condition) statement1
+</pre>
+这里有个演示这种格式的简单的例子：
+{% highlight string %}
+# cat data4
+10
+5
+13
+50 
+34
+# gawk '{if($1 > 20) print $1}' ./data4
+50
+34
+{% endhighlight %}
+并不复杂。如果需要在if语句中执行多条语句，你必须用花括号将它们括起来：
+{% highlight string %}
+# gawk '{
+> if($1 > 20)
+> {
+> x = $1 * 2
+> print x
+> }
+> }' data4
+100
+68
+{% endhighlight %}
+gawk的if语句也支持else子句，允许在if条件不成立的情况下执行一条或多条语句。这里有个使用else子句的例子：
+{% highlight string %}
+# gawk '{
+> if($1 > 20)
+> {
+> x = $1 * 2
+> print x
+> }
+> else{
+> x = $1 / 2
+> print x
+> }
+> }' data4
+5
+2.5
+6.5
+100
+68
+{% endhighlight %}
+你可以在单行上使用else子句，但必须在if语句部分之后使用分号：
+<pre>
+if(condition) statement1; else statement2
+</pre>
+这里是上一个例子的单行格式版本：
+{% highlight string %}
+# gawk '{if($1 > 20) print $1 * 2; else print $1 /2}' data4
+5
+2.5
+6.5
+100
+68
+{% endhighlight %}
 
+这个格式更紧凑，但也更难理解。
 
+2) **while语句**
+
+while语句为gawk程序提供了一个基本的循环功能。下面是while语句的格式：
+<pre>
+while(condition)
+{
+	statements
+}
+</pre>
+while循环允许遍历一组数据，并检查结束迭代的条件。在计算中必须使用每个数据行中的多个数据值时，它能帮得上忙：
+{% highlight string %}
+# tee data5 << EOF
+> 130 120 135
+> 160 113 140
+> 145 170 215
+> EOF
+130 120 135
+160 113 140
+145 170 215
+
+# gawk '{
+> total = 0
+> i = 1
+> while(i<4)
+> {
+>     total += $i
+>     i++
+> }
+> avg = total / 3
+> print "Average:", avg
+> }' data5
+Average: 128.333
+Average: 137.667
+Average: 176.667
+{% endhighlight %}
+while语句会遍历数据行中的数据字段，将每个值都加到total变量上，然后将计数器变量i增一。当计数器值等于4时，while的条件编程FALSE，循环结束，然后会执行脚本中的下条命令。那条语句会计算平均值，然后平均值会打印出来。这个过程会为数据文件中的每个数据行不断重复。
+
+gawk编程语言支持在while循环中使用break和continue语句，允许从循环中跳出：
+{% highlight string %}
+# gawk '{
+> total=0
+> i = 1
+> while(i<4)
+> {
+>     total += $i;
+>     if(i == 2)
+>        break;
+>     i++;
+> }
+> avg = total /2
+> print "The average of the first two data elements is:", avg
+> }' data5
+The average of the first two data elements is: 125
+The average of the first two data elements is: 136.5
+The average of the first two data elements is: 157.5
+{% endhighlight %}
+break语句用来在i变量的值为2时从while循环中跳出。
+
+3) **do-while语句**
+
+do-while语句类似于while语句，但会在检查条件语句之前执行命令。下面是do-while语句的格式：
+{% highlight string %}
+do{
+   statements
+}while(condition)
+{% endhighlight %}
+
+这种格式保证了语句会在条件被评估之前至少执行一次。当你需要在条件被评估之前执行一些语句时这非常有用：
+{% highlight string %}
+# gawk '{
+> total = 0
+> i = 1
+> do{
+>   total += $i
+>   i++
+> }while(total < 150)
+> print "total:", total
+> }' data5
+total: 250
+total: 160
+total: 315
+{% endhighlight %}
+
+这个脚本会从每个数据行读取数据字段并将它们加在一起，直到累加结果达到150。如果第一个数据字段大于150（如在第二个数据行中看到的），则脚本会保证在条件被评估前至少读取第一个数据字段。
+
+4） **for语句**
+
+for语句是许多编程语言用来做循环的常见方法。gawk编程语言支持C风格的for循环：
+<pre>
+for(variable assignment; condition; iteration process)
+</pre>
+它帮助将几个功能合并到一个语句中来简化循环：
+{% highlight string %}
+# gawk '{
+> total = 0
+> for(i=1;i<4;i++)
+> {
+>   total += $i;
+> }
+> avg = total / 3
+> print "Average:", avg
+> }' data5
+Average: 128.333
+Average: 137.667
+Average: 176.667
+{% endhighlight %}
+定义了for循环中的迭代计数器，你就不用担心要像使用while语句一样自己负责给计数器增一。
+
+### 2.5 格式化打印
+你可能已经注意到了```print```语句在gawk如何显示数据上并未提供多少控制。你能做的大概只是控制输出字段分隔符(OFS)。如果你正在创建详细报告，通常你需要将数据按特定的格式放到特定的位置。
+
+解决办法是使用格式化打印命令，称为```printf```。如果你熟悉C语言编程的话，gawk中的printf命令用法一样，允许指定具体的如何显示数据的指令。
+
+下面是printf命令的格式：
+<pre>
+printf "format string", var1, var2, ...
+</pre>
+format string是格式化输出的关键。
 
 
 <br />
