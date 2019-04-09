@@ -1093,6 +1093,53 @@ data11 data21 data31
 {% endhighlight %}
 每个printf的输出都会出现在同一行上。为了终止该行，END部分打印了一个换行符。
 
+下一步，让我们用修饰符来格式化第一个字符串值：
+{% highlight string %}
+# gawk 'BEGIN{FS=","; RS=""} {printf "%16s  %s\n", $1, $4}' data2
+    Riley Mullen  (312)555-1234
+  Frank Williams  (317)555-9876
+     Haley Snell  (313)555-4938
+{% endhighlight %}
+通过添加一个值16的修饰符，我们强制第一个字符串的输出采用16位字符。默认情况下，printf命令使用右对齐来将数据放到格式化空间中。要改成左对齐，只要给修饰符加一个减号就行了：
+{% highlight string %}
+# gawk 'BEGIN{FS=","; RS=""} {printf "%-16s  %s\n", $1, $4}' data2
+Riley Mullen      (312)555-1234
+Frank Williams    (317)555-9876
+Haley Snell       (313)555-4938
+{% endhighlight %}
+现在看起来专业多了。
+
+printf命令在处理浮点值时也非常有用。通过为变量指定一个格式，你可以让输出看起来更统一：
+{% highlight string %}
+# cat data5
+130 120 135
+160 113 140
+145 170 215
+# gawk '{
+> total = 0
+> for(i=1;i<4;i++)
+> {
+>    total += $i;
+> }
+> avg = total / 3
+> printf "Average: %5.1f\n", avg
+> }' data5
+Average: 128.3
+Average: 137.7
+Average: 176.7
+{% endhighlight %}
+使用```%5.1f```格式指定符，你可以强制printf命令将浮点值近似到小数点后1位。
+
+### 2.6 内建函数
+gawk编程语言提供了一些内置函数，可进行一些常见的数学、字符串以及时间函数运算。你可以在gawk程序中利用这些函数来减少脚本中的编码工作。本节将会带你逐步熟悉gawk中这些不同的内建函数。
+
+1） **数学函数**
+
+如果你用任意类型的语言编过程，那么你可能会很熟悉在代码中使用内建函数来进行一些常见的数学函数运算。gawk编程语言不会让这些想借助高级数学功能降低编码量的人失望。
+
+下面列出了gawk中内建的数学函数：
+<pre>
+</pre>
 
 
 <br />
