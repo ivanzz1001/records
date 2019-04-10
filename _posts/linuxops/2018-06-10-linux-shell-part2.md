@@ -70,7 +70,82 @@ echo "we are outside of the if statement"
 ./test2: line 4: asdfg: command not found
 we are outside of the if statement
 {% endhighlight %}
-在这个例子中，我们在if语句行故意放了一个不能工作的命令。
+在这个例子中，我们在if语句行故意放了一个不能工作的命令。由于这个命令没法工作，它会输出一个非零0的状态码，bash shell会跳过then部分的echo语句。还要注意，运行if语句中的那个命令所生成的错误消息依然会显示在脚本的输出中。有时你不想这种情况发生，我们后面会讨论如何避免这种情况。
+
+在then部分，你可以用多个命令。你可以像脚本中其他地方一样列出多条命令。bash shell会将这部分命令当成一个块。在if语句行的那个命令返回退出状态码0时执行这块命令，在该命令返回非零退出状态码时跳过这块命令：
+{% highlight string %}
+# cat test3
+#!/bin/bash
+
+# testing multiple commands in the then section
+
+testuser=ivan1001
+if grep $testuser /etc/passwd
+then
+   echo "the bash files for user $testuser are:"
+   ls -a /home/$testuser/.b*
+fi
+{% endhighlight %}
+if语句行使用了grep命令来在/etc/passwd文件中查找某个特定用户名是否在当前系统上使用。如果有用户使用了那个登录名，脚本会显示一些文本并列出该用户主目录(HOME)的bash文件：
+{% highlight string %}
+# ./test3
+ivan1001:x:1000:1000:Ubuntu16.04,,,:/home/ivan1001:/bin/bash
+the bash files for user ivan1001 are:
+/home/ivan1001/.bash_history  /home/ivan1001/.bash_logout  /home/ivan1001/.bashrc
+{% endhighlight %}
+但是，如果你将testuser变量设置成一个系统上不存在的用户，则什么都不会显示：
+{% highlight string %}
+# ./test3
+{% endhighlight %}
+看起来也没什么新鲜的。可能我们在这里显示一些消息说明这个用户在系统中未找到会稍微友好一些。是的，我们可以做到，用if-then语句的另外一个特性。
+
+<pre>
+说明：你可能会在一些脚本中看到if-then的另一种形式
+if command;then
+   commands
+fi
+
+在要执行的命令结尾加个分号，你就能在同一行使用then语句了，这样看起来就更像其他编程语言中的if-then语句
+是如何处理的了。
+</pre>
+
+## 2. if-then-else语句
+在if-then语句中，不管命令是否成功执行，你都只有一种选择。如果命令返回一个非零退出状态码，bash shell仅会继续执行脚本中的下一条命令。在这种情况下，如果能够执行另一组命令就好了。这正是if-then-else语句的作用。
+
+if-then-else在语句中提供了另外一组命令：
+{% highlight string %}
+if command
+then
+    commands
+else
+    commands
+fi
+{% endhighlight %}
+当if语句中的命令返回退出状态码0时，then部分中的命令会被执行，跟普通的if-then语句一样。当if语句中的命令返回非零退出状态码时，bash shell会执行else部分中的命令。
+
+现在你可以参考如下修改测试脚本：
+{% highlight string %}
+# cat test4
+#!/bin/bash
+
+#testing the else section
+
+testuser=badtest
+if grep $testuser /etc/passwd
+then
+   echo "The files for user '$testuser' are:"
+   ls -a /home/$testuser/.b*
+else
+   echo "the user name '$testuser' does not exist on this system"
+fi
+
+# ./test4
+the user name 'badtest' does not exist on this system
+{% endhighlight %}
+这样就更友好了。跟then部分一样，else部分可以包含多条命令。fi语句说明else部分结束了。
+
+## 3. 嵌套if
+
 
 
 
