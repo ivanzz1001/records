@@ -146,8 +146,135 @@ the user name 'badtest' does not exist on this system
 
 ## 3. 嵌套if
 
+有时你需要检查脚本代码中的多种条件。不用写多个分立的if-then语句，你可以用else部分的替代版本，称作elif。
+
+elif会通过另一个if-then语句来延续else部分：
+{% highlight string %}
+if command1
+then
+   commands
+elif command2
+then
+   more commands
+fi
+{% endhighlight %}
+elif语句行提供了另一个要测试的命令，类似于原始的if语句。如果elif后命令的退出状态码是0，则bash会执行第二个then语句部分的命令。
+
+你可以继续将多个elif语句串起来，形成一个大的if-then-elif嵌套组合：
+{% highlight string %}
+if command1
+then
+    command set 1
+elif command2
+then
+    command set 2
+elif command3
+then
+    command set 3
+elif command4
+then
+    command set 4
+fi
+{% endhighlight %}
+每块命令都会根据哪个命令会返回退出状态码0来执行。记住，bash shell会依次执行if语句，只有第一个返回退出状态码0的语句中的then部分会被执行。我们后面第7节，你将会了解如何用case命令而不用嵌套多个if-then语句。
+
+## 4. test命令
+到目前为止，你所了解到的if语句中的命令都是普通shell命令。你可能想问，if-then语句是否能测试跟命令的退出码无关的条件。
+
+答案是不能。但是，在bash shell中有个好用的工具可以帮你通过if-then语句测试其他条件。
+
+test命令提供了if-then语句中测试不同条件的途径。如果test命令中列出的条件成立，test命令就会退出并返回状态码0，这样if-then语句就与其他编程语言中的if-then语句以类似的方式工作了。如果条件不成立，test命令就会退出并返回退出状态码1，这样if-then语句就会失效。
+
+test命令的格式非常简单：
+{% highlight string %}
+test condition
+{% endhighlight %}
+
+condition是test命令要测试的一系列参数和值。当用在if-then中时，test命令看起来是这样的：
+{% highlight string %}
+if test condition
+then
+   commands
+fi
+{% endhighlight %}
+bash shell提供了另一种在if-then语句中声明test命令的方法：
+{% highlight string %}
+if [ condition ]
+then
+   commands
+fi
+{% endhighlight %}
+方括号定义了test命令中用到的条件。注意，你必须在左括号右侧和右括号左侧各加一个空格，否则会报错。
+
+test命令可以判断3类条件：
+
+* 数值比较
+
+* 字符串比较
+
+* 文件比较
+
+在后面我们将会介绍如何在if-then语句中使用这3类条件测试。
 
 
+1) **数值比较**
+
+使用test命令最常见的情形是对两个数值进行比较。下表列出了测试两个值时可用的条件参数：
+<pre>
+              表： test命令的数值比较功能
+
+  比 较                        描述
+----------------------------------------------------------------------------------
+n1 -eq n2             检查n1是否与n2相等
+
+n1 -ge n2             检查n1是否大于或等于n2
+
+n1 -gt n2             检查n1是否大于n2
+
+n1 -le n2             检查n1是否小于或等于n2
+
+n1 -lt n2             检查n1是否小于n2
+
+n1 -ne n2             检查n1是否不等于n2
+</pre>
+数值条件测试可以用在数字和变量上。这里有个例子：
+{% highlight string %}
+# cat test5
+#!/bin/bash
+
+# using numeric test comparisons
+val1=10
+val2=11
+
+if [ $val1 -gt 5 ]
+then
+   echo "The test value '$val1' is greater then 5"
+fi
+
+if [ $val1 -eq $val2 ]
+then
+   echo "the values are equal"
+else
+   echo "the values are different"
+fi
+{% endhighlight %}
+
+第一个条件测试：
+<pre>
+if [ $val1 -gt 5 ]
+</pre>
+会测试变量val1的值是否大于5。第二个条件测试：
+<pre>
+if [ $val1 -eq $val2 ]
+</pre>
+会测试变量val1的值是否和变量val2的值相等。运行脚本并观察结果：
+<pre>
+# ./test5
+The test value '10' is greater then 5
+the values are different
+</pre>
+
+两个数值条件测试都跟预期的一样执行了。
 
 
 
