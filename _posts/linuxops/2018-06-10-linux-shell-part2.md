@@ -355,6 +355,98 @@ str1 > str2           检查str1是否比str2大
 
 1) **字符串相等性**
 
+字符串的相等和不等条件不言自明，很容易看出两个字符串值相同还是不同：
+{% highlight string %}
+# cat test7 
+#!/bin/bash
+
+# testing string equality
+testuser=root
+
+if [ $USER = $testuser ]
+then
+   echo "Welcome $testuser"
+fi
+
+# ./test7 
+Welcome root
+{% endhighlight %}
+不等字符串条件也允许你判断两个字符串是否具有相同的值：
+{% highlight string %}
+# cat test8 
+#!/bin/bash
+
+# testing string equality
+testuser=baduser
+
+if [ $USER != $testuser ]
+then
+   echo "This is not $testuser"
+else
+   echo "This is $testuser"
+fi
+
+# ./test8
+This is not baduser
+{% endhighlight %}
+比较字符串的相等性时，test的比较会将所有的标点和大小写也考虑在内。
+
+2) **字符串顺序**
+
+要测试一个字符串是否比另一个字符串大就开始变得繁琐了。有两个问题会经常困扰正要开始使用test命令的大于小于特性的shell程序员：
+
+* 大于符号必须转义，否则shell会把它们当做重定向符号而把字符串当做文件名；
+
+* 大于小于顺序和sort命令所采用的不同
+
+在编写脚本时，第一条可能会导致一个不易察觉的严重问题。这里有个shell脚本编程初学时常遇到的例子：
+{% highlight string %}
+# cat badtest 
+#!/bin/bash
+
+# mis-using string comparisions
+
+val1=baseball
+val2=hockey
+
+if [ $val1 > $val2 ]
+then
+   echo "'$val1' is greater then '$val2'"
+else
+   echo "'$val1' is less then '$val2'"
+fi
+
+# ./badtest 
+'baseball' is greater then 'hockey'
+# ls -l
+total 4
+-rwxrwxrwx 1 root root 189 Apr 12 02:47 badtest
+-rw-r--r-- 1 root root   0 Apr 12 02:47 hockey
+{% endhighlight %}
+在这个脚本中只用了大于号，没有出现错误， 但结果是错的。脚本把大于号解释成了输出重定向。因此，它创建了一个名为hockey的文件。由于重定向顺利完成了，test命令返回了退出状态码0，而if语句则以为所有命令都成功结束了。
+
+要解决这个问题，你需要正确的转义大于号：
+{% highlight string %}
+# cat test9
+#!/bin/bash
+
+# right-using string comparisions
+
+val1=baseball
+val2=hockey
+
+if [ $val1 \> $val2 ]
+then
+   echo "'$val1' is greater then '$val2'"
+else
+   echo "'$val1' is less then '$val2'"
+fi 
+
+
+# ./test9
+'baseball' is less then 'hockey'
+{% endhighlight %}
+
 
 
 
