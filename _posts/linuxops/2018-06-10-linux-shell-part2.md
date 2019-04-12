@@ -217,7 +217,7 @@ test命令可以判断3类条件：
 在后面我们将会介绍如何在if-then语句中使用这3类条件测试。
 
 
-1) **数值比较**
+### 4.1 数值比较
 
 使用test命令最常见的情形是对两个数值进行比较。下表列出了测试两个值时可用的条件参数：
 <pre>
@@ -275,6 +275,92 @@ the values are different
 </pre>
 
 两个数值条件测试都跟预期的一样执行了。
+
+但是测试数值条件也有个限制。先下面的脚本：
+{% highlight string %}
+# cat test6
+#!/bin/bash
+
+# testing floating point numbers
+val1=`echo "scale=4; 10/3" | bc`
+
+echo "The test value is '$val1'"
+
+if [ $val1 -gt 3 ]
+then
+{% endhighlight %}
+运行上述脚本：
+<pre>
+# ./test6
+The test value is '3.3333'
+./test6: line 8: [: 3.3333: integer expression expected
+</pre>
+这个例子使用了bash计算器来生成一个浮点值并存储在变量val1中。下一步，它使用了test命令来判断这个值。显然这里出错了。
+
+在前面一章<<构建基本脚本>>中，你已经了解了如何在bash shell中处理浮点数值；在脚本中仍然有一个问题。test命令无法处理val1变量中存储的浮点值。
+
+记住，bash shell能处理的数仅有整数。当你使用bash计算器时，你可以让shell将浮点值作为字符串值存储进一个变量。如果你只是要通过echo语句来显示这个结果，那它可以很好地工作；但它无法在基于数字的函数中工作，例如我们的数值测试条件。尾行恰好说明了你不能在test命令中使用浮点值。
+
+而如果我们需要进行浮点值比较呢？ 其实我们也还是有办法的，请参看下面程序：
+{% highlight string %}
+# cat test7
+#!/bin/bash
+
+# testing floating point numbers
+val1=`echo "scale=4; 10/3" | bc`
+
+echo "The test value is '$val1'"
+
+if [ $val1 -gt 3 ]
+then
+   echo "the result is larger than 3"
+fi
+
+
+if [ `echo "$val1 >= 3" | bc` -eq 1 ]
+then
+    echo "the result is larger then 3(version 2)"
+fi
+{% endhighlight %}
+运行上述脚本：
+<pre>
+# ./test7
+The test value is '3.3333'
+./test6: line 8: [: 3.3333: integer expression expected
+the result is larger then 3(version 2)
+</pre>
+上面我们看到采用version 2版本是可以顺利的进行比较的。
+
+### 4.2 字符串比较
+
+test命令还允许比较字符串值。对字符串进行比较会更繁琐些，你马上就会看到。下表列出了可用来比较两个字符串值的函数：
+{% highlight string %}
+             表： test命令的字符串比较功能
+
+  比 较                      描述
+-------------------------------------------------------------------------------
+str1 = str2           检查str1是否和str2相同
+
+str1 != str2          检查str1是否和str2不同
+
+str1 < str2           检查str1是否比str2小
+
+str1 > str2           检查str1是否比str2大
+
+-n str1               检查str1的长度是否非0
+
+-z str1               检查str1的长度是否为0
+{% endhighlight %}
+下面几节将会详细介绍不同的字符串比较功能。
+
+1) **字符串相等性**
+
+
+
+
+
+
+
 
 
 
