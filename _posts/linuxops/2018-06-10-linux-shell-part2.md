@@ -446,6 +446,38 @@ fi
 # ./test9
 'baseball' is less then 'hockey'
 {% endhighlight %}
+现在那个答案已经是我们期望通过字符串比较得到的了。
+
+第二个问题更细微，除非你经常处理大小写字母，否则几乎遇不到。sort命令处理大写字母的方法刚好跟test命令的相反。让我们在脚本中测试一下这个特性：
+{% highlight string %}
+# cat test10 
+#!/bin/bash
+
+# testing string sort order
+
+val1=Testing
+val2=testing
+
+if [ $val1 \> $val2 ]
+then
+   echo "'$val1' is greater than '$val2'"
+else
+   echo "'$val1' is less than '$val2'"
+fi
+
+# ./test10 
+'Testing' is less than 'testing'
+# sort testfile
+testing
+Testing
+{% endhighlight %}
+在test命令中大写字母会被当成小于小写字母的。但当你将同样的字符串放进文件中并用sort命令排序时，小写字母会先出现。这是由各个命令使用的排序技术不同造成的。test命令会使用标准的ASCII顺序，根据每个字符的ASCII数值来决定排序顺序。sort命令使用的是系统的本地化语言设置中定义的排序顺序。对于英语，本地化设置指定了在排序顺序中小写字母出现在大写字母前。
+<pre>
+警告： 注意，test命令使用标准的数学比较符号来表示字符串比较， 而用文本代码来表示数值比较。这个细微的特性被很多程序员理解反了。
+      如果你为数值使用了数学运算符号，shell会将它们当成字符串值，可能无法产生正确结果。
+</pre>
+
+
 
 
 
