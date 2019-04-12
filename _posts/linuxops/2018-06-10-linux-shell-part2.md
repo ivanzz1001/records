@@ -588,11 +588,117 @@ Your '/root' directory exists
 ..  .bash_history    .bash_profile  .cache   .cshrc   initial-setup-ks.cfg  .tcshrc          workspace  .xauth9JwBId
 {% endhighlight %}
 
+示例代码中使用了```-d```测试条件来检查用户的$HOME目录是否存在。如果它存在的话，它将继续使用cd命令来切换到$HOME目录并进行目录列表。
+
+2) **检查对象是否存在**
+
+```-e```比较允许你在脚本中使用对象前检查文件或目录对象是否存在：
+{% highlight string %}
+# cat test12
+#!/bin/bash
+
+# checking if a directory exists
+
+if [ -e $HOME ]
+then
+   echo "OK on the directory, now to check the file"
+
+   #checking if a file exists
+   if [ -e $HOME/testing ]
+   then
+      
+     #the file exists, append data to it
+     echo "Appending data to existing file"
+     date >> $HOME/testing
+   else
+   
+     #the file does not exist. create a new file
+     echo "Creating new file"
+     date > $HOME/testing
+   fi
+
+else
+  echo "Sorry. you do not have a HOME directory"
+fi
 
 
+# ./test12
+OK on the directory, now to check the file
+Creating new file
+# ./test12
+OK on the directory, now to check the file
+Appending data to existing file
+{% endhighlight %}
+
+第一个检查用```-e```比较来判断用户是否有$HOME目录。如果有，下一个```-e```比较会检查并判断testing文件是否存在于$HOME目录中。如果文件不存在，shell文件会用单个大于号（输出重定向符号）来用date命令的输出创建一个新文件。你第二次运行这个shell脚本时，它会使用双大于号，这样它就能将date的输出追加到已经存在的文件后面。
+
+3) **检查文件**
+
+```-e```比较适用于文件和目录。要确定指定的对象是个文件，你必须使用```-f```比较：
+{% highlight string %}
+# cat test13 
+#!/bin/bash
+
+# check if a file
+if [ -e $HOME ]
+then
+   echo "the object exists, is it a file?"
+
+   if [ -f $HOME ]
+   then
+      echo "Yes, it is a file"
+   else
+      echo "No, It is not a file"
+
+      if [ -f $HOME/.bash_history ]
+      then
+        echo "But this is a file"
+      fi
+   fi
+else
+   echo "Sorry,the object does not exist"
+
+fi
+
+# ./test13
+the object exists, is it a file?
+No, It is not a file
+But this is a file
+{% endhighlight %}
+这一小段脚本作了很多检查。首先，它用```-e```比较测试$HOME是否存在。如果存在，继续用```-f```选项测试它是不是一个文件。如果它不是文件（当然不会是文件了），我们用```-f```比较来测试$HOME/.bash_history是不是一个文件（当然，是个文件）。
+
+4) **检查是否可读**
+
+在尝试从文件中读取数据之前，最好先测试一下是否能读文件。你可以通过```-r```比较测试：
+{% highlight string %}
+# cat test14 
+#!/bin/bash
+
+# testing if you can read a file
+
+pwfile=/etc/shadow
+
+# first,test if the file exists, and is a file
+if [ -f $pwfile ]
+then
+   #now test if you can read it
+    
+   if [ -r $pwfile ]
+   then
+      tail $pwfile
+   else
+      echo "Sorry, I am unable to read the $pwfile file"
+   fi
+else
+   echo "Sorry, the file $pwfile does not exist"
+
+fi
 
 
-
+# ./test14
+Sorry, I am unable to read the /etc/shadow file
+{% endhighlight %}
+/etc/shadow文件含有系统用户加密后的密码。所以它对系统上的普通用户是不可读的。```-r```比较判断出我没有这个文件的读权限，所以test命令失败了。而且bash shell执行了if-then语句的else部分。
 
 
 
