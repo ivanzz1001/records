@@ -477,6 +477,116 @@ Testing
       如果你为数值使用了数学运算符号，shell会将它们当成字符串值，可能无法产生正确结果。
 </pre>
 
+3） **字符串大小**
+
+```-n```和```-z```参数用来检查一个变量是否含有数据：
+{% highlight string %}
+# cat test11 
+#!/bin/bash
+
+# testing string length
+
+val1=testing
+val2=''
+
+if [ -n "$val1" ]
+then
+   echo "The string '$val1' is not empty"
+else
+   echo "The string '$val1' is empty"
+fi
+
+if [ -z "$val2" ]
+then
+  echo "The string '$val2' is empty"
+else
+  echo "The string '$val2' is not empty"
+fi
+
+if [ -z "$val3" ]
+then 
+   echo "The string '$val3' is empty"
+else
+   echo "The string '$val3' is not empty"
+fi
+
+# ./test11 
+The string 'testing' is not empty
+The string '' is empty
+The string '' is empty
+{% endhighlight %}
+这个例子创建了两个字符串变量。val1变量包含了一个字符串， val2变量则以空字符串创建。后续比较如下：
+<pre>
+if [ -n "$val1" ]
+</pre>
+判断val1变量是否长度非零； 而它的长度正好为非零，所以then部分被执行了；
+<pre>
+if [ -z "$val2" ]
+</pre>
+判断val2变量长度是否为零； 而它的长度正好为零，所以then部分被执行了；
+<pre>
+if [ -z "$val3" ]
+</pre>
+判断val3变量长度是否为零。这个变量并未在shell脚本中定义过，所以它说明字符串长度仍然为零，尽管它并未被定义过。
+
+<pre>
+警告： 空的和未初始化的变量对shell脚本测试来说可能有灾难性的影响。如果你不是很确定一个变量的内容，最好在数值或字符串
+      比较中使用它之前先通过-n或-z来测试一下变量是否含有值。
+</pre>
+
+3) **文件比较**
+
+最后一类测试比较可能是shell编程中最强大的也是最经常用到的比较。test命令允许你测试Linux文件系统上文件和目录的状态。下表列出了这些比较：
+<pre>
+                      表： test命令的文件比较功能
+
+  比 较                         描述
+--------------------------------------------------------------------------------------
+ -d file                检查file是否存在并是一个目录
+
+ -e file                检查file是否存在
+
+ -f file                检查file是否存在并是一个文件
+
+ -r file                检查file是否存在并可读
+
+ -w file                检查file是否存在并可写
+
+ -x file                检查file是否存在并可执行
+
+ -O file                检查file是否存在并属当前用户所有
+
+ -G file                检查file是否存在并且默认组与当前用户相同
+
+file1 -nt file2         检查file1是否比file2新
+
+file1 -ot file2         检查file1是否比file2旧 
+</pre>
+这些条件使你能够在shell脚本中检查文件系统中的文件，并且经常用在要访问文件的脚本中。鉴于它们被如此广泛地使用，我们来逐个看看：
+
+* 检查目录
+
+```-d```测试会检查指定的文件名是否在系统上以目录形式存在。当写文件到某个目录之前，或者是将文件放置到某个目录位置之前时，这会非常有用：
+{% highlight string %}
+# cat test11
+#!/bin/bash
+
+# look before you leap
+
+if [ -d $HOME ]
+then 
+  echo "Your '$HOME' directory exists"
+  cd $HOME
+  ls -a
+else
+  echo "There is a problem with your HOME directory"
+fi
+
+# ./test11
+Your '/root' directory exists
+.   anaconda-ks.cfg  .bash_logout   .bashrc  .config  .dbus                 original-ks.cfg  test11     .xauth3YSsaJ
+..  .bash_history    .bash_profile  .cache   .cshrc   initial-setup-ks.cfg  .tcshrc          workspace  .xauth9JwBId
+{% endhighlight %}
 
 
 
