@@ -550,6 +550,8 @@ if [ -z "$val3" ]
 
  -r file                检查file是否存在并可读
 
+ -s file                检查file是否存在并非空
+
  -w file                检查file是否存在并可写
 
  -x file                检查file是否存在并可执行
@@ -700,8 +702,410 @@ Sorry, I am unable to read the /etc/shadow file
 {% endhighlight %}
 /etc/shadow文件含有系统用户加密后的密码。所以它对系统上的普通用户是不可读的。```-r```比较判断出我没有这个文件的读权限，所以test命令失败了。而且bash shell执行了if-then语句的else部分。
 
+5） **检查空文件**
+
+你应该使用```-s```比较来检查文件是否为空，尤其是在你要删除文件时。当```-s```比较成功时要特别小心，它说明文件中有数据：
+{% highlight string %}
+# cat test15 
+#!/bin/bash
+
+# testing if a file is empty
+
+file=t15test
+
+touch $file
+
+if [ -s $file ]
+then
+   echo "The $file file exists and has no data in it"
+else
+   echo "The $file exists and is empty"
+fi
+
+date > $file
+if [ -s $file ]
+then
+   echo "The $file file has data in it"
+else
+   echo "The $file is still empty"
+fi
 
 
+# ./test15 
+The t15test exists and is empty
+The t15test file has data in it
+{% endhighlight %}
+touch命令创建了这个文件但不会写入任何数据。在我们使用date命令并将其输出重定向到文件中后,```-s```比较说明文件中有数据。
+
+6) **检查文件是否可写**
+
+```-w```比较会判断你是否对文件有可写权限：
+{% highlight string %}
+# cat test16 
+#!/bin/bash
+
+# checking if a file is writable
+
+logfile=$HOME/t16test
+touch $logfile
+
+chmod u-w $logfile
+
+now=`date +%Y%m%d-%H%M`
+
+if [ -w $logfile ]
+then
+   echo "The program run at: $now" > $logfile
+   echo "The first attemt succeeded"
+else
+   echo "The first attempt failed"
+fi
+
+chmod u+w $logfile
+if [ -w $logfile ]
+then
+   echo "The program run at:$now" > $logfile
+   echo "The second attempt succeeded"
+else
+   echo "The second attempt failed"
+fi
+
+
+# ./test16      //这里以普通用户身份执行
+The first attempt failed
+The second attempt succeeded
+# cat /home/ivan1001/t16test 
+The program run at:20190412-2047
+{% endhighlight %}
+这个脚本内容很多。首先，它在你的$HOME目录定义了一个日志文件，将文件名存进变量logfile中，创建文件并通过chmod命令移除该用户对文件的写权限。下一步，它创建了变量now并通过date命令保存了一个时间戳。在这之后，它会检查你是否对新日志文件有些权限（你刚刚移除了写权限）。由于现在你没有了写权限，你应该会看到那条未成功消息。
+
+之后，脚本又通过chmod命令重新赋予该用户写权限，并再次尝试写文件。这次写入成功了。
+
+7） **检查是否可执行**
+
+```-x```比较是一个简单的判断你对某个文件是否有执行权限的方法。虽然可能大多数命令用不到它，但如果你要在shell脚本中运行大量脚本，它可能很方便(以普通用户身份创建并运行test16以及test17)：
+{% highlight string %}
+# cat test17
+#!/bin/bash
+
+# testing file execution
+
+if [ -x test16 ]
+then
+   echo "you can run the script"
+   ./test16
+else
+   echo "Sorry, you are unable to execute the script"
+fi
+
+
+# ./test17
+you can run the script
+The first attempt failed
+The second attempt succeeded
+
+# chmod u-x test16
+# ./test17
+Sorry, you are unable to execute the script
+{% endhighlight %}
+这段示例shell脚本用```-x```比较来测试是否有写权限执行test16脚本。如果有写权限，它会运行这个脚本（注意，即使是在shell脚本中，你必须用正确的路径来执行不在你的$PATH路径中的脚本）。在首次成功运行test16脚本后，更改文件的权限并再试。这次， ```-x```比较失败了，因为你没有test16脚本的执行权限。
+
+8) **检查所属关系**
+
+```-O```比较允许你轻松地测试你是否是文件的属主：
+{% highlight string %}
+# cat test18 
+#!/bin/bash
+
+# check file ownership
+
+
+if [ -O /etc/passwd ]
+then
+   echo "You are the owner of the /etc/passwd file"
+else
+   echo "Sorry, you are not the owner of the /etc/passwd file"
+fi
+
+# ./test18 
+Sorry, you are not the owner of the /etc/passwd file
+# su
+Password:
+# ./test18
+You are the owner of the /etc/passwd file
+{% endhighlight %}
+这段脚本用```-O```比较来测试运行该脚本的用户是否是/etc/passwd文件的属主。第一次，这个脚本运行在普通用户账户下，所以测试失败了。第二次，我们用su命令切换到root用户，测试通过了。
+
+
+9） **检查默认属组关系**
+
+```-G```比较会检查文件的默认组，如果它匹配了用户的默认组，那就通过了。由于```-G```比较只会检查默认组而非用户所属的所有组，这会叫人有点困惑。这里有个例子：
+{% highlight string %}
+# cat test19 
+#!/bin/bash
+
+# check file group test
+
+if [ -G $HOME/testing ]
+then
+   echo "You are in the same group as the file"
+else
+   echo "The file is not owned by your group"
+fi
+
+
+# ls $HOME/testing -al
+-rw-rw-r-- 1 ivan1001 ivan1001 0 Apr 12 22:32 /home/ivan1001/testing
+# ./test19
+You are in the same group as the file
+# sudo chgrp sambashare $HOME/testing
+[sudo] password for ivan1001: 
+# ./test19
+The file is not owned by your group
+{% endhighlight %}
+第一次运行该脚本时，$HOME/testing文件是在ivan1001组的，所以```-G```比较通过了。下一次，组被改成了nogroup，用户也是其中一员，但```-G```比较失败了，因为它只比较默认组，不会去比较其他额外的组。
+
+<pre>
+//我们可以通过如下命令来查看所有的组：
+# cat /etc/group
+</pre>
+
+10) **检查文件日期**
+
+
+最后一组方法用来进行两个文件创建日期相关的比较。这在编写安装软件的脚本时非常有用。有时你不会想安装一个比系统上已安装文件还要早的文件。
+
+```-nt```比较会判定某个文件是否比另一个文件更新。如果文件更新，那它会有一个比较近的文件创建日期。```-ot```比较会判定某个文件是否比另一个文件更老。如果文件更老，它会有一个更早的创建日期。
+{% highlight string %}
+# cat test20
+#!/bin/bash
+
+# testing file dates
+
+if [ ./test19 -nt ./test18 ]
+then
+   echo "The test19 file is newer than test18"
+else
+   echo "The test18 file is newer than test19"
+fi
+
+if [ ./test17 -ot ./test19 ]
+then
+   echo "The test17 file is older than test19"
+fi
+
+# ./test20
+The test19 file is newer than test18
+The test17 file is older than test19
+{% endhighlight %}
+
+比较中用到的文件路径是相对于你运行该脚本的目录来说的。如果你要检查的文件是可以被移来移去的，这可能会造成一些问题。另一个问题是，这些比较中没有哪个会先检查文件是否存在。试试下面这个测试：
+{% highlight string %}
+# cat test21
+#!/bin/bash
+
+# testing file dates
+
+if [ ./badfile1 -nt ./badfile2 ]
+then
+   echo "The badfile1 is newer than badfile2"
+else
+   echo "The badfile2 is newer than badfile1"
+fi
+
+
+# ./test20 
+The badfile2 is newer than badfile1
+{% endhighlight %}
+这个小例子演示了如果文件不存在，```-nt```比较会返回一个无效的条件。在你尝试在```-nt```或```-ot```比较中使用文件之前，必须先确认文件存在。
+
+## 5. 复合条件测试
+
+if-then语句允许你使用布尔逻辑来组合测试。有两种布尔运算符可用：
+
+* [ condition1 ] && [ condition2 ]
+
+* [ condition1 ] || [ condition2 ]
+
+第一个布尔运算使用AND布尔运算符来组合两个条件。要让then部分的命令执行，两个条件都必须满足。
+
+第二个布尔运算使用OR布尔运算符来组合两个条件。如果任何一个条件最后都能得到一个真值，then部分的命令就会执行。
+
+{% highlight string %}
+# cat test22 
+#!/bin/bash
+
+# testing compound comparisons
+
+if [ -d $HOME ] && [ -w $HOME/testing ]
+then
+   echo "The file exists and you can write to it"
+else
+   echo "I cannot write to the file"
+fi
+
+# ./test22 
+I cannot write to the file
+# touch $HOME/testing
+# ./test22 
+The file exists and you can write to it
+{% endhighlight %}
+使用AND布尔运算符时，两个比较都必须满足。第一个比较会检查用户的$HOME目录是否存在。第二个比较会检查在用户的$HOME目录是否有个叫testing的文件，以及用户是否有该文件的写权限。如果两个比较中的任意一个失败了，if语句就会失败，shell就会执行else部分的命令。如果两个比较都通过了，if语句就通过了，shell就会执行then部分的命令。
+
+## 6. if-then的高级特性
+
+bash shell有两项较新的扩展，提供了可在if-then语句中使用的高级特性：
+
+* 用于数学表达式的双尖括号
+
+* 用于高级字符串处理功能的双方括号；
+
+后面几部分将会进一步描述这些特性中的每一项。
+
+1) **使用双尖括号**
+
+双尖括号命令允许你将高级数学表达式放入比较中。test命令只允许在比较中进行简单的算术操作。双尖括号命令提供了更多的为用过其他编程语言的程序员所熟悉的数学符号。双尖括号命令的格式如下：
+<pre>
+(( expression ))
+</pre>
+
+术语expression可以是任意的数学赋值或比较表达式。除了test命令使用的标准数学运算符，下表列出了双尖括号命令中会用到的其他运算符：
+{% highlight string %}
+             表： 双尖括号命令符号
+
+  符 号                          描述
+-------------------------------------------------------------
+  val++                        后增
+  val--                        后减
+  ++val                        先增
+  --val                        先减
+  !                            逻辑求反
+  ~                            位求反
+  **                           幂运算
+  <<                           左位移
+  >>                           右位移
+  &                            按位与
+  |                            按位或
+  &&                           逻辑与
+  ||                           逻辑或
+{% endhighlight %}
+你可以在if语句中用双尖括号命令，也可以在脚本中的普通命令里使用来赋值：
+
+{% highlight string %}
+# cat test23 
+#!/bin/bash
+
+# using double parenthesis
+
+val1=10
+
+if (( $val1 ** 2 > 90 ))
+then
+   (( val2 = $val1 ** 2 ))
+   echo "the square of $val1 is $val2"
+fi
+
+# ./test23 
+the square of 10 is 100
+{% endhighlight %}
+
+注意，你不需要将双尖括号中表达式里的大于号转义。这是尖括号命令提供的另一个高级特性。
+
+2) **使用双方括号**
+
+
+双方括号命令提供了针对字符串比较的高级特性。双方括号命令的格式如下：
+<pre>
+[[ expression ]]
+</pre>
+双方括号里的expression使用了test命令中采用的标准字符串进行比较。但它提供了test命令未提供的另一个特性————模式匹配（pattern matching).
+
+在模式匹配中，你可以定义一个正则表达式来匹配字符串值：
+{% highlight string %}
+# cat test24 
+#!/bin/bash
+
+# using pattern matching
+
+if [[ $USER == r* ]]
+then
+   echo "Hello $USER"
+else
+   echo "Sorry, I do not know you"
+fi
+
+# ./test24 
+Hello root
+{% endhighlight %}
+双方括号命令匹配了$USER环境变量来看它是否以字母```r```开头。如果是的话，比较就会通过，shell会执行then部分的命令。
+
+## 7. case命令
+
+你经常会发现自己在尝试计算一个变量的值或在一组可能的值中寻找特定值。在这种情形下，你最终必须写出很长的if-then-else语句，像这样：
+{% highlight string %}
+# cat test25 
+#!/bin/bash
+
+# looking for a possible value
+
+if [ $USER = "root" ]
+then
+   echo "Welcome $USER"
+   echo "Please enjoy your visit"
+elif [ $USER = "barbara" ]
+then
+   echo "Welcome $USER"
+   echo "Please enjoy your visit"
+elif [ $USER = "testing" ]
+then
+   echo "Special testing account"
+elif [ $USER = "jessica" ]
+then
+   echo "Do not forget to logout when you're done"
+else
+   echo "Sorry, you are not allowed here"
+fi
+   
+# ./test25 
+Welcome root
+Please enjoy your visit
+{% endhighlight %}
+elif语句继续进行if-then检查，为单个比较变量寻找特定值。
+
+你可以使用case命令，而不用写出那么多elif语句来不断检查相同变量的值。case命令会检查单个变量格式的多个值：
+{% highlight string %}
+case variable in
+pattern1 | pattern2) commands1;;
+pattern3) commands2;;
+*) commands3;;
+esac
+{% endhighlight %}
+case命令会将指定的变量同不同模式进行比较。如果变量和模式是匹配的，那么shell会执行为该模式指定的命令。你可以通过竖线操作符来分隔模式，在一行列出多个模式。星号会捕获所有跟列出的模式都不匹配的值。这里有个将if-then-else程序转换成用case命令的例子：
+{% highlight string %}
+# cat test26 
+#!/bin/bash
+
+# using the case command
+
+
+case $USER in
+root | barbara)
+    echo "Welcome, $USER"
+    echo "Please enjoy your visit";;
+testing)
+    echo "Special testing account";;
+jessica)
+    echo "Do not forget to log off when you're done";;
+*)
+    echo "Sorry, you are not allowed here";;
+esac
+
+
+# ./test26 
+Welcome, root
+Please enjoy your visit
+{% endhighlight %}
+case命令提供了一个更清晰的方法来为变量每个可能的值指定不同的选项。
 
 
 <br />
