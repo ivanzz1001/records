@@ -403,9 +403,42 @@ Sun Apr 14 05:01:15 PDT 2019
 
 通过将文本文件重定向到wc命令，你可以得到对文件中行、词和字节的快速计数。这个例子说明test6文件有3行、16个单词以及129字节。
 
-还有另外一种输入重定向的方法，称为**内联输入重定向**(inline input redirection)。这种方法允许你在命令行而不是在文件指定输入重定向的数据。
+还有另外一种输入重定向的方法，称为**内联输入重定向**(inline input redirection)。这种方法允许你在命令行而不是在文件指定输入重定向的数据。乍看一眼，则可能有点奇怪，但有些应用会用到这个过程。
 
+内联输入重定向符号是```双小于号(<<)```。除了这个符号，你必须指定一个文本标记来划分要输入数据的开始和结尾。你可以用任何字符串的值来作为文本标记，但在数据的开始和结尾必须一致：
+{% highlight string %}
+command << marker
+data
+marker
+{% endhighlight %}
+在命令行上使用内联输入重定向时，shell会用PS2环境变量中定义的次提示符来提示输入数据。下面是使用它的情况：
+{% highlight string %}
+# wc << EOF
+> test string 1
+> test string 2
+> test string 3
+> EOF
+ 3  9 42
+{% endhighlight %}
+次提示符一直提示输入更多数据，直到你输入了作为文本标记的那个字符串值。wc命令会对内敛输入重定向提供的数据执行行、词和字节计数。
 
+## 6. 管道
+有时你需要发送某个命令的输出作为另一个命令的输入。可以用重定向，只是有些笨拙：
+{% highlight string %}
+# rpm -qa >> rpm.list
+# sort < rpm.list
+a11y-profile-manager-indicator/xenial,now 0.1.10-0ubuntu3 i386 [installed]
+account-plugin-facebook/xenial,now 0.12+16.04.20160126-0ubuntu1 all [installed]
+account-plugin-flickr/xenial,now 0.12+16.04.20160126-0ubuntu1 all [installed]
+account-plugin-google/xenial,now 0.12+16.04.20160126-0ubuntu1 all [installed]
+accountsservice/xenial-updates,now 0.6.40-2ubuntu11.3 i386 [installed]
+acl/xenial,now 2.2.52-3 i386 [installed]
+acpid/xenial,now 1:2.0.26-1ubuntu2 i386 [installed]
+acpi-support/xenial,now 0.142 i386 [installed]
+activity-log-manager/xenial,now 0.9.7-0ubuntu23 i386 [installed,upgradable to: 0.9.7-0ubuntu23.16.04.1]
+{% endhighlight %}
+
+rpm命令管理着通过Red Hat包管理系统(RPM)安装到系统上的软件包，比如上面列出的Fedora系统。在和```-qa```参数一起使用时，它会生成已安装包的列表，但并不会遵循某种特定的顺序。如果你要在查找某个特定的包或一组包，可能会比较难在rpm命令的输出中找到它。
 
 
 
