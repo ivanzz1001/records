@@ -630,6 +630,50 @@ bash shell数学运算符只支持整数运算。如果你要进行任何实际�
 
 1) **bc的基本用法**
 
+bash计算器其实是允许你在命令行输入浮点表达式、解释表达式、计算并返回结果的一种编程语言。bash计算器能够识别：
+
+* 数字(整数和浮点数）
+
+* 变量（简单变量和数组）
+
+* 注释（以井号开始的行或C语言中的```/* */```对)
+
+* 表达式
+
+* 编程语句（例如if-then语句）
+
+* 函数
+
+你可以在shell提示符下通过bc命令访问bash计算器：
+{% highlight string %}
+# bc
+bc 1.06.95
+Copyright 1991-1994, 1997, 1998, 2000, 2004, 2006 Free Software Foundation, Inc.
+This is free software with ABSOLUTELY NO WARRANTY.
+For details type `warranty'. 
+12 * 5.4
+64.8
+3.165*(3+5)
+25.320
+quit
+{% endhighlight %}
+这个例子由输入表达式```12 * 5.4```开始。bash计算器会返回答案。每个输入到计算器的后续表达式都会被执行，结果会显示出来。要退出bash计算器，你必须输入quit。
+
+浮点运算是由一个内建的称为scale的变量控制的。你必须将这个值设置为结果里你想要的小数后的位数，否则你不会得到你想要的结果：
+{% highlight string %}
+# bc -q
+3.44 / 5
+0
+scale=4
+3.44/5
+.6880
+quit
+{% endhighlight %}
+scale变量的默认值是0。在scale值被设置前，bash计算器提供的答案没有小数点后的位置。在将其设置成4之后，bash计算器显示的答案有四位小数。```-q```命令行参数会将bash计算器输出的很长的欢迎条屏蔽掉。
+
+除了普通数字，bash计算器还支持变量：
+{% highlight string %}
+{% endhighlight %}
 
 
 
