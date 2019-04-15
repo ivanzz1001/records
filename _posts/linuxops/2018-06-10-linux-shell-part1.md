@@ -425,20 +425,210 @@ marker
 ## 6. 管道
 有时你需要发送某个命令的输出作为另一个命令的输入。可以用重定向，只是有些笨拙：
 {% highlight string %}
-# rpm -qa >> rpm.list
+# rpm -qa > rpm.list
 # sort < rpm.list
-a11y-profile-manager-indicator/xenial,now 0.1.10-0ubuntu3 i386 [installed]
-account-plugin-facebook/xenial,now 0.12+16.04.20160126-0ubuntu1 all [installed]
-account-plugin-flickr/xenial,now 0.12+16.04.20160126-0ubuntu1 all [installed]
-account-plugin-google/xenial,now 0.12+16.04.20160126-0ubuntu1 all [installed]
-accountsservice/xenial-updates,now 0.6.40-2ubuntu11.3 i386 [installed]
-acl/xenial,now 2.2.52-3 i386 [installed]
-acpid/xenial,now 1:2.0.26-1ubuntu2 i386 [installed]
-acpi-support/xenial,now 0.142 i386 [installed]
-activity-log-manager/xenial,now 0.9.7-0ubuntu23 i386 [installed,upgradable to: 0.9.7-0ubuntu23.16.04.1]
+acl-2.2.51-12.el7.x86_64
+bind-license-9.9.4-37.el7.noarch
+firewalld-0.4.3.2-8.el7.noarch
+gnome-keyring-3.14.0-1.el7.x86_64
+gnome-packagekit-common-3.14.3-7.el7.x86_64
+liberation-fonts-common-1.07.2-15.el7.noarch
+libglade2-2.6.4-11.el7.x86_64
+libmusicbrainz5-5.0.1-9.el7.x86_64
+libxklavier-5.4-7.el7.x86_64
+libXxf86dga-1.1.4-2.1.el7.x86_64
+mozjs24-24.2.0-6.el7.x86_64
+rdate-1.4-25.el7.x86_64
+spice-protocol-0.12.11-1.el7.noarch
+tcp_wrappers-7.6-77.el7.x86_64
+thai-scalable-waree-fonts-0.5.0-7.el7.noarch
 {% endhighlight %}
 
 rpm命令管理着通过Red Hat包管理系统(RPM)安装到系统上的软件包，比如上面列出的Fedora系统。在和```-qa```参数一起使用时，它会生成已安装包的列表，但并不会遵循某种特定的顺序。如果你要在查找某个特定的包或一组包，可能会比较难在rpm命令的输出中找到它。
+
+通过标准的输出重定向，rpm命令的输出被重定向到了文件rpm.list。命令完成后，rpm.list文件保存着我系统上安装的所有软件包列表。下一步，输入重定向用来将rpm.list文件的内容发送给sort命令来将包名按字母顺序排序。
+
+这很有用，但仍然是一种比较繁琐的生成信息的方式。取代将命令的输出重定向到文件，你可以重定向输出到另一个命令。这个过程称为管道连接(piping)。
+
+类似于```反引号()```，管道的符号在shell编程之外也很少用到。该符号由两个竖线构成，一个在另一个上面。然而，pipe符号印刷体通常看起来更像是单个竖线(|)。在美式键盘上，它通常和反斜线(\)位于同一个键。管道放在命令键，将一个命令的输出重定向到另一个上：
+{% highlight string %}
+command1 | command2
+{% endhighlight %}
+不要以为管道链接会一个一个地运行。Linux系统实际上会同时运行这两个命令，在系统内部将它们连接起来。在第一个命令产生输出的同时，输出会被立即发送给第二个命令。传输数据不会用到任何中间文件或缓冲区域。
+
+现在，通过管道你可以轻松的将rpm命令的输出管道连接到sort命令来产生结果：
+{% highlight string %}
+# rpm -qa | sort
+acl-2.2.51-12.el7.x86_64
+bind-license-9.9.4-37.el7.noarch
+firewalld-0.4.3.2-8.el7.noarch
+gnome-keyring-3.14.0-1.el7.x86_64
+gnome-packagekit-common-3.14.3-7.el7.x86_64
+liberation-fonts-common-1.07.2-15.el7.noarch
+libglade2-2.6.4-11.el7.x86_64
+libmusicbrainz5-5.0.1-9.el7.x86_64
+libxklavier-5.4-7.el7.x86_64
+libXxf86dga-1.1.4-2.1.el7.x86_64
+mozjs24-24.2.0-6.el7.x86_64
+rdate-1.4-25.el7.x86_64
+spice-protocol-0.12.11-1.el7.noarch
+tcp_wrappers-7.6-77.el7.x86_64
+thai-scalable-waree-fonts-0.5.0-7.el7.noarch
+{% endhighlight %}
+除非你眼神特别好，否则该命令的输出会一闪而过，你很有可能来不及看清就没了。由于管道功能是实时运行的，所以只要rpm命令一输出数据，sort命令就会立即对其进行排序。等到rpm命令输出完数据，sort命令就已经将数据排好序并显示在显示器上了。
+
+可以在一条命令中使用任意多条管道，可以继续将命令的输出通过管道传给其他命令来简化操作。
+
+在这个例子中，sort命令的输出会一闪而过，所以你可以用一条文本分页命令（例如less或more)来强行将输出按屏显示：
+<pre>
+# rpm -qa | sort | more
+</pre>
+这行命令序列会先执行rpm命令，将它的输出通过管道传给sort命令，然后再将sort的输出通过管道传给more命令来显示，在显示完每屏信息后停下来。这样你就可以在继续处理前停下来，阅读显示器上显示的信息。
+
+## 7. 执行数学运算
+另一个对任何编程语言都很重要的特性是操作数字的能力。遗憾的是，对shell脚本来说，这个过程会比较麻烦。在shell脚本中有两种途径来进行数学运算操作。
+
+### 7.1 expr命令
+最开始，Bourne shell提供了一个特别的命令用来处理数学表达式。expr命令允许在命令行上处理数学表达式，但是特别笨拙：
+{% highlight string %}
+# expr 1 + 5
+6
+{% endhighlight %}
+expr命令能够识别一些不同的数学和字符串操作符，如下表所示：
+{% highlight string %}
+                     表： expr命令操作符
+
+  操作符                               描述
+----------------------------------------------------------------------------
+ARG1 | ARG2              如果没有参数是null或0值，返回ARG1; 否则返回ARG2
+
+ARG1 & ARG2              如果没有参数是null或0值，返回ARG1；否则返回0
+
+ARG1 < ARG2              如果ARG1小于ARG2，返回1； 否则返回0
+
+ARG1 <= ARG2             如果ARG1小于等于ARG2，返回1； 否则返回0
+
+ARG1 = ARG2              如果ARG1等于ARG2，返回1； 否则返回0
+
+ARG1 != ARG2             如果ARG1不等于ARG2，返回1； 否则返回0
+
+ARG1 >= ARG2             如果ARG1大于等于ARG2，返回1； 否则返回0
+
+ARG1 > ARG2              如果ARG1大于ARG2，返回1； 否则返回0
+
+ARG1 + ARG2              返回ARG1和ARG2的算术运算和
+
+ARG1 - ARG2              返回ARG1和ARG2的算术运算差
+
+ARG1 * ARG2              返回ARG1和ARG2的算术乘积
+
+ARG1 / ARG2              返回ARG1除以ARG2的值
+
+ARG1 % ARG2              返回ARG1除以ARG2的余数
+
+STRING : REGEXP          如果REGEXP匹配到了STRING中的某个模式，返回该模式匹配
+
+match STRING REGEXP      如果REGEXP匹配到了STRING中的某个模式，返回该模式匹配
+
+substr STRING POS LENGTH 返回起始位置为POS（从1开始计数），长度为LENGTH个字符的子字符串
+
+index STRING CHARS       返回在STRING中找到CHARS字符串的位置； 否则返回0
+
+length STRING            返回字符串STRING的数值长度
+
++ TOKEN                  将TOKEN解释成字符串，即使是个关键字
+
+(EXPRESSION)             返回EXPRESSION的值
+{% endhighlight %}
+
+尽管标准操作符在expr命令中工作得很好，但在脚本或命令行上使用它们时仍有问题出现。许多expr命令操作符在shell中有其他意思（比如星号）。在expr命令中使用它们会得到一些诡异的结果：
+{% highlight string %}
+# expr 5 * 2
+expr: syntax error
+{% endhighlight %}
+要解决这个问题，在传给expr命令前，你需要使用shell转义字符（反斜线）来识别容易被shell错误解释的任意字符：
+{% highlight string %}
+# expr 5 \* 2
+10
+{% endhighlight %}
+现在麻烦才刚刚开始！在shell脚本中使用expr命令也同样麻烦：
+{% highlight string %}
+# cat test6 
+#!/bin/bash
+
+# An example of using the expr command
+
+var1=10
+var2=20
+
+var3=`expr $var2 / $var1`
+echo "The result is $var3"
+{% endhighlight %}
+要将一个数学算式的结果赋给一个变量，你需要使用```反引号```来获取expr命令的输出：
+<pre>
+# ./test6 
+The result is 2
+</pre>
+
+幸好，bash shell有一个针对处理数学运算符的改进，你将会在下一节看到。此外expr命令只能处理整数。
+
+### 7.2 使用方括号
+bash shell为了保持跟Bourne shell的兼容而包含了expr命令，但它同样也提供了一个执行数学表达式的更简单的方法。在bash中，在将一个数学运算结果赋给某个变量时，你可以用美元符和方括号（$[ operation ])将数学表达式圈起来：
+{% highlight string %}
+//对于方括号中的空格，仍能正常处理
+# var1=$[1 + 5]
+# echo $var1
+6
+# var2=$[$var1 * 2]
+# echo $var2
+12
+{% endhighlight %}
+用方括号来执行shell数学运算比用expr命令方便很多。这种技术在shell脚本中也能工作起来：
+{% highlight string %}
+# cat test7 
+#!/bin/bash
+
+var1=100
+var2=50
+var3=45
+
+var4=$[$var1 * ($var2 - $var3)]
+echo "The result is $var4"
+{% endhighlight %}
+运行这个脚本会得到如下输出：
+<pre>
+# ./test7 
+The result is 500
+</pre>
+同样，注意在使用方括号来计算公式时，不用担心shell会误解乘号或其他符号。shell知道它不是通配符，因为它在方括号内。
+
+在bash shell脚本中进行算术运算会有一个主要的限制。看看下面这个例子：
+{% highlight string %}
+# cat test8 
+#!/bin/bash
+
+var1=100
+var2=45
+
+var3=$[$var1 / $var2]
+echo "The final result is $var3"
+{% endhighlight %}
+
+现在，运行一下，看看会发生什么：
+<pre>
+# ./test8 
+The final result is 2
+</pre>
+bash shell数学运算符只支持整数运算。如果你要进行任何实际的数学计算，这是一个巨大的限制。
+
+<pre>
+说明： z shell(zsh) 提供了完整的浮点数算术操作。如果你需要在shell脚本中进行浮点数运算，可以考虑看看z shell。
+</pre>
+
+### 7.3 浮点解决方案
+有几种解决方案能够解决bash中数学运算的整数限制。最常见的解决方法是用内建的bash计数器，称作bc。
+
+1) **bc的基本用法**
 
 
 
