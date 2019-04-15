@@ -673,7 +673,252 @@ scale变量的默认值是0。在scale值被设置前，bash计算器提供的�
 
 除了普通数字，bash计算器还支持变量：
 {% highlight string %}
+# bc -q
+var1=10
+var1*4
+40
+var2=var1/5
+print var2
+2
+quit
 {% endhighlight %}
+一旦变量的值被定义了，你就可以在整个bash计算器会话中使用变量了。print语句允许你打印变量和数字。
+
+2） **在脚本中使用bc**
+
+现在你可能想问bash计算器是如何在shell脚本中帮助你处理浮点运算的。你还记得老朋友反引号吗？ 是的，你可以用反引号来运行bc命令并将输出赋给一个变量。基本格式是这样的：
+{% highlight string %}
+variable=`echo "options; expression" | bc`
+{% endhighlight %}
+第一部分options允许你来设置变量。如果你需要设置不止一个变量，可以用分号来分开它们。expression参数定义了通过bc执行的数学表达式。这里有个在脚本中使用它的例子：
+{% highlight string %}
+# cat test9 
+#!/bin/bash
+
+var1=`echo "scale=4; 3.44 /5" | bc`
+echo "The answer is $var1"
+{% endhighlight %}
+这个例子将scale变量设置成了四位小数，并未表达式指定了特定的运算。运行这个脚本会产生如下输出：
+<pre>
+# ./test9 
+The answer is .6880
+</pre>
+太好了！ 现在你不会被限制只能用数字作为表达式值了。你也可以用shell脚本中定义好的变量：
+{% highlight string %}
+# cat test10 
+#!/bin/bash
+
+var1=100
+var2=45
+var3=`echo "scale=4; $var1 / $var2" | bc`
+
+echo "The answer for this is $var3"
+{% endhighlight %}
+
+脚本中定义了两个变量，它们都可以用在表达式中发送给bc命令。记住用美元符来表示变量的值而不是变量自身。这个脚本的输出如下：
+<pre>
+# ./test10 
+The answer for this is 2.2222
+</pre>
+
+当然了，一旦一个值被赋给变量，那个变量就能在其他运算中使用了：
+{% highlight string %}
+# cat test11 
+#!/bin/bash
+
+var1=20
+var2=3.14159
+var3=`echo "scale=4; $var1 * $var1" | bc`
+var4=`echo "scale=4; $var3 * $var2" | bc`
+
+echo "The final result is $var4"
+
+
+# ./test11 
+The final result is 1256.63600
+{% endhighlight %}
+这个方法适用于较短的运算，但有时你会更多地和你自己的数字打交到。如果你有很多运算，在同一个命令行中列出多个表达式就会有点麻烦。
+
+针对这个问题有个解决办法。bc命令能识别输入重定向，允许你将一个文件重定向到bc命令来处理。然而，这同样会叫人困惑，因为你必须将表达式存储到文件中。
+
+最好的办法是使用内联输入重定向，允许你直接在控制台重定向数据。在shell脚本中，你可以将输出赋给一个变量：
+{% highlight string %}
+variable=`bc << EOF
+options
+statements
+expressions
+EOF
+`
+{% endhighlight %}
+
+EOF文本字符串标识了内联重定向数据的开始和结尾。记住仍然需要反引号来将bc命令的输出赋给变量。
+
+现在你可以将所有独立的bash计算器元素放到同一个脚本文件中的不同行。下面是在脚本中使用这种技术的例子：
+{% highlight string %}
+# cat test12 
+#!/bin/bash
+
+var1=10.46
+var2=43.67
+var3=33.2
+var4=71
+
+var5=`bc << EOF
+scale=4
+a1 = ($var1 * $var2)
+b1 = ($var3 * $var4)
+a1 + b1
+EOF
+`
+
+echo "The final answer for this mess is $var5"
+
+# ./test12 
+The final answer for this mess is 2813.9882
+{% endhighlight %}
+将每个选项和表达式放在脚本中不同的行中，可以让事情变得更清晰，也更容易阅读和跟进。EOF字符串标识了重定向给bc命令的数据的起始和结尾。当然，你需要用反引号来标识输出要赋给变量的命令。
+
+你还会注意到这个例子中，你可以在bash计算器中赋值给变量。重要的是记住，在bash计算器中创建的变量只在bash计算中有效，不能在shell脚本中使用。
+
+## 8. 退出脚本
+
+到目前为止，在我们的示例脚本中，我们总是匆忙结尾。在我们运行完最后一条命令时，就结束了脚本。这里还有一个更好的结束事情的方法。
+
+shell中运行的每个命令都使用退出状态码(exit status)来告诉shell它完成了处理。退出状态码是一个0~255之间的整数，在命令结束运行时由命令传给shell。你可以捕获这个值并在脚本中使用。
+
+### 8.1 查看退出状态码
+Linux提供了```$?```专属变量来保存上个执行的命令的退出状态码。你必须在你要查看的命令之后马上查看或使用```$?```变量。它的值会变成shell中执行的最后一条命令的退出状态码。
+<pre>
+# date
+Mon Apr 15 18:38:20 CST 2019
+# echo $?
+0
+</pre>
+按照惯例，一个成功结束的命令的退出状态码是0。如果一个命令结束时有错误，退出状态码中就会有一个正数值：
+<pre>
+# asdfg
+bash: asdfg: command not found...
+# echo $?
+127
+</pre>
+无效命令会返回一个退出状态码127。Linux错误退出状态码没有什么标准惯例。但有一些可用的参考，如下表所示：
+<pre>
+           表： Linux退出状态码
+
+  状态码                描述
+---------------------------------------------------------------------------
+    0            命令成功结束
+    1            通用未知错误
+    2            误用shell命令
+    126          命令不可执行
+    127          没找到命令
+    128          无效退出参数
+    128+x        Linux信号x的严重错误
+    130          命令通过CTRL+C终止
+    255          退出状态码越界
+</pre>
+退出状态码126表明用户没有执行命令的正确权限：
+{% highlight string %}
+# touch myproc.c
+# ./myproc.c
+-bash: ./myproc.c: Permission denied
+# echo $?
+126
+{% endhighlight %}
+另一个你会碰到的常见错误是给某个命令提供了无效参数：
+{% highlight string %}
+# date %t
+date: invalid date ‘%t’
+# echo $?
+1
+{% endhighlight %}
+这会生成通用的退出状态码1，表明在命令中发生了未知错误。
+
+### 8.2 exit命令
+默认情况下，shell脚本会以脚本中的最后一个命令的退出状态码退出：
+{% highlight string %}
+# cat test6 
+#!/bin/bash
+
+# An example of using the expr command
+
+var1=10
+var2=20
+var3=`expr $var2 / $var1`
+
+echo "The result is $var3"
+
+# ./test6 
+The result is 2
+# echo $?
+0
+{% endhighlight %}
+你可以改变这个来返回你自己的退出状态码。exit命令允许你在脚本结束时指定一个退出状态码：
+{% highlight string %}
+# cat test13 
+#!/bin/bash
+
+# tesing the exit status
+
+var1=10
+var2=30
+var3=$[ $var1 + $var2 ]
+
+echo "The answer is $var3"
+
+exit 5
+{% endhighlight %}
+当你查看脚本退出码时，你会得到作为参数传给exit命令的值：
+<pre>
+# ./test13 
+The answer is 40
+# echo $?
+5
+</pre>
+你也可以在exit命令的参数中使用变量：
+{% highlight string %}
+# cat test14
+#!/bin/bash
+
+# tesing the exit status
+
+var1=10
+var2=30
+var3=$[ $var1 + $var2 ]
+exit $var3
+{% endhighlight %}
+
+当你运行这个命令时，它会产生如下退出状态：
+<pre>
+# ./test13 
+# echo $?
+40
+</pre>
+然而，你要注意这个功能，退出状态码最大只能是255。看下面的例子会怎样：
+{% highlight string %}
+# cat test14b 
+#!/bin/bash
+
+# tesing the exit status
+
+var1=10
+var2=30
+var3=$[ $var1 * $var2 ]
+
+echo "The value is $var3"
+exit $var3
+{% endhighlight %}
+现在运行它，你会得到如下输出：
+<pre>
+# ./test14b 
+The value is 300
+# echo $?
+44
+</pre>
+退出状态码减到了0~255区间。shell通过模运算得到这个结果。一个值的模就是被除后的余数。结果中的数是指定的数被256除的余数。在这个例子中的300（返回的值）， 余数是44，它就成了最后的状态退出码。
+
+
+
 
 
 
