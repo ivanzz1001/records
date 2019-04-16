@@ -140,8 +140,126 @@ word: work
 在第一个有问题的值上，添加了反斜线字符来转义```don't```值中的单引号。在第二个有问题的值上，将```this'll```值用双引号圈起来。这两种方法都能正常工作，辨别出这个值。
 
 你可能遇到的另一个问题是有多个词的值。记住，for循环假定每个值都是用空格分隔的。如果有包含空格的数据值，你可能会遇到另一个问题：
+{% highlight string %}
+# cat badtest2 
+#!/bin/bash
 
+# another example of how not to use the for command
 
+for test in Nevada New Hampshire New Mexio New York North California
+do 
+    echo "Now going to $test"
+done
+
+# ./badtest2 
+Now going to Nevada
+Now going to New
+Now going to Hampshire
+Now going to New
+Now going to Mexio
+Now going to New
+Now going to York
+Now going to North
+Now going to California
+{% endhighlight %}
+这不是我们想要的结果。for命令用空格来划分列表中的每个值。如果在单独的数据值中有空格，那么你必须用双引号来将这些值圈起来：
+{% highlight string %}
+# cat test3 
+#!/bin/bash
+
+# another example of how not to use the for command
+
+for test in Nevada "New Hampshire" "New Mexio" "New York" "North California"
+do 
+    echo "Now going to $test"
+done
+
+# ./test3 
+Now going to Nevada
+Now going to New Hampshire
+Now going to New Mexio
+Now going to New York
+Now going to North California
+{% endhighlight %}
+现在for命令可以正确的区分不同值了。还有，注意当你在某个值两边使用双引号时，shell不会将双引号当成值的一部分。
+
+3) **从变量读取列表**
+
+通常shell脚本遇到的情况是，你将一系列值都集中存储在了一个变量中，然后需要遍历整个列表。你也可以通过for命令完成这个：
+{% highlight string %}
+# cat test4 
+#!/bin/bash
+
+# using a variable to hold the list
+
+list="Alabama Alaska Arizona Arkansas Colorado"
+list=$list" Connecticut"
+
+for state in $list
+do 
+   echo "Have you ever visited $state"
+done
+
+# ./test4 
+Have you ever visited Alabama
+Have you ever visited Alaska
+Have you ever visited Arizona
+Have you ever visited Arkansas
+Have you ever visited Colorado
+Have you ever visited Connecticut
+{% endhighlight %}
+
+$list变量包含了给迭代用的标准文本值列表。注意，代码还是用了另一个赋值语句来向$list变量包含的已有列表添加了一个值。这是向变量中存储的已有文本字符串尾部添加文本的一个常用方法。
+
+4） **从命令读取值**
+
+生成列表中要用的值的另外一个途径就是使用命令的输出。你可以用反引号来执行任何能产生输出的命令，然后在for命令中使用该命令的输出：
+{% highlight string %}
+# cat test5 
+#!/bin/bash
+
+# reading values from a file
+
+file="states"
+
+for state in `cat $file`
+do
+   echo "Visit beautiful $state"
+done
+
+# cat states 
+Alabama
+Alaska
+Arizona
+Arkansas
+Colorado
+Connecticut
+Delaware
+Florida 
+Georgia
+
+# ./test5 
+Visit beautiful Alabama
+Visit beautiful Alaska
+Visit beautiful Arizona
+Visit beautiful Arkansas
+Visit beautiful Colorado
+Visit beautiful Connecticut
+Visit beautiful Delaware
+Visit beautiful Florida
+Visit beautiful Georgia
+{% endhighlight %}
+
+这个例子在反引号中使用了cat命令来输出文件states的内容。你会注意到states文件每行有一个州，而不是通过空格分割的。for命令依然以每次一行的方式遍历了cat命令的输出，假定每个州都是在单独的一行上。但这并没有解决数据中有空格的问题，如果你列出了一个名字中有空格的州，for命令仍然会将每个单词当作单独的值。这是有原因的，下一节我们将会了解到。
+
+<pre>
+说明： test5的代码范例将文件名赋给变量，只用了文件名而不是路径。这要求文件和脚本位于同一个目录中。如果不是的话，你需要使用
+      全路径名（不管是绝对路径还是相对路径）来引用文件位置。
+</pre>
+
+5） **更改字段分隔符**
+
+这个问题的原因是特殊的环境变量```IFS```，称为内部字段分隔符(internal field seperator)
 
 
 <br />
