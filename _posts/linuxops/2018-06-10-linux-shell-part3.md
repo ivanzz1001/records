@@ -259,7 +259,94 @@ Visit beautiful Georgia
 
 5） **更改字段分隔符**
 
-这个问题的原因是特殊的环境变量```IFS```，称为内部字段分隔符(internal field seperator)
+这个问题的原因是特殊的环境变量```IFS```，称为内部字段分隔符(internal field seperator)。IFS环境变量定义了bash shell用作字段分隔符的一系列字符。默认情况下，bash shell会将下列字符当做字段分隔符：
+
+* 空格
+
+* 制表符
+
+* 换行符
+
+如果bash shell在数据中看到了这些字符中的任意一个，它就会假定你在列表中开始了一个新的数据段。在处理可能含有空格的数据（比如文件名时），这会非常麻烦，如你在上一个脚本示例中看到的。
+
+要解决这个问题，你可以在shell脚本中临时更改IFS环境变量的值来限制一下被bash shell当做字段分隔符的字符。但这种方式有点奇怪。比如，如果你修改IFS的值使其只能识别换行符，你必须这么做：
+<pre>
+IFS=$'\n'
+</pre>
+将这个语句加入到脚本中，告诉bash shell在数据值中忽略空格和制表符。对前一个脚本使用这种方法，将获得如下输出：
+{% highlight string %}
+# cat states 
+Alabama
+Alaska
+Arizona
+Arkansas
+Colorado
+Connecticut
+Delaware
+Florida 
+Georgia
+New York
+New Hampshire
+North Carolina
+
+# cat test5b 
+#!/bin/bash
+
+# reading values from a file
+
+file="states"
+
+IFS=$'\n'
+
+for state in `cat $file`
+do
+   echo "Visit beautiful $state"
+done
+
+# ./test5b 
+Visit beautiful Alabama
+Visit beautiful Alaska
+Visit beautiful Arizona
+Visit beautiful Arkansas
+Visit beautiful Colorado
+Visit beautiful Connecticut
+Visit beautiful Delaware
+Visit beautiful Florida 
+Visit beautiful Georgia
+Visit beautiful New York
+Visit beautiful New Hampshire
+Visit beautiful North Carolina
+{% endhighlight %}
+现在shell脚本能够使用列中含有空格的值了。
+
+<pre>
+警告： 在处理长脚本时，可能在一个地方需要修改IFS的值，然后忘掉它了并在脚本中其他地方以为还是默
+认的值。一个可参考的简单实践是在修改IFS之前保存原来的IFS值，之后再恢复它。
+
+这种技术可以这样编程：
+IFS.old=$IFS
+IFS=$'\n'
+
+// here use the new IFS value in code
+
+IFS=$IFS.old
+这会为脚本中后面的操作保证IFS的值恢复到了默认值。
+</pre>
+
+还有其他一些IFS环境变量的绝妙用法。假定你要遍历一个文件中用冒号分隔的值（比如在/etc/passwd文件中），你要做的就是将IFS的值设为冒号：
+{% highlight string %}
+IFS=$':'
+{% endhighlight %}
+如果你要指定多个IFS字符，只要将它们在赋值行串起来就行：
+{% highlight string %}
+IFS=$'\n:;"'
+{% endhighlight %}
+这个赋值会将换行符、冒号、分号和双引号作为字段分隔符。如何使用IFS字符解析数据没有任何限制。
+
+6） **用通配符读取目录**
+
+
+
 
 
 <br />
