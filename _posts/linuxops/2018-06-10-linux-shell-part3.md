@@ -345,6 +345,170 @@ IFS=$'\n:;"'
 
 6） **用通配符读取目录**
 
+最后，你可以用for命令来自动遍历某个目录下的文件。进行此操作时，你必须在文件名或路径名中使用通配符。它会强制shell使用文件文件扩展匹配（file globbing)。文件扩展匹配是生成匹配指定通配符的文件名或路径名的过程。
+
+这个特性在处理目录中的文件而你不知道所有的文件名时非常好用：
+{% highlight string %}
+# cat test6 
+#!/bin/bash
+
+# iterate through all the files in a directory
+
+for file in /usr/local/*
+do 
+   if [ -d "$file" ]
+   then
+       echo "$file is a directory"
+   elif [ -f "$file" ]
+   then
+       echo "$file is a  regular file"
+   fi
+
+done
+
+# ./test6 
+/usr/local/bin is a directory
+/usr/local/etc is a directory
+/usr/local/games is a directory
+/usr/local/go is a directory
+/usr/local/include is a directory
+/usr/local/lib is a directory
+/usr/local/lib64 is a directory
+/usr/local/libexec is a directory
+/usr/local/nginx is a directory
+/usr/local/openssl is a directory
+/usr/local/redis-3.2.11 is a directory
+/usr/local/sbin is a directory
+/usr/local/share is a directory
+/usr/local/src is a directory
+{% endhighlight %}
+
+for命令会遍历```/usr/local/*```输出的结果。该代码用test命令测试了每个条目（使用方括号方法），以查看它是个目录（通过-d参数)还是个文件（通过-f参数）。
+
+注意，在这个例子中，我们和if语句里的测试处理的有些不同：
+<pre>
+if [ -d "$file" ]
+</pre>
+在Linux中，目录名和文件名中包含空格当然是合法的。要容纳这种值，你应该将```$file```变量用双引号圈起来。如果不这么做，遇到含有空格的目录名或文件名时会有错误产生：
+<pre>
+./test6: line 6: [: too many arguments
+./test6: line 9: [: too many arguments
+</pre>
+在test命令中，bash shell会将额外的单词当做参数，造成错误。
+
+你也可以在for命令中通过列出一系列的目录通配符来将目录查找方法和列表方法合并进同一个for语句：
+{% highlight string %}
+# cat test7 
+#!/bin/bash
+
+# iterate through all the files in a directory
+
+for file in /usr/local/* /root/Downloads/*
+do 
+   if [ -d "$file" ]
+   then
+       echo "$file is a directory"
+   elif [ -f "$file" ]
+   then
+       echo "$file is a  regular file"
+   fi
+
+done
+
+# ./test7 
+/usr/local/bin is a directory
+/usr/local/etc is a directory
+/usr/local/games is a directory
+/usr/local/go is a directory
+/usr/local/include is a directory
+/usr/local/lib is a directory
+/usr/local/lib64 is a directory
+/usr/local/libexec is a directory
+/usr/local/nginx is a directory
+/usr/local/openssl is a directory
+/usr/local/redis-3.2.11 is a directory
+/usr/local/sbin is a directory
+/usr/local/share is a directory
+/usr/local/src is a directory
+/root/Downloads/Create_DB.sql is a  regular file
+/root/Downloads/curl-7.29.0-46.el7.x86_64.rpm is a  regular file
+/root/Downloads/libcurl-7.29.0-46.el7.x86_64.rpm is a  regular file
+/root/Downloads/libcurl-devel-7.29.0-46.el7.x86_64.rpm is a  regular file
+/root/Downloads/mysql is a directory
+{% endhighlight %}
+
+for语句首先使用了文件扩展匹配来遍历通配符生成的文件列表，然后它会遍历列表中的下一个文件。你可以将任意多的通配符放进列表中。
+<pre>
+警告： 注意，你可以在列表数据中放入任何东西。即使文件或目录不存在，for语句也会尝试处理你放到列表中的任何东西。在处理文件
+      或目录时，这可能会是个问题。你也不知道你正在尝试遍历一个并不存在的目录： 在处理之前测试一下文件或目录总是好的。
+</pre>
+
+## 2. C语言风格的for命令
+
+如果你用C语言编过程，你可能会对bash shell使用for命令的方式有点惊奇。在C语言中，for循环通常定义一个变量，然后这个变量会在每次迭代时自动改变。通常，程序员会将这个变量用作计数，并在每次迭代中让计数器增一或减一。bash的for命令也提供了这个功能。本节将会告诉你如何在bash shell中使用C语言风格的for命令。
+
+### 2.1 C语言的for命令
+C语言的for命令有一个用来指明变量的特殊方法、一个必须保持成立才能继续迭代的条件，以及另一个为每个迭代改变变量的方法。当指定条件不成立时，for循环就会停止。条件等式通过标准的数学符号定义，比如，考虑下面的C语言代码：
+{% highlight string %}
+for(i=0;i<10;i++)
+{
+      printf("the next number is %d\n", i);
+}
+{% endhighlight %}
+这段代码产生了一个简单的迭代循环，其中变量```i```作为计数器。第一部分将一个默认值赋给该变量。中间的部分定义了循环重复的条件。当定义的条件不成立时，for循环就停止迭代了。最后一部分定义了迭代的过程。在每次迭代之后，最后一部分中定义的表达式会被执行。在本例中，i变量在每次迭代后增一。
+
+bash shell也支持一个版本的for循环，看起来跟C语言风格的for循环类似，虽然它也有一些细微的不同，包括一些会叫shell程序员困惑的东西。这是bash中C语言风格的for循环的基本格式：
+{% highlight string %}
+//注： 如下格式没有空格的限制，与C语言类似
+for (( variable assignment; condition; iteration process ))
+{% endhighlight %}
+
+C语言风格的for循环的格式可能对bash shell脚本程序员来说有点困难，由于它使用了C语言风格的变量引用方式而不是shell风格的变量引用方式。C语言风格的for命令看起来如下：
+{% highlight string %}
+for((i=0;i<10;i++))
+{% endhighlight %}
+
+注意，有一些事情没有遵循标准的bash shell for命令：
+
+* 给变量赋值可以有空格
+
+* 条件中的变量不以美元符开头；
+
+* 迭代过程的算式未用expr命令格式
+
+shell开发人员创建了这种格式以更贴切地模仿C语言风格的for命令。这对C语言程序员来说很好，但也可能将即使是专家级的shell程序员弄得一头雾水。在脚本中使用C语言风格的for循环时要小心。
+
+这里有个在bash shell程序中使用C语言风格的for命令的例子：
+{% highlight string %}
+# cat test8 
+#!/bin/bash
+
+# testing the C-style for loop
+
+for((i=1;i<=10;i++))
+do
+    echo "The next number is $i"
+done
+
+# ./test8 
+The next number is 1
+The next number is 2
+The next number is 3
+The next number is 4
+The next number is 5
+The next number is 6
+The next number is 7
+The next number is 8
+The next number is 9
+The next number is 10
+{% endhighlight %}
+
+
+
+
+
+
+
 
 
 
