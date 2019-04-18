@@ -503,11 +503,82 @@ The next number is 9
 The next number is 10
 {% endhighlight %}
 
+for循环通过定义好的变量（本例中是字母i）遍历了这些命令。在每个迭代中，```$i```变量包含了for循环中赋给的值。在每次迭代后，循环的迭代过程会作用在变量上，在本例中，变量增一。
 
+### 2.2 使用多个变量
+C语言风格的for命令也允许你为迭代使用多个变量。循环会单独处理每个变量，允许你为每个变量定义不同的迭代过程。
+{% highlight string %}
+# cat test9 
+#!/bin/bash
 
+# multiple variables
 
+for((a=1,b=10;a<=10 && b>=5;a++,b--))
+do
+   echo "$a -- $b"
+done
 
+# ./test9 
+1 -- 10
+2 -- 9
+3 -- 8
+4 -- 7
+5 -- 6
+6 -- 5
+{% endhighlight %}
 
+变量a和b每个都用不同的值来初始化并且定义了不同的迭代过程。循环每个迭代中增加变量a的同时，减少了变量b。
+
+## 3. while命令
+while命令某种意义上是if-then语句和for循环的混杂体。while命令允许你定义一个要测试的命令，然后循环执行一组命令，只要定义的测试命令返回的是退出状态码0。它会在每个迭代的一开始测试test命令。在test命令返回非零退出状态码时，while命令会停止执行那组命令。
+
+1) **while的基本格式**
+
+while命令的基本格式是：
+{% highlight string %}
+while test command
+do
+    other commands
+done
+{% endhighlight %}
+while命令中定义的test命令和if-then中定义的是一样的格式。和if-then语句中一样，你可以使用任何普通的bash shell命令，或者用test命令作为条件，比如变量值。
+
+while命令的关键是，指定的test命令的退出状态码必须随着循环中运行的命令改变。如果退出状态码从来不变，那while循环将会一直不停的循环。
+
+最常见的test命令的用法是，用方括号来查看循环命令中用到的shell变量的值：
+{% highlight string %}
+# cat test10 
+#!/bin/bash
+
+# while command test
+
+var1=10
+while [ $var1 -gt 5 ]
+do
+   echo $var1
+   var1=$[$var1-1]
+done
+
+# ./test10 
+10
+9
+8
+7
+6
+{% endhighlight %}
+while命令定义了每次迭代时检查的测试条件：
+<pre>
+while [ $var1 -gt 5 ]
+</pre>
+只有测试条件成立，while命令才会继续遍历执行定义好的命令。在这些命令中，测试条件中用到的变量必须被修改，否则你就进入了一个无限循环。在本例中，我们用shell算术来将变量值减一：
+<pre>
+var1=$[$var1-1]
+</pre>
+while循环会在测试条件不再成立时停止。
+
+2) **使用多个测试命令**
+
+在极少数情况中，
 
 
 
