@@ -578,7 +578,47 @@ while循环会在测试条件不再成立时停止。
 
 2) **使用多个测试命令**
 
-在极少数情况中，
+在极少数情况中，while命令允许你在while语句行定义多个测试命令。只有最后一个测试命令的退出状态码会被用来决定什么时候结束循环。如果你不够小心，这可能会导致一些有意思的结果。下面的例子将会说明：
+{% highlight string %}
+# cat test11 
+#!/bin/bash
+
+# testing a multicommand while loop
+
+var1=10
+
+while echo $var1
+    [ $var1 -ge 0 ]
+do
+    echo "This is inside the loop"
+    var1=$[$var1-1]
+done
+
+# ./test11 
+10
+This is inside the loop
+9
+This is inside the loop
+8
+This is inside the loop
+7
+This is inside the loop
+6
+This is inside the loop
+5
+This is inside the loop
+4
+This is inside the loop
+3
+This is inside the loop
+2
+This is inside the loop
+1
+This is inside the loop
+0
+This is inside the loop
+-1
+{% endhighlight %}
 
 
 
