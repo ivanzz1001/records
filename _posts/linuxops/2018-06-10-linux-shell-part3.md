@@ -779,9 +779,238 @@ Outer loop:
 
 ## 6. 循环处理文件数据
 
+通常，你必须遍历存储在文件中的数据。这要求结合已经讲过的两种技术：
+
+* 使用嵌套循环
+
+* 修改IFS环境变量
+
+通过修改```IFS```环境变量，你就能强制for命令将文件中的每行都当成单独的一个条目来处理，即便数据中有空格也是如此。一旦你从文件中提取出了单独的行，你可能需要再次循环来提取其中的数据。
+
+经典的例子是处理/etc/passwd文件中的数据。这要求你逐行遍历/etc/passwd文件并将IFS变量的值改成冒号，这样你就能分隔开每行中的各个单独的数据段了：
+{% highlight string %}
+# cat test16 
+#!/bin/bash
+
+# changing the IFS value
+
+IFS_OLD=$IFS
+IFS=$'\n'
+
+for entry in `cat /etc/passwd`
+do
+    echo "Values in $entry -"
+    IFS=:
+    
+    for value in $entry
+    do
+       echo "     $value"
+    done
+done
+{% endhighlight %}
+
+这个脚本使用了两个不同的IFS值来解析数据。第一个IFS值解析出/etc/passwd文件中的单独的行。内部for循环进一步将IFS的值修改为冒号，允许你从/etc/passwd的行中解析出单独的值。
+
+在运行这个脚本时，你会得到如下输出：
+<pre>
+# ./test16 | more
+Values in root:x:0:0:root:/root:/bin/bash -
+     root
+     x
+     0
+     0
+     root
+     /root
+     /bin/bash
+...
+</pre>
+
+内部循环会解析出/etc/passwd每行中的每个单独的值。这用来处理通常导入电子表格采用的逗号分割的数据也很方便。
+
+## 7. 控制循环
+你可能会想，一旦启动了循环，就必须等待循环完成所有的迭代。不是这样的，有几个命令能帮助我们控制循环内部的情况：
+
+* break命令
+
+* continue命令
+
+每个命令在如何控制循环的执行上有不同的用法。下面几节将会介绍如何使用这些命令来控制循环的执行。
+
+### 7.1 break命令
+break命令是退出进行中的循环的一个简单方法。你可以用break命令来退出任意类型的循环，包括while和until循环。
+
+有几种情况你可以使用break命令。本节将会介绍这些方法中的每一种。
+
+1） **跳出单个循环**
+
+在shell执行break命令时，它会尝试跳出正在处理的循环：
+{% highlight string %}
+# cat test17 
+#!/bin/bash
+
+# breaking out of a for loop
+
+for var1 in 1 2 3 4 5 6 7 8 9 10
+do
+    if [ $var1 -eq 5 ]
+    then 
+          break
+    fi
+   
+    echo "Iteration number: $var1"
+done
+echo "The for loop is completed"
+
+# ./test17 
+Iteration number: 1
+Iteration number: 2
+Iteration number: 3
+Iteration number: 4
+The for loop is completed
+{% endhighlight %}
+for循环通常都会遍历一遍列表中指定的所有值。但当满足if-then的条件时，shell会执行break命令，for循环会停止。
+
+这种方法同样适用于while和until循环：
+{% highlight string %}
+# cat test18 
+#!/bin/bash
+
+# breaking out of a while loop
+
+var1=1
+
+while [ $var1 -lt 10 ]
+do
+    if [ $var1 -eq 5 ]
+    then
+        break
+    fi
+
+    echo "Iteration: $var1"
+    var1=$[$var1 + 1]
+done
+
+echo "The while loop is completed"
 
 
+# ./test18 
+Iteration: 1
+Iteration: 2
+Iteration: 3
+Iteration: 4
+The while loop is completed
+{% endhighlight %}
+while循环会在if-then的条件满足时执行break命令，终止。
 
+2) **跳出内部循环**
+
+在处理多个循环时，break命令会自动终止你所在最里面的循环：
+{% highlight string %}
+# cat test19 
+#!/bin/bash
+
+# breaking out of an inner loop
+
+for((a=1;a<4;a++))
+do
+    echo "Outer loop: $a"
+
+    for ((b=1;b<100;b++))
+    do
+         if [ $b -eq 5 ]
+         then
+              break
+         fi
+ 
+         echo "   inner loop: $b" 
+    done
+done
+
+# ./test19 
+Outer loop: 1
+   inner loop: 1
+   inner loop: 2
+   inner loop: 3
+   inner loop: 4
+Outer loop: 2
+   inner loop: 1
+   inner loop: 2
+   inner loop: 3
+   inner loop: 4
+Outer loop: 3
+   inner loop: 1
+   inner loop: 2
+   inner loop: 3
+   inner loop: 4
+{% endhighlight %}
+内部循环的for语句指明一直重复直到变量等于100。但内部循环的if-then语句指明当变量b的值等于5时执行break命令。注意，即使内部循环通过break命令终止了，外部循环依然按指定的继续执行。
+
+3）**跳出外部循环**
+
+有时你在内部循环，但需要停止外部循环。break命令接受单个命令行参数值：
+<pre>
+break n
+</pre>
+其中n说明了要跳出的循环层级。默认情况下，n为1，表明跳出的是当前的循环。如果你将n设为2，break命令就会停止下一级的外部循环：
+{% highlight string %}
+# cat test20 
+#!/bin/bash
+
+# breaking out of an outer loop
+
+for((a=1;a<4;a++))
+do
+   echo "Outer loop: $a"
+   for ((b=1;b<100;b++))
+   do
+       if [ $b -gt 4 ]
+       then
+            break 2
+       fi
+
+       echo "    Inner loop: $b"
+   done
+done
+
+# ./test20 
+Outer loop: 1
+    Inner loop: 1
+    Inner loop: 2
+    Inner loop: 3
+    Inner loop: 4
+{% endhighlight %}
+注意，当shell执行了break命令时，外部循环停止了。
+
+### 7.2 continue命令
+continue命令是提早结束执行循环内部的命令但并不完全终止整个循环的一个途径。它允许你在循环内部设置shell不执行命令的条件。这里有个在for循环中使用continue命令的简单例子：
+{% highlight string %}
+# cat test21 
+#!/bin/bash
+
+# using the continue command
+
+for((var1=1; var1<15;var1++))
+do
+   if [ $var1 -gt 5 ] && [ $var1 -lt 10 ]
+   then
+       continue
+   fi
+
+   echo "Iteration number: $var1"
+done
+
+# ./test21 
+Iteration number: 1
+Iteration number: 2
+Iteration number: 3
+Iteration number: 4
+Iteration number: 5
+Iteration number: 10
+Iteration number: 11
+Iteration number: 12
+Iteration number: 13
+Iteration number: 14
+{% endhighlight %}
 
 
 
