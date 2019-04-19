@@ -1012,7 +1012,46 @@ Iteration number: 13
 Iteration number: 14
 {% endhighlight %}
 
-当if-then语句的条件被满足时（值大于5而小于10），shell会执行continue命令
+当if-then语句的条件被满足时（值大于5而小于10），shell会执行continue命令，跳过循环中的其他命令，但循环会继续。当if-then的条件不再被满足时，一切又回到正轨了。
+
+也可以在while和until循环中使用continue命令，但要特别小心。记住，当shell执行continue命令时，它会跳过剩余的命令。如果你在这些条件中的某条中增加测试条件变量，问题就出现了：
+{% highlight string %}
+# cat badtest 
+#!/bin/bash
+
+# improperly using the continue command in a while loop
+
+var1=0
+
+while echo "while iteration: $var1"
+     [ $var1 -lt 15 ]
+do
+   if [ $var1 -gt 5 ] && [ $var1 -lt 10 ]
+   then
+       continue
+   fi
+
+   echo "   Inner iteration number: $var1"
+   var1=$[$var1 + 1]
+   
+done
+
+# ./badtest | more
+while iteration: 0
+   Inner iteration number: 0
+while iteration: 1
+   Inner iteration number: 1
+while iteration: 2
+   Inner iteration number: 2
+while iteration: 3
+   Inner iteration number: 3
+while iteration: 4
+   Inner iteration number: 4
+while iteration: 5
+   Inner iteration number: 5
+while iteration: 6
+while iteration: 6
+{% endhighlight %}
 
 
 
