@@ -635,8 +635,151 @@ while循环会在var1变量等于0时执行echo语句，然后将var1变量的�
 这说明在含有多个命令的while语句中，在每次迭代中所有的测试命令都会被执行，包括最后一个测试命令不成立的最后那次循环。要小心这种用法。另一个要小心的是你如何指定多个测试命令。注意每个测试命令都是在单独的一行上。
 
 
-## 4. util命令
-util命令和while命令工作的方式完全相反。util命令要求你指定一个通常输出非零退出状态码的测试命令。只有测试命令的退出状态码非零，bash shell才会执行循环中列出的那些命令。一旦测试命令返回了退出状态码0，循环就结束了。
+## 4. until命令
+until命令和while命令工作的方式完全相反。util命令要求你指定一个通常输出非零退出状态码的测试命令。只有测试命令的退出状态码非零，bash shell才会执行循环中列出的那些命令。一旦测试命令返回了退出状态码0，循环就结束了。
+
+如你所期望的，until命令的格式如下：
+<pre>
+until test commands
+do
+    other commands
+done
+</pre>
+类似于while命令，你可以在until命令语句中有多个测试命令。只有最后一个命令的退出状态码决定bash shell是否执行定义好的其他命令。
+
+下面是使用util命令的一个例子：
+{% highlight string %}
+# cat test12 
+#!/bin/bash
+
+# using the util command
+
+var1=100
+
+until [ $var1 -eq 0 ]
+do
+    echo $var1
+    var1=$[$var1-25]
+done
+
+# ./test12 
+100
+75
+50
+25
+{% endhighlight %}
+本例中会测试var1变量来决定until循环何时停止。只要变量的值等于0了，util命令就会停止循环了。同while命令一样，在和until命令一起使用多个测试命令时要注意：
+{% highlight string %}
+# cat test13 
+#!/bin/bash
+
+# using the until command
+
+var1=100
+
+until echo $var1
+     [ $var1 -eq 0 ]
+do
+    echo "Inside the loop: $var1"
+    var1=$[$var1 - 25]
+done
+
+# ./test13 
+100
+Inside the loop: 100
+75
+Inside the loop: 75
+50
+Inside the loop: 50
+25
+Inside the loop: 25
+0
+{% endhighlight %}
+shell会执行指定的测试命令，只有在最后一个命令成立时停止。
+
+
+## 5. 嵌套循环
+循环语句可以在循环内使用任意类型的命令，包括其他循环命令。这种称为嵌套循环(nested loop)。注意，在使用嵌套循环时，你是在迭代中使用迭代，命令运行的次数是乘积关系。不注意这点有可能会在脚本中造成问题。
+
+这里有个在for循环中嵌套for循环的简单例子：
+{% highlight string %}
+# cat test14 
+#!/bin/bash
+
+# nesting for loops
+
+for((a=1;a<=3;a++))
+do
+    echo "Starting loop $a:"
+    for((b=1;b<=3;b++))
+    do
+       echo "    Inside loop: $b"
+    done
+done
+
+# ./test14 
+Starting loop 1:
+    Inside loop: 1
+    Inside loop: 2
+    Inside loop: 3
+Starting loop 2:
+    Inside loop: 1
+    Inside loop: 2
+    Inside loop: 3
+Starting loop 3:
+    Inside loop: 1
+    Inside loop: 2
+    Inside loop: 3
+{% endhighlight %}
+这个被嵌套的循环（也称为内部循环）会在外部循环的每次迭代中遍历一遍它所有的值。注意，两个循环的do和done命令没有任何差别。bash shell知道当第一个done命令执行时是指内部循环而非外部循环。
+
+在混用循环命令时也一样，比如在while循环内部放置一个for循环：
+{% highlight string %}
+# cat test15 
+#!/bin/bash
+
+# placing a for loop inside a while loop
+
+var1=5
+
+while [ $var1 -ge 0 ]
+do
+    echo "Outer loop: $var"
+    for((var2=1; var2<3;var2++))
+    do
+       var3=$[$var1*$var2]
+       echo "   Inner loop: $var1 * $var2 = $var3"
+    done
+   
+    var1=$[$var1-1]
+done
+
+# ./test15 
+Outer loop: 
+   Inner loop: 5 * 1 = 5
+   Inner loop: 5 * 2 = 10
+Outer loop: 
+   Inner loop: 4 * 1 = 4
+   Inner loop: 4 * 2 = 8
+Outer loop: 
+   Inner loop: 3 * 1 = 3
+   Inner loop: 3 * 2 = 6
+Outer loop: 
+   Inner loop: 2 * 1 = 2
+   Inner loop: 2 * 2 = 4
+Outer loop: 
+   Inner loop: 1 * 1 = 1
+   Inner loop: 1 * 2 = 2
+Outer loop: 
+   Inner loop: 0 * 1 = 0
+   Inner loop: 0 * 2 = 0
+{% endhighlight %}
+
+同样，shell能够区分开内部for循环的do和done命令与外部while循环的do和done命令。
+
+## 6. 循环处理文件数据
+
+
 
 
 
