@@ -1012,7 +1012,7 @@ Iteration number: 13
 Iteration number: 14
 {% endhighlight %}
 
-
+当if-then语句的条件被满足时（值大于5而小于10），shell会执行continue命令
 
 
 
