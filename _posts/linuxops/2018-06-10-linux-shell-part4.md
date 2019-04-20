@@ -26,6 +26,12 @@ bash shell有个特性允许你这么做。函数(function)是可以起个名字
 function name {
     commands
 }
+
+或
+
+function name() {
+    commands
+}
 {% endhighlight %}
 name属性定义了赋予函数的唯一名称。你必须给脚本中定义的每个函数赋个唯一的名称。
 
@@ -309,12 +315,84 @@ The new value is 400
 
 ### 3.1 向函数传递参数
 
+如我们在**2.2节**中提到的，bash shell会将函数当做小型脚本来对待。这意味着你可以向函数传递参数，就跟普通脚本一样。
 
+函数可以使用标准的参数环境变量来代表命令行上传给函数的参数。例如，函数名会在```$0```变量中定义，函数命令行上的任何参数都会通过```$1```、```$2```等定义。也可以用特殊变量```$#```来判断传给函数的参数数目。
 
+在脚本中指定函数时，必须将参数和函数放在同一行，像这样：
+{% highlight string %}
+func1 $value1 10
+{% endhighlight %}
+然后函数可以用参数环境变量来获得参数值。这里有个使用此方法向函数传值的例子：
+{% highlight string %}
+# cat test6 
+#!/bin/bash
 
+# passing parameters to a function
 
+function addelem() {
+   if [ $# -eq 0 ] || [ $# -gt 2 ]
+   then
+        echo -1
+   elif [ $# -eq 1 ]
+   then
+        echo $[$1 + $1]
+   else
+        echo $[$1 + $2]
+   fi
+}
 
+echo -n "Adding 10 and 15: "
+value=`addelem 10 15`
+echo $value
 
+echo -n "Let's try adding just one number: "
+value=`addelem 10`
+echo $value
+
+echo -n "Now trying adding no numbers: "
+value=`addelem`
+echo $value
+
+echo -n "Finally, try adding three numbers: "
+value=`addelem 10 15 20`
+echo $value
+
+# ./test6 
+Adding 10 and 15: 25
+Let's try adding just one number: 20
+Now trying adding no numbers: -1
+Finally, try adding three numbers: -1
+{% endhighlight %}
+
+test6脚本中的```addelem```函数首先会检查脚本传给它的参数数目。如果没有任何参数，或者如果多于两个参数，addelem会返回值-1。如果只有一个参数，addelem会将参数自己加到自己上面生成结果。如果有两个参数，addelem会将它们加起来生成结果。
+
+由于函数使用特殊参数环境变量作为自己的参数值，它不能直接从脚本的命令行获取脚本的参数值。下面的例子将会运行失败：
+{% highlight string %}
+# cat badtest1 
+#!/bin/bash
+
+# trying to access script parameters inside a function
+
+function badfunc1 {
+
+  echo $[$1 * $2]
+}
+
+if [ $# -eq 2 ]
+then
+    value=`badfunc1`
+    echo "The result is $value"
+else
+    echo "Usage: badtest a b"
+fi
+
+# ./badtest1 
+Usage: badtest a b
+# ./badtest1 10 15
+./badtest1: line 7: * : syntax error: operand expected (error token is "* ")
+The result is
+{% endhighlight %}
 
 
 
