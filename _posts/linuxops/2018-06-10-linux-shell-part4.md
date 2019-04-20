@@ -394,9 +394,249 @@ Usage: badtest a b
 The result is
 {% endhighlight %}
 
+尽管函数使用了```$1```和```$2```变量，但它们却和脚本主体中的```$1```和```$2```变量不尽相同。要在函数中使用这些值，必须在调用函数时手动将它们传过去：
+{% highlight string %}
+# cat test7 
+#!/bin/bash
+
+# trying to access script parameters inside a function
+
+function func7() {
+   echo $[$1 * $2]
+}
+
+if [ $# -eq 2 ]
+then
+  value=`func7 $1 $2`
+  echo "The result is $value"
+else
+  echo "Usage: badtest1 a b"
+fi
+  
+# ./test7 
+Usage: badtest1 a b
+# ./test7 10 15
+The result is 150
+{% endhighlight %}
+
+通过将```$1```和```$2```变量传给函数，它们就能跟其他变量一样，功函数使用了。
+
+### 3.2 在函数中处理变量
+
+给shell脚本程序员经常带来麻烦的事是变量的作用域。作用域是什么情况下变量可见。函数中定义的变量可以跟普通变量的作用域不同，也就是说，它们可以在脚本的其他部分隐藏起来。函数会用两种类型的变量：
+
+* 全局变量
+
+* 局部变量
+
+下面几节将会介绍如何在函数中使用这两种类型的变量。
+
+1） **全局变量**
+
+全局变量是在shell脚本中任何地方都有效的变量。如果你在脚本的主体部分定义了一个全局变量，那么你可以在函数内读取它的值。类似地，如果你在函数内定义了一个全局变量，你可以在脚本的主体部分读取它的值。
+
+默认情况下，你在脚本中定义的任何变量都是全局变量。在函数外定义的变量可在函数内正常访问：
+{% highlight string %}
+# cat test8 
+#!/bin/bash
+
+# using a global variable to pass a value
+
+function dbl() {
+
+  value=$[$value * 2]
+}
+
+read -p "Enter a value: " value
+
+dbl
+
+echo "The new value is: $value"
+
+
+# ./test8 
+Enter a value: 20
+The new value is: 40
+{% endhighlight %}
+
+```$value```变量是在函数外定义的，并在函数外被赋值了。但```dbl```函数被调用时，变量及其值在函数中都依然有效。如果变量在函数内被赋予了新值，那么在脚本中引用该变量时，新值依然有效。
+
+但这其实是很危险的事情，尤其是如果你想在不同的shell脚本中使用函数的话。它要求你知道函数中具体使用了哪些变量，包括那些用来计算并没有返回到脚本的值的变量。这里有个例子来说明事情是如何搞砸的：
+{% highlight string %}
+# cat badtest2 
+#!/bin/bash
+
+# demonstrating a bad use of variables
+
+function func1() {
+  temp=$[$value + 5]
+
+  result=$[$temp * 2]
+}
+
+temp=4
+value=6
+
+func1
+
+echo "The result is: $result"
+
+if [ $temp -gt $value ]
+then
+   echo "temp is larger"
+else
+   echo "temp is smaller"
+fi
+
+# ./badtest2 
+The result is: 22
+temp is larger
+{% endhighlight %}
+
+由于```$temp```变量在函数中用到了，它的值在脚本中使用时，产生了一个意想不到的结果。有个简单的办法可以在函数中解决这个问题，下节将会介绍。
+
+2) **局部变量**
+
+不用在函数中使用全局变量，函数内部使用的任何变量都可以被声明成局部变量。要那么做时，只要在变量声明的前面加上```local```关键字就可以了：
+<pre>
+local temp
+</pre>
+
+也可以在给变量赋值时在赋值语句中使用local关键字：
+{% highlight string %}
+local temp=$[$value + 5]
+{% endhighlight %}
+
+local关键字保证了变量只局限在该函数中。如果脚本中该函数之外有同样名字的变量，那么shell将会保持这两个变量的值是分离的。现在你就能很轻松地让函数变量和脚本变量分离开来，只共用想共用的：
+{% highlight string %}
+# cat test9 
+#!/bin/bash
+
+# demonstrating the local keyword
+
+function func1() {
+   local temp=$[$value + 5]
+
+   result=$[$temp * 2]
+}
+
+temp=4
+value=6
+
+func1
+
+echo "The  result is: $result"
+
+if [ $temp -gt $value ]
+then
+   echo "temp is larger"
+else
+   echo "temp is smaller"
+fi
+
+# ./test9 
+The  result is: 22
+temp is smaller
+{% endhighlight %}
+
+现在在func1函数中使用```$temp```变量时，并不会影响在主体脚本中赋给```$temp```变量的值。
+
+## 4. 数组变量和函数
+
+这里我们首先介绍一下shell中的可变数组。如下所示，我们可以按此格式定义一个数组：
+{% highlight string %}
+# mytest=(one two three four five)
+{% endhighlight %}
+数组中每个元素之间用空格分割，并没有什么很特别的地方。如果你想把数组当做普通的值来显示，你可能要失望了：
+{% highlight string %}
+# echo $mytest
+one
+{% endhighlight %}
+只有数组的第一个值显示出来了。要引用一个单独的数组元素，你必须要用代表它在数组中位置的数值索引值。数值要用方括号括起来：
+{% highlight string %}
+# echo ${mytest[2]}
+three
+{% endhighlight %}
+
+要显示整个数组变量，可用星号作为通配符放在索引值的位置：
+<pre>
+# echo ${mytest[*]}
+one two three four five
+</pre>
+
+你也可以改变某个索引值位置的值：
+<pre>
+# mytest[2]=seven
+# echo ${mytest[*]}
+one two seven four five
+</pre>
+你甚至能用unset命令来删除数组中的某个值，但是要小心，这可能会有点复杂。看下面的例子：
+{% highlight string %}
+# unset mytest[2]
+# echo ${mytest[*]}
+one two four five
+# echo ${mytest[2]}
+
+# echo ${mytest[3]}
+four
+{% endhighlight %}
+这个例子用unset命令来删除索引值为2位置的值。显示整个数组时，看起来像是索引里面已经没这个索引了。但当专门显示索引值为2的位置的值时，能看到这个位置是空的。
+
+最后，可以unset命令后跟上数组名来删除整个数组：
+<pre>
+# unset mytest
+# echo ${mytest[*]}
+
+</pre>
+数组变量的遍历可以按如下方式进行：
+{% highlight string %}
+# for((i=0;i<${#mytest[@]}; i++)); do echo ${mytest[$i]}; done
+one
+two
+
+four
+# for i in ${mytest[*]}; do echo $i; done
+one
+two
+four
+five
+{% endhighlight %}
+上面```${#mytest[@]}```可以获取数组的长度。我们注意到两种遍历方式的输出有些不同，这主要是因为我们前面执行unset命令后，删除了元素的缘故。
 
 
 
+有时可变数组会让事情很麻烦，所以在shell脚本编程时并不经常用。接下来我们会讨论在函数中使用数组变量。
+
+
+### 4.1 向函数传递数组参数
+
+向脚本函数传递数组变量的方法会有点不好理解。将数组变量当做单个参数传递的话，它不会起作用(说明：```$@```用于获取所有参数）：
+{% highlight string %}
+# cat badtest3 
+#!/bin/bash
+
+# trying to pass an array variable
+
+function testit() {
+
+   echo "The parameters are: $@"
+   thisarray=$1
+
+   echo "The received array is ${thisarray[*]}"
+}
+
+myarray=(1 2 3 4 5)
+
+echo "The original array is: ${myarray[*]}"
+
+testit $myarray
+
+# ./badtest3 
+The original array is: 1 2 3 4 5
+The parameters are: 1
+The received array is 1
+{% endhighlight %}
+如果你试图将该数组变量当成一个函数参数，函数只会取数组变量的第一个值。
 
 
 
