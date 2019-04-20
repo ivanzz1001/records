@@ -1052,6 +1052,131 @@ while iteration: 5
 while iteration: 6
 while iteration: 6
 {% endhighlight %}
+你可能要确保你将脚本的输出重定向到了more命令，这样才能停止这些。所有一切看起来都正常，直到满足了if-then条件，shell执行了continue命令。当shell执行continue命令时，它会跳过while循环中的其他命令。遗憾的是，这正是while测试命令中被测的```$var1```计数变量增加的地方。这意味着这个变量不会再增长了，正如你从前面连续的输出显示中看到的。
+
+和break命令一样，continue命令也允许通过命令行参数指定要继续哪级循环：
+<pre>
+continue n
+</pre>
+其中n定义了要继续的循环层级。下面是继续外部for循环的一个例子：
+{% highlight string %}
+# cat test22 
+#!/bin/bash
+
+# continuing an outer loop
+
+for((a=1;a<=5;a++))
+do
+   echo "Iteration $a:"
+
+   for((b=1;b<3;b++))
+   do
+       if [ $a -gt 2 ] && [ $a -lt 4 ]
+       then
+           continue 2
+       fi
+
+       var3=$[$a * $b]
+       echo "    The result of $a * $b is $var3"
+   done
+done
+
+# ./test22 
+Iteration 1:
+    The result of 1 * 1 is 1
+    The result of 1 * 2 is 2
+Iteration 2:
+    The result of 2 * 1 is 2
+    The result of 2 * 2 is 4
+Iteration 3:
+Iteration 4:
+    The result of 4 * 1 is 4
+    The result of 4 * 2 is 8
+Iteration 5:
+    The result of 5 * 1 is 5
+    The result of 5 * 2 is 10
+{% endhighlight %}
+其中的if-then语句：
+{% highlight string %}
+if [ $a -gt 2 ] && [ $a -lt 4 ]
+then
+    continue 2
+fi
+{% endhighlight %}
+用continue命令来停止处理循环内的命令但继续处理外部循环。注意值为3的迭代脚本输出未再处理任何内部循环语句，因为continue命令停止了处理过程，但外部循环依然会继续。
+
+## 8. 处理循环的输出
+
+最后，在shell脚本中，你要么```管接```要么重定向循环的输出。你可以在done命令之后添加一个处理命令：
+{% highlight string %}
+for file in /home/ivan1001/*
+do 
+    if [ -d "$file" ]
+    then 
+       echo "$file is a directory"
+    elif [ -f "$file" ]
+    then 
+        echo "$file is a file"
+     fi
+done > output.txt
+{% endhighlight %}
+
+shell会将for命令的结果重定向到文件output.txt中，而不是显示在屏幕上。
+
+考虑下面重定向for命令的输出到文件的例子：
+{% highlight string %}
+# cat test23 
+#!/bin/bash
+
+# redirecting the for output to a file
+
+for((a=1; a < 10; a++))
+do
+   echo "The number is $a"
+done > test23.txt
+
+echo "The command is finished"
+
+# ./test23 
+The command is finished
+# cat test23.txt 
+The number is 1
+The number is 2
+The number is 3
+The number is 4
+The number is 5
+The number is 6
+The number is 7
+The number is 8
+The number is 9
+{% endhighlight %}
+shell创建了文件test23.txt，并将for命令的输出重定向到这个文件。shell在for命令之后如常显示了echo语句。
+
+这种方法同样适用于将循环的结果管接给另一个命令：
+{% highlight string %}
+# cat test24 
+#!/bin/bash
+
+# piping a loop to another command
+
+for state in "North Dakota" Connecticut Illinois Alabama Tennessee
+do
+
+  echo "$state is the next place to go"
+done | sort
+
+echo "This completes our travels"
+
+# ./test24 
+Alabama is the next place to go
+Connecticut is the next place to go
+Illinois is the next place to go
+North Dakota is the next place to go
+Tennessee is the next place to go
+This completes our travels
+{% endhighlight %}
+
+state值并没有在for命令列表中以特定次序列出。for命令的输出传给了sort命令，它会改变for命令输出的结果的顺序。运行这个脚本实际上说明了结果已经在脚本内部排好序了。
 
 
 
