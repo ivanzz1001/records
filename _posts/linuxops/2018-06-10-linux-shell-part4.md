@@ -665,6 +665,106 @@ testit ${myarray[*]}
 The original array is: 1 2 3 4 5
 The new array value is: 1 2 3 4 5
 {% endhighlight %}
+该脚本用```$myarray```变量来保存所有的单个数组值，然后将它们都放在该函数的命令行上。之后该函数从命令行参数重建数组变量。在函数内部，数组仍然可以像其他数组一样使用：
+{% highlight string %}
+# cat test11 
+#!/bin/bash
+
+# adding values in an array
+
+function addarray() {
+   local sum=0
+   local newarray
+
+   newarray=(`echo $@`)
+
+   for value in ${newarray[*]}
+   do
+       sum=$[$sum + $value]
+   done
+
+   echo $sum
+}
+
+myarray=(1 2 3 4 5)
+
+echo "The original array is: ${myarray[*]}"
+
+arg1=`echo ${myarray[*]}`
+
+result=`addarray $arg1`
+
+echo "The result is: $result"
+
+
+# ./test11 
+The original array is: 1 2 3 4 5
+The result is: 15
+{% endhighlight %}
+addarray函数会遍历所有的数组值，将它们加在一起。你可以在myarray数组变量中放置任意多的值，addarray函数会将它们都加起来。
+
+### 4.2 从函数返回数组
+
+从函数里向shell脚本传回数组变量也用类似的方法。函数用echo语句来按正确顺序输出单个数组值，然后脚本再将它们重新放进一个新的数组变量中：
+{% highlight string %}
+# cat test12 
+#!/bin/bash
+
+# returning an array value
+
+function arraydblr() {
+
+   local origarray
+   local newarray
+   local elements
+
+   local i
+
+   origarray=(`echo $@`)
+
+   newarray=(`echo $@`)
+
+   elements=$[$# - 1]
+
+   for((i=0;i<=$elements;i++))
+   do
+     newarray[$i]=$[${origarray[$i]} * 2]
+   done
+
+   echo ${newarray[*]}
+
+}
+
+myarray=(1 2 3 4 5)
+
+echo "The original array is: ${myarray[*]}"
+
+arg1=`echo ${myarray[*]}`
+
+result=(`arraydblr $arg1`)
+
+echo "The new array is: ${result[*]}"
+
+
+# ./test12 
+The original array is: 1 2 3 4 5
+The new array is: 2 4 6 8 10
+{% endhighlight %}
+该脚本用```$arg1```变量将数组值传给arraydblr函数。arraydblr函数将该数组重组到新的数组变量中，生成该输出数组变量的一个副本。之后，它遍历了数组变量中的单个值，将每个值翻倍，并将结果放到函数中该数组变量的副本中。
+
+之后，arraydblr函数使用echo语句来输出该数组变量值中的每个值。脚本用arraydblr函数的输出来重新生成一个新的数组变量。
+
+## 5. 函数递归
+
+局部函数变量提供的一个特性是自成体系（self-containment)。自成体系的函数不需要使用任何外部资源，除了脚本在命令行上传给它的变量。
+
+这个特性使得函数可以递归地调用，也就是说函数可以调用自己来得到结果。通常，递归函数都有一个最终可以迭代到的基准值。许多高级数学算法用递归来一级一级地降解复杂的方程，直到基准值定义的那级。
+
+递归算法的经典例子是计算阶乘。一个数的阶乘
+
+
+
+
 
 
 
