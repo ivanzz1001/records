@@ -760,14 +760,260 @@ The new array is: 2 4 6 8 10
 
 这个特性使得函数可以递归地调用，也就是说函数可以调用自己来得到结果。通常，递归函数都有一个最终可以迭代到的基准值。许多高级数学算法用递归来一级一级地降解复杂的方程，直到基准值定义的那级。
 
-递归算法的经典例子是计算阶乘。一个数的阶乘
+递归算法的经典例子是计算阶乘。一个数的阶乘是该数之前的所有数乘以该数的值。因此，要计算5的阶乘，你可以执行如下方程：
+<pre>
+5! = 1 * 2 * 3 * 4 * 5 = 120
+</pre>
+使用递归，方程可简化成以下形式：
+<pre>
+x! = x * (x-1)!
+</pre>
+
+也就是说，x的阶乘等于 x 乘以 x-1 的阶乘。这可以用简单的递归脚本表达为：
+{% highlight string %}
+function factorial() {
+    if [ $1 -eq 1]
+    then
+        echo 1
+    else
+        local temp=$[$1 - 1]
+        local result=`factorial $temp`
+        echo $[$result * $1]
+    fi
+}
+{% endhighlight %}
+阶乘函数用它自己来计算阶乘的值：
+{% highlight string %}
+# cat test13 
+#!/bin/bash
+
+# using recursion
+
+function factorial() {
+   if [ $1 -eq 1 ]
+   then
+       echo 1
+   else
+       local temp=$[$1 - 1]
+       local result=`factorial $temp`
+       echo $[$result * $1]
+   fi
+}
+
+read -p "Enter value: " value
+
+result=`factorial $value`
+
+echo "The factorial of $value is: $result"
+
+# ./test13 
+Enter value: 5
+The factorial of 5 is: 120
+{% endhighlight %}
+使用阶乘函数很容易。创建了这样的函数后，你可能想在其他脚本中使用它。下一步，我们将会了解如何有效地使用它。
+
+## 6. 创建库
+很容易发现，在单个脚本中，使用函数可以省去一些键入的工作，但如果你碰巧要在脚本间使用同一个代码块呢？显然，在每个脚本中都定义同样的函数而只使用一次会比较麻烦。
+
+有个方法能解决这个问题。bash shell允许创建函数库文件，然后在需要时在多个脚本中引用该文件。
+
+这个过程的第一步是创建一个包含脚本中所需函数的公用库文件。这里有个简单的称为myfuncs的库文件，它定义了3个简单的函数：
+{% highlight string %}
+# cat myfuncs 
+#!/bin/bash
+
+# my script functions
+
+function addem() {
+  echo $[$1 + $2]
+
+}
+
+function multem() {
+   echo $[$1 * $2]
+}
+
+function divem() {
+    if [ $2 -ne 0 ]
+    then
+       echo $[$1 / $2]
+    else
+       echo -1
+    fi
+}
+{% endhighlight %}
+
+下一步是在要用这些函数的脚本文件中包含myfuncs库文件。从这里开始，事情变得复杂起来。
+
+问题出在shell函数的作用域上。和环境变量一样，shell函数只对定义它的shell会话有效。如果你在shell命令行界面的提示符下运行myfuncs shell脚本，shell会创建一个新的shell并在新shell中运行这个脚本。它会为那个新shell定义这3个函数，但当你运行另外一个用到这些函数的脚本时，它们却不可用。
+
+这同样适用于脚本。如果你尝试将该库文件当做普通脚本文件运行，函数不会出现在脚本中：
+{% highlight string %}
+# cat badtest4 
+#!/bin/bash
+
+# using a library file the wrong way
+
+./myfuncs
+
+result=`addem 10 15`
+
+echo "the result is: $result"
+
+# ./badtest4 
+./badtest4: line 7: addem: command not found
+the result is: 
+{% endhighlight %}
+使用函数库的关键在于```source```命令。source命令会在当前的shell上下文中执行命令，而不是创建一个新的shell来执行命令。可以用source命令来在shell脚本中运行库文件脚本。这样函数就对脚本可用了。
+
+source命令有个快捷别名，称作```点操作符```(dot operator)。要在shell脚本中运行myfuncs库文件，你只需添加下面这行：
+<pre>
+. ./myfuncs
+</pre>
+这个例子假定myfuncs库文件和shell脚本位于同一目录。如果不是，你需要使用相应路径访问该文件。这里有个用myfuncs库文件创建脚本的例子：
+{% highlight string %}
+# cat test14 
+#!/bin/bash
+
+# using functions defined in a library file
+
+. ./myfuncs
+
+value1=10
+value2=5
+
+result1=`addem $value1 $value2`
+
+result2=`multem $value1 $value2`
+
+result3=`divem $value1 $value2`
+
+echo "The result of adding them is: $result1"
+echo "The result of multiplying them is: $result2"
+echo "The result of dividing them is: $result3"
+
+# ./test14 
+The result of adding them is: 15
+The result of multiplying them is: 50
+The result of dividing them is: 2
+{% endhighlight %}
+
+该脚本成功地使用了myfuncs库文件中定义的函数。
+
+## 7. 在命令行上使用函数
+可以用脚本函数来创建一些十分复杂的操作。有时，在命令行界面的提示符下直接使用这些命令也很有必要。
+
+和在shell脚本中将脚本函数当命令使用一样，你也可以在命令行界面上将脚本函数当命令用。这是一个很好的功能，因为一旦你在shell中定义了函数，你就可以在整个系统上直接用它了，而无需担心脚本是不是在PATH环境变量里。重点在于让shell找到这些函数。有几种方法可以实现。
+
+### 7.1 在命令行上创建函数
+由于在键入命令时shell就会解释命令，你可以在命令行上直接定义一个函数。有两种方法。一种方法是在一行内定义整个函数：
+{% highlight string %}
+# function divem() { echo $[$1 / $2]; }
+# divem 100 5
+20
+{% endhighlight %}
+当你在命令行上定义函数时，你必须记住在每个命令后面加个分号，这样shell就能知道在哪里分开命令了：
+{% highlight string %}
+# function doubleit() { read -p "Enter value:" value; echo $[
+> $value * 2]; }
+
+# doubleit 
+Enter value:20
+40
+{% endhighlight %}
+
+另一种方法是用多行来定义函数。在定义时，bash shell会使用次提示符来提示输入更多命令。用这种方法，你不用在每条命令末尾放一个分号，只要按下回车键就行：
+{% highlight string %}
+# function multem() {
+> echo $[$1 * $2]
+> }
+
+# multem 2 5
+10
+{% endhighlight %}
+在函数的尾部使用花括号，shell就会知道你已经完成了函数的定义。
+
+<pre>
+警告： 在命令行上创建函数时要特别小心。如果你给函数起了个跟内建命令或另一个相同的名字，函数将会覆盖
+      原来的命令。
+</pre>
+
+### 7.2 在.bashrc文件中定义函数
+在命令行上直接定义shell函数的明显缺点是当退出shell时，函数就消失了。对于复杂的函数来说，这可能会是个问题。
+
+一个简单得多的方法是将在每次启动新shell时都会加载的地方定义函数。最好的地方就是.bashrc文件。bash shell会在每次启动时在主目录查找这个文件，不管是交互式的还是从现有shell启动一个新的shell。
+
+1） **直接定义函数**
+
+可以直接在主目录的.bashrc文件中定义函数。许多Linux发行版已经在.bashrc文件中定义了一些东西了。所以注意别删掉这些内容，只要在已有文件的末尾加上你写的函数就行了。这里有个例子：
+{% highlight string %}
+# cat .bashrc
+# .bashrc
+
+# Source global definitions
+if [ -r /etc/bashrc ]; then
+     . /etc/bashrc
+fi
+
+function addem() {
+    echo $[$1 + $2]
+}
+{% endhighlight %}
+直到下次启动新的bash shell时该函数才会生效。添加并重启bash shell后，你就能在系统上任意地方使用该函数了。
+
+2） **读取函数文件**
+
+只要是在shell脚本中，你都可以用source命令（或者它的别名： 点操作符）来将已有库文件中的函数添加到你的.bashrc脚本中：
+{% highlight string %}
+# cat .bashrc
+# .bashrc
+
+# Source global definitions
+if [ -r /etc/bashrc ]; then
+     . /etc/bashrc
+fi
+
+. /home/ivan1001/libraries/myfuncs
+{% endhighlight %}
+确保包含了引用库文件的正确路径名，以便于bash shell来查看该文件。下次启动shell时，库中的所有函数都可以在命令行界面下使用了。
+<pre>
+# addem 10 5
+15
+
+# multem 10 5
+50
+
+# divem 10 5
+2
+</pre>
+更好的一点是，shell还会将定义好的函数传给子shell进程。这样这些函数在该shell会话中的任何shell脚本中也都可用。你可以写个脚本来测试，直接使用这些函数而不用单独定义或读取它们：
+{% highlight string %}
+# cat test15
+#!/bin/bash
+
+# using a function defined in .bashrc file
+
+value1=10
+value2=5
+
+result1=`addem $value1 $value2`
+
+result2=`multem $value1 $value2`
+
+result3=`divem $value1 $value2`
+
+echo "The result of adding them is: $result1"
+echo "The result of multiplying them is: $result2"
+echo "The result of dividing them is: $result3"
 
 
-
-
-
-
-
+//注意： 实际在Centos上，需要使用source命令来执行，否则识别不了
+# source ./test15
+The result of adding them is: 15
+The result of multiplying them is: 50
+The result of dividing them is: 2
+{% endhighlight %}
+甚至不用读取库文件，这些函数也能在shell脚本中很好地工作。
 
 
 <br />
