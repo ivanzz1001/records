@@ -119,13 +119,56 @@ shell通过特殊的STDERR文件描述符来处理错误消息。STDERR文件描
 
 ### 1.2 重定向错误
 
+你已经知道如何用重定向符号来重定向STDOUT数据。成功定向STDERR数据也没太大差别，你只要在使用重定向符号时定义STDERR文件描述符就可以了。有几种办法来处理。
 
+1) **只重定向错误**
 
+如你在上表（表： Linux的标准文件描述符）中看到的，STDERR文件描述符被设为2。你可以选择只重定向错误消息，将该文件描述符值放在重定向符号前。该值必须紧紧地放在重定向符号前，否则不会工作：
+{% highlight string %}
+# ls -al badfile 2> test4
+# cat test4
+ls: cannot access 'badfile': No such file or directory
+root@ubuntu:~/workspace# 
+{% endhighlight %}
 
+现在运行该命令，错误消息不会出现在屏幕上了。而是，该命令生成的任何错误消息都会保存在输出文件中。用这种方法，shell会只重定向错误消息，而非普通数据。这里有个在同一输出中混用STDOUT和STDERR的例子：
+{% highlight string %}
+# ls -al test badtest test2 2> test5
+-rw-r--r-- 1 root root 55 Apr 22 08:41 test
+# cat test5
+ls: cannot access 'badtest': No such file or directory
+ls: cannot access 'test2': No such file or directory
+{% endhighlight %}
+ls命令的正常STDOUT输出仍然会发送到默认的STDOUT文件描述符，也就是显示器。由于该命令重定向了文件描述符2的输出（STDERR）到了一个输出文件，shell会将生成的任何错误消息直接发送到指定的重定向文件中。
 
+2）**重定向错误和数据**
 
+如果你想重定向错误和正常输出，你必须用两个重定向符号。你需要在想要重定向的每个数据前添加对应的文件描述符，并将它们指向对应的保存数据的输出文件：
+{% highlight string %}
+# ls -al test test2 test3 badtest 2>test6 1>test7
+# cat test6
+ls: cannot access 'test': No such file or directory
+ls: cannot access 'badtest': No such file or directory
 
+# cat test7
+-rw-r--r-- 1 root root 0 Apr 22 09:11 test2
+-rw-r--r-- 1 root root 0 Apr 22 09:11 test3
+{% endhighlight %}
 
+shell利用```1>```符号将ls命令本该输出到STDOUT的正常输出重定向到了test7文件。任何本该输出到STDERR的错误消息通过```2>```符号被重定向到了test6文件。
+
+你可以用这种方法来将脚本的正常输出和脚本生成的错误消息分离开来。它允许你轻松地识别错误，而不用在成千上万行正常输出数据中艰难查找。
+
+另外，如果愿意，你也可以将STDERR和STDOUT的输出重定向到同一个输出文件。为此，bash shell提供了特殊的重定向符号```&>```:
+{% highlight string %}
+# ls -al test test2 test3 badtest &>test7
+root@ubuntu:~/workspace# cat test7
+ls: cannot access 'test': No such file or directory
+ls: cannot access 'badtest': No such file or directory
+-rw-r--r-- 1 root root 0 Apr 22 09:11 test2
+-rw-r--r-- 1 root root 0 Apr 22 09:11 test3
+{% endhighlight %}
+当使用```&>```符号时，命令生成的所有输出都会发送到同一位置，包括数据和错误。你会注意到错误消息中有一条跟你期望的顺序不同。这条针对badtest文件的错误消息（列出的最后一个文件）出现在输出文件中的第二行。bash shell会自动给错误消息分配较标准输出来说更高的优先级。这样你就能在一处地方查看错误消息了，而不用翻遍整个输出文件。
 
 
 
