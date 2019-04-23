@@ -238,6 +238,192 @@ This is a test of redirecting all output.
 from a script to another file
 without having to redirect every individual line
 {% endhighlight %}
+exec命令会启动一个新的shell并将STDOUT文件描述符重定向到文件。脚本中发给STDOUT的所有输出会被重定向到文件。
+
+你可以在脚本中间重定向STDOUT:
+{% highlight string %}
+# cat ./test11
+#!/bin/bash
+
+# redirecting output to different locations
+
+exec 2>testerror
+
+echo "This is the start of the script"
+echo "now redirecting all output to another location"
+
+exec 1>testout
+
+echo "This output should go to the testout file"
+echo "but this should go to the testerror file" >&2
+
+# ./test11
+This is the start of the script
+now redirecting all output to another location
+
+# cat testout
+This output should go to the testout file
+
+# cat testerror 
+but this should go to the testerror file
+{% endhighlight %}
+这个脚本用exec命令来将发给STDERR的输出重定向到文件testerror。下一步，脚本用语句显示了一些行到STDOUT。那之后，再次使用exec命令来将STDOUT重定向到testout文件。注意，尽管STDOUT被重定向了，你仍然可以指定将echo语句的输出发给STDERR，在本例中仍然是重定向到testerror文件中。
+
+这个特性在你要将脚本的部分输出重定向到另一个位置时能派上用场，比如错误日志。在使用该特性时你会碰到个小问题。
+
+一旦你重定向了STDOUT或STDERR，你就无法轻易将它们重定向回原来的位置。你需要在重定向中来回切换的话，有个办法可以用。在本文的第4节将会讨论该方法以及如何在脚本中使用。
+
+## 3. 在脚本中重定向输入
+你可以用在脚本中重定向STDOUT和STDERR的同样方法来将STDIN从键盘重定向到其他位置。exec命令允许你将STDIN重定向到Linux系统上的文件中。
+{% highlight string %}
+exec 0< testfile
+{% endhighlight %}
+这个命令会告诉shell它应该从文件testfile中获得输入，而不是STDIN。这个重定向只要在脚本需要输入时就会作用。下面是该用法的实例：
+{% highlight string %}
+# cat test12
+#!/bin/bash
+
+# redirecting file input
+
+exec 0<testfile
+
+count=1
+
+while read line
+do
+    echo "Line #$count: $line"
+    count=$[$count + 1]
+done
+
+# ./test12
+Line #1: This is the first line.
+Line #2: This is the second line.
+Line #3: This is the third line.
+{% endhighlight %}
+在上一章<<高级脚本编程之处理用户输入>>介绍了如何使用read命令来读取用户在键盘上输入的数据。将STDIN重定向到文件后，当read命令试图从STDIN读入数据时，它会到文件去读取数据，而不是键盘。
+
+这是在脚本中从要处理的文件中读取数据的绝妙方法。Linux系统管理员的一项日常任务就是从要处理的日志文件中读取数据。这是完成该任务最简单的办法。
+
+## 4. 创建自己的重定向
+在脚本中重定向输入和输出时，并不局限于这3个默认的文件描述符。我曾提到过，在shell中最多可以有9个打开的文件描述符。其他6个文件描述符会从3排到8，并且当做输入或输出重定向都行。你可以将这些文件描述符中的任意一个分配给文件，然后在脚本中使用它们。本节将介绍如何在脚本中使用其他文件描述符。
+
+1） **创建输出文件描述符**
+
+你可以用exec命令来给输出分配文件描述符。和标准的文件描述符一样，一旦你给一个文件位置分配了另外一个文件描述符，那个重定向就会一直有效，直到你重新分配。这里有个在脚本中使用其他文件描述符的简单例子：
+{% highlight string %}
+# cat test13
+#!/bin/bash
+
+# using an alternative file descriptor
+
+exec 3>test13out
+
+echo "This should display on the monitor"
+echo "and This should be stored in the file" >&3
+echo "Then this should be back on the monitor"
+
+# ./test13 
+This should display on the monitor
+Then this should be back on the monitor
+# cat test13out 
+and This should be stored in the file
+{% endhighlight %}
+这个脚本用```exec```命令来将文件描述符3重定向到另一个文件位置。当脚本执行echo语句时，它们如你所期望的那样，显示在STDOUT上。但你重定向到文件描述符3的那行echo语句输出到了另外那个文件。它允许你在显示器上保持正常的输出，而将特定信息重定向到文件中，比如日志文件。
+
+你也可以使用exec命令来将输出追加到现有文件中，而不是创建一个新文件：
+{% highlight string %}
+exec 3>>test13out
+{% endhighlight %}
+现在输出会被追加到test13out文件，而不是创建一个新文件。
+
+2) **重定向文件描述符**
+
+现在介绍怎么从已重定向的文件描述符中恢复。你可以分配另外一个文件描述符给标准文件描述符，反之亦然。这意味着你可以重定向STDOUT的原来位置到另一个文件描述符，然后将该文件描述符重定向回STDOUT。这听起来有点复杂，但实际上相当直接。这个简单的例子能帮你理清楚：
+{% highlight string %}
+# cat test14 
+#!/bin/bash
+
+# storing STDOUT, then come back to it
+
+exec 3>&1
+
+exec 1>test14out
+
+echo "This should store in the output file"
+echo "along with this line"
+
+exec 1>&3
+
+echo "Now things should be back to normal"
+
+
+
+# ./test14
+Now things should be back to normal
+# cat test14out 
+This should store in the output file
+along with this line
+{% endhighlight %}
+
+这个例子有点叫人抓狂，我们来一段一段地看。首先，脚本将文件描述符3重定向到文件描述符1的当前位置，也就是STDOUT。这意味着任何发送给文件描述符3的输出都将出现在显示器上。
+
+第二个exec命令将STDOUT重定向到文件，shell现在会将发送给STDOUT的输出直接重定向到输出文件中。但是，文件描述符3仍然指向STDOUT原来的位置，也就是显示器。如果此时将输出数据发送给描述符3，它仍然会出现在显示器上，尽管STDOUT已经被重定向过。
+
+在向STDOUT（现在指向一个文件）发送一些输出之后，脚本会将STDOUT重定向到文件描述符3的当前位置（仍然是设置到显示器）。这意味着现在STDOUT指向了它原来的位置，也就是显示器。
+
+这个方法可能有点叫人困惑，但它是在脚本中临时将输出重定向然后再将输出恢复到通常设置的通用办法。
+
+3） **创建输入文件描述符**
+
+你可以用和重定向输出文件描述符同样的办法来重定向输入文件描述符。在重定向到文件之前，先将STDIN文件描述符保存到另外一个文件描述符，然后在读取完文件之后再将STDIN恢复到它原来的位置：
+{% highlight string %}
+# cat test15 
+#!/bin/bash
+
+# redirecting input file descriptors
+
+exec 6<&0
+
+exec 0<testfile
+
+count=1
+
+while read line
+do
+   echo "Line #$count: $line"
+   count=$[$count + 1]
+done
+
+
+exec 0<&6
+
+read -p "Are you done now? " answer
+
+case $answer in
+Y|y) echo "Goodby";;
+N|n) echo "Sorry, this is the end";;
+esac
+
+# ./test15 
+Line #1: This is the first line.
+Line #2: This is the second line.
+Line #3: This is the third line.
+Are you done now? y
+Goodby
+{% endhighlight %}
+在这个例子中，文件描述符6用来保存STDIN的位置。然后脚本将STDIN重定向到一个文件。read命令的所有输入都是从重定向后的STDIN中来的，也就是输入文件。
+
+在读取了所有行之后，脚本会将STDIN重定向到文件描述符6，从而将STDIN恢复到原来的位置。该脚本用了另外一个read命令来测试STDIN是否恢复正常了。这次它会等待键盘的输入。
+
+4) **创建读写文件描述符**
+
+尽管看起来可能会很奇怪，你也可以打开单个文件描述符来作为输入和输出。你可以用同一个文件描述符来从文件中读取数据，并将数据写到同一个文件中。
+
+但用这种方法时，你要特别小心。由于你在向同一个文件进行读取数据、写入数据操作，shell会维护一个内部指针，指明现在在文件中什么位置。任何读或写都会从文件指针上次保存的位置开始。如果你不够小心，它会产生一些有意思的结果。看看下面这个例子：
+{% highlight string %}
+ee
+{% endhighlight %}
+
 
 
 
