@@ -421,10 +421,61 @@ Goodby
 
 但用这种方法时，你要特别小心。由于你在向同一个文件进行读取数据、写入数据操作，shell会维护一个内部指针，指明现在在文件中什么位置。任何读或写都会从文件指针上次保存的位置开始。如果你不够小心，它会产生一些有意思的结果。看看下面这个例子：
 {% highlight string %}
-ee
+# cat test16
+#!/bin/bash
+
+# testing input/output file descriptor
+
+exec 3<>testfile
+
+read line <&3
+
+echo "Read: $line"
+
+echo "This is a test line" >&3
+
+
+# ./test16 
+Read: This is the first line.
+# cat testfile
+This is the first line.
+This is a test line
+ine.
+This is the third line.
 {% endhighlight %}
+这个例子用了exec命令来将用作读取输入和写入输出的文件描述符3分配给文件testfile。下一步，它通过分配好的文件描述符来用read命令读取文件中的第一行，然后将读取的那行输入显示在STDOUT上。之后，它用echo语句来向用通过文件描述符打开的文件写入一行数据。
+
+在运行脚本时，最开始事情看起来都还正常。输出说明脚本读了testfile文件中的第一行。但在运行脚本后，显示testfile文件的内容，你会看到写到文件中的数据覆盖了已有的数据。
+
+当脚本向文件中写入数据时，它会从文件指针所处的位置开始。read命令读取了第一行数据，所以它会让文件指针指向第二行数据的第一个字符。在echo语句将数据输出到文件时，它会将数据放在文件指针的当前位置，覆盖该位置的任何数据。
+
+5) **关闭文件描述符**
+
+如果你创建了新的输入或输出文件描述符，shell脚本会在退出时自动关闭它们。然而还有一些情况，你需要在脚本结束前手动关闭文件描述符。
+
+要关闭文件描述符，将它重定向到特殊符号```&-```。脚本看起来如下：
+{% highlight string %}
+exec 3>&-
+{% endhighlight %}
+该语句会关闭文件描述符3，从而阻止在脚本中再使用它。这里有个例子说明当你尝试使用已关闭的文件描述符时会怎样：
+{% highlight string %}
+# cat badtest 
+#!/bin/bash
+
+# testing closing file descriptors
 
 
+exec 3<>test17file
+
+echo "This is a test line of data" >&3
+
+exec 3>&-
+
+echo "This won't work" >&3
+
+# ./badtest 
+./badtest: line 12: 3: Bad file descriptor
+{% endhighlight %}
 
 
 
