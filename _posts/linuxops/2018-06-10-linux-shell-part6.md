@@ -171,6 +171,76 @@ ls: cannot access 'badtest': No such file or directory
 当使用```&>```符号时，命令生成的所有输出都会发送到同一位置，包括数据和错误。你会注意到错误消息中有一条跟你期望的顺序不同。这条针对badtest文件的错误消息（列出的最后一个文件）出现在输出文件中的第二行。bash shell会自动给错误消息分配较标准输出来说更高的优先级。这样你就能在一处地方查看错误消息了，而不用翻遍整个输出文件。
 
 
+## 2. 在脚本中重定向输出
+
+你可以在脚本中用STDOUT和STDERR文件描述符来在多个位置生成输出，只要简单地重定向相应的文件描述符。有两种方法来在脚本中重定向输出：
+
+* 临时重定向每行输出
+
+* 永久重定向脚本中的所有命令
+
+1） **临时重定向**
+
+如果你要故意在脚本中生成错误消息，可以将单独的一行输出重定向到STDERR。你所需要做的是使用输出重定向符来将输出重定向到STDERR文件描述符。在重定向到文件描述符时，你必须在文件描述符数字之前加一个and符(&):
+{% highlight string %}
+echo "This is an error message" >&2
+{% endhighlight %}
+
+注意， ```>&2```为一个整体，中间不能有空格。上面这行会将文本显示在脚本的STDERR文件描述符所指向的任何位置，而不是通常的STDOUT。下面是个用此特性的脚本例子：
+{% highlight string %}
+# cat test8
+#!/bin/bash
+
+# testing STDERR messages
+
+echo "This is an error" >&2
+
+echo "This is normal output"
+{% endhighlight %}
+正常运行这个脚本，你可能看不出什么区别：
+<pre>
+# ./test8
+This is an error
+This is normal output
+</pre>
+记住，默认情况下Linux会将STDERR定向到STDOUT。但是，如果你在运行脚本时重定向了STDERR，脚本中所有定向到STDERR的文本都会被重定向：
+{% highlight string %}
+# ./test8 2> test9
+This is normal output
+# cat test9
+This is an error
+{% endhighlight %}
+太好了！通过STDOUT显示的文本显示在了屏幕上，而发送给STDERR的echo语句的文本则重定向到了输出文件。
+
+这个方法非常适合在脚本中生成错误消息。如果有人用了你的脚本，他们可以轻松地通过STDERR文件描述符重定向错误消息，如上所示。
+
+2） **永久重定向**
+
+如果脚本中有大量数据需要重定向，那重定向每个echo语句就会很繁琐。取而代之，你可以用exec命令告诉shell在脚本执行期间重定向某个特定文件描述符：
+{% highlight string %}
+# cat test10 
+#!/bin/bash
+
+# redirecting all output to a file
+
+exec 1>testout
+
+echo "This is a test of redirecting all output."
+
+echo "from a script to another file"
+
+echo "without having to redirect every individual line"
+
+
+# ./test10 
+# cat testout
+This is a test of redirecting all output.
+from a script to another file
+without having to redirect every individual line
+{% endhighlight %}
+
+
+
 
 <br />
 <br />
