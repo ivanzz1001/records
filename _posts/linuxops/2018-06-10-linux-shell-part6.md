@@ -476,6 +476,107 @@ echo "This won't work" >&3
 # ./badtest 
 ./badtest: line 12: 3: Bad file descriptor
 {% endhighlight %}
+一旦关闭了文件描述符，你就不能在脚本中向它写入任何数据了，否者shell会生成错误消息。
+
+在关闭文件描述符时还要注意另一件事。如果后面你在脚本中打开了同一个输出文件，shell会用一个新文件来替换已有文件。这意味着如果你要输出任何数据，它将会覆盖已有文件。考虑下面这个问题的例子：
+{% highlight string %}
+# cat test17 
+#!/bin/bash
+
+# testing closing file descriptors
+
+exec 3>test17file
+
+echo "This is a test line of data" >&3
+exec 3>&-
+
+cat test17file
+
+exec 3>test17file
+
+echo "This'll be bad" >&3
+
+# ./test17 
+This is a test line of data
+# cat test17file
+This'll be bad
+{% endhighlight %}
+
+在向test17file文件发送一个数据字符串并关闭该文件描述符后，脚本用了cat命令来显示文件的内容。到目前为止，一切都还好。下一步，脚本重新打开了该输出文件并向它发送了另一个数据字符串。当你显示该输出文件的内容时，你所能看到的只有第二个数据字符串。shell覆盖了原来的输出文件。
+
+5) **列出打开的文件描述符**
+
+对你来说，只有9个文件描述符可用，你可能会觉得要让事情简单直接并不难。但有时要记住哪个文件描述符被重定向到了哪里很难。为了便于理清楚，bash shell提供了lsof命令。
+
+lsof命令会列出整个linux系统打开的所有文件描述符。这是个有争议的功能，因为它会向非系统管理员用户提供linux系统的信息。鉴于此，许多Linux系统隐藏了该命令，这样用户就不会一不小心就发现了。
+
+在我的Fedora Linux系统上，lsof命令位于/usr/sbin目录。要用普通用户来运行它，我必须通过全路径名来引用它：
+<pre>
+# /usr/sbin/lsof
+</pre>
+它会产生大量的输出。它会显示当前Linux系统上打开的每个文件的有关信息。这包括后台运行的所有进程以及登录到系统的任何用户。
+
+有足够的命令行选项和参数帮助过滤lsof的输出。最常用的有```-p```和```-d```选项，前者允许指定进程ID(PID)，后者允许指定要显示的文件描述符个数。
+
+要知道该进程的当前PID，你可以用特殊环境变量```$$```(shell会将它设置为当前PID）。```-a```选项用来对其他两个选项的结果执行布尔AND运算，产生如下输出：
+{% highlight string %}
+# /usr/sbin/lsof -a -p $$ -d 0,1,2
+lsof: WARNING: can't stat() fuse.gvfsd-fuse file system /run/user/1000/gvfs
+      Output information may be incomplete.
+COMMAND  PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+bash    4808 root    0u   CHR  136,0      0t0    3 /dev/pts/0
+bash    4808 root    1u   CHR  136,0      0t0    3 /dev/pts/0
+bash    4808 root    2u   CHR  136,0      0t0    3 /dev/pts/0
+{% endhighlight %}
+上例显示了当前进程(bash shell)的默认文件描述符。lsof的默认输出中有7列信息，见下表所示：
+<pre>
+                     表： lsof的默认输出
+
+   列                        描述
+------------------------------------------------------------------------------------------
+COMMAND             正在运行的命令名的前9个字符
+PID                 进程的PID
+USER                进程属猪的登录名
+FD                  文件描述符值以及访问类型（r代表读，w代表写，u代表读写）
+TYPE                文件的类型（CHR代表字符型，BLK代表块类型，DIR代表目录，REG代表常规文件）
+DEVICE              设备的设备号(主设备号和从设备号）
+SIZE                如果有的话，文件的大小
+NODE                本地文件的节点号
+NAME                文件名
+</pre>
+与STDIN、STDOUT和STDERR关联的文件类型是字符型。因为STDIN、STDOUT和STDERR文件描述符都指向终端的设备名。所有3种标准文件都支持读和写（尽管向STDIN写数据以及从STDOUT读数据看起来有点奇怪）。
+
+现在，我们看一下打开了多个替代性文件描述符的脚本中lsof命令的结果：
+{% highlight string %}
+# cat test18
+#!/bin/bash
+
+# testing lsof with file descriptors
+
+exec 3>test18file1
+exec 6>test18file2
+exec 7<testfile
+
+/usr/sbin/lsof -a -p $$ -d 0,1,2,3,6,7
+
+# ./test18 
+lsof: WARNING: can't stat() fuse.gvfsd-fuse file system /run/user/1000/gvfs
+      Output information may be incomplete.
+COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF      NODE NAME
+test18  27314 root    0u   CHR  136,0      0t0         3 /dev/pts/0
+test18  27314 root    1u   CHR  136,0      0t0         3 /dev/pts/0
+test18  27314 root    2u   CHR  136,0      0t0         3 /dev/pts/0
+test18  27314 root    3w   REG    8,3        0 138317852 /root/workspace/test18file1
+test18  27314 root    6w   REG    8,3        0 138317865 /root/workspace/test18file2
+test18  27314 root    7r   REG    8,3        0 142445969 /root/workspace/testfile
+{% endhighlight %}
+
+该脚本创建了3个替代性文件描述符，两个作为输出（3和6），一个作为输入（7）。在脚本运行lsof命令时，你可以在输出中看到新的文件描述符。我们去掉了输出中的第一部分，这样你就能看到文件名的结果了。文件名显示了文件描述符中采用的文件的完整路径名。它将将每个文件都显示成REG类型的，说明它们是文件系统中的常规文件。
+
+## 6. 阻止命令输出
+
+
+
 
 
 
