@@ -25,6 +25,8 @@ description: nginx使用基础
 
 3. [nginx下载大文件失败的解决方法](https://blog.51cto.com/zhukeqiang/2286462)
 
+4. [时间request_time和upstream_response_time](https://happyqing.iteye.com/blog/2384266)
+
 <br />
 <br />
 <br />
