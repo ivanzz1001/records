@@ -575,8 +575,40 @@ test18  27314 root    7r   REG    8,3        0 142445969 /root/workspace/testfil
 
 ## 6. 阻止命令输出
 
+有时候你不想显示脚本的输出。这在将脚本作为后台进程执行时很常见。如果在脚本后台运行时有任何错误消息出现，shell会通过电子邮件将它们发送给进程的属主。这会很麻烦，尤其是在你运行会生成很多烦琐的小错误的脚本时。
+
+要解决这个问题，你可以将STDERR重定向到一个称作null文件的特殊文件。null文件跟它的名字很像，文件里什么都没有。shell输出到null文件的的任何数据都不会保存，这样它们就被丢弃了。
+
+在Linux系统上null文件的标准位置是/dev/null。你重定向到该位置的任何数据都会被丢掉，不会显示：
+{% highlight string %}
+# ls -al > /dev/null
+# cat /dev/null
+{% endhighlight %}
+这是阻止任何错误消息而不保存它们的一个通用方法：
+{% highlight string %}
+# ls -al badfile test16 2>/dev/null
+-rw-r--r-- 1 root root 0 Apr 24 08:46 test16
+{% endhighlight %}
+你也可以在输入重定向将/dev/null作为输入文件。由于/dev/null文件不含有任何内容，程序员通常用它来快速移除现有文件中的数据而不用先删除文件再创建：
+{% highlight string %}
+# cat testfile 
+This is the first line.
+This is the second line.
+This is the third line.
 
 
+# cat /dev/null > testfile
+# cat testfile
+{% endhighlight %}
+文件testfile仍然存在系统上，但现在它是空文件。这是清除日志文件的一个通用方法，它们必须留在原来位置等待应用程序写入。
+
+
+## 7. 创建临时文件
+Linux系统有一个特殊的留给临时文件用的目录位置。Linux使用/tmp目录来存放不需要一直保留的文件。大多数Linux发行版配置了系统在启动时自动删除/tmp目录的所有文件。
+
+系统上的任何用户账户都有权限在/tmp目录中读和写。这个特性为你提供了简单地创建临时文件的途经，而不用管清理工作。
+
+有个特殊的命令可以用来创建临时文件。mktemp命令可以轻松地在/tmp目录中创建一个唯一的临时文件。shell会创建这个文件，但不用默认的umask值。它会将文件的读和写权限分配给文件的属主，并将你设置成文件的属主。一旦创建了文件，你就在脚本中有了完整的读写权限，但其他人没法访问（当然，root用户除外）
 
 
 
