@@ -43,7 +43,7 @@ NUMA node1 CPU(s):     14-27,42-55
 </pre>
 下面我们解释一下各字段的含义：
 
-* Architecture: 用于只是CPU架构。当前我们使用的CPU架构为x86_64
+* Architecture: 用于指示CPU架构。当前我们使用的CPU架构为x86_64
 
 * CPU op-mode(s): 表明此CPU可以32 bit模式运行，也可以64 bit模式运行
 
