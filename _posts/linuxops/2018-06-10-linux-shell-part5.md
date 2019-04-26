@@ -216,7 +216,25 @@ echo "The calculated value is: $total"
 The calculated value is:
 {% endhighlight %}
 
+当脚本认为参数变量中会有数据而实际上并没有时，你很可能会从脚本得到一个错误消息。这种写脚本的方法并不可取。在使用数据前检查数据确实已经存在于变量里很有必要：
+{% highlight string %}
+# cat test7 
+#!/bin/bash
 
+# testing parameters before use
+
+if [ -n "$1" ]
+then
+    echo "Hello $1, glad to meet you"
+else
+    echo "Sorry, you did not identify yourself"
+fi
+
+# ./test7 Rich
+Hello Rich, glad to meet you
+# ./test7 
+Sorry, you did not identify yourself
+{% endhighlight %}
 
 
 
