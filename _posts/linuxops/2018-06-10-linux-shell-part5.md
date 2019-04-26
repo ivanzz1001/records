@@ -235,6 +235,57 @@ Hello Rich, glad to meet you
 # ./test7 
 Sorry, you did not identify yourself
 {% endhighlight %}
+在本例中，在test命令里使用了```-n```参数来检查命令行参数中是否有数据。在下一节中，你会看到还有另一种检查命令行参数的方法。
+
+## 2. 特殊参数变量
+在bash shell中有些特殊变量，它们会记录命令行参数。本节将会介绍它们都是哪些变量以及如何使用它们。
+
+1） **参数计数**
+
+如你在上一节中看到的，通常在脚本中使用命令行参数之前应该检查一下命令行参数。对于使用多个命令行参数的脚本来说，这有点麻烦。
+
+你可以只数一下命令行中输入了多少个参数，而不测试每个参数。bash shell为此提供了一个特殊变量。
+
+```$#```特殊变量含有脚本运行时就有的命令行参数的个数。你可以在脚本中任何地方使用这个特殊变量，就跟普通变量一样：
+{% highlight string %}
+# cat test8 
+#!/bin/bash
+
+# getting the number of parameters
+
+echo "There were $# parameter(s) supplied"
+
+# ./test8 
+There were 0 parameter(s) supplied
+# ./test8 1 2 3 4 5
+There were 5 parameter(s) supplied
+# ./test8 "Rich Blum"
+There were 1 parameter(s) supplied
+{% endhighlight %}
+现在你就能在使用参数前测试参数的总数了：
+{% highlight string %}
+# cat test9
+#!/bin/bash
+
+# testing parameters 
+
+if [ $# -ne 2 ]
+then
+    echo "Usage: test9 a b"
+else
+    total=$[$1 + $2]
+    echo "The total is: $total"
+fi
+
+# ./test9 
+Usage: test9 a b
+# ./test9 10
+Usage: test9 a b
+# ./test9 10 15
+The total is: 25
+# ./test9 10 15 20
+Usage: test9 a b
+{% endhighlight %}
 
 
 
