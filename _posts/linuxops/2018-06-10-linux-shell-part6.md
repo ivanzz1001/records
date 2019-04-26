@@ -608,7 +608,191 @@ Linux系统有一个特殊的留给临时文件用的目录位置。Linux使用/
 
 系统上的任何用户账户都有权限在/tmp目录中读和写。这个特性为你提供了简单地创建临时文件的途经，而不用管清理工作。
 
-有个特殊的命令可以用来创建临时文件。mktemp命令可以轻松地在/tmp目录中创建一个唯一的临时文件。shell会创建这个文件，但不用默认的umask值。它会将文件的读和写权限分配给文件的属主，并将你设置成文件的属主。一旦创建了文件，你就在脚本中有了完整的读写权限，但其他人没法访问（当然，root用户除外）
+有个特殊的命令可以用来创建临时文件。mktemp命令可以轻松地在/tmp目录中创建一个唯一的临时文件。shell会创建这个文件，但不用默认的umask值。它会将文件的读和写权限分配给文件的属主，并将你设置成文件的属主。一旦创建了文件，你就在脚本中有了完整的读写权限，但其他人没法访问（当然，root用户除外）。
+
+1） **创建本地临时文件**
+
+默认情况下，mktemp会在本地目录中创建一个文件。要用mktemp命令在本地目录中创建一个临时文件，你只要指定一个文件名模板就行了。模板可以包含任意文本文件名，在文件名末尾加上6个```X```就行了：
+<pre>
+# mktemp testing.XXXXXX
+testing.2lUbyW
+#  ls -al testing*
+-rw-------. 1 root root 0 Apr 26 10:18 testing.2lUbyW
+</pre>
+mktemp命令会用6个字符码替换这6个X，从而保证文件名在目录中是唯一的。你可以创建多个临时文件，它可以保证每个文件都是唯一的：
+<pre>
+# mktemp testing.XXXXXX
+testing.Rhr8Iw
+# mktemp testing.XXXXXX
+testing.hMgsNx
+# mktemp testing.XXXXXX
+testing.b74WZF
+[root@localhost workspace]#  ls -al testing*
+-rw-------. 1 root root 0 Apr 26 10:18 testing.2lUbyW
+-rw-------. 1 root root 0 Apr 26 10:21 testing.b74WZF
+-rw-------. 1 root root 0 Apr 26 10:21 testing.hMgsNx
+-rw-------. 1 root root 0 Apr 26 10:21 testing.Rhr8Iw
+</pre>
+
+如你所看到的，mktemp命令的输出正是它所创建的文件的名字。在脚本中使用mktemp命令时，你可能要将文件名保存到变量中，这样你就能在后面的脚本中引用了：
+{% highlight string %}
+# cat test19 
+#!/bin/bash
+
+# creating and using a temp file
+
+tempfile=`mktemp test19.XXXXXX`
+
+exec 3>$tempfile
+
+echo "This script writes to temp fille '$tempfile'"
+
+echo "This is the first line." >&3
+echo "This is the second line." >&3
+echo "This is the third line." >&3
+
+exec 3>&-
+
+echo "Done creating temp file. The contents are:"
+
+cat $tempfile
+
+rm -rf $tempfile 2>/dev/null
+
+# ./test19 
+This script writes to temp fille 'test19.jzj3WH'
+Done creating temp file. The contents are:
+This is the first line.
+This is the second line.
+This is the third line.
+{% endhighlight %}
+这个脚本用mktemp命令来创建临时文件并将文件名赋给```$tempfile```变量。然后，它将这个临时文件作为文件描述符3的输出重定向文件。在将临时文件名显示在STDOUT之后，它会将一些行写到临时文件，然后它会显示临时文件的内容，并用rm命令删除。
+
+2) **在/tmp目录创建临时文件**
+
+```-t```选项会强制mktemp命令来在系统的临时目录来创建该文件。在用这个特性时，mktemp命令会返回用来创建临时文件的全路径，而不是只有文件名：
+<pre>
+# mktemp -t test.XXXXXX
+/tmp/test.u4wDZ6
+# ls -al /tmp/test*
+-rw-------. 1 root root 0 Apr 26 10:56 /tmp/test.u4wDZ6
+</pre>
+
+由于mktemp命令返回了全路径名，你就可以在Linux系统上的任何目录下引用该临时文件，而不用管它将临时文件放在了什么位置：
+{% highlight string %}
+# cat test20 
+#!/bin/bash
+
+# creating a temp file in /tmp
+
+tempfile=`mktemp -t tmp.XXXXXX`
+
+echo "This is a test file." >$tempfile
+
+echo "This is the second line of the test." >>$tempfile
+
+echo "The temp file is located at: $tempfile"
+
+cat $tempfile
+
+rm -rf $tempfile
+# ./test20 
+The temp file is located at: /tmp/tmp.el7oX3
+This is a test file.
+This is the second line of the test.
+{% endhighlight %}
+
+在mktemp创建临时文件时，它会将全路径名返回给变量。这样你就能在任何命令中使用该值来引用该临时文件了。
+
+3) **创建临时目录**
+
+```-d```选项告诉mktemp命令来创建一个临时目录而不是临时文件。这样你就能用该目录做想做任何需要的操作了，比如创建额外的临时文件：
+{% highlight string %}
+# cat test21 
+#!/bin/bash
+
+# using a temporary directory
+
+tempdir=`mktemp -d dir.XXXXXX`
+
+cd $tempdir
+
+tempfile=`mktemp temp.XXXXXX`
+tempfile2=`mktemp temp.XXXXXX`
+
+exec 7>$tempfile
+exec 8>$tempfile2
+
+echo "Sending data to directory $tempdir"
+
+echo "This is a test line of data for '$tempfile'" >&7
+echo "This is a test line of data for '$tempfile2'" >&8
+
+# ./test21 
+Sending data to directory dir.3CR7bQ
+# cat dir.3CR7bQ/temp.orwVXV 
+This is a test line of data for 'temp.orwVXV'
+# cat dir.3CR7bQ/temp.xXgAwv 
+This is a test line of data for 'temp.xXgAwv'
+{% endhighlight %}
+这段脚本在当前目录创建了一个目录，然后它用cd命令跳进该目录，并创建了两个临时文件。之后这两个临时文件被分配给文件描述符用来存储脚本的输出。
+
+## 8. 记录消息
+有时将输出一边发送到显示器一边发送到日志文件，这会有一些好处。你不用将输出重定向两次，只要用特殊的tee命令就行。
+
+tee命令相当于管道的```T型```接头。它将从STDIN过来的数据同时发给两个目的地。一个目的地是STDOUT，另一个目的地是tee命令行所指定的文件名：
+<pre>
+tee filename
+</pre>
+由于tee会将从STDIN过来的数据重定向，你可以用它和管道命令来一起将任何命令的输出重定向：
+<pre>
+# date | tee testfile
+Fri Apr 26 11:30:24 CST 2019
+# cat testfile
+Fri Apr 26 11:30:24 CST 2019
+</pre>
+输出出现在了STDOUT中，并且也写入了指定的文件中。注意，默认情况下，tee命令会在每次使用时覆盖输出文件内容：
+<pre>
+# who | tee testfile
+root     pts/0        2019-04-15 11:48 (192.168.79.1)
+
+# cat testfile
+root     pts/0        2019-04-15 11:48 (192.168.79.1)
+</pre>
+如果想将数据追加到文件中，必须用```-a```选项：
+<pre>
+# date | tee -a testfile
+Fri Apr 26 11:34:02 CST 2019
+
+# cat testfile 
+root     pts/0        2019-04-15 11:48 (192.168.79.1)
+Fri Apr 26 11:34:02 CST 2019
+</pre>
+利用这个方法，你就能将数据保存在文件中，也能将数据显示在屏幕上了：
+{% highlight string %}
+# cat test22 
+#!/bin/bash
+
+# using the tee command for logging
+
+tempfile=test22file
+
+echo "This is the start of the test." | tee $tempfile
+
+echo "This is the second line of the test." | tee -a $tempfile
+
+echo "This is the end of the test." | tee -a $tempfile
+
+# ./test22 
+This is the start of the test.
+This is the second line of the test.
+This is the end of the test.
+# cat test22file 
+This is the start of the test.
+This is the second line of the test.
+This is the end of the test.
+{% endhighlight %}
+现在你就能在将输出显示给用户的同时也永久保留一份了。
 
 
 
