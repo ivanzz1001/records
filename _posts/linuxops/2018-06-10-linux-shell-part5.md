@@ -579,7 +579,221 @@ Parameter #3 = test3
 
 3) **处理带值的选项**
 
+有些选项会带上一个额外的参数值。在这种情况下，命令看起来像下面这样：
+<pre>
+# ./testing -a test1 -b -c -d test2
+</pre>
+当命令行选项要求额外的参数时，脚本必须能检测并能正确地处理。下面有个如何处理的例子：
+{% highlight string %}
+# cat test17 
+#!/bin/bash
 
+# extracting command line options and values
+
+while [ -n "$1" ]
+do
+   case "$1" in
+       -a) echo "Found the -a option";;
+       -b) param="$2"
+           echo "Found the -b option, with parameter value $param"
+           shift;;
+       -c) echo "Found the -c option";;
+       --) shift
+           break;;
+       *) echo "$1 is not an option";;
+   esac 
+
+   shift
+done
+
+
+count=1
+
+for param in "$@"
+do
+   echo "Parameter #$count = $param"
+
+   count=$[$count + 1]
+done
+
+# ./test17 -a -b test1 -d
+Found the -a option
+Found the -b option, with parameter value test1
+-d is not an option
+{% endhighlight %}
+在这个例子中，case语句定义了3个它要处理的选项。```-b```选项也要求一个额外的参数值。由于要处理的参数是```$1```，额外的参数值就应该位于$2(因为所有的参数在处理完之后都会被移出去）。只要将参数值从$2变量中提取出来就可以了。
+
+只用基本的特性，这个过程就能工作，不管按什么顺序放置选项（但要记住包含每个选项相应的选项参数）：
+<pre>
+# ./test17 -b test1 -a -d
+Found the -b option, with parameter value test1
+Found the -a option
+-d is not an option
+</pre>
+
+现在shell脚本中已经有了处理命令行选项的基本能力，但还有一些限制。比如，如果你想将多个选项放进一个参数中时，它就不能工作了：
+<pre>
+# ./test17 -ac
+-ac is not an optio
+</pre>
+在Linux中，合并选项是一个很常见的用法，而且如果脚本要更用户友好一些，那么也要给用户提供这种特性。幸好，有另外一种处理选项的方法能够帮忙。
+
+### 4.2 使用getopt命令
+getopt命令是一个在处理命令行选项和参数时非常方便的工具。它能够识别命令行参数，从而在脚本中解析它们时更方便。
+
+1） **命令的格式**
+
+getopt命令可以接受一系列任意形式的命令行选项和参数，并自动将它们转换成适当的格式。它的命令格式如下：
+<pre>
+getopt options optstring parameters
+</pre>
+optstring 是这个过程的关键所在。它定义了命令行有效的选项字母，还定义了哪些选项字母需要参数值。
+
+首先，在optstring 中列出你要在脚本中用到的每个命令行选项字母。然后，在每个需要参数值的选项字母后加一个冒号。getopt命令会基于你定义的optstring解析提供的参数。
+
+下面是个getopt如何工作的简单例子：
+<pre>
+# getopt ab:cd -a -b test1 -cd test2 test3
+ -a -b test1 -c -d -- test2 test3
+</pre>
+optstring定义了4个有效选项字母： a、b、c和d。它还定义了选项字母b需要一个参数值。当getopt命令运行时，它会检查提供的参数列表，并基于提供的optstring解析。注意它会自动将```-cd```选项分成两个单独的选项，并插入双破折号来分开行中的额外参数。
+
+如果你指定了一个不在optstring中的选项，默认情况下，getopt会产生一条错误消息：
+<pre>
+# getopt ab:cd -a -b test1 -cde test2 test3
+getopt: invalid option -- 'e'
+ -a -b test1 -c -d -- test2 test3
+</pre>
+如果想忽略这条错误消息，可以在命令后加```-q```选项：
+<pre>
+# getopt -q ab:cd -a -b test1 -cde test2 test3
+ -a -b 'test1' -c -d -- 'test2' 'test3'
+root@ubuntu:~/workspace# 
+</pre>
+注意，getopt命令必须列在optstring之前。现在你可以在脚本中使用此命令处理命令行选项了。
+
+2) **在脚本中使用getopt**
+
+你可以在脚本中使用getopt来格式化输入给脚本的任何命令行选项。但用起来略微复杂。
+
+方法是用getopt命令生成的格式化后的版本来替换已有的命令行选项和参数。用set命令能够做到。
+
+在第5章中，你就已经见过set命令了。set命令能够和shell中的不同变量一起工作。第5章介绍了如何使用set命令来显示所有的系统环境变量。
+
+set命令的选项之一是双破折线，它会将命令行参数替换成set命令的命令行的值。
+
+然后，该方法会将原始的脚本的命令行参数传给getopt命令，之后再将getopt命令的输出传给set命令，用getopt格式化后的命令行参数来替换原始的命令行参数。看起来如下：
+<pre>
+set -- `getopt -q ab:cd "$@"`
+</pre>
+现在原始的命令行参数变量的值会被getopt命令的输出替换，而getopt已经为我们格式化好了命令行参数。
+
+利用该方法，现在我们就就可以写出能帮我们处理命令行参数的脚本了：
+{% highlight string %}
+# cat test18 
+#!/bin/bash
+
+# extracting command line options and values with getopt
+
+set -- `getopt -q ab:c "$@"`
+
+while [ -n "$1" ]
+do
+    case "$1" in
+       -a) echo "Found the -a option";;
+
+       -b) param=$2
+           echo "Found the -b option, with parameter value $param"
+           shift;;
+
+       -c) echo "Found the -c option";;
+
+       --) shift
+           break;;
+
+        *) echo "$1 is not an option"
+      esac
+
+      shift
+done
+
+count=1
+
+for param in "$@"
+do
+   echo "Parameter #$count: $param"
+
+   count=$[$count + 1]
+
+done
+{% endhighlight %}
+你会注意到它跟test17脚本一样。唯一不同的是加入了getopt命令来帮助格式化命令行参数。现在运行脚本并加上复杂选项，可以看出它工作得更好了：
+<pre>
+# ./test18 -ac
+Found the -a option
+Found the -c option
+</pre>
+当然，所有的原始功能还能顺利工作：
+<pre>
+# ./test18 -a -b test1 -cd test2 test3 test4
+Found the -a option
+Found the -b option, with parameter value 'test1'
+Found the -c option
+Parameter #1: 'test2'
+Parameter #2: 'test3'
+Parameter #3: 'test4'
+</pre>
+现在事情看起来好多了。但是，仍然有一个小问题潜伏在getopt命令中。看看这个例子：
+<pre>
+# ./test18 -a -b test1 -cd "test2 test3" test4
+Found the -a option
+Found the -b option, with parameter value 'test1'
+Found the -c option
+Parameter #1: 'test2
+Parameter #2: test3'
+Parameter #3: 'test4'
+</pre>
+getopt命令并不擅长处理带空格的参数值。它会将空格当做参数分隔符，而不是根据双引号将二者当做一个参数。幸而，还有另外一个办法能解决这个问题。
+
+### 4.3 使用更高级的getopts
+bash shell包含了getopts命令(注意是复数）。它跟近亲getopt看起来很像，但有一些扩展功能。
+
+与getopt将命令行上找到的选项和参数处理后只生成一个输出不同，getopts命令能够和已有的shell参数变量对应地顺序工作。
+
+getopts命令的格式如下：
+<pre>
+getopts optstring variable
+</pre>
+optstring值类似于getopt命令中的那个。有效的选项字母都会列在optstring中，如果选项字母要求有个参数值，就加一个冒号。要去掉错误消息的话，可以在optstring之前加一个冒号。getopts命令将当前参数保存在命令行中定义的variable中。
+
+getopts命令会用到两个环境变量。如果选项需要跟一个参数值，```OPTARG```环境变量就会保存这个值。```OPTIND```环境变量保存了参数列表中getopts正在处理的参数位置。这样你就能在处理完选项之后继续处理其他命令行参数了。
+
+让我们看个使用getopts命令的简单例子：
+{% highlight string %}
+# cat test19 
+#!/bin/bash
+
+# simple demonstration of the getopts command
+
+while getopts :ab:c opt
+do
+   case "$opt" in
+     a) echo "Found the -a option";;
+      
+     b) echo "Found the -b option, with value $OPTARG";;
+
+     c) echo "Found the -c option";;
+
+     *) echo "Unknown option: $opt";;
+
+   esac
+done
+
+# ./test19 -ab test1 -c
+Found the -a option
+Found the -b option, with value test1
+Found the -c option
+{% endhighlight %}
 
 
 
