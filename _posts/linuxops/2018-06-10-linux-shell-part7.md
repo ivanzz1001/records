@@ -134,19 +134,63 @@ CREATE_MAIL_SPOOL=yes
 
 * 系统为该用户账户在mail目录下创建一个用于接收邮件的文件
 
-倒数第二个值很有意思。useradd命令允许管理员创建一份默认的HOME目录配置，然后把它作为创建新用户HOME目录的模板。这样，就能自动在每个新用户的HOME目录里放置默认的系统文件。在Centos7.3 Linux系统上，/etc/skel目录下有以下文件：
-<pre>
-# ls -al /etc/skel/ 
-total 24
-drwxr-xr-x.   3 root root   78 Oct 21  2017 .
-drwxr-xr-x. 138 root root 8192 Apr 18 17:23 ..
--rw-r--r--.   1 root root   18 Aug  3  2016 .bash_logout
--rw-r--r--.   1 root root  193 Aug  3  2016 .bash_profile
--rw-r--r--.   1 root root  231 Aug  3  2016 .bashrc
-drwxr-xr-x.   4 root root   39 Oct 21  2017 .mozilla
-</pre>
+倒数第二个值很有意思。useradd命令允许管理员创建一份默认的HOME目录配置，然后把它作为创建新用户HOME目录的模板。这样，就能自动在每个新用户的HOME目录里放置默认的系统文件。在Ubuntu16.04 Linux系统上，/etc/skel目录下有以下文件：
+{% highlight string %}
+# ls -al /etc/skel/
+total 40
+drwxr-xr-x   2 root root  4096 Feb 23 22:17 .
+drwxr-xr-x 131 root root 12288 Apr 28 06:15 ..
+-rw-r--r--   1 root root   220 Aug 31  2015 .bash_logout
+-rw-r--r--   1 root root  3771 Aug 31  2015 .bashrc
+-rw-r--r--   1 root root  8980 Apr 20  2016 examples.desktop
+-rw-r--r--   1 root root   655 Jun 24  2016 .profile
+{% endhighlight %}
 通过这些文件的名字，我们大概可以看出这些文件是做什么的。它们是bash shell环境的标准启动文件。系统会自动将这些默认文件复制到你创建的每个用户的HOME目录。
 
+你可以用默认系统参数创建一个新用户账户来试一下，并检查一下新用户的HOME目录：
+{% highlight string %}
+# useradd -m test
+# ls -al /home/test
+total 32
+drwxr-xr-x 2 test test 4096 Apr 28 09:16 .
+drwxr-xr-x 4 root root 4096 Apr 28 09:16 ..
+-rw-r--r-- 1 test test  220 Aug 31  2015 .bash_logout
+-rw-r--r-- 1 test test 3771 Aug 31  2015 .bashrc
+-rw-r--r-- 1 test test 8980 Apr 20  2016 examples.desktop
+-rw-r--r-- 1 test test  655 Jun 24  2016 .profile
+{% endhighlight %}
+
+默认情况下，useradd命令不会创建HOME目录，但是```-m```命令行选项会叫它创建HOME目录。你能在例子中看到，useradd命令创建了新的HOME目录，并将/etc/skel目录中的文件复制了过来。
+<pre>
+说明： 运行本章中提到的用户账户管理命令，需要以root用户账户登录或通过sudo命令以root用户
+      账户身份运行这些命令。
+</pre>
+
+要想在创建用户时改变默认值或默认行文，可以使用命令行参数。下表列出了这些参数：
+<pre>
+            表： useradd命令行参数
+
+   参  数                        描   述
+--------------------------------------------------------------------------------
+-c comment           给新用户添加备注
+-d home_dir          为主目录指定一个名字（如果不想用登录名作为主目录名的话）
+-e expire_date       用YYYY-MM-DD格式指定一个账户过期的日期
+
+-f inactive_days     指定这个账户密码过期后多少天这个账户被禁用；0表示密码一过期就立即禁用，
+                     -1表示禁用这个功能
+
+-g initial_group     指定用户登录组的GID或组名
+-G group             指定用户除登录组之外所属的一个或多个附加组
+-k                   必须和-m一起使用，将/etc/skel目录的内容复制到用户的HOME目录
+
+-m                   创建用户的HOME目录
+-M                   不创建用户的HOME目录（当默认设置里指定创建时，才用到）
+-n                   创建一个同用户登录名同名的新组
+-r                   创建系统账户
+-p passwd            为用户账户指定默认密码
+-s shell             指定默认的登录shell
+-u uid               为账户指定一个唯一的UID
+</pre>
 
 
 
