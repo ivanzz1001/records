@@ -943,8 +943,154 @@ Please enter your age: 10
 That makes you over 3650 days old!
 {% endhighlight %}
 
-你会注意到，在第一个例子中当有名字输入时，read命令会将姓和名保存在同一个变量中。read命令会为提示符输入的所有数据分配一个变量，或者你也可以指定多个变量。输入的每个数据值
+你会注意到，在第一个例子中当有名字输入时，read命令会将姓和名保存在同一个变量中。read命令会为提示符输入的所有数据分配一个变量，或者你也可以指定多个变量。输入的每个数据值都会分配给表中的下一个变量。如果变量表在数据之前用完了，剩下的数据就都会分配给最后一个变量：
+{% highlight string %}
+# cat test23 
+#!/bin/bash
 
+# entering multiple variables
+
+read -p "Enter your name: " first last
+
+echo "Checking data for $last, $first..."
+
+# ./test23 
+Enter your name: Rich Blum Cort
+Checking data for Blum Cort, Rich...
+{% endhighlight %}
+
+你可以在read命令行中不指定变量。如果那么做了，read命令会将它收到的任何数据都放进特殊环境变量```REPLY```中：
+{% highlight string %}
+# cat ./test24 
+#!/bin/bash
+
+# testing the REPLY environment variable
+
+read -p "Enter a number: "
+
+factorial=1
+
+for((count=1; count <=$REPLY; count++))
+do
+    factorial=$[$factorial * $count] 
+done
+
+echo "The factorial of $REPLY is $factorial"
+
+# ./test24 
+Enter a number: 5
+The factorial of 5 is 120
+{% endhighlight %}
+```REPLY```环境变量会保存输入的所有数据，它可以在shell脚本中像其他变量一样使用。
+
+### 6.2 超时
+使用read命令时有个危险，就是脚本很可能会等脚本用户的输入一直等下去。如果脚本必须继续执行下去，不管是否有数据输入，你可以用```-t```选项来指定一个计时器。```-t```选项指定了read命令等待输入的秒数。当计时器过期后，read命令会返回一个非零退出状态码：
+{% highlight string %}
+# cat ./test25 
+#!/bin/bash
+
+# timing the data entry
+
+if read -t 5 -p "Please enter your name: " name
+then
+    echo "Hello $name, welcome to my script"
+else
+    echo 
+    echo "Sorry, too slow"
+fi
+
+# ./test25 
+Please enter your name: Rich
+Hello Rich, welcome to my script
+# ./test25 
+Please enter your name: 
+Sorry, too slow
+{% endhighlight %}
+由于计时器过期的话read命令会以非零退出状态码退出，我们可以使用标准的结构化语句，如if-then语句或while循环来轻松地记录发生的情况。在本例中，计时器过期时，if语句不成立，shell会执行else部分的命令。
+
+可以让read命令来对输入的字符计数，而非对输入过程计时。当输入的字符达到预设的字符数时，它会自动退出，将输入的数据赋给变量：
+{% highlight string %}
+# cat test26 
+#!/bin/bash
+
+# getting just one character of input
+
+read -n1 -p "Do you want to continue [Y/N]? " answer
+
+case $answer in
+  Y | y) echo 
+         echo "find, continue on ...";;
+  N | n) echo
+         echo "OK, goodbye"
+         exit;;
+esac
+
+echo "This is the end of the script"
+
+# ./test26 
+Do you want to continue [Y/N]? Y
+find, continue on ...
+This is the end of the script
+
+# ./test26 
+Do you want to continue [Y/N]? n
+OK, goodbye
+{% endhighlight %}
+本例中将```-n```选项和值 1 一起使用，告诉read命令在接受单个字符后退出。只要你按下单个字符回显后，read命令就会接受输入并将它传给变量，而不必按回车键。
+
+### 6.3 隐藏方式读取
+有时你需要读取脚本用户的输入，但不想输入出现在屏幕上。典型的例子是输入的密码，但还有很多其他需要隐藏的数据类型。
+
+```-s```选项会阻止将传给read命令的数据显示在显示器上（实际上，数据会被显示，只是read命令会将文本颜色设成跟背景色一样）。 这里有个在脚本中使用```-s```选项的例子：
+{% highlight string %}
+# cat ./test27 
+#!/bin/bash
+
+# hiding input data from the monitor
+
+read -s -p "Enter your passwd: " pass
+
+echo 
+
+echo "Is your password really $pass? "
+
+# ./test27 
+Enter your passwd: 
+Is your password really 123AaBb?
+{% endhighlight %}
+输入提示符输入的数据不会出现在屏幕上，但会赋给变量，以便在脚本中使用。
+
+### 6.4 从文件中读取
+最后，你也可以用read命令来读取Linux系统上文件里保存的数据。每次调用read命令会从文件中读取一行文本。当文件中再没有内容时，read命令会退出并返回非零退出状态码。
+
+其中最难的部分是将文件中的数据传给read命令。最常见的方法是将文件运行cat命令后的输出通过管道直接传给含有read命令的while循环。下面的例子说明怎么处理：
+{% highlight string %}
+# cat test28
+#!/bin/bash
+
+# reading data from a file
+
+count=1
+
+cat test | while read line
+do
+   echo "Line #$count: $line"
+   count=$[$count + 1]
+done
+
+echo "Finished processing the file"
+
+# cat test
+The quick brown dog jumps over the lazy fox.
+This is a test, this is only a test.
+O Romeo, Romeo! Wherefore art thou Romeo?
+# ./test28
+Line #1: The quick brown dog jumps over the lazy fox.
+Line #2: This is a test, this is only a test.
+Line #3: O Romeo, Romeo! Wherefore art thou Romeo?
+Finished processing the file
+{% endhighlight %}
+while循环会继续通过read命令处理文件中的行，直到read命令以非零退出状态码退出。
 
 
 
