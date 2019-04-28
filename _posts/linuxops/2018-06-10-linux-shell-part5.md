@@ -794,6 +794,161 @@ Found the -a option
 Found the -b option, with value test1
 Found the -c option
 {% endhighlight %}
+while语句定义了getopts命令，指明了要查找哪些命令行选项，以及每次迭代中存储它们的变量名。
+
+你会注意到在本例中case语句的用法有些不同。getopts命令解析命令行选项时，它会移除开头的单破折线，所以在case定义中不用单破折线。
+
+getopts命令有几个好用的功能。对新手来说，你可以在参数值中包含空格：
+<pre>
+# ./test19 -b "test1 test2" -a
+Found the -b option, with value test1 test2
+Found the -a option
+</pre>
+
+另一个好用的功能是将选项字母和参数值放在一起使用，而不用加空格：
+<pre>
+# ./test19 -abtest1
+Found the -a option
+Found the -b option, with value test1
+</pre>
+getopts命令能够从```-b```选项中正确解析出test1值。getopts命令的另一个好用的功能是，它能够将命令行上找到的所有未定义的选项统一输出成问好：
+<pre>
+# ./test19 -d
+Unknown option: ?
+# ./test19 -acde
+Found the -a option
+Found the -c option
+Unknown option: ?
+Unknown option: ?
+</pre>
+optstring中未定义的选项字母会以问号形式发送给代码。
+
+getopts命令知道何时停止处理选项，并将参数留给你处理。在getopts处理每个选项时，它会将```OPTIND```环境变量增一。在getopts完成处理时，你可以将OPTIND值和shift命令一起使用来移动参数：
+{% highlight string %}
+# cat ./test20 
+#!/bin/bash
+
+# processing options and parameters with getopts
+
+while getopts :ab:cd opt
+do
+    case "opt" in
+       a) echo "Found the -a option";;
+
+       b) echo "Found the -b option, with value: $OPTARG";;
+
+       c) echo "Found the -c option";;
+
+       d) echo "Found the -d opiton";;
+
+       *) echo "Unknown option: $opt";;
+ 
+    esac
+
+done
+
+shift $[$OPTIND -1]
+
+count=1
+
+for param in "$@"
+do
+    echo "Parameter #$count: $param"
+
+    count=$[$count + 1]
+done
+
+
+# ./test20 -a -b test1 -d test2 test3 test4
+Unknown option: a
+Unknown option: b
+Unknown option: d
+Parameter #1: test2
+Parameter #2: test3
+Parameter #3: test4
+{% endhighlight %}
+现在你就有了一个能在所有shell脚本中使用的全功能命令行选项和参数处理工具。
+
+## 5. 将选项标准化
+
+在创建shell脚本时，显然你可以控制具体怎么做。你完全可以决定用哪些字母选项和如何使用。
+
+但有些字母选项在Linux世界里已经演变成某种标准的含义。如果你能在shell脚本中支持这些选项，脚本看起来能更友好些。
+
+下表显示了Linux中用到的一些命令行选项的通用含义：
+<pre>
+                表： 通用的Linux命令选项
+
+选 项                    描  述
+-----------------------------------------------------------------------
+ -a                   显示所有对象
+ -c                   生成一个计数
+ -d                   指定一个目录
+ -e                   扩展一个对象
+ -f                   指定读入数据的文件
+ -h                   显示命令的帮助信息
+ -i                   忽略文本大小写
+ -l                   产生输出的长格式版本
+ -n                   使用非交互模式（批量）
+ -o                   指定将所有输出重定向到输出文件
+ -q                   以安静模式运行
+ -r                   递归地处理目录和文件
+ -s                   以安静模式运行
+ -v                   生成详细输出
+ -x                   排除某个对象
+ -y                   对所有问题回答yes
+</pre>
+通过学习本书时遇到的各种bash命令，你大概已经知道这些选项中大部分的含义了。你的选项也采用同样的含义，会让用户
+
+
+## 6. 获得用户输入
+尽管命令行选项和参数是从脚本用户获得输入的一种重要方式，但有时脚本的交互性还可以更强一些。有时你想要在脚本运行时问个问题，并等待运行脚本的人来回答。bash shell为此提供了read命令。
+
+### 6.1 基本的读取
+read命令接受从标准输入（键盘）或另外一个文件描述符（参见<<高级脚本编程之处理用户输入>>一文)的输入。在收到输入后，read命令会将数据放进一个标准变量。下面是read命令的最简单用法：
+{% highlight string %}
+# cat test21 
+#!/bin/bash
+
+# testing the read command
+
+echo -n "Enter your name: "
+
+read name
+
+echo "Hello $name, welcome to my program."
+
+# ./test21 
+Enter your name: Rich Blum
+Hello Rich Blum, welcome to my program.
+{% endhighlight %}
+
+相当简单。注意生成提示的echo命令使用了```-n```选项。它会移掉字符串末尾的换行符，允许脚本用户紧跟其后输入数据，而不是下一行。这让脚本看起来更像表单。
+
+实际上，read命令包含了```-p```选项，允许你直接在read命令行指定提示符：
+{% highlight string %}
+# cat test22 
+#!/bin/bash
+
+# testing the read -p option
+
+read -p "Please enter your age: " age
+
+days=$[$age * 365]
+
+echo "That makes you over $days days old!"
+
+# ./test22 
+Please enter your age: 10
+That makes you over 3650 days old!
+{% endhighlight %}
+
+你会注意到，在第一个例子中当有名字输入时，read命令会将姓和名保存在同一个变量中。read命令会为提示符输入的所有数据分配一个变量，或者你也可以指定多个变量。输入的每个数据值
+
+
+
+
+
 
 
 
