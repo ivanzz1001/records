@@ -103,6 +103,49 @@ daemon:*:17110:0:99999:7:::
 
 ### 1.3 添加新用户
 
+添加新用户到Linux系统的工具是useradd。这个命令提供了一次性创建新用户账户及设置用户HOME目录结构的简便方法。useradd命令使用系统的默认值以及命令行参数来设置用户账户。可以用useradd命令加```-D```参数来查看你的Linux系统的系统默认值：
+{% highlight string %}
+# /usr/sbin/useradd -D
+GROUP=100
+HOME=/home
+INACTIVE=-1
+EXPIRE=
+SHELL=/bin/bash
+SKEL=/etc/skel
+CREATE_MAIL_SPOOL=yes
+{% endhighlight %}
+<pre>
+说明： 一些Linux发行版会把Linux用户和组工具放在/usr/sbin目录下，有可能不在PATH环境变量里。如果你的Linux系统是这样
+      的话，可以将这个目录添加进PATH环境变量，或者使用绝对路径名来运行这个程序
+</pre>
+```-D```参数显示了在创建新用户时如果你不在命令行指定的话，useradd命令使用的默认值。这个例子列出了这些默认值：
+
+* 新用户会被添加到GID为100的公共组；
+
+* 新用户的HOME目录将会位于/home/loginname
+
+* 新用户账户密码在过期后不会被禁用
+
+* 新用户账户未被设置为某个日期后就过期
+
+* 新用户账户将bash shell作为默认的shell
+
+* 系统会将/etc/skel目录下的内容复制到用户的HOME目录下；
+
+* 系统为该用户账户在mail目录下创建一个用于接收邮件的文件
+
+倒数第二个值很有意思。useradd命令允许管理员创建一份默认的HOME目录配置，然后把它作为创建新用户HOME目录的模板。这样，就能自动在每个新用户的HOME目录里放置默认的系统文件。在Centos7.3 Linux系统上，/etc/skel目录下有以下文件：
+<pre>
+# ls -al /etc/skel/ 
+total 24
+drwxr-xr-x.   3 root root   78 Oct 21  2017 .
+drwxr-xr-x. 138 root root 8192 Apr 18 17:23 ..
+-rw-r--r--.   1 root root   18 Aug  3  2016 .bash_logout
+-rw-r--r--.   1 root root  193 Aug  3  2016 .bash_profile
+-rw-r--r--.   1 root root  231 Aug  3  2016 .bashrc
+drwxr-xr-x.   4 root root   39 Oct 21  2017 .mozilla
+</pre>
+通过这些文件的名字，我们大概可以看出这些文件是做什么的。它们是bash shell环境的标准启动文件。系统会自动将这些默认文件复制到你创建的每个用户的HOME目录。
 
 
 
