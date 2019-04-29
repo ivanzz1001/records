@@ -270,15 +270,112 @@ usermod命令是用户账户修改工具中最强大的一个。它能用来修�
 
 2） **passwd和chpasswd**
 
+改变用户密码的一个简便方法就是用passwd命令：
+<pre>
+# passwd test
+Changing password for user test.
+New password: 
+Retype new password: 
+passwd: all authentication tokens updated successfully.
+</pre>
+
+如果只用passwd命令，它会改变你自己的密码。系统上的任何用户都能改变他自己的密码，但只有root用户才有权限改变别人的密码。
+
+```-e```选项能强制用户下次登录时修改密码。你可以先给用户设置一个简单的密码，之后再强制他们在下次登录时改成他们能记住的更复杂的密码。
+
+如果需要为系统中的大量用户来修改密码，chpasswd命令能让事情简单许多。chpasswd命令能从标准输入自动读取登录名和密码对（由冒号分割）列表，给密码加密，然后为用户账户设置。你也可以用重定向命令来将含有```userid:passwd```对的文件重定向给命令：
+{% highlight string %}
+# chpasswd < users.txt
+
+# echo "test:testAa@123" | chpasswd
+
+# chpasswd << EOF
+> test:testAaBb@123
+> EOF
+{% endhighlight %}
 
 
+3) **chsh、chfn和chage**
+
+chsh、chfn和chage工具专门用来修改特定的账户信息。chsh命令用来快速修改默认的用户登录shell。使用时必须用shell的全路径名作为参数，不能只用shell名：
+{% highlight string %}
+# chsh -s /bin/csh test
+Changing shell for test.
+Shell changed.
+{% endhighlight %}
+
+chfn命令提供了在/etc/passwd文件的备注字段中存储信息的标准方法。chfn命令会将unix的finger命令用到的信息存进备注字段，而不是简单的存入一些随机文本（比如 昵称 之类的），或是将备注字段留空。finger命令可以用来简单地查看Linux系统上的用户信息：
+{% highlight string %}
+# finger rich
+Login: rich                       Name: Rich Blum
+Directory: /home/rich             Shell: /bin/bash
+On since Thu Sep 20 18:03 (EDT) on pts/0 from 192.168.1.2
+No mail.
+No Plan.
+{% endhighlight %}
+<pre>
+说明： 出于安全性考虑，很多Linux系统管理员会在系统上禁用finger命令
+</pre>
+
+如在使用chfn命令时不加参数，它会向你询问要存进备注字段的恰当值：
+{% highlight string %}
+# chfn test
+Changing finger information for test.
+Name []: Ima Test
+Office []: Director of Technology
+Office Phone []: (123)555-1234
+Home Phone []: (123)555-9876
+
+Finger information changed.
+
+# finger test
+Login: test                       Name: Ima Test
+Directory: /home/test             Shell: /bin/csh
+Office: Director of Technology    Office Phone: (123)555-1234
+Home Phone: (123)555-9876
+Never logged in.
+No mail.
+No Plan.
+{% endhighlight %}
+查看/etc/passwd文件中的记录，你会看到下面这样的结果：
+{% highlight string %}
+# cat /etc/passwd | grep test
+test:x:1001:1002:Ima Test,Director of Technology,(123)555-1234,(123)555-9876:/home/test:/bin/csh
+{% endhighlight %}
+
+所有的人物信息现在都存在了/etc/passwd文件中了。
+
+最后，chage命令用来帮助管理用户账户的有效期。它有一些参数可以用来设置每个值，如下表所示：
+<pre>
+               表： chage命令参数
+
+参 数                   描     述
+---------------------------------------------------------------------------------------
+ -d               设置上次修改密码到现在的天数
+ -E               设置密码过期的日期
+ -I               设置密码过期到锁定账户的天数
+ -m               设置修改密码之间最少要多少天
+ -W               设置密码过期前多久开始出现提醒信息
+</pre>
+chage命令的日期值可以用下面两种方式中的任意一种：
+
+* YYYY-MM-DD格式的日期
+
+* 代表从1970年1月1日起到该日期天数的数值
+
+chage命令中有个好用的功能是设置账户的过期日期。通过它，你就能创建临时用户了。设定的日期一过，临时账户就会自动过期，而不需要记住在那天去删除这些账户。过期的账户跟锁定的账户很相似： 账户仍然存在，当用户无法用它登录。
+
+## 2. 使用Linux组
+用户账户在控制单个用户安全性方面很管用，但他们在允许一组用户共享资源时就捉襟见肘了。为了达到这个目的，Linux系统用了另外一个概念————组（group)。
 
 
+组权限允许多个用户共享一组共用的权限来访问系统上的对象，比如文件、目录或设备之类的。
 
+Linux发行版在处理默认组的归属关系时略有差异。有些Linux发行版会创建一个组，把所有用户都当做这个组的成员；遇到这种情况要特别小心，因为文件很可能对其他用户也是可读的。有些发行版会为每个用户创建一个单独的组，这样可以更安全一些。
 
+每个组都有一个唯一的GID————跟UID类似，在系统上这是个唯一的数值。和GID一起的，每个组还有一个唯一的组名。Linux系统上有一些组工具可以用来创建和管理你自己的组。本节将详述组信息是如何保存的，以及如何用组工具来创建新组、修改已有的组。
 
-
-
+1） **/etc/group文件**
 
 
 
