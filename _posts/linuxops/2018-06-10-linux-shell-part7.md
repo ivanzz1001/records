@@ -587,6 +587,195 @@ drwxr-x--x 2 ivan1001 ivan1001 4096 Apr 29 08:50 newdir
 
 ### 4.1 改变权限
 
+chmod命令用来改变文件和目录的安全性设置。chmod命令的格式如下：
+{% highlight string %}
+chmod options mode file
+{% endhighlight %}
+mode参数后可跟个八进制模式或符号模式来设置安全性设置。八进制模式设置非常直接，直接用期望赋予文件的标准3位八进制权限码：
+<pre>
+# chmod 760 newfile
+# ls -l newfile
+-rwxrw----. 1 root root 0 Apr 30 10:08 newfile
+</pre>
+
+八进制文件权限会自动应用到指定的文件上。符号模式的权限就没这么简单了。
+
+与通常用到的3组三字符权限字符不同，chmod用了另外一种实现。下面是在符号模式下指定权限的格式：
+{% highlight string %}
+[ugoa...] [+-=][rwxXstugo...]
+{% endhighlight %}
+非常有意义，不是吗？ 第一组字符定义了权限作用的对象：
+
+* u代表用户
+
+* g代表组
+
+* o代表其他
+
+* a代表上述所有
+
+下一步，后面跟着的符号表示你是想在现有权限的基础上增加权限（+)，还是在现有权限的基础上移除权限(-)，还是将权限设置成后面的值(=)。
+
+最后，第3个符号代表作用到设置上的权限。你会发现，这个值要比```rwx```多。额外的设置有以下几项：
+
+* X: 如果对象是目录或者它已有执行权限，赋予执行权限
+
+* s: 运行时重新设置UID和GID
+
+* t: 保留文件或目录
+
+* u: 将权限设置为跟属主一样
+
+* g: 将权限设置为跟属组一样
+
+* o: 将权限设置为跟其他用户一样
+
+这么使用这些权限：
+<pre>
+# ls -l newfile
+-rwxrw----. 1 root root 0 Apr 30 10:08 newfile
+# chmod o+r newfile
+# ls -l newfile
+-rwxrw-r--. 1 root root 0 Apr 30 10:08 newfile
+</pre>
+
+不管其他用户在这一安全级别之前都有什么权限，```o+r```给这一级别添加了读取权限。
+<pre>
+# chmod u-x newfile
+# ls -l newfile
+-rw-rw-r--. 1 root root 0 Apr 30 10:08 newfile
+</pre>
+
+```u-x```移除了属主已有的执行权限。回顾一下之前讲过的ls命令的那个参数```-F```，能够在具有执行权限的文件名后加一个星号。可用在这里检查前后的变化：
+<pre>
+# chmod u-x newfile
+# ls -lF ./newfile
+-rw-rw-r--. 1 root root 0 Apr 30 10:08 ./newfile
+# chmod u+x newfile
+# ls -lF ./newfile
+-rwxrw-r--. 1 root root 0 Apr 30 10:08 ./newfile*
+</pre>
+
+options参数为chmod命令提供了另外一些功能。```-R```参数可以让权限的改变递归地作用到文件和子目录。可以在指定文件名时用通配符将权限的更改通过一个命令作用到多个文件上。
+
+### 4.2 改变所属关系
+有时你要改变文件的属主，比如有人离职或开发人员创建了一个在产品环境中运行时需要归属在系统账户下的应用。Linux提供了两个命令来完成这个功能： chown命令用来改变文件的属主，chgrp命令用来改变文件的默认属组。
+
+chown命令的格式如下：
+{% highlight string %}
+chown [OPTION]... [OWNER][:[GROUP]] FILE...
+{% endhighlight %}
+可以用登录名或UID来指定文件的新属主：
+<pre>
+# chown ivan1001 newfile
+# ls -l newfile
+-rw-r--r--. 1 ivan1001 root 0 Apr 30 10:51 newfile
+</pre>
+
+非常简单。chown命令也支持同时改变文件的属主和属组：
+{% highlight string %}
+# chown ivan1001:ivan1001 newfile
+# ls -l newfile
+-rw-r--r--. 1 ivan1001 ivan1001 0 Apr 30 10:51 newfile
+{% endhighlight %}
+如果你不嫌麻烦，那么你可以这么改变一个目录的默认属组：
+{% highlight string %}
+# chown :ivan1001 ./newfile
+# ls -l newfile
+-rw-r--r--. 1 root ivan1001 0 Apr 30 10:54 newfile
+{% endhighlight %}
+最后，如果你的Linux系统采用和登录名匹配的组名，你可以只用一个条目就改变二者：
+{% highlight string %}
+# chown ivan1001: newfile
+# ls -l newfile
+-rw-r--r--. 1 ivan1001 ivan1001 0 Apr 30 11:00 newfile
+{% endhighlight %}
+
+chown命令采用一些不同的选项参数。```-R```参数加通配符可以递归地改变子目录和文件的所属关系。```-h```参数可以改变该文件的所有符号链接文件的所属关系。
+
+<pre>
+说明： 只有root用户能够改变文件的属主。任何属主都可以改变文件的	属组，但前提是属主必须是源和目标属组的成员。
+</pre>
+
+chgrp命令可以很方便的更改目录或文件的默认属组：
+{% highlight string %}
+# chgrp ivan1001 newfile
+# chmod g+w newfile
+# ls -l newfile
+-rw-rw-r--. 1 root ivan1001 0 Apr 30 11:08 newfile
+{% endhighlight %}
+
+现在ivan1001组的任意一个成员都可以写这个文件了。这是Linux系统共享文件的一个途径。然而，在系统上给一组人共享一个文件很复杂。下一节会介绍如何做。
+
+## 5. 共享文件
+可能你已经猜到了，创建组是Linux系统上共享文件访问权限的方法。但在一个完整的共享文件的环境中，事情会复杂得多。
+
+在第3节中你已经看到，创建新文件时，Linux会用默认UID和GID来给文件分配权限。想让其他人也能访问文件，你要么改变其他用户所在安全组的访问权限，要么就给文件分配一个新的包含其他用户的默认属组。
+
+如果你想在大的环境中创建文档并将文档与人共享，这会很繁琐。幸好有解决这个问题的简单方法。
+
+Linux还为每个文件和目录存储了3个额外的信息位：
+
+* 设置用户ID(SUID): 当文件被用户使用时，程序会以文件属主的权限运行
+
+* 设置组ID(SGID): 对文件来说，程序会以文件属组的权限运行； 对目录来说，目录中创建的新文件会以目录的默认属组作为默认属组。
+
+* 粘着位: 进程结束后文件还会在内存中
+
+SGID位对文件共享非常重要。使能了SGID位，你能让在一个共享目录下创建的新文件都属于该目录的属组，也就是每个用户的组。
+
+SGID可通过chmod命令设置。它会加到标准3位八进制值之前（组成4位八进制值），或者在符号模式下用符号```s```。
+
+如果你用的是八进制模式，你需要知道这些位的位置，如下表所示：
+
+<pre>
+                表： chmod SUID、SGID和粘着位的八进制值
+
+二进制值               八进制值                    描述
+-------------------------------------------------------------------------------
+ 000                     0                   所有位都清零
+ 001                     1                   粘着位置位
+ 010                     2                   SGID位置位
+ 011                     3                   SGID位和粘着位都置位
+ 100                     4                   SUID位置位
+ 101                     5                   SUID为和粘着位置位
+ 110                     6                   SUID位和SGID位置位
+ 111                     7                   所有位都置位       
+</pre>
+因此，要创建一个共享目录，使目录里的新文件都能沿用目录的数组，你只需将该目录的SGID位置位：
+{% highlight string %}
+# groupadd shared
+# mkdir /tmp/testdir
+# ls -l /tmp/
+drwxr-xr-x. 2 root     root        6 Apr 30 11:31 testdir
+
+# chgrp shared /tmp/testdir
+# chmod g+s /tmp/testdir
+# chmod g+w /tmp/testdir
+# ls -l /tmp
+drwxrwsr-x. 2 root     shared      6 Apr 30 11:31 testdir
+
+# umask 002
+# cd /tmp/testdir
+# touch testfile
+# ls -l
+total 0
+-rw-rw-r--. 1 root shared 0 Apr 30 11:38 testfile
+{% endhighlight %}
+
+首先，用mkdir命令来创建希望共享的目录。其次，通过chgrp命令将该目录的默认属组改为含有所有需要共享文件用户的组。最后，将目录的SGID位置位，以保证目录中新建文件都用shared作为默认属组。
+
+为了让这个环境能正常工作，所有组成员都需把它们的umask值设置成文件对属组成员可写。在前面的例子中，umask改成了```002```，所以文件对属组是可写的。
+
+做完了这些，组成员就能到共享目录下创建新文件了。跟期望的一样，新文件会沿用目录的属组，而不是用户的默认属组。现在shared组的所有用户都能访问这个文件了。
+
+
+
+
+
+
+
+
 
 
 <br />
