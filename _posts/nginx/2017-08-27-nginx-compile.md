@@ -154,6 +154,12 @@ description: nginx源代码编译安装
 这里我们所用的nginx版本为：nginx-1.10.3
 {% highlight string %}
 # ./configure \
+--prefix=/usr/local/nginx \
+--with-http_ssl_module \
+--with-pcre=../pcre-8.40 \
+--with-zlib=../zlib-1.2.11
+
+# ./configure \
 --sbin-path=/usr/local/nginx/nginx \
 --conf-path=/usr/local/nginx/nginx.conf \
 --pid-path=/usr/local/nginx/nginx.pid \

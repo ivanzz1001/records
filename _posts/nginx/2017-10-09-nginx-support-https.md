@@ -25,6 +25,7 @@ description: Nginx支持https
 
 # yum install openssl openssl-devel      //头文件默认安装在/usr/include/openssl目录下
 
+# wget http://nginx.org/download/nginx-1.10.3.tar.gz
 # tar -zxvf nginx-1.10.3.tar.gz
 # cd nginx-1.10.3/
 
