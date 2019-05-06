@@ -740,7 +740,7 @@ data31
 
 2) **匹配操作符**
 
-匹配操作符(matching operator)允许将正则表达式限定在数据行中的特定数据字段。匹配操作符是波浪线(~)。你要一起制定匹配操作符、数据字段变量以及要匹配的正则表达式：
+匹配操作符(matching operator)允许将正则表达式限定在数据行中的特定数据字段。匹配操作符是波浪线(~)。你要一起指定匹配操作符、数据字段变量以及要匹配的正则表达式：
 {% highlight string %}
 $1 ~ /^data/
 {% endhighlight %}
@@ -808,7 +808,7 @@ x > y: 值x大于y
 data11,data12,data13,data14,data15
 data21,data22,data23,data24,data25
 data31,data32,data33,data34,data35
-root@ubuntu:~/workspace# 
+
 # gawk -F, '$1 == "data" {print $1}' data1
 # gawk -F, '$1 == "data11" {print $1}' data1
 data11
