@@ -87,7 +87,7 @@ This is an example of a function
 Now this is the end of the script
 {% endhighlight %}
 
-每次引用```func1```函数名时，bash shell会回到func1函数的定义并指定你在那里定义的命令。
+每次引用```func1```函数名时，bash shell会回到func1函数的定义并执行你在那里定义的命令。
 
 函数定义不必是shell脚本中最前面的事，但要小心。如果在函数被定义前使用函数，你会收到一条错误消息：
 {% highlight string %}

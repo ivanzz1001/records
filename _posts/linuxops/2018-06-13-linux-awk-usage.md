@@ -1084,10 +1084,7 @@ Haley Snell     (313)555-4938
 data11,data12,data13,data14,data15
 data21,data22,data23,data24,data25
 data31,data32,data33,data34,data35
-[root@localhost workspace]# cat data1
-data11,data12,data13,data14,data15
-data21,data22,data23,data24,data25
-data31,data32,data33,data34,data35
+
 # gawk 'BEGIN{FS=","} {printf "%s ", $1} END{printf "\n"}' data1
 data11 data21 data31 
 {% endhighlight %}
