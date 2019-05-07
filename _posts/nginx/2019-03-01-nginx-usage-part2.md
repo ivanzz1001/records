@@ -360,6 +360,8 @@ hello world
 
 6. [nginx](https://cloud.tencent.com/developer/section/1259213)
 
+7. [nginx的11个http请求处理阶段](https://blog.51cto.com/wenxi123/2296295)
+
 <br />
 <br />
 <br />
