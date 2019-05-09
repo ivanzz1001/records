@@ -8,7 +8,7 @@ description: nginx使用基础
 ---
 
 
-
+本章我们介绍一下Nginx中用到的一些缓冲。
 
 <!-- more -->
 
