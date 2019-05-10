@@ -89,7 +89,7 @@ int Partion(SqList L, int low, int high)
 {% highlight string %}
 void QSort(SqList L,int low, high)
 {
-	while(low < high)
+	if(low < high)
 	{
 		pivotloc = Partion(L, low, high);
 		
