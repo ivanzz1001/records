@@ -50,6 +50,41 @@ HKEY_CURRENT_USER/Software/Microsoft/Windows/CurrentVersion/Internet Settings/
 
 ![fiddler-usage-2](https://ivanzz1001.github.io/records/assets/img/tools/fiddler_usage_2.jpg)
 
+
+### 4.  Fiddler添加时间戳信息
+有时候，我们通过Fiddler抓包，想看到请求响应的时间戳信息。默认情况下， Fiddler是没有打开时间戳信息的，我们可以在菜单栏"Rules"->"Customize Rules"中添加如下脚本：
+{% highlight string %}
+// 显示每行请求的发起时间:时分秒毫秒
+public static BindUIColumn("BeginTime", 80)
+function BeginTimingCol(oS: Session){   
+
+	return oS.Timers.ClientDoneRequest.ToString("HH:mm:ss.fff");
+
+}
+// 显示每行请求的响应时间:时分秒毫秒
+public static BindUIColumn("EndTime", 80)
+function EndTimingCol(oS: Session){     
+
+	return oS.Timers.ServerDoneResponse.ToString("HH:mm:ss.fff");
+
+}
+// 显示每行请求的服务端耗时时间
+public static BindUIColumn("Time Taken", 80)
+function CalcTimingCol(oS: Session){  
+   
+	var sResult = "0";                  
+
+	if ((oS.Timers.ServerDoneResponse > oS.Timers.ClientDoneRequest)) {  
+
+		sResult = (oS.Timers.ServerDoneResponse - oS.Timers.ClientDoneRequest).TotalMilliseconds.ToString("N0");
+
+	}  
+
+	return sResult + "ms";  
+}
+{% endhighlight %}
+之后继续抓包，则可以看到请求、响应的时间戳信息了。
+
 <br />
 <br />
 
