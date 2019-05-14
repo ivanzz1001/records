@@ -167,10 +167,26 @@ description: nginx源代码编译安装
 --with-pcre=../pcre-8.40 \
 --with-zlib=../zlib-1.2.11
 
+# ./configure \
+--prefix=/usr/local/nginx \
+--conf-path=/etc/nginx/nginx.conf \
+--error-log-path=/var/log/nginx/error.log \
+--http-log-path=/var/log/nginx/access.log \
+--pid-path=/var/run/nginx.pid \
+--lock-path=/var/lock/nginx.lock \
+--http-client-body-temp-path=/var/tmp/nginx/client/ \
+--http-proxy-temp-path=/var/tmp/nginx/proxy/ \
+--http-fastcgi-temp-path=/var/tmp/nginx/fcgi/ \
+--http-uwsgi-temp-path=/var/tmp/nginx/uwsgi \
+--with-http_ssl_module \
+--with-pcre=../pcre-8.40 \
+--with-zlib=../zlib-1.2.11
+
 # make 
 
 # make install 
 {% endhighlight %}
+如果我们要打开调试选项，可以使用```--with-debug```。
 
 
 **(6) 查看nginx是否安装成功**
