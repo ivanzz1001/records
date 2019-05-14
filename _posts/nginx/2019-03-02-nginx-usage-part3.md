@@ -106,6 +106,23 @@ Context:	http, server, location
 
 ## 2. nginx代理缓存配置示例
 
+* 通用网站配置
+{% highlight string %}
+proxy_buffer_size 4k;            #设置代理服务器（nginx）保存用户头信息的缓冲区大小
+proxy_buffers 4 32k;             #proxy_buffers缓冲区，网页平均在32k以下的设置
+proxy_busy_buffers_size 64k;     #高负荷下缓冲大小（proxy_buffers*2）
+proxy_temp_file_write_size 64k;
+#设定缓存文件夹大小，大于这个值，将从upstream服务器传
+{% endhighlight %}
+
+* docker registry的配置 这个每次传输至少都是9M以上的内容，缓冲区配置大
+{% highlight string %}
+proxy_buffering on;
+proxy_buffer_size 4k; 
+proxy_buffers 8 1M;
+proxy_busy_buffers_size 2M;
+proxy_max_temp_file_size 0;
+{% endhighlight %}
 
 
 <br />
