@@ -11,11 +11,46 @@ description: ceph数据一致性浅析
 
 ceph作为一个分布式存储系统，保证数据的一致性是很重要的一个方面。ceph的数据存储是以PG为单位来进行的，而数据的一致性也是通过PG的相关操作来实现的。本章涉及到的内容包括：
 
-* PGMap的映射
+* PG的创建过程
 
 * Ceph Peering机制
 
 <!-- more -->
+
+## 1. PG的创建过程
+
+PG的创建是由monitor节点发起的，形成请求message发送给osd，在OSD上创建PG。
+
+### 1.1 monitor节点处理
+
+1) 在monitor中由PGMonitor发现是否创建了pool， pool中是否存在PG需要进行创建。首先来看函数PGMonitor::register_new_pgs()
+{% highlight string %}
+bool PGMonitor::register_new_pgs()
+{
+    ....
+    // first pgs in this pool
+    bool new_pool = pg_map.pg_pool_sum.count(poolid) == 0;
+
+    for (ps_t ps = 0; ps < pool.get_pg_num(); ps++) 
+    {
+        pg_t pgid(ps, poolid, -1);
+        if (pg_map.pg_stat.count(pgid)) 
+        {
+	        dout(20) << "register_new_pgs  have " << pgid << dendl;
+	        continue;
+        }
+        created++;
+        register_pg(osdmap, pgid, pool.get_last_change(), new_pool);
+    }   
+}
+{% endhighlight %}
+
+
+
+
+
+
+
 
 
 
