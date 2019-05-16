@@ -69,12 +69,97 @@ Default:
 send_timeout 60s;
 Context:	http, server, location
 {% endhighlight %}
+用于设置nginx发送响应倒客户端的超时时间。该超时时间是指**两次连续的写**操作之间的时间间隔，而不是整个响应的传输时间。假如客户端在该超时时间内未收到任何数据，则连接会被关闭。
 
+5) **lingering_timeout指令**
+
+我们可以在ngx_http_core_module模块找到lingering_timeout指令，其基本语法如下：
+{% highlight string %}
+Syntax:	lingering_timeout time;
+Default:	
+lingering_timeout 5s;
+Context:	http, server, location
+{% endhighlight %}
+当```lingering_close```开启之后，本指令用于设置在连接关闭之前最长等待多长时间以接受更多的客户端数据。假如在这段时间之内并没有数据到达，连接将会被关闭。否则，数据会被读取并忽略，nginx开始等待更多的数据到达。```wait-read-ignore```循环会一直重复，但最长不会超过lingering_time时间。
+<pre>
+注： 默认情况下lingering_close是被启用的。
+</pre>
 
 
 ### 1.2 nginx与proxied server之间的超时
 
+1) **proxy_connect_timeout指令**
 
+我们可以在ngx_http_proxy_module模块找到proxy_connect_timeout指令，其基本语法如下：
+{% highlight string %}
+Syntax:	proxy_connect_timeout time;
+Default:	
+proxy_connect_timeout 60s;
+Context:	http, server, location
+{% endhighlight %}
+定义nginx与后端代理服务器(proxied server)建立连接时的超时时间。我们需要注意的是，该超时时间通常不应该超过```75s```。
+
+2) **proxy_read_timeout指令**
+
+我们可以在ngx_http_proxy_module模块找到proxy_read_timeout指令，其基本语法如下：
+{% highlight string %}
+Syntax:	proxy_read_timeout time;
+Default:	
+proxy_read_timeout 60s;
+Context:	http, server, location
+{% endhighlight %}
+定义nginx读取后端代理服务器(proxied server)响应的超时时间。该超时时间是指**两次连续的读**操作之间的时间间隔，而不是整个响应的传输时间。假如代理服务器在该超时时间段内没有传递任何数据，连接将被关闭。
+
+3) **proxy_send_timeout指令**
+
+我们可以在ngx_http_proxy_module模块找到proxy_send_timeout指令，其基本语法如下：
+{% highlight string %}
+Syntax:	proxy_send_timeout time;
+Default:	
+proxy_send_timeout 60s;
+Context:	http, server, location
+{% endhighlight %}
+用于设置将请求发送到代理服务器(proxied server)的超时时间。该超时时间是指**两次连续的写**操作之间的时间间隔，而不是整个请求的传输时间。假如代理服务器(proxied server)在该超时时间之内没有收到任何数据，则连接会被关闭。
+
+### 1.3 其他超时时间
+
+1） **resolver_timeout指令**
+
+resolver_timeout指令在ngx_http_core_module模块、ngx_mail_core_module模块以及ngx_stream_core_module模块均可找到，在三个模块中的语法也类似。我们以http模块为例：
+{% highlight string %}
+Syntax:	resolver_timeout time;
+Default:	
+resolver_timeout 30s;
+Context:	http, server, location
+{% endhighlight %}
+用于设置解析一个名称(name)的超时时间。
+
+
+## 2. nginx日志中常用的时间参数
+在nginx日志中，有时为了排查问题，我们需要加上时间戳信息。通常我们会按如下方式打印日志信息：
+{% highlight string %}
+error_log /var/log/nginx/error.log info;
+
+http {
+        log_format  main  '$remote_addr - $remote_user [$time_local]  [$request_time] [$upstream_response_time] "$request" '
+                                        '$status $body_bytes_sent "$http_referer" '
+                                        '"$http_user_agent" "$http_x_forwarded_for" "$upstream_addr" ';
+}
+{% endhighlight %}
+上面涉及到3个时间戳：
+
+1) **time_local**
+
+在ngx_http_core_module、ngx_http_log_module以及ngx_stream_core_module模块中均可以找到time_local变量。在上面例子中，```$time_local```对应的是ngx_http_log_module模块中的变量。它是nginx处理完打印日志的时间，而不是请求发出的时间。
+
+2) **request_time**
+
+请求的处理时间，分辨率为毫秒。该时间是从nginx接收到来自客户端第一个字节开始，到nginx向客户端返回最后一个字节后写日志时的时间间隔。
+
+
+3) **upstream_response_time**
+
+我们可以在ngx_http_upstream_module模块找到本变量。用于指示从Nginx向后端(proxied server)建立连接开始到接收完数据然后关闭连接为止的时间，分辨率为毫秒。
 
 
 ## 3. 附录： 浅谈HTTP长连接和Keep-Alive
