@@ -67,8 +67,40 @@ KeepAlive在一段时间内保持打开状态，它们会在这段时间内占�
 
 * Content-Length: 表示实体内容的长度。浏览器通过这个字段来判断当前请求的数据是否已经全部接收。所以，当浏览器请求的是一个静态资源时，即服务器能明确知道返回内容的长度时，可以设置Content-Length来控制请求的结束。但当服务器并不知道请求结果的长度时，如一个动态的页面或者数据，Content-Length就无法解决上面的问题，这个时候就需要用到Transfer-Encoding字段。
 
-* Transfer-Encoding: 
+* Transfer-Encoding: 是指传输编码，在上面的问题中，当服务器无法知道实体内容的长度时，就可以通过指定```Transfer-Encoding: chunked```来告知浏览器当前的编码是将数据分成一块一块传递的。当然，还可以指定"Transfer-Encoding: gzip, chunked"，表明实体内容不仅是gzip压缩的，还是分块传递的。最后，当浏览器接收到一个长度为0的chunked时，知道当前请求内容已全部接收。
 
+4） **Keep-Alive timeout**
+
+http守护进程一般都提供了keep-alive timeout时间设置参数。比如nginx的keepalive_timeout， 和Apache的KeepAliveTimeout。这个keepalive_timeout时间意味着： 一个http产生的tcp连接在传送完最后一个响应后，还需要hold住keepalive_timeout秒后，才开始关闭这个连接。
+
+当http守护进程发送完一个响应后，理应马上主动关闭响应的TCP连接，设置keepalive_timeout后，http守护进程会想说：“再等等， 看看浏览器还有没有请求过来”，这一等，便是keepalive_timeout时间。如果守护进程在这个等待的时间里，一直没有收到浏览器发过来的http请求，则关闭这个http连接。
+
+5） **TCP的keepalive**
+
+连接建立之后，如果客户端一直不发送数据，或者隔很长时间才发送一次数据，当连接很久没有数据报文传输时如何去确定对方还在线，到底是掉线了还是确实没有数据传输，连接还需不需要保持，这种情况在TCP协议设计中是需要考虑的。
+
+TCP协议通过一种巧妙的方式去解决这个问题，当超过一段时间之后，TCP自动发送一个数据为空的报文（侦测包）给对方，如果对方回应了这个报文，说明对方还在线，连接可以继续保持； 如果对方没有报文返回，并且重试了多次之后则认为链接丢失，没必要保持连接。
+
+tcp keep-alive是TCP的一种检测TCP连接状况的保鲜机制。 tcp keep-alive保鲜定时器支持三个系统内核配置参数：
+<pre>
+# ls -l /proc/sys/net/ipv4/tcp_keepalive_*
+-rw-r--r-- 1 root root 0 May 15 19:36 /proc/sys/net/ipv4/tcp_keepalive_intvl
+-rw-r--r-- 1 root root 0 May 15 19:36 /proc/sys/net/ipv4/tcp_keepalive_probes
+-rw-r--r-- 1 root root 0 May 15 19:36 /proc/sys/net/ipv4/tcp_keepalive_time
+
+# cat /proc/sys/net/ipv4/tcp_keepalive_intvl
+75
+# cat /proc/sys/net/ipv4/tcp_keepalive_probes
+9
+# cat /proc/sys/net/ipv4/tcp_keepalive_time
+7200
+</pre>
+keepalive是TCP保鲜定时器，当网络两端建立了TCP连接之后，闲置（双方没有任何数据流发送往来）了tcp_keepalive_time后，服务器就会尝试向客户端发送侦测包，来判断TCP连接状况（可能客户端崩溃、强制关闭了应用、主机不可达等等）。如果没有收到对方的回答(ack包），则会在tcp_keepalive_intvl后再次尝试发送侦测包，直到收到对方的ack。如果一直没有收到对方的ack，一共会尝试tcp_keepalive_probes次，每次的时间间隔分别是75s、150s、225s、300s。如果尝试tcp_keepalive_probes次，依然没收到对方的ack包，则会丢弃该tcp连接。TCP连接默认闲置时间是2小时，一般设置为30分钟足够了。
+
+<pre>
+注： 谁想定期检查连接状况,谁就启用keep alive。另一端可以不起，只是被动地对探测包进行响应，这种响应是
+    tcp协议的基本要求，跟keep alive无关。并不需要客户端和服务器端都开启keep alive
+</pre>
 
 
 <br />
