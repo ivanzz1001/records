@@ -38,6 +38,40 @@ HTTP是一种无状态协议，客户端向服务器发送一个TCP请求，服�
 
 KeepAlive在一段时间内保持打开状态，它们会在这段时间内占用资源。占用过多就会影响性能。关于http的keep-alive，请参看：**浅谈HTTP长连接和Keep-Alive**
 
+2) **client_header_timeout指令**
+
+我们可以在ngx_http_core_module模块找到client_header_timeout指令，其基本语法如下：
+{% highlight string %}
+Syntax:	client_header_timeout time;
+Default:	
+client_header_timeout 60s;
+Context:	http, server
+{% endhighlight %}
+用于指定nginx读取客户端```请求头```(request header)的超时时间。假如客户端在该超时时间之内未传输完整个http头，则请求会被终止并返回一个408(Request Time-out)错误。
+
+3) **client_body_timeout指令**
+
+我们可以在ngx_http_core_module模块找到client_body_timeout指令，其基本语法如下：
+{% highlight string %}
+Syntax:	client_body_timeout time;
+Default:	
+client_body_timeout 60s;
+Context:	http, server, location
+{% endhighlight %}
+用于指定nginx读取客户端```请求体```(request body)的超时时间。该超时时间是指**两次连续的读**操作之间的时间间隔，而不是整个请求体（request body)的传输时间。假如在超时时间之内，客户端并没有传递任何数据，则请求会被终止并返回一个408(Request Time-out)错误。
+
+4） **send_timeout指令**
+
+我们可以在ngx_http_core_module模块找到send_timeout指令，其基本语法如下：
+{% highlight string %}
+Syntax:	send_timeout time;
+Default:	
+send_timeout 60s;
+Context:	http, server, location
+{% endhighlight %}
+
+
+
 ### 1.2 nginx与proxied server之间的超时
 
 
@@ -116,7 +150,7 @@ keepalive是TCP保鲜定时器，当网络两端建立了TCP连接之后，闲�
 
 5. [nginx指令](http://nginx.org/en/docs/dirindex.html)
 
-6. []()
+6. [ngin日志time_local解释](https://blog.csdn.net/mental_derangement/article/details/81779795)
 
 <br />
 <br />
