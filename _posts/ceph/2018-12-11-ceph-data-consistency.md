@@ -23,7 +23,9 @@ PG的创建是由monitor节点发起的，形成请求message发送给osd，在O
 
 ### 1.1 monitor节点处理
 
-1) 在monitor中由PGMonitor发现是否创建了pool， pool中是否存在PG需要进行创建。首先来看函数PGMonitor::register_new_pgs()
+1） **register_new_pgs()**
+
+在monitor中由PGMonitor发现是否创建了pool， pool中是否存在PG需要进行创建。首先来看函数PGMonitor::register_new_pgs()
 {% highlight string %}
 bool PGMonitor::register_new_pgs()
 {
@@ -31,23 +33,260 @@ bool PGMonitor::register_new_pgs()
     // first pgs in this pool
     bool new_pool = pg_map.pg_pool_sum.count(poolid) == 0;
 
-    for (ps_t ps = 0; ps < pool.get_pg_num(); ps++) 
+    for (ps_t ps = 0; ps < pool.get_pg_num(); ps++)                      //标记位置1
     {
-        pg_t pgid(ps, poolid, -1);
-        if (pg_map.pg_stat.count(pgid)) 
+        pg_t pgid(ps, poolid, -1);                                       //标记位置2
+        if (pg_map.pg_stat.count(pgid))                                  //标记位置3
         {
 	        dout(20) << "register_new_pgs  have " << pgid << dendl;
 	        continue;
         }
         created++;
-        register_pg(osdmap, pgid, pool.get_last_change(), new_pool);
+        register_pg(osdmap, pgid, pool.get_last_change(), new_pool);     //标记位置4
     }   
 }
 {% endhighlight %}
+标记位置1：循环遍历当前这个pool中的所有PG
+
+标记位置2: 根据当前这个pool中PG的序号和pool的id，形成pgid。(pgid就是用来统计哪个pool中的第几个pg而已，使用m_seed作为pg序号，m_pool作为pool序号，如下所示：）
+<pre>
+struct pg_t {
+  uint64_t m_pool;
+  uint32_t m_seed;
+  int32_t m_preferred;
+
+  ....
+};
+</pre>
+
+标记位置3： pg_map中统计了所有的PG，如果发现当前的PG不在pg_map中，说明这个pg是需要被创建的
+
+标记位置4： 使用register_pg()函数开始处理申请这个PG
 
 
+2） **申请PG**
+
+register_pg()函数开始对PG的申请进行处理，这时已经有了pgid和pool的信息：
+{% highlight string %}
+void PGMonitor::register_pg(OSDMap *osdmap,
+                            pg_t pgid, epoch_t epoch,
+                            bool new_pool)
+{
+     ....
+
+     pg_stat_t &stats = pending_inc.pg_stat_updates[pgid];       //标记位置1
+     stats.state = PG_STATE_CREATING;                            //标记位置2
+     stats.created = epoch;
+     stats.parent = parent;
+     stats.parent_split_bits = split_bits;
+     stats.mapping_epoch = epoch;
 
 
+     //标记位置3
+     osdmap->pg_to_up_acting_osds(
+       pgid,
+       &stats.up,
+       &stats.up_primary,
+       &stats.acting,
+       &stats.acting_primary);
+}
+
+
+void OSDMap::_pg_to_up_acting_osds(const pg_t& pg, vector<int> *up, int *up_primary,
+                                   vector<int> *acting, int *acting_primary) const
+{
+    
+}
+{% endhighlight %}
+标记位置1： 将刚创建的pgid统计到pending_inc.pg_stat_updates结构中
+
+标记位置2： 设置这个PG的状态为PG_STATE_CREATING
+
+标记位置3： 将PG映射到OSD上，这时候需要osdmap，最终通过_pg_to_up_acting_osds()函数完成映射
+
+接下来会将这个```pending_inc```进行打包，然后推行propose_pending()，开始提议，等待完成最后推行（这其实是paxos协议的一部分）。
+
+3） **propose_pending()**
+
+在check_osd_map()函数中首先执行了register_new_pgs()，之后将映射好的PG通过propose_pending()完成推行，形成一致的PGMap。(说明： 类PGMonitor继承了PaxosService）:
+{% highlight string %}
+void PGMonitor::check_osd_map(epoch_t epoch)
+{
+    if (map_pg_creates())
+        propose = true;
+    if (register_new_pgs())
+        propose = true;
+
+    if ((need_check_down_pgs || !need_check_down_pg_osds.empty()) && check_down_pgs())
+        propose = true;
+
+    if (propose)
+        propose_pending();
+}
+
+void PaxosService::propose_pending()
+{
+    paxos->queue_pending_finisher(new C_Committed(this));
+    paxos->trigger_propose();               //标记位置1
+}
+{% endhighlight %}
+标记位置1： 触发提议的表决
+
+4） **触发提议表决**
+{% highlight string %}
+bool Paxos::trigger_propose()
+{
+    if (is_active()) {
+       dout(10) << __func__ << " active, proposing now" << dendl;
+       propose_pending();
+       return true;
+    } else {
+       dout(10) << __func__ << " not active, will propose later" << dendl;
+       return false;
+    }
+}
+
+void Paxos::propose_pending()
+{
+    ...
+    state = STATE_UPDATING;
+    begin(bl);
+}
+{% endhighlight %}
+上面完成投票表决之后，就会调用refresh_from_paxos()完成提议的推行。
+
+5) **进行提议的推行**
+{% highlight string %}
+void Monitor::refresh_from_paxos(bool *need_bootstrap)
+{
+    for (int i = 0; i < PAXOS_NUM; ++i) {
+        paxos_service[i]->refresh(need_bootstrap);      //标记位置1
+    }
+    for (int i = 0; i < PAXOS_NUM; ++i) {
+       paxos_service[i]->post_refresh();
+    }
+}
+
+void PaxosService::refresh(bool *need_bootstrap)
+{
+     update_from_paxos(need_bootstrap);
+}
+
+void PGMonitor::update_from_paxos(bool *need_bootstrap)
+{
+    PGMap::Incremental inc;
+    try {
+        bufferlist::iterator p = bl.begin();
+        inc.decode(p);                             //标记位置1
+    } catch (const std::exception &e)   {
+        dout(0) << "update_from_paxos: error parsing "
+         << "incremental update: " << e.what() << dendl;
+        assert(0 == "update_from_paxos: error parsing incremental update");
+        return;
+    }
+
+    pg_map.apply_incremental(g_ceph_context, inc);          //标记位置2
+}
+{% endhighlight %}
+决策推行函数update_from_paxos()，在这里会根据仲裁决定，然后处理结果，上面说道已经推行了创建的PG。
+
+标记位置1： 重新解析pgid;
+
+标记位置2： 将这个决议交给pg_map进行处理，调用PGMap::apply_incremental()
+
+6) **发送请求到OSD以创建PG**
+
+我们在上面Monitor::refresh_from_paxos()后面会调用post_refresh()，此函数会最后向对应的OSD发出创建PG的命令：
+{% highlight string %}
+void PaxosService::post_refresh()
+{
+  post_paxos_update();
+}
+
+void PGMonitor::post_paxos_update()
+{
+  if (mon->osdmon()->osdmap.get_epoch()) {
+    send_pg_creates();
+  }
+}
+
+void PGMonitor::send_pg_creates()
+{
+    if (osdmap.is_up(osd))
+       send_pg_creates(osd, NULL, 0);
+}
+
+epoch_t PGMonitor::send_pg_creates(int osd, Connection *con, epoch_t next)
+{
+    m = new MOSDPGCreate(pg_map.last_osdmap_epoch);    
+
+
+    if (con) {
+        con->send_message(m);                   
+    } else {
+       assert(mon->osdmon()->osdmap.is_up(osd));
+       mon->messenger->send_message(m, mon->osdmon()->osdmap.get_inst(osd));
+    }
+}
+{% endhighlight %}
+上面创建了一个```MOSDPGCreate```对象，然后向其发送消息进行PG的创建。```MOSDPGCreate```实现了Message类：
+{% highlight string %}
+struct MOSDPGCreate : public Message {
+  MOSDPGCreate()
+    : Message(MSG_OSD_PG_CREATE, HEAD_VERSION, COMPAT_VERSION) {}
+  MOSDPGCreate(epoch_t e)
+    : Message(MSG_OSD_PG_CREATE, HEAD_VERSION, COMPAT_VERSION),
+      epoch(e) { }
+};
+{% endhighlight %}
+
+### 1.2 osd节点处理
+osd这时收到一个消息，根据消息命令字```MSG_OSD_PG_CREATE```，发现这是一个创建PG的消息，然后交给handle_pg_create()进行处理：
+{% highlight string %}
+void OSD::dispatch_op(OpRequestRef op)
+{
+  switch (op->get_req()->get_type()) {
+
+  case MSG_OSD_PG_CREATE:
+    handle_pg_create(op);
+}
+
+void OSD::handle_pg_create(OpRequestRef op)
+{
+    MOSDPGCreate *m = (MOSDPGCreate*)op->get_req();
+
+    for (map<pg_t,pg_create_t>::iterator p = m->mkpg.begin();p != m->mkpg.end(); ++p, ++ci) 
+    {
+         pg_t on = p->first;             //标记位置1
+
+         // is it still ours?
+        vector<int> up, acting;
+        int up_primary = -1;
+        int acting_primary = -1;
+        osdmap->pg_to_up_acting_osds(on, &up, &up_primary, &acting, &acting_primary);   // 标记位置2
+        int role = osdmap->calc_pg_role(whoami, acting, acting.size());
+
+        ...
+
+        spg_t pgid;
+        bool mapped = osdmap->get_primary_shard(on, &pgid);            
+
+
+        //标记位置3
+        handle_pg_peering_evt(pgid,history,pi,osdmap->get_epoch(),
+              PG::CephPeeringEvtRef(new PG::CephPeeringEvt(osdmap->get_epoch(),osdmap->get_epoch(),PG::NullEvt()))
+        );                 
+
+    }
+
+}
+{% endhighlight %}
+
+标记位置1： 在消息中恢复出所要创建的PG到on上
+
+标记位置2： 根据PG编号，重新计算该PG所映射到的OSD
+
+标记位置3： 实际创建PG。因为Monitor并不会给PG的从OSD发送消息来创建该PG，而是由该主OSD上的PG在Peering过程中创建，所以最先创建的肯定是primary PG，从PG的创建也是在peering过程中通过handler_pg_peering_evt来完成的。
 
 
 
