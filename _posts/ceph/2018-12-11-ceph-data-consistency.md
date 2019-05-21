@@ -293,6 +293,12 @@ void OSD::handle_pg_create(OpRequestRef op)
 PG的加载： 当OSD重启时，调用函数OSD::init()，该函数调用load_pgs函数加载已经存在的PG，其处理过程和创建PG的过程相似
 </pre>
 
+## 2. PG创建后状态机的状态转换
+如下图10-2为PG总体状态转换图的简化版： 状态Peering、Active、ReplicaActive4的内部状态没有添加进去。
+
+![ceph-pg-peering](https://ivanzz1001.github.io/records/assets/img/ceph/pg/ceph_pg_peering1.jpg)
+
+
 
 
 
