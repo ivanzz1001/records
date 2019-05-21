@@ -288,6 +288,12 @@ void OSD::handle_pg_create(OpRequestRef op)
 
 标记位置3： 实际创建PG。因为Monitor并不会给PG的从OSD发送消息来创建该PG，而是由该主OSD上的PG在Peering过程中创建，所以最先创建的肯定是primary PG，从PG的创建也是在peering过程中通过handler_pg_peering_evt来完成的。
 
+说明：
+<pre>
+PG的加载： 当OSD重启时，调用函数OSD::init()，该函数调用load_pgs函数加载已经存在的PG，其处理过程和创建PG的过程相似
+</pre>
+
+
 
 
 
@@ -314,6 +320,10 @@ void OSD::handle_pg_create(OpRequestRef op)
 7. [ceph存储 PG的状态机和peering过程](https://blog.csdn.net/skdkjzz/article/details/51579903)
 
 8. [Ceph中一些PG相关的状态说明和基本概念说明、故障模拟](https://blog.csdn.net/pansaky/article/details/86700301)
+
+9. [ceph OSD读写流程](http://www.sysnote.org/2015/11/25/ceph-osd-rw2/)
+
+9. [mongoose库](https://github.com/cesanta/mongoose)
 
 <br />
 <br />
