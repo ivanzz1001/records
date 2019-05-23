@@ -15,6 +15,10 @@ ceph作为一个分布式存储系统，保证数据的一致性是很重要的�
 
 * Ceph Peering机制
 
+下面我们先给出一幅PG状态机的总体状态转换图：
+
+
+
 <!-- more -->
 
 ## 1. PG的创建过程
@@ -298,9 +302,49 @@ PG的加载： 当OSD重启时，调用函数OSD::init()，该函数调用load_p
 
 ![ceph-pg-peering](https://ivanzz1001.github.io/records/assets/img/ceph/pg/ceph_pg_peering1.jpg)
 
+通过该图可以了解PG的高层状态转换过程，如下所示：
 
+1) 当PG创建后，同时在该类内部创建了一个属于该PG的RecoveryMachine类型的状态机，该状态机的初始化状态为默认初始化状态Initial
 
+2) 在PG创建后，调用函数pg->handle_create(&rctx)来给状态机投递事件：
+{% highlight string %}
+void PG::handle_create(RecoveryCtx *rctx)
+{
+  dout(10) << "handle_create" << dendl;
+  rctx->created_pgs.insert(this);
+  Initialize evt;
+  recovery_state.handle_event(evt, rctx);
+  ActMap evt2;
+  recovery_state.handle_event(evt2, rctx);
+}
+{% endhighlight %}
+由以上代码可知： 该函数首先向RecoveryMachine投递了Initialize类型的事件。由上图10-2可知，状态机在RecoveryMachine/Initial状态接收到Initialize类型的事件后直接转移到Reset状态。其次，向RecoveryMachine投递了ActMap事件。
 
+3） 状态Reset接收到ActMap事件，跳转到Started状态
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Reset::react(const ActMap&)
+{
+  PG *pg = context< RecoveryMachine >().pg;
+  if (pg->should_send_notify() && pg->get_primary().osd >= 0) {
+    context< RecoveryMachine >().send_notify(
+      pg->get_primary(),
+      pg_notify_t(
+	pg->get_primary().shard, pg->pg_whoami.shard,
+	pg->get_osdmap()->get_epoch(),
+	pg->get_osdmap()->get_epoch(),
+	pg->info),
+      pg->past_intervals);
+  }
+
+  pg->update_heartbeat_peers();
+  pg->take_waiters();
+
+  return transit< Started >();
+}
+{% endhighlight %}
+在自定义的react函数里直接调用了transit函数跳转到Started状态。
+
+4） 进入状态RecoveryMachine/Started后，就进入RecoveryMachine
 
 
 
