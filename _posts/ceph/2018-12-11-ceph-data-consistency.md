@@ -259,43 +259,55 @@ void OSD::handle_pg_create(OpRequestRef op)
 {
     MOSDPGCreate *m = (MOSDPGCreate*)op->get_req();
 
+    if (!require_mon_peer(op->get_req()->get())) {        //标记位置1
+        return;
+    }
+
+    if (!require_same_or_newer_map(op, m->epoch, false))   //标记位置2
+       return;
+
+
+    //标记位置3
     for (map<pg_t,pg_create_t>::iterator p = m->mkpg.begin();p != m->mkpg.end(); ++p, ++ci) 
     {
-         pg_t on = p->first;             //标记位置1
-
-         // is it still ours?
-        vector<int> up, acting;
-        int up_primary = -1;
-        int acting_primary = -1;
-        osdmap->pg_to_up_acting_osds(on, &up, &up_primary, &acting, &acting_primary);   // 标记位置2
-        int role = osdmap->calc_pg_role(whoami, acting, acting.size());
-
-        ...
-
-        spg_t pgid;
-        bool mapped = osdmap->get_primary_shard(on, &pgid);            
-
-
-        //标记位置3
-        handle_pg_peering_evt(pgid,history,pi,osdmap->get_epoch(),
-              PG::CephPeeringEvtRef(new PG::CephPeeringEvt(osdmap->get_epoch(),osdmap->get_epoch(),PG::NullEvt()))
-        );                 
+                     
 
     }
+
+    maybe_update_heartbeat_peers();    //标记位置4
 
 }
 {% endhighlight %}
 
-标记位置1： 在消息中恢复出所要创建的PG到on上
+标记位置1： 调用函数require_mon_peer确保是由Monitor发送的创建消息
 
-标记位置2： 根据PG编号，重新计算该PG所映射到的OSD
+标记位置2： 调用函数require_same_or_newer_map检查epoch是否一致。如果对方的epoch比自己拥有的更新，就更新自己的epoch；否则就直接拒绝该请求。
 
-标记位置3： 实际创建PG。因为Monitor并不会给PG的从OSD发送消息来创建该PG，而是由该主OSD上的PG在Peering过程中创建，所以最先创建的肯定是primary PG，从PG的创建也是在peering过程中通过handler_pg_peering_evt来完成的。
+标记位置3： 对消息中mkpg列表里每一个PG，开始执行如下创建操作
+
+* 检查该PG的参数split_bits，如果不为0，那么就是PG的分裂请求，这里不做处理；检查PG的preferred，如果设置了，就跳过，目前不支持； 检查确认该pool存在； 检查本OSD是该PG的主OSD； 如果参数up不等于acting，说明该PG有temp_pg，至少确定该PG存在，直接跳过。
+
+* 调用函数_have_pg获取该PG对应的类。如果该PG已经存在，跳过
+
+* 调用PG::_create在本地对象存储中创建相应的collection
+
+* 调用函数_create_lock_pg初始化PG
+
+* 调用函数pg->handle_create(&rctx)给新创建PG状态机投递事件，PG的状态发生相应的改变，后面会介绍
+
+* 所有修改操作都打包在事务rctx.transaction中，调用函数dispatch_context将事务提交到本地对象存储中
+
+标记位置4：调用函数maybe_update_heartbeat_peers来更新OSD的心跳列表
+
 
 说明：
 <pre>
 PG的加载： 当OSD重启时，调用函数OSD::init()，该函数调用load_pgs函数加载已经存在的PG，其处理过程和创建PG的过程相似
 </pre>
+
+### 1.3 PG在从OSD上的创建
+
+上面```1.1```、```1.2```讲述的是PG在主OSD上的创建流程。
 
 ## 2. PG创建后状态机的状态转换
 如下图10-2为PG总体状态转换图的简化版： 状态Peering、Active、ReplicaActive4的内部状态没有添加进去。
