@@ -17,7 +17,7 @@ ceph作为一个分布式存储系统，保证数据的一致性是很重要的�
 
 下面我们先给出一幅PG状态机的总体状态转换图：
 
-
+![ceph-pg-peering](https://ivanzz1001.github.io/records/assets/img/ceph/pg/ceph_pg_peering1.jpg)
 
 <!-- more -->
 
@@ -300,7 +300,7 @@ PG的加载： 当OSD重启时，调用函数OSD::init()，该函数调用load_p
 ## 2. PG创建后状态机的状态转换
 如下图10-2为PG总体状态转换图的简化版： 状态Peering、Active、ReplicaActive4的内部状态没有添加进去。
 
-![ceph-pg-peering](https://ivanzz1001.github.io/records/assets/img/ceph/pg/ceph_pg_peering1.jpg)
+![ceph-pg-peering](https://ivanzz1001.github.io/records/assets/img/ceph/pg/ceph_pg_peering2.jpg)
 
 通过该图可以了解PG的高层状态转换过程，如下所示：
 
