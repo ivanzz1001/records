@@ -23,7 +23,7 @@ ceph作为一个分布式存储系统，保证数据的一致性是很重要的�
 
 ## 1. PG的创建过程
 
-PG的创建是由monitor节点发起的，形成请求message发送给osd，在OSD上创建PG。
+PG的创建是由monitor节点发起的，形成请求message发送给**主osd**，在OSD上创建PG。
 
 ### 1.1 monitor节点处理
 
@@ -299,15 +299,15 @@ void OSD::handle_pg_create(OpRequestRef op)
 
 标记位置4：调用函数maybe_update_heartbeat_peers来更新OSD的心跳列表
 
-
-说明：
-<pre>
-PG的加载： 当OSD重启时，调用函数OSD::init()，该函数调用load_pgs函数加载已经存在的PG，其处理过程和创建PG的过程相似
-</pre>
-
 ### 1.3 PG在从OSD上的创建
 
-上面```1.1```、```1.2```讲述的是PG在主OSD上的创建流程。
+上面```1.1```、```1.2```讲述的是PG在主OSD上的创建流程。Monitor并不会给PG的从OSD发送消息来创建该PG， 而是由该主OSD上的PG在Peering过程中创建。主OSD给从OSD的PG状态机投递事件时，在函数handle_pg_peering_evt中，如果发现该PG不存在，才完成创建该PG。
+
+函数handle_pg_peering_evt是处理Peering状态机事件的入口。该函数会查找相应的PG，如果该PG不存在，就创建该PG。该PG的状态机进入RecoveryMachine/Stray状态。
+
+### 1.4 PG的加载
+
+当OSD重启时，调用函数OSD::init()，该函数调用load_pgs函数加载已经存在的PG，其处理过程和创建PG的过程相似。
 
 ## 2. PG创建后状态机的状态转换
 如下图10-2为PG总体状态转换图的简化版： 状态Peering、Active、ReplicaActive4的内部状态没有添加进去。
@@ -356,7 +356,131 @@ boost::statechart::result PG::RecoveryState::Reset::react(const ActMap&)
 {% endhighlight %}
 在自定义的react函数里直接调用了transit函数跳转到Started状态。
 
-4） 进入状态RecoveryMachine/Started后，就进入RecoveryMachine
+4） 进入状态RecoveryMachine/Started后，就进入RecoveryMachine/Started的默认的子状态RecoveryMachine/Started/Start中
+{% highlight string %}
+/*-------Start---------*/
+PG::RecoveryState::Start::Start(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Start")
+{
+    context< RecoveryMachine >().log_enter(state_name);
+
+    PG *pg = context< RecoveryMachine >().pg;
+    if (pg->is_primary()) {
+        dout(1) << "transitioning to Primary" << dendl;
+        post_event(MakePrimary());
+    } else { //is_stray
+        dout(1) << "transitioning to Stray" << dendl; 
+        post_event(MakeStray());
+    }
+}
+{% endhighlight %}
+由以上代码可知，在Start状态的构造函数中，根据本OSD在该PG中担任的角色不同分别进行如下处理：
+
+* 如果是主OSD，就调用函数post_event，抛出事件MakePrimary，进入主OSD的默认子状态Primary/Peering中
+
+* 如果是从OSD，就调用函数post_event，抛出事件MakeStray，进入Started/Stray状态
+
+对于一个PG的OSD处于Stray状态，是指该OSD上的PG副本目前状态不确定，但是可以响应主OSD的各种查询操作。它有两种可能： 一种是最终转移到状态ReplicaActive，处于活跃状态，成为PG的一个副本； 另一种可能的情况是： 如果是数据迁移的源端，可能一直保持Stray状态，该OSD上的副本可能在数据迁移完成后，PG以及数据就都被删除了。
+
+## 3. Ceph的Peering过程分析
+在介绍了statechart状态机和PG的创建过程后，正式开始Peering过程介绍。Peering的过程使一个PG内的OSD达成一个一致状态。当主从副本达成一个一致的状态后，PG处于active状态，Peering过程的状态就结束了。但此时该PG的三个OSD的数据副本上的数据并非完全一致。
+
+PG在如下两种情况下触发Peering过程：
+
+* 当系统初始化时，OSD重新启动导致PG重新加载，或者PG新创建时，PG会发起一次Peering的过程
+
+* 当有OSD失效，OSD的增加或者删除等导致PG的acting set发生了变化，该PG就会重新发起一次Peering过程
+
+### 3.1 基本概念
+
+1） **acting set和up set**
+
+acting set是一个PG对应副本所在的OSD列表，该列表是有序的，列表中第一个OSD为主OSD。在通常情况下，up set和acting set列表完全相同。要理解它们的不同之处，需要理解下面介绍的```“临时PG”```概念。
+
+2) **临时PG**
+
+假设一个PG的acting set为[0,1,2]列表。此时如果osd0出现故障，导致CRUSH算法重新分配该PG的acting set为[3,1,2]。此时osd3为该PG的主OSD，但是OSD3为新加入的OSD，并不能负担该PG上的读操作。所以PG向Monitor申请一个临时的PG，osd1为临时的主OSD，这是up set变为[1,3,2]，acting set依然为[3,1,2]，导致acting set和up set不同。当osd3完成Backfill过程之后，临时PG被取消，该PG的up set修复为acting set，此时acting set和up set都是[3,1,2]列表。
+
+3) **权威日志**
+
+权威日志（在代码里一般简写为olog)是一个PG的完整顺序且连续操作的日志记录。该日志将作为数据修复的依据。
+
+4） **up_thru**
+
+引入up_thru的概念是为了解决特殊情况： 当两个以上的OSD处于down状态，但是Monitor在两次epoch中检测到了这种状态，从而导致Monitor认为它们是先后宕掉。后宕的OSD有可能产生数据更新，导致需要等待该OSD的修复，否则有可能产生数据丢失。
+
+例10-1： up_thru处理过程
+
+![up-thru-1](https://ivanzz1001.github.io/records/assets/img/ceph/pg/up_thru_1.jpg)
+
+过程如下所示：
+
+a) 在epoch 1时，一个PG中有A、B两个OSD（两个副本）都处于up状态。
+
+b) 在epoch 2时，Monitor检测到了A处于down状态，B仍然处于up状态。由于Monitor的检测可能滞后，实际可能有两种情况：
+<pre>
+情况1： 此时B其实也已经和A同时宕了，只是Monitor没有检测到。此时PG不可能完成PG的Peering过程，PG没有新数据写入；
+
+情况2： 此时B确实处于up状态，由于B上保持了完整的数据，PG可以完成Peering过程并处于active状态，可以接受新的数据写操作。
+</pre>
+上述两种情况，Monitor无法区分。
+
+c) 在epoch 3时，Monitor检测到B也宕了
+
+d) 在epoch 4时，A恢复了up的状态后，该PG发起Peering过程，该PG是否允许完成Peering过程处于active状态，可以接受读写操作？
+<pre>
+d.1) 如果在epoch 2时，属于情况1： PG并没有数据更新，B上不会写入数据，A上的数据保存完整，此时PG可以完成Peering过程
+     从而处于active状态，接受写操作
+
+d.2) 如果在epoch 2时，属于情况2： PG上有新数据更新到了osd B，此时osd A缺失一些数据，该PG不能完成Peering过程
+</pre>
+
+为了使Monitor能够区分上述两种情况，引入了up_thru的概念， up_thru记录了每个OSD完成Peering后的epoch值。其初始值设置为0。
+
+在上述情况2， PG如果可以恢复为active状态，在Peering过程，须向Monitor发送消息，Monitor用数组up_thru[osd]来记录该OSD完成Peering后的epoch值。
+
+当引入up_thru后，上述例子的处理过程如下：
+
+![up-thru-2](https://ivanzz1001.github.io/records/assets/img/ceph/pg/up_thru_2.jpg)
+
+```情况1```的处理流程如下：
+
+a) 在epoch 1时， up_thru[B]为0，也就是说B在epoch为0时参与完成Peering。
+
+b) 在epoch 2时，Monitor检查到OSD A处于down状态， OSD B仍处于up状态(实际B已经处于down状态)，PG没有完成Peering过程，不会向Monitor上报更新up_thru的值。
+
+c) epoch 3时，A 和 B两个OSD都宕了
+
+d) epoch 4时，A恢复up状态， PG开始Peering过程，发现up_thru[B]为0，说明在epoch为2时没有更新操作，该PG可以完成Peering过程， PG处于active状态
+
+情况2的处理如下所示：
+
+![up-thru-3](https://ivanzz1001.github.io/records/assets/img/ceph/pg/up_thru_3.jpg)
+
+```情况2```的处理流程如下：
+
+a) 在epoch 1时，up_thru[B]为0，也就是说B在epoch为0时参与完成Peering过程
+
+b) 在epoch 2时， Monitor检查到OSD A处于down状态，OSD B还处于up状态，该PG完成了Peering过程，向Monitor上报B的up_thru变为当前epoch的值为2，此时PG可接受写操作请求
+
+c) 在epoch 4时，A和B都宕了，B的up_thru为2
+
+d) 在epoch 5时， A处于up状态，开始Peering过程，发现up_thru[B]为2，说明在epoch为2时完成了Peering，有可能有更新操作，该PG需要等待B恢复。否则可能丢失B上更新的数据。
+
+### 3.2 PG日志
+PG日志(pg log)为一个PG内所有更新操作的记录（下文所指的日志，如不特别指出，都是指PG日志）。每个PG对应一个PG日志，它持久化保存在每个PG对应pgmeta_oid对象的omap属性中。
+
+它有如下特点：
+
+* 记录一个PG内所有对象的更新操作元数据信息，并不记录操作的数据
+
+* 是一个完整的日志记录，版本号是顺序的且连续的
+
+1） **pg_log_t**
+
+
+
 
 
 
