@@ -479,6 +479,24 @@ PG日志(pg log)为一个PG内所有更新操作的记录（下文所指的日�
 
 1） **pg_log_t**
 
+结构体pg_log_t在内存中保存了该PG的所有操作日志，以及相关的控制结构：
+{% highlight string %}
+struct pg_log_t {
+    eversion_t head;    // 日志的头， 记录最新的日志记录
+    eversion_t tail;    // 日志的尾， 记录最旧的日志记录
+
+    // 用于EC，指示本地可以回滚的版本，可回滚的版本都大于版本can_rollback_to的值
+    eversion_t can_rollback_to;
+
+    //在EC的实现中，本地保留了不同版本的数据。本数据段指示本PG里可以删除掉的对象版本
+    eversion_t rollback_info_trimmed_to;
+
+    //所有日志的列表
+    list<pg_log_entry_t> log;  
+    ....
+};
+{% endhighlight %}
+需要注意的是，PG日志的记录是以整个PG为单位，包括该PG内所有对象的修改记录。
 
 
 
