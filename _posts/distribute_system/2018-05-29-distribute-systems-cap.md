@@ -62,6 +62,37 @@ In order to model partition tolerance, the network will be allowed to losearbitr
 
 
 ## 2. CAP理论的证明
+该理论由Brewer提出，2年后就是2002年，Lynch与其他人证明了Brewer猜想，从而把CAP上升为一个定理。但是，它只是证明了CAP三者不可能同时满足，并没有证明任意二者都可满足的问题。所以，该证明被认为是一个收窄的结果。
+
+
+Lynch的证明相对比较简单： 采用反证法，如果三者可同时满足，则因为允许P的存在，一定存在Server之间的丢包，如此则不能保证C，证明简洁而严谨。
+
+在该证明中，对CAP的定义进行了更明确的声明：
+
+**C:** 一致性被称为原子对象，任何的读写都应该看起来是```原子```的，或串行的。写后面的读一定能读到前面写的内容，所有的读写请求都好像被全局排序一样。
+
+**A:** 对任何非失败节点都应该在有限时间内给出请求的回应。（请求的可终止性）
+
+**P:** 允许节点之间丢失任意多的消息，当网络分区发生时，节点之间的消息可能会完全丢失。
+
+对于CAP进一步的案例解释：
+
+2010年的这篇文章*brewers-cap-theorem-on-distributed-systems/*，用了3个例子来阐述CAP，分别是：
+<pre>
+example 1: 单点的mysql;
+
+example 2: 两个mysql， 但不同的mysql存储不同的数据子集，相当于sharding；
+
+example 3: 两个mysql，对A的一个insert操作，需要在B上执行成功才认为操作完成（类似于复制集）
+</pre>
+
+作者认为在```example 1```和```example 2```上都能保证强一致性，但不能保证可用性；在```example 3```这个例子中，由于分区(Partition)的存在，就需要在一致性和可用性之间权衡。对于复制而言，在很多场景下不追求强一致性。比如用户支付之后，交易记录落地了，但可能消费记录的消息同步存在延迟，比如消息阻塞了。在金融业务中，采取类似两地三中心架构，往往可能采取本地数据和异地机房数据同时写成功再返回的方式。这样付出了性能的损耗，响应时间变长。但发生机房故障后，能确保数据时完全可读写的，保障了一致性。
+
+## 3. CAP理论澄清
+【CAP理论十二年回顾： “规则”变了】 一文首发于Computer杂志，后由```InfoQ```和```IEEE```联合呈现，非常精彩[3]，文章表达了几个观点：
+
+1) **“三选二”是一个伪命题**
+
 
 
 
@@ -73,6 +104,8 @@ In order to model partition tolerance, the network will be allowed to losearbitr
 1. [分布式系统之CAP原理](https://www.cnblogs.com/heapStark/p/8351852.html)
 
 2. [PODC-keynote.pdf](https://people.eecs.berkeley.edu/~brewer/cs262b-2004/PODC-keynote.pdf)
+
+3. [CAP理论十二年回顾： “规则”变了](http://www.infoq.com/cn/articles/cap-twelve-years-later-how-the-rules-have-changed/)
 
 <br />
 <br />
