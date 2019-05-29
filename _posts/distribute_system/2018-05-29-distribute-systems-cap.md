@@ -91,7 +91,60 @@ example 3: 两个mysql，对A的一个insert操作，需要在B上执行成功�
 ## 3. CAP理论澄清
 【CAP理论十二年回顾： “规则”变了】 一文首发于Computer杂志，后由```InfoQ```和```IEEE```联合呈现，非常精彩[3]，文章表达了几个观点：
 
-1) **“三选二”是一个伪命题**
+### 3.1 三选二”是一个伪命题
+
+不是为了P（分区容忍性），要在A和C之间选择一个。分区很少出现，CAP在大多数时候允许完美的```C```和```A```。但当分区存在或可感知其影响的情况下，就要预备一种策略去探知分区并显式处理其影响。这样的策略应分为三个步骤： 探知分区发生，进入显式的分区模式以限制某些操作， 启动恢复过程以恢复数据一致性并补偿分区期间发生的错误。
+
+“一致性的作用范围”其实反映了这样一种观念，即在一定的边界状态是一致的，但超出了边界就无从谈起。比如在一个主分区内可以保证完备的一致性和可用性，而在分区外服务是不可用的。Paxos算法和原子性多播(atomic multicast)系统一般符合这样的场景。像Google的一般做法是将主分区归属在单个数据中心里面，然后交给Paxos算法去解决跨区域的问题，一方面保证全局协商一致（global consensus)如Chubby，一方面实现高可用的持久性存储如Megastore。
+
+
+### 3.2 ACID、BASE、CAP
+
+ACID和BASE这两个术语*好记有余而精确不足*，出现比较晚的```BASE```硬凑的感觉更明显，它是“Basically Available， Softstate，Eventually consistent（基本可用、软状态、最终一致性）”的首字母缩写。其中的软状态和最终一致性这两种技巧擅于对付存在分区的场合，并因此提高了可用性。
+
+```CAP```和```ACID```的关系更复杂一些，也因此引起更多误解。其中一个原因是```ACID```的C和A字母所代表的概念不同于```CAP```的C和A。还有一个原因是选择可用性只部分地影响ACID约束。
+
+进一步看【分区】之后:
+
+![distri-cap-4](https://ivanzz1001.github.io/records/assets/img/distribute/distri-cap-4.png)
+
+用一下上面这张图，在```状态S```的时候是非分区状态，而分区模式则演化出来了```S1```和```S2```，那么问题来了，分区恢复之后，状态究竟是多少呢？有几种解决方案。
+
+1） **State-Based CRDTs**
+
+关于```State-Based CRDTs```，请参看[Conflict-free_replicated_data_type](https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type)：
+<pre>
+State-based CRDTs are called convergent replicated data types,or CvRDTs. In contrast to CmRDTs, CvRDTs 
+send their full localstate to other replicas. CvRDTs have the following local interface:
+
+·  query - reads the state of the replica, with no sideeffects
+
+·  update - writes to the replica state in accordance withcertain restrictions
+
+·  merge - merges local state with the state of some remotereplica
+
+The merge function must be commutative, associative, and idempotent. It provides a join for any pair of replica 
+states, so theset of all states forms asemilattice. The update functionmust monotonically increase the internal
+ state, according to the same partial order rules as the semilattice.
+</pre>
+
+2) **Operation-based CRDTs**
+
+在分区恢复过程中，设计师必须解决两个问题：
+
+* 分区两侧的状态最终必须保持一致；
+
+* 并且必须补偿分区期间产生的错误；
+
+如上图所示，对于分区恢复的状态```S'```可以通过未分区时的状态```S```为起点，然后按顺序**[回放]**相应的变化事件(以特定方式推进分区两侧的一系列操作，并在过程中一直保持一致的状态)。Bayou[4]就是这个实现机制，它会回滚数据库到正确的时刻并按无歧义的、确定性的顺序重新执行所有的操作，最终使所有的节点达到相同的状态。
+
+对于有冲突的情况，比如版本管理软件cvs，存在人工介入、消除冲突的处理策略。
+
+3) **有限制处理**
+
+以自动柜员机(ATM)的设计来说，强一致性看似符合逻辑的选择，但现实情况是可用性远比一致性重要。理由很简单： 高可用性意味着高收入。不管怎么样，讨论如何补偿分区期间被破坏的不变性约束，ATM的设计很适合作为例子。
+
+
 
 
 
@@ -106,6 +159,8 @@ example 3: 两个mysql，对A的一个insert操作，需要在B上执行成功�
 2. [PODC-keynote.pdf](https://people.eecs.berkeley.edu/~brewer/cs262b-2004/PODC-keynote.pdf)
 
 3. [CAP理论十二年回顾： “规则”变了](http://www.infoq.com/cn/articles/cap-twelve-years-later-how-the-rules-have-changed/)
+
+4. [Bayou](http://www.cs.berkeley.edu/~brewer/cs262b/update-conflicts.pdf)
 
 <br />
 <br />
