@@ -37,9 +37,31 @@ In order to model partition tolerance, the network will be allowed to losearbitr
 
 1) **CA without P**
 
-如果不要求P（即不允许分区），则C（强一致性）和A（可用性）是可以保证的。但其实分区不是你想不想的问题，而是始终会存在，CA系统基本上是单机系统，比如单机数据库。2PC是实现强一致性的具体手段。
+如果不要求P（分区容忍性），即认为分区不会发生，则C（强一致性）和A（可用性）是可以保证的。但其实分区不是你想不想的问题，而是始终会存在，CA系统基本上是单机系统，比如单机数据库。2PC是实现强一致性的具体手段。
 
 ![distri-cap-1](https://ivanzz1001.github.io/records/assets/img/distribute/distri-cap-1.jpg)
+
+图片来自于： [PODC-keynote.pdf](http://www.cs.berkeley.edu/~brewer/cs262b-2004/PODC-keynote.pdf)
+
+
+2) **CP without A**
+
+如果不要求A（可用），相当于每个请求都需要在Server之间强一致，而P（分区）会导致同步时间无限延长，如此CP也是可以保证的。很多传统的数据库分布式事务都属于这种模式。
+
+![distri-cap-2](https://ivanzz1001.github.io/records/assets/img/distribute/distri-cap-2.jpg)
+
+图片来自于： [PODC-keynote.pdf](http://www.cs.berkeley.edu/~brewer/cs262b-2004/PODC-keynote.pdf)
+
+3） **AP without C**
+
+要高可用并允许分区，则需放弃一致性。一旦分区发生，节点之间可能会失去联系，为了高可用，每个节点只能用本地数据提供服务，而这样会导致全局数据的不一致性。现在众多的NoSQL都属于此类。
+
+![distri-cap-3](https://ivanzz1001.github.io/records/assets/img/distribute/distri-cap-3.jpg)
+
+图片来自于： [PODC-keynote.pdf](http://www.cs.berkeley.edu/~brewer/cs262b-2004/PODC-keynote.pdf)
+
+
+## 2. CAP理论的证明
 
 
 
