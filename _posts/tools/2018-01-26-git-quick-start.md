@@ -122,6 +122,44 @@ $ git commit -m 'initial project version'
 
 
 ### 3.2 检查当前文件状态
+要查看哪些文件处于什么状态，可以用```git status```命令。如果在克隆仓库后立即使用此命令，会看到类似这样的输出：
+<pre>
+$ git status 
+</pre>
+上面命令直接结果如下：
+{% highlight string %}
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+$ git status
+On branch master
+Your branch is ahead of 'origin/master' by 1 commit.
+  (use "git push" to publish your local commits)
+nothing to commit, working directory clean
+
+{% endhighlight %}
+
+这说明现在你的工作目录相当干净。换句话说，所有已跟踪文件在上次提交后都未被更改过。此外，上面的信息还表明，当前目录下没有出现任何处于未跟踪状态的新文件，否则Git会在这里列出来。最后，该命令还显示了当前所在分支，并告诉你这个分支同远程服务器上对应的分支没有偏离。现在，分支名是```master```，这是默认的分支名。
+
+现在，在项目下创建一个新的```mytext.txt```文件。如果之前并不存在这个文件，使用```git status```命令，你将看到一个新的未跟踪的文件：
+{% highlight string %}
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+$ echo "This is my first Git control file" > mytext.txt
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+$ git status
+On branch master
+Your branch is ahead of 'origin/master' by 1 commit.
+  (use "git push" to publish your local commits)
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+
+        mytext.txt
+
+nothing added to commit but untracked files present (use "git add" to track)
+
+{% endhighlight %}
+在状态报告中可以看到新建的```mytext.txt```文件出现在```Untracked files```下面。未跟踪的文件意味着Git在之前的快照（提交）中没有这些文件； Git不会自动将之纳入跟踪范围，除非你明明白白告诉它 “我需要跟踪该文件”，这样的处理让你不必担心将生成的二进制文件或者其他不想被跟踪的文件包含进来。不过现在的例子中，我们确实想要跟踪管理```mytext.txt```文件。
+
+
 
 
 
