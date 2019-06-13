@@ -159,7 +159,375 @@ nothing added to commit but untracked files present (use "git add" to track)
 {% endhighlight %}
 在状态报告中可以看到新建的```mytext.txt```文件出现在```Untracked files```下面。未跟踪的文件意味着Git在之前的快照（提交）中没有这些文件； Git不会自动将之纳入跟踪范围，除非你明明白白告诉它 “我需要跟踪该文件”，这样的处理让你不必担心将生成的二进制文件或者其他不想被跟踪的文件包含进来。不过现在的例子中，我们确实想要跟踪管理```mytext.txt```文件。
 
+### 3.3 跟踪新文件
+使用命令```git add```开始跟踪一个文件。所以，要跟踪```mytext.txt```文件，运行：
+<pre>
+$ git add mytext.txt
+</pre>
+此时再运行```git status```命令，会看到```mytext.txt```文件已被跟踪，并处于暂存状态：
+{% highlight string %}
+$ git add mytext.txt
+warning: LF will be replaced by CRLF in mytext.txt.
+The file will have its original line endings in your working directory.
 
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+$ git status
+On branch master
+Your branch is ahead of 'origin/master' by 1 commit.
+  (use "git push" to publish your local commits)
+Changes to be committed:
+  (use "git reset HEAD <file>..." to unstage)
+
+        new file:   mytext.txt
+
+{% endhighlight %} 
+只要在```Changes to be committed```这行下面的，就说明是已暂存状态。如果此时提交，那么该文件此时此刻的版本将被留存在历史记录中。```git add```命令使用**文件**或**目录的路径**作为参数； 如果参数是目录的路径，该命令将递归地跟踪该目录下的所有文件。
+
+### 3.4 暂存已修改文件
+现在我们来修改一个已被跟踪的文件。如果修改了一个名为```README.md```的已被跟踪的文件，打开文件```README.md```并编辑其中的内容，在文件的末尾加入一行内容：
+<pre>
+这是暂存已修改文件示例
+</pre>
+然后运行```git status```命令，会看到下面内容：
+{% highlight string %}
+$ git status
+On branch master
+Your branch is ahead of 'origin/master' by 1 commit.
+  (use "git push" to publish your local commits)
+Changes to be committed:
+  (use "git reset HEAD <file>..." to unstage)
+
+        new file:   mytext.txt
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+        modified:   README.md
+
+{% endhighlight %}
+文件```README.md```出现在*Changes not staged for commit*这行下面，说明已跟踪文件的内容发生了变化，但还没有放到暂存区。要暂存这次更新，需要运行```git add```命令。这是个多功能命令： 可以用它开始跟踪新文件，或者把已跟踪的文件放到暂存区，还能用于合并时把有冲突的文件标记为已解决状态等。将这个命令理解为*“添加内容到下一次提交中”*而不是*“将一个文件添加到项目中”*要更加合适。现在让我们运行```git add```将```README.md```放到暂存区，然后再看看```git status```的输出：
+{% highlight string %}
+$ git add README.md
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+$ git status
+On branch master
+Your branch is ahead of 'origin/master' by 1 commit.
+  (use "git push" to publish your local commits)
+Changes to be committed:
+  (use "git reset HEAD <file>..." to unstage)
+
+        modified:   README.md
+        new file:   mytext.txt
+
+
+{% endhighlight %}
+
+现在两个文件都已暂存，下一次提交时就会一并记录到仓库。假设此时，想要在```README.md```里再加条注释，重新编辑存盘后，准备提交。不过且慢，先向```README.md```文件加入一点内容，再运行```git status```，如下所示：
+{% highlight string %}
+$ echo "Add new Line content 1002" >> README.md
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+$ git status
+On branch master
+Your branch is ahead of 'origin/master' by 1 commit.
+  (use "git push" to publish your local commits)
+Changes to be committed:
+  (use "git reset HEAD <file>..." to unstage)
+
+        modified:   README.md
+        new file:   mytext.txt
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+        modified:   README.md
+
+{% endhighlight %}
+
+怎么回事？ 现在```README.md```文件同时出现在暂存区和非暂存区。这怎么可能呢？好吧，实际上Git只不过暂存了运行```git add```命令时的版本，如果现在提交，```README.md```的版本是最后一次运行```git add```命令时的那个版本，而不是运行```git commit```时，在工作目录中的当前版本。所以， 运行了```git add```之后又做了修订的文件，需要重新运行```git add```把新版本重新暂存起来：
+{% highlight string %}
+$ git add README.md
+warning: LF will be replaced by CRLF in README.md.
+The file will have its original line endings in your working directory.
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+$ git status
+warning: LF will be replaced by CRLF in README.md.
+The file will have its original line endings in your working directory.
+On branch master
+Your branch is ahead of 'origin/master' by 1 commit.
+  (use "git push" to publish your local commits)
+Changes to be committed:
+  (use "git reset HEAD <file>..." to unstage)
+
+        modified:   README.md
+        new file:   mytext.txt
+
+
+{% endhighlight %}
+
+### 3.5 状态简览
+```git status```命令的输出十分详细，但其用语有些繁琐。如果你使用```git status -s```命令或```git status --short```命令，将得到一种更为紧凑的格式输出。运行```git status -s```，状态报告输出如下：
+{% highlight string %}
+$ git status -s
+ M README.md
+MM Rakefile
+A  lib/git.rb
+M  lib/simplegit.rb
+?? LICENSE.txt
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+{% endhighlight %}
+新添加的未跟踪文件前面有```??```标记； 新添加到暂存区中的文件前面有```A标记```；修改过的文件前面有```M标记```。你可能注意到了```M```有两个可以出现的位置，出现在右边的```M```表示该文件被修改了但是还没放入暂存区，出现在靠左边的```M```表示该文件被修改了并放入了暂存区。例如，上面的状态报告显示：```README.md```文件在工作区被修改了但是还没有将修改后的文件放入暂存区（因为```M```靠右)；```lib/simplegit.rb```文件被修改了并将修改后的文件放入了暂存区； 而```Rakefile```在工作区被修改并提交到暂存区后又在工作区被修改了，所以在暂存区和工作区都有该文件被修改的记录。
+
+### 3.6 忽略文件
+一般我们总会有些文件无需纳入Git的管理，也不希望它们总出现在未跟踪文件列表。通常都是些自动生成的文件，比如日志文件，或者编译过程中创建的临时文件等。在这种情况下，我们可以创建一个名为```.gitignore```的文件，列出要忽略的文件模式。来看一个实际的例子：
+<pre>
+$ cat .gitignore
+*.[oa]
+*~
+</pre>
+第一行告诉Git忽略所有以```.o```或```.a```结尾的文件。一般这类对象文件和存档文件都是编译过程中出现的。第二行告诉Git忽略所有以波浪符(```~```)结尾的文件，许多文本编辑软件（比如Emacs)都用这样的文件名保存副本。此外，你可能还需好忽略```log```、```tmp```或者```pid```目录，以及自动生成的文档等等。要养成一开始就设置好```.gitignore```文件的习惯，以免将来误提交这类无用的文件。
+
+文件```.gitignore```的格式规范如下：
+
+* 所有空行或者以```#```开头的行都会被Git忽略
+
+* 可以使用标准的glob模式匹配
+
+* 匹配模式可以以(```/```)开头防止递归
+
+* 匹配模式可以以(```/```)结尾指定目录
+
+* 要忽略指定模式以外的文件或目录，可以在模式前加上惊叹号(```!```)取反
+
+所谓的```glob```模式是指shell所使用的简化了的正则表达式。星号(```*```)匹配零个或多个任意字符；```[abc]```匹配任何一个列在方括号中的字符；问号(```?```)只匹配一个任意字符；如果在方括号中使用短划线分割两个字符，表示所有在这两个字符范围内的都可以匹配（比如```[0-9]```表示匹配所有```0```到```9```的数字）。使用两个星号(```*```)表示匹配任意中间目录，比如```a/**/z```可以匹配```a/z```、```a/b/z```或```a/b/c/z```等。
+
+下面再看一个```.gitignore```文件的例子：
+{% highlight string %}
+# no .a files
+*.a
+
+# but do track lib.a, even though you're ignoring .a files above
+!lib.a
+
+# only ignore the TODO file in the current directory, not subdir/TODO
+/TODO
+
+# ignore all files in the build/ directory
+build/
+
+# ignore doc/notes.txt, but not doc/server/arch.txt
+doc/*.txt
+
+# ignore all .pdf files in the doc/ directory
+doc/**/*.pdf
+{% endhighlight %}
+提示： GitHub有一个十分详细的针对数十种项目及编程语言的```.gitignore```文件列表，你可以在[http://github.com/github/gitignore](http://github.com/github/gitignore)找到它。
+
+### 3.7 查看已暂存和未暂存的修改
+如果```git status```命令的输出对于你来说过于模糊，你想知道具体修改了什么地方，可以用```gid diff```命令。稍后我们会详细介绍```git diff```，可能通常会用它来回答这两个问题： 当前做的哪些更新还没有暂存？有哪些更新已经暂存起来准备好了下次提交？尽管```git status```已经通过在相应栏下列出文件名的方式回答了这个问题，```git diff```将通过文件补丁的格式显示具体哪些行发生了改变。
+
+假如再次修改```README.md```文件后暂存，然后编辑```README.md```文件并在文件的最后追加一行内容：
+<pre>
+this is another line 1003
+</pre>
+之后先不暂存，运行```git status```命令将会看到:
+{% highlight string %}
+$ echo "this is another line 1003" >> README.md
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+$ git status
+On branch master
+Your branch is ahead of 'origin/master' by 1 commit.
+  (use "git push" to publish your local commits)
+Changes to be committed:
+  (use "git reset HEAD <file>..." to unstage)
+
+        modified:   README.md
+        new file:   mytext.txt
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+        modified:   README.md
+
+{% endhighlight %}
+要查看尚未暂存的文件更新了哪些部分，不加参数直接输入```git diff```:
+{% highlight string %}
+$ git diff
+diff --git a/README.md b/README.md
+index b88c8f8..f4a9af5 100644
+--- a/README.md
++++ b/README.md
+@@ -2,3 +2,4 @@
+ 这是一个Git学习使用的仓库
+ 这是暂存已修改文件示例
+ Add new Line content 1002
++this is another line 1003
+warning: LF will be replaced by CRLF in README.md.
+The file will have its original line endings in your working directory.
+
+{% endhighlight %}
+上面输出显示有加一行：*+this is another line 1003*，前面带一个加号```+```。
+
+请注意，```git diff```本身只显示尚未暂存的改动，而不是自上次提交以来所做的所有改动。所以有时候你一下子暂存了所有更新过的文件后，运行```git diff```后却什么也没有，就是这个原因。
+
+然后用```git diff --cached```查看已经暂存起来的变化：(```--staged```和```--cached```是同义词）
+{% highlight string %}
+$ git diff --cached
+diff --git a/README.md b/README.md
+index 6e1708a..b88c8f8 100644
+--- a/README.md
++++ b/README.md
+@@ -1,2 +1,4 @@
+ # git-start
+ 这是一个Git学习使用的仓库
++这是暂存已修改文件示例
++Add new Line content 1002
+diff --git a/mytext.txt b/mytext.txt
+new file mode 100644
+index 0000000..b4d835a
+--- /dev/null
++++ b/mytext.txt
+@@ -0,0 +1 @@
++This is my first Git control file
+warning: LF will be replaced by CRLF in mytext.txt.
+The file will have its original line endings in your working directory.
+
+{% endhighlight %}
+如上所示，分别对比了两个文件：```READ<E.md```和```mytext.txt```。
+
+### 3.8 提交更新
+现在的暂存区域已经准备妥当可以提交了。在此之前，请一定要确认还有什么修改过的或新建的文件还没有```git add```过，否则提交的时候不会记录这些还没暂存起来的变化。这些修改过的文件只保留在本地磁盘。所以，每次准备提交前，先用```git status```看下，是不是都已暂存起来了，如果没有暂存起来则要先使用命令```git add .```将所有文件暂存起来，然后再运行提交命令```git commit```:
+<pre>
+$ git status 
+$ git add .
+$ git commit
+</pre>
+这种方式会启动文本编辑器以便输入本次提交的说明。（默认会启用shell的环境变量```$EDITOR```所指定的软件，一般都是```vim```或```emacs```。使用```git config --global core.editor```命令设定你喜欢的编辑软件。)
+
+编辑器会显示类似下面的文本信息（本例选用vim的屏显方式展示）：
+{% highlight string %}
+
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+# On branch master
+# Your branch is ahead of 'origin/master' by 1 commit.
+#   (use "git push" to publish your local commits)
+#
+# Changes to be committed:
+#       modified:   README.md
+#       new file:   mytext.txt
+#
+
+this is my commit info note.
+
+{% endhighlight %}
+可以看到，默认的提交消息包含最后一次运行```git status```的输出，放在注释行里，另外开头还有一空行，供你输入提交说明。完全可以去掉这些注释行，不过留着也没关系，多少能帮你回想起这次更新的内容有哪些。（如果想要更详细的对修改了哪些内容的提示，可以用```-v```选项，这会将你所做的改变的```diff```输出放到编辑器中从而使你知道本次提交具体做了哪些修改。）退出编辑器时，Git会丢掉注释行，用输入提交附带信息生成一次提交。如上面示例中，提交的备注信息是:*this is my commit info note.*。
+
+
+另外，也可以在```commit```命令后添加```-m```选项，将提交信息与命令放在同一行，如下所示：
+{% highlight string %}
+$ git commit -m "this is my commit info note."
+[master warning: LF will be replaced by CRLF in README.md.
+The file will have its original line endings in your working directory.
+b14fb86] this is my commit info note.
+warning: LF will be replaced by CRLF in README.md.
+The file will have its original line endings in your working directory.
+warning: LF will be replaced by CRLF in mytext.txt.
+The file will have its original line endings in your working directory.
+ 2 files changed, 4 insertions(+)
+ create mode 100644 mytext.txt
+
+{% endhighlight %}
+现在已经创建了第一个提交！可以看到，提交后它会告诉你，当前是在哪个分支(master)提交的，本次提交的完整SHA-1校验和是什么(```b14fb86```)，以及在本次提交中，有多少文件修订过，多少行添加和删改过。
+
+请记住，提交时记录的是放在暂存区域的快照。任何还未暂存的仍然保持已修改状态，可以在下次提交时纳入版本管理。每一次运行提交操作，都是对你项目做一次快照，以后可以回到这个状态，或者进行比较。
+
+### 3.9 跳过使用暂存区域
+尽管使用暂存区域的方式可以精心准备要提交的细节，但有时候这么做略显繁琐。Git提供了一个跳过使用暂存区域的方式，只要在提交的时候，给```git commit```加上```-a```选项，Git就会自动把所有已经跟踪过的文件暂存起来一并提交，从而跳过```git add```步骤：
+{% highlight string %}
+$ git status
+On branch master
+Your branch is ahead of 'origin/master' by 2 commits.
+  (use "git push" to publish your local commits)
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+        modified:   README.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+$ git commit -a -m "added new benchmarks"
+warning: LF will be replaced by CRLF in README.md.
+The file will have its original line endings in your working directory.
+[master warning: LF will be replaced by CRLF in README.md.
+The file will have its original line endings in your working directory.
+07719e8] added new benchmarks
+warning: LF will be replaced by CRLF in README.md.
+The file will have its original line
+{% endhighlight %}
+看到了吗？ 提交之前不再需要```git add```文件```README.md```了。
+
+### 3.10 移除文件
+
+要从Git中移除某个文件，就必须要从已跟踪文件清单中移除（确切地说，是从暂存区域移除），然后提交。可以用```git rm```命令完成此项工作，并连带从工作目录中删除指定的文件，这样以后就不会出现在未跟踪文件清单中了。
+
+如果只是简单地从工作目录中手工删除文件，运行```git status```时就会在*"Changes not staged for commit"*部分（也就是未暂存清单）看到：
+{% highlight string %}
+$ rm mytext.txt
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+$ git status
+On branch master
+Your branch is ahead of 'origin/master' by 3 commits.
+  (use "git push" to publish your local commits)
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+        deleted:    mytext.txt
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+{% endhighlight %}
+
+下一次提交时，该文件就不再纳入版本管理了。如果删除之前修改过并且已经放到暂存区域的话，则必须要用强制删除选项```-f```(注： ```force```的首字母）。这是一种安全特性，用于防止误删还没有添加到快照的数据，这样的数据不能给Git恢复。
+
+另外一种情况是，我们想把文件从Git仓库中删除（亦即从暂存区域移除），但仍然希望保留在当前工作目录中。换句话说，你想让文件保留在磁盘，但是并不想Git继续跟踪。当你忘记添加```.gitignore```文件，不小心把一个很大的日志文件或一堆```.a```这样的编译生成文件添加到暂存区时，这一做法尤其有用。为达到这一目的，使用```--cached```选项：
+{% highlight string %}
+$ git rm --cached mytext.txt
+rm 'mytext.txt'
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+$ git status
+On branch master
+Your branch is ahead of 'origin/master' by 3 commits.
+  (use "git push" to publish your local commits)
+Changes to be committed:
+  (use "git reset HEAD <file>..." to unstage)
+
+        deleted:    mytext.txt
+
+{% endhighlight %}
+```git rm```命令后面可以列出文件或者目录的名字，也可以使用```glob```模式。比方说：
+<pre>
+$ git rm log/\*.log
+</pre>
+注意到星号```*```之前的反斜杠```\```，因为Git有它自己的文件模式扩展匹配方式，所以我们不用shell来帮忙展开。此命令删除```log```目录下扩展名为```.log```的所有文件。类似的比如：
+<pre>
+$ git rm \*~
+</pre>
+该命令删除以```~```结尾的所有文件。
+
+### 3.11 移动文件
 
 
 
