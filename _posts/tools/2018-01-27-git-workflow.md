@@ -551,7 +551,7 @@ Automatic merge failed; fix conflicts and then commit the result.
 
 print ("Life is short, you need Python !")
 
-
+d
 a = 10
 
 b = 20
@@ -622,6 +622,591 @@ To https://github.com/ivanzz1001/sample.git
 {% endhighlight %}
 现在，一个新的代码又提交并推送到远程仓库中了。
 
+## 8. Git隐藏(Stash)操作
+
+假设您正在为产品新的功能编写/实现代码，当正在编写代码时，突然出现软件客户端升级。这时，您必须将新编写的功能代码保留几小时然后去处理升级的问题。在这段时间内不能提交代码，也不能丢弃您的代码更改。所以需要临时等待一段时间，您可以存储部分更改，然后再提交它。
+
+在Git中，隐藏操作将使您能够修改跟踪文件，阶段更改，并将其保存在一系列未完成的更改中，并可以随时重新应用。
+
+{% highlight string %}
+$ git status
+On branch master
+Your branch is up-to-date with 'origin/master'.
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+        modified:   main.py
+
+no changes added to commit (use "git add" and/or "git commit -a")
+{% endhighlight %}
+
+现在要切换分支以进行客户升级，但不想提交一直在做的工作，那么可以将当前工作的改变隐藏起来。要将一个新的存根推导堆栈上，运行```git stash```命令：
+{% highlight string %}
+$ git stash
+Saved working directory and index state WIP on master: f260043 synchronized with
+ the remote repository
+HEAD is now at f260043 synchronized with the remote repository
+{% endhighlight %}
+现在工作目录是干净的，所有更改都保存在堆栈中。现在使用```git status```命令来查看当前工作区的状态：
+{% highlight string %}
+$ git status
+On branch master
+Your branch is up-to-date with 'origin/master'.
+nothing to commit, working tree clean
+{% endhighlight %}
+现在可以安全的切换分支并在其他地方工作。通过使用```git stash list```命令来查看已存在更改的列表。
+{% highlight string %}
+$ git stash list
+stash@{0}: WIP on master: f260043 synchronized with the remote repository
+{% endhighlight %}
+
+假设您已经解决了客户升级问题，想要重新开始新的功能的代码编写，查找上次没有写完成的代码，只需执行```git stash pop```命令即可从堆栈中弹出更改并将其放置到当前工作目录中：
+{% highlight string %}
+$ git stash pop
+On branch master
+Your branch is up-to-date with 'origin/master'.
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+        modified:   main.py
+
+no changes added to commit (use "git add" and/or "git commit -a")
+Dropped refs/stash@{0} (3307d3f6c18f70351a7bd851deeaa2165c77bdbe)
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample (master)
+$ git status
+On branch master
+Your branch is up-to-date with 'origin/master'.
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+        modified:   main.py
+
+no changes added to commit (use "git add" and/or "git commit -a")
+{% endhighlight %}
+
+可以看到，工作区中修改的文件(```main.py```)	又显示了。现在我们就可以继续编写上次未完成的代码了。
+
+## 9. Git移动操作
+顾名思义，移动操作将目录或文件从一个位置移动到另一个位置。例如，我们想要将源代码移动到src目录中，修改后的目录结构将显示如下：
+{% highlight string %}
+$ pwd
+/f/worksp/sample
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample (master)
+$ ls
+main.py*  README.md
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample (master)
+$ mkdir src
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample (master)
+$ git mv main.py src/
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample (master)
+$ git status
+On branch master
+Your branch is up-to-date with 'origin/master'.
+Changes to be committed:
+  (use "git reset HEAD <file>..." to unstage)
+
+        renamed:    main.py -> src/main.py
+{% endhighlight %}
+为了使这些更改永久性，必须将修改的目录结构推送到远程仓库，以便其他开发人员可以看到这些修改：
+{% highlight string %}
+$ git commit -m "modified directory structure"
+[master 4fb8e52] modified directory structure
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ rename main.py => src/main.py (100%)
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample (master)
+$ git push
+Username for 'https://github.com': ivanzz1001
+Counting objects: 3, done.
+Delta compression using up to 2 threads.
+Compressing objects: 100% (2/2), done.
+Writing objects: 100% (3/3), 315 bytes | 0 bytes/s, done.
+Total 3 (delta 0), reused 0 (delta 0)
+To https://github.com/ivanzz1001/sample.git
+   f260043..4fb8e52  master -> master
+{% endhighlight %}
+在其他开发人员的本地存储库中，可以通过执行```git pull```来与远程存储库进行同步，之后就可以看到新的目录结构了.
+
+## 10. Git重命名操作
+到目前为止，我们前面已经建了一个python的源代码文件，现在，要修改```main.py```文件的名称把它作为一个新的模块，假设这里要把```main.py```文件的名称更新为```module.py```:
+{% highlight string %}
+$ pwd
+/f/worksp/sample
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample (master)
+$ cd src
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample/src (master)
+$ ls
+main.py*
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample/src (master)
+$ git mv main.py module.py
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample/src (master)
+$ git status -s
+R  main.py -> module.py
+
+{% endhighlight %}
+Git在文件名之前显示```R```，表示文件已被重命名。
+
+对于提交操作，需要使用```-a```标志，这使```git commit```自动检测修改的文件：
+{% highlight string %}
+$ git commit -a -m "rename main.py to module.py"
+[master 2d08ad6] rename main.py to module.py
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ rename src/{main.py => module.py} (100%)
+{% endhighlight %}
+提交后，我们将更改推送到远程存储库：
+{% highlight string %}
+$ git push origin master
+Username for 'https://github.com': ivanzz1001
+Counting objects: 3, done.
+Delta compression using up to 2 threads.
+Compressing objects: 100% (2/2), done.
+Writing objects: 100% (3/3), 318 bytes | 0 bytes/s, done.
+Total 3 (delta 0), reused 0 (delta 0)
+To https://github.com/ivanzz1001/sample.git
+   4fb8e52..2d08ad6  master -> master
+{% endhighlight %}
+现在，其他开发人员可以通过使用```git pull```命令更新本地存储库来查看这些修改。
+
+## 11. Git删除操作
+其他开发人员在更新本地存储库后，在```src```目录中找到一个```module.py```文件。现在假设要对上面的项目中代码结构进行重构，代码文件```module.py```已经不再使用了，要将它删除，那么应该怎么做呢？ 请参考以下命令：
+{% highlight string %}
+$ pwd
+/f/worksp/sample
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample (master)
+$ ls
+README.md  src/
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample (master)
+$ git rm src/module.py
+rm 'src/module.py'
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample (master)
+$ git commit -m "remove/delete module.py"
+[master 34faaf0] remove/delete module.py
+ 1 file changed, 16 deletions(-)
+ delete mode 100644 src/module.py
+$ git push origin master
+{% endhighlight %}
+接着我们可以在另外一台电脑上执行```git pull```拉去最新代码，查看```sample/src```目录中的文件是否存在了。
+
+
+## 12. Git修正错误
+人非圣贤孰能无过，所以每个VCS都提供一个功能来修复错误，直到Git控制的某一点上。Git提供了一个功能，可用于撤销对本地存储库所做的修改。
+
+假设用户意外地对本地存储库进行了一些更改，然后想要撤销这些更改。在这种情况下，恢复操作起着重要的作用。
+
+1) **恢复未提交的更改**
+
+假设我们不小心修改了本地存储库中的一个文件，此时想撤销这些修改。为了处理这种情况，我们可以使用```git checkout```命令。可以使用此命令来还原文件的内容。
+
+为了更好的演示，我们首先在```sample/src```目录下创建一个文件```string.py```，其代码如下所示：
+{% highlight string %}
+#!/usr/bin/python3
+
+var1 = 'Hello World!'
+var2 = "Python Programming"
+
+print ("var1[0]: ", var1[0])
+print ("var2[1:5]: ", var2[1:5]) # 切片加索引
+{% endhighlight %}
+并使用以下命令将此文件推送到远程仓库：
+{% highlight string %}
+$ pwd
+/f/worksp/sample
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample ((2d08ad6...))
+$ git add src/
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample ((2d08ad6...))
+$ git status
+HEAD detached at 2d08ad6
+Changes to be committed:
+  (use "git reset HEAD <file>..." to unstage)
+
+        new file:   src/string.py
+
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample ((2d08ad6...))
+$ git commit -m "add new file string.py"
+[detached HEAD de3783f] add new file string.py
+ 1 file changed, 7 insertions(+)
+ create mode 100644 src/string.py
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample ((de3783f...))
+$ git push origin master
+Username for 'https://github.com': ivanzz1001
+Counting objects: 2, done.
+Delta compression using up to 2 threads.
+Compressing objects: 100% (1/1), done.
+Writing objects: 100% (2/2), 236 bytes | 0 bytes/s, done.
+Total 2 (delta 0), reused 0 (delta 0)
+To https://github.com/ivanzz1001/sample.git
+   2d08ad6..34faaf0  master -> master
+{% endhighlight %}
+现在已经将```string.py```添加到远程存储库中了。
+
+假设我们不小心或者有心修改了本地存储库中的一个文件。但现在不想要这些修改内容了，也就是说想要撤销修改。要处理这种情况，那么可以使用```git checkout```命令。可以使用此命令来还原文件的内容：
+{% highlight string %}
+$ pwd
+/f/worksp/sample
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample ((de3783f...))
+$ echo 'print ("just for test")' >> src/string.py
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample ((de3783f...))
+$ cat src/string.py
+#!/usr/bin/python3
+
+var1 = 'Hello World!'
+var2 = "Python Programming"
+
+print ("var1[0]: ", var1[0])
+print ("var2[1:5]: ", var2[1:5]) # ▒▒Ƭ▒▒▒▒▒▒
+print ("just for test")
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample ((de3783f...))
+$ git status
+HEAD detached from 2d08ad6
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+        modified:   src/string.py
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+$ git checkout -- src/string.py
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample ((de3783f...))
+$ git status
+HEAD detached from 2d08ad6
+nothing to commit, working tree clean
+{% endhighlight %}
+
+此外，还可以使用```git checkout```命令从本地存储库中获取已删除的文件。假设我们从本地存储库中删除一个文件，我们想要恢复这个文件，那么可以通过使用```git checkout```命令来实现这一点：
+{% highlight string %}
+$ ls src/
+module.py*  string.py*
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample ((de3783f...))
+$ rm -rf src/string.py
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample ((de3783f...))
+$ git status -s
+ D src/string.py
+{% endhighlight %}
+Git在文件名前显示字母```D```，表示该文件已从本地存储库中删除：
+{% highlight string %}
+$ git checkout -- src/string.py
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample ((de3783f...))
+$ ls src/
+module.py*  string.py*
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample ((de3783f...))
+$ git status
+HEAD detached from 2d08ad6
+nothing to commit, working tree clean
+{% endhighlight %}
+```注意```：在提交之前执行这些操作。
+
+2) **删除分段区域的更改**
+
+我们已经看到，当执行添加操作时，文件将从本地存储库移动到暂存区域。如果用户意外修改文件并将其添加到暂存区域，则可以通过```git checkout```命令恢复其更改。
+
+在Git中，有一个```HEAD```指针总是指向最新的提交。如果要从分段区域撤销更改，则可以使用```git checkout```命令，但是使用```checkout```命令，必须提供一个附加参数，即```HEAD```指针。附加的提交指针参数指示```git checkout```命令重置工作树，并删除分段更改。
+
+让我们假设从本地存储库修改一个文件。如果查看此文件的状态，它将显示该文件已修改但未添加到暂存区域：
+{% highlight string %}
+$ pwd
+/f/worksp/sample
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample ((de3783f...))
+$ git status
+HEAD detached from 2d08ad6
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+        modified:   src/string.py
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample ((de3783f...))
+$ git add src/string.py
+{% endhighlight %}
+git状态显示该文件存在于暂存区域，现在使用```git checkout```命令恢复该文件，并查看还原文件的状态：
+{% highlight string %}
+$ git checkout head -- src/string.py
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample ((de3783f...))
+$ git status
+HEAD detached from 2d08ad6
+nothing to commit, working tree clean
+{% endhighlight %}
+
+
+3) **用Git复位移动头指针**
+
+经过少量更改后，可以决定删除这些更改。```git reset```命令用于复位或恢复更改。我们可以执行三种不同类型的复位操作。
+
+下图显示了```git reset```命令的图示：
+
+```git reset```命令之前：
+
+![git-reset-before](https://ivanzz1001.github.io/records/assets/img/tools/git-reset-before.png)
+
+
+```git reset```命令之后：
+
+![git-reset-after](https://ivanzz1001.github.io/records/assets/img/tools/git-reset-after.png)
+
+* **soft选项**
+
+每个分支都有一个```HEAD```指针，它指向最新的提交。如果用```--soft```选项后跟提交ID的```git reset```命令，那么它将仅重置```HEAD```指针而不会破坏任何东西。
+
+```.git/refs/heads/master```文件存储```HEAD```指针的提交ID，可以使用```git log -1```命令验证它：
+{% highlight string %}
+$ pwd
+/f/worksp/sample
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample ((de3783f...))
+$ cat .git/refs/heads/master
+e8c14b2341c2787741e859591154a92e601cd54e
+{% endhighlight %}
+
+现在，查看最新前两个提交的ID，最近一次ID与上述提交ID一致：
+{% highlight string %}
+$ git log -2
+commit e8c14b2341c2787741e859591154a92e601cd54e
+Author: ivanzz1001 <782740456@qq.com>
+Date:   Sun Jun 16 17:54:39 2019 +0800
+
+    add module.py
+
+commit 1f6d8dac970e8d2440eab4c0fce93588d2bf1433
+Merge: 34faaf0 de3783f
+Author: ivanzz1001 <782740456@qq.com>
+Date:   Sun Jun 16 17:18:04 2019 +0800
+
+    Merge branch 'temp'
+{% endhighlight %}
+下面我们重置```HEAD```指针：
+{% highlight string %}
+$ git reset --soft 2d08ad6ba68b554c9d7ff2b998a816b7e6991f93
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample (master)
+$ git status
+On branch master
+Your branch is behind 'origin/master' by 4 commits, and can be fast-forwarded.
+  (use "git pull" to update your local branch)
+Changes to be committed:
+  (use "git reset HEAD <file>..." to unstage)
+
+        new file:   src/string.py
+
+{% endhighlight %}
+现在查看```.git/refs/heads/master```文件的内容：
+{% highlight string %}
+$ cat .git/refs/heads/master
+2d08ad6ba68b554c9d7ff2b998a816b7e6991f93
+
+{% endhighlight %}
+来自文件的提交ID已更改，现在通过查看提交消息进行验证：
+{% highlight string %}
+$ git log -2
+commit 2d08ad6ba68b554c9d7ff2b998a816b7e6991f93
+Author: ivanzz1001 <782740456@qq.com>
+Date:   Sun Jun 16 10:37:24 2019 +0800
+
+    rename main.py to module.py
+
+commit 4fb8e522eaee991caead45b48d72b6fedaff78ff
+Author: ivanzz1001 <782740456@qq.com>
+Date:   Sun Jun 16 10:17:43 2019 +0800
+
+    modified directory structure
+{% endhighlight %}
+
+* **mixed选项**
+
+使用```--mixed```选项的Git重置将从尚未提交的暂存区域还原这些更改。它仅从暂存区域恢复更改，对文件的工作副本进行的实际更改不受影响。默认Git复位等效于执行```git reset --mixed```。
+
+* **hard选项**
+
+如果使用```--hard```选项与Git重置命令，它将清除分段区域；它会将```HEAD```指针重置为特定提交ID的最新提交，并删除本地文件更改。
+
+让我们查看提交ID：
+{% highlight string %}
+$ git log -1
+commit 2d08ad6ba68b554c9d7ff2b998a816b7e6991f93
+Author: ivanzz1001 <782740456@qq.com>
+Date:   Sun Jun 16 10:37:24 2019 +0800
+
+    rename main.py to module.py
+{% endhighlight %}
+通过在文件开头添加单行注释来修改文件或者往文件里添加其他代码：
+{% highlight string %}
+$ head -2 src/string.py
+#!/usr/bin/python3
+# this is a comment
+
+$ git status -s
+AM src/string.py
+{% endhighlight %}
+
+将修改的文件添加到暂存区域，并使用```git status```命令进行验证：
+{% highlight string %}
+$ git add src/string.py
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample (master)
+$ git status
+On branch master
+Your branch is behind 'origin/master' by 4 commits, and can be fast-forwarded.
+  (use "git pull" to update your local branch)
+Changes to be committed:
+  (use "git reset HEAD <file>..." to unstage)
+
+        new file:   src/string.py
+{% endhighlight %}
+Git状态显示该文件存在于暂存区域。现在，重置```HEAD```与```--hard```选项：
+{% highlight string %}
+$ git reset --hard 2d08ad6ba68b554c9d7ff2b998a816b7e6991f93
+HEAD is now at 2d08ad6 rename main.py to module.py
+
+$ ls src/
+module.py*
+{% endhighlight %}
+```git reset```命令成功，这将从分段区域还原文件，并删除对文本文件所做的任何本地修改。
+
+{% highlight string %}
+$ git status
+On branch master
+Your branch is behind 'origin/master' by 4 commits, and can be fast-forwarded.
+  (use "git pull" to update your local branch)
+nothing to commit, working tree clean
+{% endhighlight %}
+
+Git状态显示已经恢复到了提交时的那个版本。
+
+通常我们将```git reset```与```git branch```搭配一起使用。
+
+
+## 13. Git标签操作
+标签操作允许为仓库中的特定版本提供有意义的名称，假设项目中有两个程序员： ```maxsu```和```minsu```，他们决定标记项目代码，以便以后可以更容易访问这些代码。
+
+1) **创建标签**
+
+使用```git tag```命令来标记当前```HEAD```指针。在创建标签时需要提供```-a```选项的标签名称，并提供带```-m```选项的标签消息。
+
+{% highlight string %}
+$ pwd
+/f/worksp/sample
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample (master)
+$ git tag -a "Release_1_0" -m "Tagged basic string operation code" HEAD
+{% endhighlight %}
+
+如果要标记特定提交，则使用```COMMIT ID```而不是```HEAD```指针。使用以下命令将标签推送到远程存储库：
+{% highlight string %}
+$ git push origin tag Release_1_0
+Username for 'https://github.com': ivanzz1001
+Counting objects: 1, done.
+Writing objects: 100% (1/1), 180 bytes | 0 bytes/s, done.
+Total 1 (delta 0), reused 0 (delta 0)
+To https://github.com/ivanzz1001/sample.git
+ * [new tag]         Release_1_0 -> Release_1_0
+{% endhighlight %}
+
+2) **查看标签**
+
+假设开发人员(```maxsu```)创建了标签。现在，另外一个开发人员(```minsu```)就可以使用带```-l```选项的```git tag```命令查看所有可用的标签：
+{% highlight string %}
+$ pwd
+/f/worksp/sample
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample (master)
+$ git pull
+Already up-to-date.
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample (master)
+$ git tag -l
+Release_1_0
+{% endhighlight %}
+可使用```git show```命令后跟其标签名来查看有关标签的更多详细信息：
+{% highlight string %}
+$ git show Release_1_0
+tag Release_1_0
+Tagger: ivanzz1001 <782740456@qq.com>
+Date:   Sun Jun 16 22:12:35 2019 +0800
+
+Tagged basic string operation code
+
+commit e8c14b2341c2787741e859591154a92e601cd54e
+Author: ivanzz1001 <782740456@qq.com>
+Date:   Sun Jun 16 17:54:39 2019 +0800
+
+    add module.py
+
+diff --git a/src/module.py b/src/module.py
+new file mode 100644
+index 0000000..20d8471
+--- /dev/null
++++ b/src/module.py
+@@ -0,0 +1,16 @@
++#!/usr/bin/python3
++#coding=utf-8
++
++print ("Life is short, you need Python !")
++
++a = 10
++b = 20
++
++def mul(a, b)
++   return (a*b)
++
++def sum(a, b)
++   return (a+b)
++
++c = sum(a, b)
++print("The value of c is ", c)
+\ No newline at end of file
+
+{% endhighlight %}
+
+
+3) **删除标签**
+
+使用以下命令从本地及远程存储库中删除标签，注意使用```git tag -d```中带有```-d```选项：
+{% highlight string %}
+$ git tag
+Release_1_0
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample (master)
+$ git tag -d Release_1_0
+Deleted tag 'Release_1_0' (was 1765dcc)
+
+Administrator@2NIJJZIFGF14CRQ MINGW32 /f/worksp/sample (master)
+$ git push origin :Release_1_0
+Username for 'https://github.com': ivanzz1001
+To https://github.com/ivanzz1001/sample.git
+ - [deleted]         Release_1_0
+{% endhighlight %}
+
+## 13. Git补丁操作
 
 
 <br />
@@ -642,6 +1227,8 @@ To https://github.com/ivanzz1001/sample.git
 6. [git创建远程分支](https://blog.csdn.net/u012701023/article/details/79222731)
 
 7. [git clone 单个分支项目或者所有项目分支](https://blog.csdn.net/she_lock/article/details/79453484)
+
+8. [Git HEAD detached from XXX (git HEAD 游离) 解决办法](https://blog.csdn.net/u011240877/article/details/76273335)
 
 <br />
 <br />
