@@ -1208,6 +1208,142 @@ To https://github.com/ivanzz1001/sample.git
 
 ## 13. Git补丁操作
 
+补丁是一个文本文件，其内容类似于```git diff```，但与代码一样，它也有关于提交的元数据。例如提交ID、日期、提交消息等。我们可以从提交创建一个补丁，而其他人可以将它们应用到他们的存储库。
+
+假设我们在项目中实现了一个```strcat```函数。并将编写的代码的路径发送给其他开发人员。然后，其他开发人员可以将接收的补丁应用到自己的代码中。
+
+我们使用```git format-patch```命令创建最新提交的修补程序。如果要为特定提交创建修补程序，请在```format-patch```命令后面指定```COMMIT_ID```。
+{% highlight string %}
+$ pwd
+/f/worksp/sample
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master)
+$ git status
+On branch master
+Your branch is up-to-date with 'origin/master'.
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+        modified:   src/module.py
+        modified:   src/string.py
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master)
+$ git add src/
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master)
+$ git commit -m "Added my_strcat function"
+[master 97c15f5] Added my_strcat function
+ 2 files changed, 7 insertions(+), 3 deletions(-)
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master)
+$ git format-patch -1
+0001-Added-my_strcat-function.patch
+
+{% endhighlight %}
+上述命令在当前工作目录中创建```.patch```文件。其他开发人员可以使用这个补丁来修改他的文件。Git分别提供两个命令```git am```和```git apply```来应用补丁。```git apply```修改本地文件而不创建提交， 而```git am```会修改本地文件并创建提交。
+
+要应用补丁，请使用以下命令：
+{% highlight string %}
+$ git clone https://github.com/ivanzz1001/sample.git patch-sample
+Cloning into 'patch-sample'...
+remote: Enumerating objects: 30, done.
+remote: Counting objects: 100% (30/30), done.
+remote: Compressing objects: 100% (23/23), done.
+remote: Total 30 (delta 4), reused 26 (delta 2), pack-reused 0
+Unpacking objects: 100% (30/30), done.
+Checking connectivity... done.
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp
+$ cd patch-sample/
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/patch-sample (master)
+$ git diff
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/patch-sample (master)
+$ git status -s
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/patch-sample (master)
+$ git apply ../sample/0001-Added-my_strcat-function.patch
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/patch-sample (master)
+$ git status -s
+ M src/module.py
+ M src/string.py
+{% endhighlight %}
+
+修补程序成功应用，现在我们可以使用```git diff```命令查看修改：
+{% highlight string %}
+$ git diff
+diff --git a/src/module.py b/src/module.py
+index 20d8471..a033fe8 100644
+--- a/src/module.py
++++ b/src/module.py
+@@ -6,10 +6,10 @@ print ("Life is short, you need Python !")
+ a = 10
+ b = 20
+
+-def mul(a, b)
++def mul(a, b):
+    return (a*b)
+
+-def sum(a, b)
++def sum(a, b):
+    return (a+b)
+
+ c = sum(a, b)
+diff --git a/src/string.py b/src/string.py
+index 1c719ca..378baf9 100644
+--- a/src/string.py
++++ b/src/string.py
+@@ -1,7 +1,11 @@
+ #!/usr/bin/python3
++#coding=utf-8
++
++def my_strcat(str1, str2):
++    return (str1 + str2)
+
+ var1 = 'Hello World!'
+ var2 = "Python Programming"
+
+ print ("var1[0]: ", var1[0])
+-print ("var2[1:5]: ", var2[1:5]) # <C7><D0>Ƭ<BC><D3><CB><F7><D2><FD>
+\ No newline at end of file
++print ("var2[1:5]: ", var2[1:5]) #
+\ No newline at end of file
+{% endhighlight %}
+
+## 14. Git管理分支
+分支操作允许创建另一路线/方向上开发。我们可以使用这个操作将开发过程分为两个不同的方向。例如，我们发布了```1.0```版本的产品，可能需要创建一个分支，以便将```2.0```功能的开发与```1.0```版本中错误修复分开。
+
+1） **创建分支**
+
+我们可以使用```git branch <branch_name>```命令创建一个新的分支。可以从现有的分支创建一个新的分支，也可以使用特定的提交或标签作为起点创建分支。如果没有提供任何特定的提交ID，那么将以```HEAD```作为起点来创建分支。参考如下代码，创建一个分支 ```new_branch```:
+{% highlight string %}
+$ git branch new_branch
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master)
+$ git branch
+* master
+  new_branch
+
+{% endhighlight %}
+执行上述命令后，它创建了一个新的分支```new_branch```； 使用```git branch```命令列出可用的分支。Git会在当前签出分支之前显示一个星号。
+
+创建分支操作的图示表示如下：
+
+![git-branch-before](https://ivanzz1001.github.io/records/assets/img/tools/git-branch-before.png)
+
+![git-branch-after](https://ivanzz1001.github.io/records/assets/img/tools/git-branch-after.png)
+
+2) **切换分支**
+
+
+
+
+
 
 <br />
 <br />
