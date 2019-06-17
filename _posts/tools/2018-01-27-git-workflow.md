@@ -1612,13 +1612,13 @@ $ git branch
 Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master)
 $ git log -2
 commit 5a6de967c14187af715375f9e1dcbd08a9b120b4
-Author: liuzyan <1181891136@qq.com>
+Author: ivanzz1001 <1181891136@qq.com>
 Date:   Mon Jun 17 14:10:58 2019 +0800
 
     Added w_strlen function to return string length of wchar_t string
 
 commit 97c15f5a7680e81dca0e91c88fa32ef529ef57c9
-Author: liuzyan <1181891136@qq.com>
+Author: ivanzz1001 <1181891136@qq.com>
 Date:   Mon Jun 17 10:20:11 2019 +0800
 
     Added my_strcat function
@@ -1835,6 +1835,39 @@ From https://github.com/ivanzz1001/sample
 Already up-to-date.
 {% endhighlight %}
 已经解决了冲突，现在执行```git pull```应该就没问题了。
+
+## 16. Git不同平台换行符问题
+GNU/Linux和Mac OS使用换行符(LF)作为行结束字符，而Windows使用回车和换行(CRLF)组合来表示行结束字符。
+
+我了避免这些行结尾的差异的不必要提交，我们必须配置Git客户端写入与Git仓库使用相同的行结束符。
+
+对于Windows系统，可以将Git客户端配置为将行结束符转换为```CRLF```格式，而在进行提交操作时将其转换会```LF```格式。以下根据您的需要来设置：
+<pre>
+$ git config --global core.autocrlf true
+</pre>
+
+
+## 17. Git远程操作详解
+Git是目前最流行的版本管理系统，学会Git几乎成了开发者的必备技能。
+
+Git有很多优势，其中之一就是远程操作非常简便。本文详细介绍5个Git命令，它们的概念和用法，理解了这些内容， 你就会完全掌握Git远程操作：
+
+* git clone
+
+* git remote
+
+* git fetch
+
+* git pull
+
+* git push
+
+本文针对初级用户，从最简单的讲起，但是需要读者对Git的基本用法有所了解。同时，本文覆盖了上面5个命令的几乎所有的常用用法，所以对于熟练用户也有参考价值。
+
+![git-remote-op](https://ivanzz1001.github.io/records/assets/img/tools/git-remote-op.jpg)
+
+
+
 
 
 
