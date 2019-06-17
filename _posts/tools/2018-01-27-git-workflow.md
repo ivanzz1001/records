@@ -1340,8 +1340,501 @@ $ git branch
 
 2) **切换分支**
 
+使用```git checkout```命令在分支之间切换：
+{% highlight string %}
+$ git checkout new_branch
+Switched to branch 'new_branch'
+{% endhighlight %}
+
+3) **创建和切换分支的快捷方式**
+
+在上面的例子中，分别使用两个命令创建和切换分支。Git为```checkout```命令提供```-b```选项，此操作将创建一个新的分支，并立即切换到新分支：
+{% highlight string %}
+$ git checkout -b test_branch
+Switched to a new branch 'test_branch'
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (test_branch)
+$ git branch
+  master
+  new_branch
+* test_branch
+
+{% endhighlight %}
+
+4) **删除本地分支**
+
+删除本地分支可以使用如下命令（注意： 删除分支之前，请切换到其他分支）：
+
+* 非强制删除分支
+
+非强制删除分支采用```-d```选项。当```test_branch```分支上提交的内容未合并到master分支上时，删除```test_branch```分支时会报错，需要先合并分支才能删除。
+{% highlight string %}
+$ git branch
+  master
+  new_branch
+* test_branch
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (test_branch)
+$ git checkout master
+Switched to branch 'master'
+Your branch is ahead of 'origin/master' by 1 commit.
+  (use "git push" to publish your local commits)
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master)
+$ git branch -d test_branch
+Deleted branch test_branch (was 97c15f5).
+{% endhighlight %}
+
+* 强制删除分支
+
+强制删除分支采用```-D```选项。当```test_branch```分支上提交的内容未合并到master分支上时，能强制删除```test_branch```分支，只会丢失```test_branch```提交的且未合并到master分支上的内容。
+{% highlight string %}
+$ git branch
+  master
+  new_branch
+* test_branch
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (test_branch)
+$ git checkout master
+Switched to branch 'master'
+Your branch is ahead of 'origin/master' by 1 commit.
+  (use "git push" to publish your local commits)
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master)
+$ git branch -D test_branch
+Deleted branch test_branch (was 97c15f5).
+{% endhighlight %}
+当前剩下的分支如下：
+<pre>
+$ git branch
+* master
+  new_branch
+</pre>
+
+5) **重命名分支**
+
+假设需要在项目中添加对宽字符的支持，并且已经创建了一个新的分支，但分支名称需要重新命名。那么可通过使用```-m```选项后跟旧的分支名称和新的分支名称来更改/重命名分支名称。
+{% highlight string %}
+$ git branch
+* master
+  new_branch
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master)
+$ git branch -m new_branch wchar_support
+{% endhighlight %}
+现在，使用```git branch```命令显示新的分支名称：
+<pre>
+$ git branch
+* master
+  wchar_support
+</pre>
+
+6) **查看远程分支**
+
+我们可以使用```git branch -a```来查看远程分支，远程分支会用红色标示出来：
+<pre>
+$ git branch -a
+* master
+  wchar_support
+  remotes/origin/HEAD -> origin/master
+  remotes/origin/master
+</pre>
+
+7) **提交分支到远程仓库**
+
+我们可以使用如下命令将本地新创建的分支推送到远程仓库：
+<pre>
+$ git push origin wchar_support
+Username for 'https://github.com': ivanzz1001
+Password for 'https://ivanzz1001@github.com':
+Total 0 (delta 0), reused 0 (delta 0)
+remote:
+remote: Create a pull request for 'wchar_support' on GitHub by visiting:
+remote:      https://github.com/ivanzz1001/sample/pull/new/wchar_support
+remote:
+To https://github.com/ivanzz1001/sample.git
+ * [new branch]      wchar_support -> wchar_support
+</pre>
+
+8) **删除远程分支**
+
+不同版本的Git在操作起来有些不一样。首先查看本地Git版本：
+<pre>
+$ git --version
+git version 2.5.1.windows.1
+</pre>
+
+* 在Git v1.7.0之前
+
+删除远程分支（推送一个空分支到远程分支，其实相当于删除远程分支）：
+{% highlight string %}
+$ git push origin :wchar_support
+Username for 'https://github.com': ivanzz1001
+Password for 'https://ivanzz1001@github.com':
+To https://github.com/ivanzz1001/sample.git
+ - [deleted]         wchar_support
+{% endhighlight %}
+
+删除远程tag（推送一个空的tag到远程tag，其实相当于删除远程tag)
+{% highlight string %}
+git tag -d <tagname>
+git push origin :refs/tags/<tagname>
+{% endhighlight %}
 
 
+* 在Git v1.7.0之后
+
+我们可以使用如下命令删除远程分支：
+{% highlight string %}
+$ git push origin --delete wchar_support
+Username for 'https://github.com': ivanzz1001
+Password for 'https://ivanzz1001@github.com':
+To https://github.com/ivanzz1001/sample.git
+ - [deleted]         wchar_support
+{% endhighlight %}
+其实基于软件的向前兼容性，后续版本的Git仍支持```v1.7.0```之前的删除方式。
+
+9) **重命名远程分支**
+
+在Git中重命名远程分支，其实就是先删除远程分支，然后重命名本地分支，再重新提交一个远程分支。
+
+10） **合并两个分支**
+
+实现一个函数来返回字符串长度。新的代码显示如下：
+{% highlight string %}
+#!/usr/bin/python3
+#coding=utf-8
+
+def my_strcat(str1, str2):
+    return (str1 + str2)
+
+var1 = 'Hello World!'
+var2 = "Python Programming"
+
+print ("var1[0]: ", var1[0])
+print ("var2[1:5]: ", var2[1:5]) #
+
+a='我'
+b='ab'
+
+ab='我ab'
+print (len(a), len(b), len(ab), len('='))
+{% endhighlight %}
+
+查看当前分支状态：
+{% highlight string %}
+$ git status
+On branch wchar_support
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+        modified:   src/string.py
+
+no changes added to commit (use "git add" and/or "git commit -a")
+{% endhighlight %}
+假设经过测试，代码没有问题，最后将其变更推送到新分支：
+{% highlight string %}
+$ git add src/string.py
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (wchar_support)
+$ git commit -m "Added w_strlen function to return string length of wchar_t string"
+[wchar_support 5a6de96] Added w_strlen function to return string length of wchar_t string
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+{% endhighlight %}
+请注意，下面将把这些更改推送到新的分支，所以这里使用的分支名称为```wchar_support```而不是```master```。执行过程及结果如下所示：
+{% highlight string %}
+$ git push origin wchar_support
+Username for 'https://github.com': ivanzz1001
+Password for 'https://ivanzz1001@github.com':
+Counting objects: 4, done.
+Delta compression using up to 8 threads.
+Compressing objects: 100% (4/4), done.
+Writing objects: 100% (4/4), 460 bytes | 0 bytes/s, done.
+Total 4 (delta 1), reused 0 (delta 0)
+remote: Resolving deltas: 100% (1/1), completed with 1 local object.
+remote:
+remote: Create a pull request for 'wchar_support' on GitHub by visiting:
+remote:      https://github.com/ivanzz1001/sample/pull/new/wchar_support
+remote:
+To https://github.com/ivanzz1001/sample.git
+ * [new branch]      wchar_support -> wchar_support
+{% endhighlight %}
+
+提交更改后，新分支将显示如下：
+
+![git-branch-commit](https://ivanzz1001.github.io/records/assets/img/tools/git-branch-commit.png)
+
+如果其他开发人员很想知道，我们在私人分支上做了什么，那么可从```wchar_support```分支检查日志：
+{% highlight string %}
+$ git log origin/wchar_support -2
+commit 5a6de967c14187af715375f9e1dcbd08a9b120b4
+Author: ivanzz1001 <1181891136@qq.com>
+Date:   Mon Jun 17 14:10:58 2019 +0800
+
+    Added w_strlen function to return string length of wchar_t string
+
+commit 97c15f5a7680e81dca0e91c88fa32ef529ef57c9
+Author: ivanzz1001 <1181891136@qq.com>
+Date:   Mon Jun 17 10:20:11 2019 +0800
+
+    Added my_strcat function
+
+{% endhighlight %}
+通过查看提交消息，其他开发人员(```minsu```)看到有一个宽字符的相关计算函数，他希望在```master```分支中也要有相同的功能。不用重新执行代码编写，而是通过将分支与主分支合并来执行代码的合并。下面来看看应该怎么做？
+{% highlight string %}
+$ git branch
+* master
+  wchar_support
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master)
+$ pwd
+/f/worksp/sample
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master)
+$ git merge origin/wchar_support
+Updating 97c15f5..5a6de96
+Fast-forward
+ src/string.py | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+{% endhighlight %}
+合并操作后，```master```分支显示如下：
+
+![git-branch-merge](https://ivanzz1001.github.io/records/assets/img/tools/git-branch-merge.png)
+
+现在，分支```wchar_support```已经和```master```分支合并了。可以通过查看提交消息或者通过查看```string.py```文件中的修改来验证它：
+{% highlight string %}
+$ git branch
+* master
+  wchar_support
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master)
+$ git log -2
+commit 5a6de967c14187af715375f9e1dcbd08a9b120b4
+Author: liuzyan <1181891136@qq.com>
+Date:   Mon Jun 17 14:10:58 2019 +0800
+
+    Added w_strlen function to return string length of wchar_t string
+
+commit 97c15f5a7680e81dca0e91c88fa32ef529ef57c9
+Author: liuzyan <1181891136@qq.com>
+Date:   Mon Jun 17 10:20:11 2019 +0800
+
+    Added my_strcat function
+{% endhighlight %}
+上述命令产生以下结果：
+{% highlight string %}
+$ cat src/string.py
+#!/usr/bin/python3
+#coding=utf-8
+
+def my_strcat(str1, str2):
+    return (str1 + str2)
+
+var1 = 'Hello World!'
+var2 = "Python Programming"
+
+print ("var1[0]: ", var1[0])
+print ("var2[1:5]: ", var2[1:5]) #
+
+a='我'
+b='ab'
+
+ab='我ab'
+print (len(a), len(b), len(ab), len('='))
+{% endhighlight %}
+测试后，就可以将代码更改推送到```master```分支了。
+{% highlight string %}
+$ git push origin master
+Username for 'https://github.com': ivanzz1001
+Password for 'https://ivanzz1001@github.com':
+Total 0 (delta 0), reused 0 (delta 0)
+To https://github.com/ivanzz1001/sample.git
+   e8c14b2..5a6de96  master -> master
+
+{% endhighlight %}
+
+## 15. Git处理冲突
+假设要在```wchar_support```分支中执行更改，修改```wchar_support```分支中的代码。添加一个计算长度的函数```count_len(obj)```，代码变如下：
+{% highlight string %}
+#!/usr/bin/python3
+#coding=utf-8
+
+def my_strcat(str1, str2):
+    return (str1 + str2)
+
+var1 = 'Hello World!'
+var2 = "Python Programming"
+
+print ("var1[0]: ", var1[0])
+print ("var2[1:5]: ", var2[1:5]) #
+
+a='我'
+b='ab'
+
+ab='我ab'
+print (len(a), len(b), len(ab), len('='))
+
+def count_len(obj):
+    return len(obj)
+{% endhighlight %}
+假设验证代码后，没问题就提交这些更改：
+{% highlight string %}
+$ git status
+On branch wchar_support
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+        modified:   src/string.py
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (wchar_support)
+$ git add src/string.py
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (wchar_support)
+$ git commit -m "add new function: count_len(obj)"
+[wchar_support 954bdfd] add new function: count_len(obj)
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+{% endhighlight %}
+
+1) **执行master分支变更**
+
+于此同时，在```master```分支中，另外一个开发人员（```minsu```)也更改了内容，在里面实现了一个```obj_len(obj)```函数，如下所示：
+{% highlight string %}
+
+#!/usr/bin/python3
+#coding=utf-8
+
+def my_strcat(str1, str2):
+    return (str1 + str2)
+
+var1 = 'Hello World!'
+var2 = "Python Programming"
+
+print ("var1[0]: ", var1[0])
+print ("var2[1:5]: ", var2[1:5]) #
+
+a='我'
+b='ab'
+
+ab='我ab'
+print (len(a), len(b), len(ab), len('='))
+
+def obj_len(obj):
+    return len(obj)
+{% endhighlight %}
+
+测试验证通过后，现在就提交更新内容：
+{% highlight string %}
+$ git status
+On branch master
+Your branch is up-to-date with 'origin/master'.
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+        modified:   src/string.py
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master)
+$ git add src/string.py
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master)
+$ git commit -m "add a new function obj_len(obj)"
+[master 77c07b9] add a new function obj_len(obj)
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master)
+$ git push origin master
+Username for 'https://github.com': ivanzz1001
+Password for 'https://ivanzz1001@github.com':
+Counting objects: 4, done.
+Delta compression using up to 8 threads.
+Compressing objects: 100% (4/4), done.
+Writing objects: 100% (4/4), 422 bytes | 0 bytes/s, done.
+Total 4 (delta 1), reused 0 (delta 0)
+remote: Resolving deltas: 100% (1/1), completed with 1 local object.
+To https://github.com/ivanzz1001/sample.git
+   5a6de96..77c07b9  master -> master
+{% endhighlight %}
+同时在```wchar_support```分支上，我们已经实现了一个```count_len(obj)```函数。假设经过测试后，提交并将其更改推送到```wchar_support```分支。
+
+2） **出现冲突**
+
+假设另外一个开发人员(```minsu```)想看看我们在```wchar_support```分支上做了什么，他试图从```wchar_support```分支中拉出最新的变化，但是Git会中断这个操作，并显示以下错误消息：
+{% highlight string %}
+$ git branch
+* master
+  wchar_support
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master)
+$ git pull origin wchar_support
+From https://github.com/ivanzz1001/sample
+ * branch            wchar_support -> FETCH_HEAD
+Auto-merging src/string.py
+CONFLICT (content): Merge conflict in src/string.py
+Automatic merge failed; fix conflicts and then commit the result.
+
+{% endhighlight %}
+
+3) **解决冲突**
+
+从错误消息中，很明显文件```src/string.py```中存在冲突。运行```git diff```命令查看更多细节：
+{% highlight string %}
+$ git diff
+diff --cc src/string.py
+index a85690f,5a8bed6..0000000
+--- a/src/string.py
++++ b/src/string.py
+@@@ -16,5 -16,5 +16,9 @@@ b='ab
+  ab='我ab'
+  print (len(a), len(b), len(ab), len('='))
+
+++<<<<<<< HEAD
+ +def obj_len(obj):
+++=======
++ def count_len(obj):
+++>>>>>>> 954bdfd9f60af3e3ccab9b57d9cb4e8c771c2cc1
+      return len(obj)
+
+{% endhighlight %}
+
+由于两个人同时修改了```string.py```中的代码，所以Git出于混乱状态，并且要求用户手动解决冲突。结社```maxsu```决定保留修改的代码，并删除自己定义的函数```obj_len(obj)```。删除冲突标记后，如下所示：
+{% highlight string %}
+$ git diff
+diff --cc src/string.py
+index a85690f,5a8bed6..0000000
+--- a/src/string.py
++++ b/src/string.py
+@@@ -16,5 -16,5 +16,6 @@@ b='ab
+  ab='我ab'
+  print (len(a), len(b), len(ab), len('='))
+
+- def obj_len(obj):
+++
++ def count_len(obj):
+      return len(obj)
+
+{% endhighlight %}
+由于```minsu```已经修改了这些文件，所以必须首先提交这些修改：
+{% highlight string %}
+$ git add .
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master|MERGING)
+$ git commit -m "Resolved conflict"
+[master d4d8f8a] Resolved conflict
+
+Administrator@ZHANGYW6668 MINGW64 /f/worksp/sample (master)
+$ git pull origin wchar_support
+From https://github.com/ivanzz1001/sample
+ * branch            wchar_support -> FETCH_HEAD
+Already up-to-date.
+{% endhighlight %}
+已经解决了冲突，现在执行```git pull```应该就没问题了。
 
 
 
