@@ -100,7 +100,7 @@ example 3: 两个mysql，对A的一个insert操作，需要在B上执行成功�
 
 ### 3.2 ACID、BASE、CAP
 
-ACID和BASE这两个术语*好记有余而精确不足*，出现比较晚的```BASE```硬凑的感觉更明显，它是“Basically Available， Softstate，Eventually consistent（基本可用、软状态、最终一致性）”的首字母缩写。其中的软状态和最终一致性这两种技巧擅于对付存在分区的场合，并因此提高了可用性。
+ACID(原子性、一致性、隔离性、持久性）和BASE这两个术语*好记有余而精确不足*，出现比较晚的```BASE```硬凑的感觉更明显，它是“Basically Available， Softstate，Eventually consistent（基本可用、软状态、最终一致性）”的首字母缩写。其中的软状态和最终一致性这两种技巧擅于对付存在分区的场合，并因此提高了可用性。
 
 ```CAP```和```ACID```的关系更复杂一些，也因此引起更多误解。其中一个原因是```ACID```的C和A字母所代表的概念不同于```CAP```的C和A。还有一个原因是选择可用性只部分地影响ACID约束。
 
