@@ -114,9 +114,9 @@ Hash算法的一个衡量指标是```单调性```(Monotonicity)，定义如下�
 
 ![hc-figure-3](https://ivanzz1001.github.io/records/assets/img/distribute/hc_figure_3.png)
 
-整个空间按顺时钟方向组织。0和2^32-1在零点0方向重合。
+整个空间按顺时钟方向组织。0和2^32-1在零点方向重合。
 
-下一步将各个服务器使用Hash算法进行一次哈希计算，具体可以选择服务器的IP或主机名作为关键字进行哈希，这样每台机器就能确定其在哈希环上的为。这里假设将上文中的四台服务器使用IP地址哈希后在环空间的位置如下：
+下一步将各个服务器使用Hash算法进行一次哈希计算，具体可以选择服务器的IP或主机名作为关键字进行哈希，这样每台机器就能确定其在哈希环上的位置。这里假设将上文中的四台服务器使用IP地址哈希后在环空间的位置如下：
 
 
 ![hc-figure-4](https://ivanzz1001.github.io/records/assets/img/distribute/hc_figure_4.png)
