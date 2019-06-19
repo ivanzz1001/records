@@ -35,7 +35,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 下面我们来看一下gcc编译的一些常用选项：
 
-* **-o <file>**: 指定将输出写入到file文件
+* ```-o <file>```: 指定将输出写入到file文件
 
 * **-E**: 只进行预处理，不会进行编译、汇编和链接
 
