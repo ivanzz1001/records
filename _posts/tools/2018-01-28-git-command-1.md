@@ -432,6 +432,7 @@ $ git commit --amend                 # 增补提交，会使用与当前提交�
 录制自己的工作时，工作树中修改后的文件内容将临时存储到使用```git add```命名为```索引```的暂存区域。一个文件只能在索引中恢复，而不是在工作树中，使用```git reset HEAD <file>```可以恢复对文件的修改。
 
 
+## 8. git reset命令
 
 
 <br />
@@ -455,6 +456,7 @@ $ git commit --amend                 # 增补提交，会使用与当前提交�
 
 8. [Git HEAD detached from XXX (git HEAD 游离) 解决办法](https://blog.csdn.net/u011240877/article/details/76273335)
 
+9. [如何加速国内Github访问](https://www.jianshu.com/p/66facbd8926a)
 <br />
 <br />
 <br />
