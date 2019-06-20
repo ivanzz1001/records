@@ -434,6 +434,63 @@ $ git commit --amend                 # 增补提交，会使用与当前提交�
 
 ## 8. git reset命令
 
+```git reset```命令用于将当前```HEAD```复位到指定状态。一般用于撤销之前的一些操作（如： ```git add```、```git commit```等）。基本语法格式如下：
+{% highlight string %}
+git reset [-q] [<tree-ish>] [--] <paths>...                                 # form-1
+git reset (--patch | -p) [<tree-sh>] [--] [<paths>...]                      # form-2
+git reset [--soft | --mixed | --hard | --merge | --keep] [-q] [<commit>]    # form-3
+{% endhighlight %}
+
+### 8.1 描述
+
+对于上面```form-1```与```form-2```两种形式，会从```<tree-ish>```拷贝对应的条目到暂存区；而对于```form-3```这种形式，会将当前分支的```HEAD```设置为某一个提交ID，并通过相应的选项修改对应的暂存区和工作树。
+<pre>
+注： 对于tree-ish, 既可以是一个提交ID，也可以是一个树ID，当然也可以是HEAD。
+
+更多关于tree-ish信息，请参看http://gitbook.liuhui998.com/4_6.html
+</pre>
+
+* form-1: 这种形式会将```<path>```指定的**暂存区条目**复位到```<tree-ish>```指定的状态。其并不会影响到工作树，也不会对当前分支造成影响。```git reset <paths>```具有与```git add <paths>```相反的含义。
+
+在运行```git reset <paths>```命令更新索引条目(index entry)之后，你可以使用```git checkout```命令从索引中将相应的内容检出到工作树。另外，通过使用```git checkout <commit-id>```命令，你可以从提交中将指定路径的文件检出到索引区和工作树。
+
+* form-2: 这里不做介绍
+
+* form-3: 这种形式分支的head复位到某个commit，并根据相应的mode可能会更新暂存区（将其复位到某个```提交树```)和工作树。假如```mode```省略的话，则默认为```--mixed```。```mode```的可选值可以为如下几种：
+<pre>
+--soft: 根本不会涉及到暂存区和工作树，仅仅只会将head复位到某个commit。这会使得你当前工作目录中的被修改的文件可以
+        进行提交。（注意，假如我们进行提交，默认会创建一个匿名分支。所以，通常我们应该先创建一个新的分支，然后
+        在新的分支中进行提交）。
+
+--mixed: 重置索引（即暂存区），但是不会重置工作树（通常被修改的文件将会保留，但是没有被标记为准备提交状态），并且
+         报告有哪些没有被修改。这是默认的选项值。
+
+--hard: 重置索引和工作树，目录树中自从commit-id之后的所有更改都将会丢失，并将HEAD指向commit-id
+</pre>
+
+### 8.2 应用场景
+下面列出一些```git reset```的典型应用场景：
+
+1) **回滚添加操作**
+
+{% highlight string %}
+$ edit    file1.c file2.c                   # (a) 
+$ git add file1.c file1.c                   # (a.1) 添加两个文件到暂存
+$ mailx                                     # (b) 
+$ git reset                                 # (c) 
+$ git pull git://info.example.com/ nitfol   # (d)
+{% endhighlight %}
+
+a) 编辑文件```file1.c```、```file2.c```，做了些更改，并把更改添加到暂存区。
+
+b) 查看邮件，发现某人要您执行```git pull```，有些文件需要合并下来
+
+c) 然而，您已经把暂存区搞乱了，因为暂存区同```HEAD commit```不匹配了，但是即将```git pull```下来的东西不会影响已修改的```file1.c```、```file2.c```，因此可以```revert```这两个文件的改变。在revert后，那些改变应该依旧在工作目录中，因此执行```git reset```
+
+d) 然后执行了```git pull```之后，自动合并，```file1.c```和```file2.c```这些改变依然在工作目录中。
+
+
+
 
 <br />
 <br />
