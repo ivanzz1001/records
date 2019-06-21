@@ -457,7 +457,7 @@ git reset [--soft | --mixed | --hard | --merge | --keep] [-q] [<commit>]    # fo
 * form-2: 这里不做介绍
 
 * form-3: 这种形式分支的head复位到某个commit，并根据相应的mode可能会更新暂存区（将其复位到某个```提交树```)和工作树。假如```mode```省略的话，则默认为```--mixed```。```mode```的可选值可以为如下几种：
-<pre>
+{% highlight string %}
 --soft: 根本不会涉及到暂存区和工作树，仅仅只会将head复位到某个commit。这会使得你当前工作目录中的被修改的文件可以
         进行提交。（注意，假如我们进行提交，默认会创建一个匿名分支。所以，通常我们应该先创建一个新的分支，然后
         在新的分支中进行提交）。
@@ -465,8 +465,11 @@ git reset [--soft | --mixed | --hard | --merge | --keep] [-q] [<commit>]    # fo
 --mixed: 重置索引（即暂存区），但是不会重置工作树（通常被修改的文件将会保留，但是没有被标记为准备提交状态），并且
          报告有哪些没有被修改。这是默认的选项值。
 
---hard: 重置索引和工作树，目录树中自从commit-id之后的所有更改都将会丢失，并将HEAD指向commit-id
-</pre>
+--hard: 重置索引和工作树，目录树中自从<commit>之后的所有更改都将会丢失，并将HEAD指向<commit>
+
+--merge: 重置暂存区，并更新工作树中<commit>与HEAD之间不同的文件，但是会保留工作树与暂存区之间的不同的文件内容（例如：
+         被修改的文件尚未添加到暂存区）
+{% endhighlight %}
 
 ### 8.2 应用场景
 下面列出一些```git reset```的典型应用场景：
@@ -489,6 +492,137 @@ c) 然而，您已经把暂存区搞乱了，因为暂存区同```HEAD commit```
 
 d) 然后执行了```git pull```之后，自动合并，```file1.c```和```file2.c```这些改变依然在工作目录中。
 
+2） **回滚最近一次提交**
+
+{% highlight string %}
+$ git commit -a -m "这是提交的备注信息"
+$ git reset --soft HEAD^                #(a) 
+$ edit code                             #(b) 编辑代码操作
+$ git commit -a -c ORIG_HEAD            #(c)
+{% endhighlight %}
+
+a) 当提交了之后，又发现代码没有提交完整，或者想重新编辑一下提交的信息，可执行```git reset --soft HEAD^```，让工作目录还跟reset之前一样，不作任何改变。```HEAD^```表示HEAD之前最近一次提交。
+
+b) 对工作目录下的文件做修改，比如：修改文件中的代码等
+
+c) 然后使用```reset```之前那次提交的注释、作者、日期等信息重新提交。注意：当执行```git reset```命令时，Git会把老的HEAD拷贝到文件```.git/ORIG_HEAD```中，在命令中可以使用```ORIG_HEAD```引用这个提交。```git commit```命令中```-a```参数的意思是告诉git，自动把所有修改的和删除的文件都放进暂存区，未被git跟踪的新建文件不受影响。```commit```命令中```-c <commit>```或者```-C <commit>```意思是拿已经提交的对象中的信息（作者、提交者、注释、时间戳等）提交，那么这条```git commit```命令的意思就非常明确清晰了，把所有更改的文件加入暂存区，并使用上次的提交信息重新提交。
+
+3） **回滚最近几次提交，并把这几次提交放到指定分支中**
+
+回滚最近几次提交，并把这几次提交放到叫做```topic/wip```的分支上去。
+{% highlight string %}
+$ git branch topic/wip       (a) 
+$ git reset --hard HEAD~3    (b) 
+$ git checkout topic/wip     (c)
+{% endhighlight %}
+a) 假设已经提交了一些代码，但是此时发现这些提交还不够成熟，不能进入master分支，希望在新的branch上暂存这些改动。因此执行了```git branch```命令在当前HEAD上建立了新的叫做```topic/wip```的分支。
+
+b) 然后回滚```master```分支上的最近三次提交。```HEAD~3```指向当前```HEAD-3```个提交，命令
+<pre>
+$ git reset --hard HEAD~3
+</pre>
+表示删除最近的三个提交（删除```HEAD```、```HEAD^```、```HEAD~2```)，将HEAD指向```HEAD~3```
+
+4) **永久删除最后几个提交**
+{% highlight string %}
+$ git commit        ##执行一些提交
+$ git reset --hard HEAD~3   (a)
+{% endhighlight %}
+
+a) 最后三个提交（即```HEAD```、```HEAD^```和```HEAD~2```)提交有问题，想永久删除这三个提交。
+
+5) **回滚merge和pull操作**
+{% highlight string %}
+$ git pull                              (a) 
+Auto-merging nitfol 
+CONFLICT (content): Merge conflict in nitfol 
+Automatic merge failed; fix conflicts and then commit the result. 
+
+$ git reset --hard                      (b) 
+$ git pull . topic/branch               (c) 
+Updating from 41223... to 13134... 
+Fast-forward 
+$ git reset --hard ORIG_HEAD            (d)
+{% endhighlight %}
+a) 从```origin```拉取下来一些更新，但是产生了很多冲突，但您暂时没有那么多时间去解决这些冲突，因此决定稍后有空的时候再重新执行```git pull```操作。
+
+b) 由于```git pull```操作产生了冲突，因此所有拉取下来的改变尚未提交，仍然在暂存区中。这种情况下```git reset --hard```与```git reset --hard HEAD```意思相同，即都是清除索引和工作区中被搞乱的东西。
+
+c) 将```topic/branch```分支合并到当前的分支，这次没有产生冲突，并且合并后的更改自动提交。
+
+d) 但此时你又发现将```topic/branch```合并过来为时尚早，因此决定退滚合并，执行```git reset --hard ORIG_HEAD```回滚刚才的```pull/merge```操作。说明： 前面讲过，执行```git reset```时，Git会把reset之前的```HEAD```放入```ORIG_HEAD```文件中，命令行中使用ORIG_HEAD引用这个提交。同样的，执行```git pull```和```git merge```操作时，git都会把执行操作前的HEAD放入```ORIG_HEAD```中，以用作回滚操作。
+
+6) **在污染的工作区中回滚合并或者拉取**
+
+{% highlight string %}
+$ git pull                         (a) 
+Auto-merging nitfol 
+Merge made by recursive. 
+nitfol                |   20 +++++---- 
+... 
+$ git reset --merge ORIG_HEAD      (b)
+
+{% endhighlight %}
+a) 即便你已经在本地更改了工作区中的一些东西，可安全的执行```git pull```操作，前提是要知道将要```git pull```下面的内容不会覆盖工作区中的内容。
+
+b） ```git pull```完成后，发现这次拉取下来的修改不满意，想要回滚到```git pull```之前的状态，从前面的介绍知道，我们可以执行```git reset --hard ORIG_HEAD```，但是这个命令有个副作用就是清空工作区，即丢弃本地未使用```git add```的那些改变。为了避免丢弃工作区中的内容，可以使用```git reset --merge ORIG_HEAD```，注意其中的```--hard```换成了```--merge```，这样就可以避免在回滚时清除工作区。
+
+7) **中断的工作流程处理**
+
+在实际的开发过程中经常出现这样的情形： 你正在开发一个新的功能（工作在分支： ```feature```中），此时来了一个紧急的bug需要修复，但是目前在工作区中的内容还没有成型，还不足以提交，但是又必须切换到另外的分支去修改bug。请看下面的例子：
+{% highlight string %}
+$ git checkout feature ;# you were working in "feature" branch and 
+$ work work work       ;# got interrupted 
+$ git commit -a -m "snapshot WIP"                 (a) 
+$ git checkout master 
+$ fix fix fix 
+$ git commit ;# commit with real log 
+$ git checkout feature 
+$ git reset --soft HEAD^ ;# go back to WIP state  (b) 
+$ git reset                                       (c)
+{% endhighlight %}
+a) 这次属于临时提交，因此随便添加一个临时注释即可。
+
+b) 这次```reset```删除了WIP commit，并且把工作区设置成提交WIP快照之前的状态。
+
+c) 此时，在索引中依然遗留着```snapshot WIP```提交时所做的未提交变化，```git reset```将会清理索引成尚未提交```snapshot WIP```时的状态便于接下来继续工作。
+
+8) **重置单独的一个文件**
+
+假如你已经添加了一个文件进入索引，但是而后又不打算把这个文件提交，此时可以使用```git reset```把这个文件从索引中去除：
+{% highlight string %}
+$ git reset -- frotz.c                      (a) 
+$ git commit -m "Commit files in index"     (b) 
+$ git add frotz.c                           (c)
+{% endhighlight %}
+a) 把文件```frotz.c```从索引中去除
+
+b) 把索引中的文件提交
+
+c) 再次把```frotz.c```添加到索引
+
+9) **保留工作区并丢弃一些之前的提交**
+
+假设你正在编辑一些文件，并且已经提交，接着继续工作。但是现在你发现当前在工作区中的内容应该属于另一个分支，与之前的提交没有什么关系。此时，可以开启一个新的分支，并且保留着工作区中的内容：
+{% highlight string %}
+$ git tag start 
+$ git checkout -b branch1 
+$ edit 
+$ git commit ...                            (a) 
+$ edit 
+$ git checkout -b branch2                   (b) 
+$ git reset --keep start                    (c)
+{% endhighlight %}
+
+a) 这次是把在```branch1```中的改变提交了。
+
+b) 此时发现，之前的提交不属于这个分支，此时新建了```branch2```分支，并切换到```branch2```上
+
+c) 此时可以使用```git reset --keep```把在start之后的提交清除，但保持工作区不变。
+
+
+
+## 9. git rm命令
 
 
 
