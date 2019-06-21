@@ -623,7 +623,358 @@ c) 此时可以使用```git reset --keep```把在start之后的提交清除，�
 
 
 ## 9. git rm命令
+```git rm```命令用于从工作区和索引中删除文件。基本语法格式如下：
+{% highlight string %}
+git rm [-f | --force] [-n] [-r] [--cached] [--ignore-unmatch] [--quiet] [--] <file>...
+{% endhighlight %}
 
+1) **描述**
+
+从索引中删除文件，或者从索引与工作树中删除文件。```git rm```不会仅仅只移除工作目录中的文件，一定会同时移除索引中的文件。被移除的文件必须与分支的提示相同，并且在索引中不能对其内容进行更新，尽管可以通过```-f```选项来覆盖默认的行为。当指定了```--cache```选项时，暂存区的内容必须与分支的提示或磁盘上的文件相匹配，从而将文件从索引中删除。
+
+使用```git rm```来删除文件，同时还会将这个删除操作记录下来；而使用```rm```来删除文件，仅仅是删除了物理文件，没有将其从git的记录中剔除。
+
+直观的来讲，```git rm```删除过的文件，执行：
+<pre>
+git commit -m "commit message or mark"
+</pre>
+提交时，会自动将删除该文件的操作提交上去; 而对于用```rm```命令直接删除的文件，执行上面的提交命令时，则不会将删除该文件的操作提交上去。不过不要紧，即使你已经通过```rm```将某个文件删除掉了，你也可以通过执行```git rm```命令重新将该文件从git的记录中移除掉，这样的话，再执行上面的提交命令，也能够将这个删除操作提交上去。
+
+如果之前不小心用```rm```命令删除了一大批文件呢？如此时用```git rm```逐个的再删除一次就显得相当繁琐了。可如下方式做提交：
+<pre>
+$ git commit -a -m "commit message or mark"
+</pre>
+
+2) **示例**
+
+在Git中我们可以通过```git rm```命令把一个文件删除，并把它从git仓库管理系统中移除。但是注意最后要执行```git commit```才真正提交到git仓库。
+
+* 示例1
+
+删除```text1.txt```文件，并把它从git的仓库管理系统中移除：
+<pre>
+$ git rm test1.txt
+</pre>
+
+* 示例2
+
+删除文件夹```mydir```，并把它从git的仓库管理系统中移除：
+<pre>
+$ git rm -r mydir
+</pre>
+
+* 示例3
+
+{% highlight string %}
+$ git rm Ducumentation/\*.txt
+{% endhighlight %}
+从```Ducumentation```目录及其子目录下的索引中删除所有```.txt```文件。
+
+## 10. git mv命令
+```git mv```命令用于移动或重命名文件、目录或符号链接。基本语法格式如下：
+{% highlight string %}
+git mv <options>... <args>...
+{% endhighlight %}
+
+1) **描述**
+
+移动或重名文件、目录或符号链接：
+{% highlight string %}
+git mv [-v] [-f] [-n] [-k] <source> <destination>
+git mv [-v] [-f] [-n] [-k] <source> ... <destination directory>
+{% endhighlight %}
+
+在第一种形式中，它将重命名```<source>```为```<destination>```，```<source>```必须存在，并且是文件、符号链接或目录。在第二种形式中，最后一个参数必须是现有的目录，给定的源```<source>```将被移动到这个目录中。
+
+索引在成功完成后更新，但仍必须提交更改。
+
+2） **示例**
+
+把一个文件```text.txt```移动到```mydir```，可以执行以下操作：
+<pre>
+$ git mv text.txt mydir/
+</pre>
+运行上面的```git mv```其实就相当于运行了三条命令：
+<pre>
+$ mv text.txt mydir/
+$ git rm text.txt
+$ git add mydir
+</pre>
+
+## 11 git branch命令
+
+```git branch```命令用于列出、创建或删除分支。其基本语法格式如下：
+{% highlight string %}
+git branch [--color[=<when>] | --no-color] [-r | -a]
+           [--list] [-v [--abbrev=<length> | --no-abbrev]]
+           [--column[=<options>] | --no-column]
+           [(--merged | --no-merged | --contains) [<commit>]] [<pattern>...]
+git branch [--set-upstream | --track | --no-track] [-l] [-f] <branchname> [<start-point>]
+git branch (--set-upstream-to=<upstream> | -u <upstream>) [<branchname>]
+git branch --unset-upstream [<branchname>]
+git branch (-m | -M) [<oldbranch>] <newbranch>
+git branch (-d | -D) [-r] <branchname>...
+git branch --edit-description [<branchname>]
+{% endhighlight %}
+
+1) **描述**
+
+如果给出了```--list```，或者没有非选项参数，则列出现有的分支；当前分支将以星号突出显示。选项```-r```导致远程跟踪分支被列出， 而选项```-a```显示本地和远程分支。如果给出了一个```<pattern>```，它将被用作一个shell通配符，将输出限制为匹配的分支。如果给出多个模式，如果匹配任何模式，则显示分支。请注意，提供```<pattern>```时，必须使用```--list```,
+
+2） **使用示例**
+
+* 查看当前有哪些分支
+<pre>
+$ git branch 
+  master
+* wchar_support
+</pre>
+
+上面的显示结果中，当前有两个分支：```master```和```wchar_support```。当前在```wchar_support```分支上，它前面有一个星号
+
+
+* 新建一个分支
+
+下面的命令将创建一个分支```dev2```:
+<pre>
+$ git branch dev2
+</pre>
+
+* 切换到指定的分支
+
+下面的命令将切换到指定的分支：
+<pre>
+$ git checkout dev2
+$ git branch
+* dev2
+  master
+  wchar_support
+</pre>
+
+* 查看本地和远程分支
+{% highlight string %}
+$ git branch -a
+* dev2
+  master 
+  wchar_support
+  remotes/origin/HEAD -> origin/master
+  remotes/orgin/master
+  remotes/orgin/wchar_support
+{% endhighlight %}
+
+
+* 将更改添加到新分支上
+{% highlight string %}
+$ git status
+On branch dev2
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+
+        newfile.txt
+
+nothing added to commit but untracked files present (use "git add" to track)
+
+Administrator@MY-PC /D/worksp/sample (dev2)
+
+$ git add newfile.txt
+
+Administrator@MY-PC /D/worksp/sample (dev2)
+
+$ git commit newfile.txt -m "commit a new file: newfile.txt"
+[dev2 c5f8a25] commit a new file: newfile.txt
+ 1 file changed, 2 insertions(+)
+ create mode 100644 newfile.txt
+
+Administrator@MY-PC /D/worksp/sample (dev2)
+
+$ git push origin dev2
+Username for 'http://git.oschina.net': 769728683@qq.com
+Password for 'http://769728683@qq.com@git.oschina.net':
+Counting objects: 12, done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (8/8), done.
+Writing objects: 100% (11/11), 965 bytes | 0 bytes/s, done.
+Total 11 (delta 3), reused 0 (delta 0)
+To http://git.oschina.net/yiibai/sample.git
+ * [new branch]      dev2 -> dev2
+{% endhighlight %}
+
+
+* 修改分支名字
+{% highlight string %}
+$ git branch
+* dev2
+  master
+  wchar_support
+
+Administrator@MY-PC /D/worksp/sample (dev2)
+$ git branch -m dev2 version.2
+
+Administrator@MY-PC /D/worksp/sample (version.2)
+$ git branch -r
+  origin/HEAD -> origin/master
+  origin/dev2
+  origin/master
+  origin/wchar_support
+
+Administrator@MY-PC /D/worksp/sample (version.2)
+$ git branch
+  master
+* version.2
+  wchar_support
+
+{% endhighlight %}
+
+* 删除远程分支
+
+执行如下命令删除一个名称为```dev2```的远程分支：
+{% highlight string %}
+$ git branch
+  master
+* version.2
+  wchar_support
+
+Administrator@MY-PC /D/worksp/sample (version.2)
+$ git push origin --delete dev2
+Username for 'http://git.oschina.net': 769728683@qq.com
+Password for 'http://769728683@qq.com@git.oschina.net':
+To http://git.oschina.net/yiibai/sample.git
+ - [deleted]         dev2
+{% endhighlight %}
+
+
+* 合并某个分支到当前分支
+
+执行如下的命令将```version2```分支合并到当前分支```master```:
+{% highlight string %}
+$ git branch
+  master
+* version.2
+  wchar_support
+
+Administrator@MY-PC /D/worksp/sample (version.2)
+$ git checkout master
+Switched to branch 'master'
+Your branch is up-to-date with 'origin/master'.
+
+Administrator@MY-PC /D/worksp/sample (master)
+$ git status
+On branch master
+Your branch is up-to-date with 'origin/master'.
+
+nothing to commit, working directory clean
+
+Administrator@MY-PC /D/worksp/sample (master)
+$ git merge version.2
+Updating e7d1734..c5f8a25
+Fast-forward
+ mydir/text.txt | 0
+ newfile.txt    | 2 ++
+ src/string.py  | 5 ++++-
+ 3 files changed, 6 insertions(+), 1 deletion(-)
+ create mode 100644 mydir/text.txt
+ create mode 100644 newfile.txt
+{% endhighlight %}
+
+## 12. git checkout命令
+```git checkout```命令用于切换分支或者恢复工作树文件。```git checkout```是git最常用的命令之一，同时也是一个很危险的命令，因为这条命令会重写工作区。基本语法格式如下：
+{% highlight string %}
+git checkout [-q] [-f] [-m] [<branch>]
+git checkout [-q] [-f] [-m] [--detach] [<commit>]
+git checkout [-q] [-f] [-m] [[-b|-B|--orphan] <new_branch>] [<start_point>]
+git checkout [-f|--ours|--theirs|-m|--conflict=<style>] [<tree-ish>] [--] <paths>...
+git checkout [-p|--patch] [<tree-ish>] [--] [<paths>...]
+{% endhighlight %}
+
+
+1) **描述**
+
+更新工作树中的文件以匹配索引或指定树中的版本。如果没有给出路径，```git checkout```还会更新```HEAD```，将指定的分支设置为当前分支。
+
+2) **示例**
+
+* 示例1
+
+以下顺序检查主分支，将```Makefile```还原为两个修订版本，错误地删除```hello.c```，并从索引中取回：
+{% highlight string %}
+$ git checkout master               #(a)
+$ git checkout master~2 Makefile    #(b)
+$ rm -f hello.c
+$ git checkout hello.c              #(c)
+{% endhighlight %}
+
+a) 切换到```master```分支
+
+b) 从另一个提交中取出文件
+
+c) 从索引中恢复```hello.c```
+
+如果想要检出索引中的所有```C```源文件，可以使用如下命令：
+<pre>
+$ git checkout -- '*.c'
+</pre>
+注意： ```*.c```是使用引号的。文件```hello.c```也将被检出，即使它不再工作树中，因为文件```globbing```用于匹配索引中的条目（而不是shell的工作树中）
+
+如果有一个分支的名称也刚好为```hello.c```，这一步将被混淆为切换到分支的指令。此时，我们应该写为：
+<pre>
+$ git checkout -- hello.c
+</pre>
+
+* 示例2
+
+在错误的分支工作后，想切换到正确的分支，则使用：
+<pre>
+$ git checkout mytopic
+</pre>
+但是，你的```错误```分支和正确的```mytopic```分支可能会在本地修改的文件中有所不同，在这种情况下，上述检出将会失败：
+<pre>
+$ git checkout mytopic
+error: You have local changes to 'frotz'; not switching branches.
+</pre>
+可以将```-m```标志赋给命令，这样将尝试三路（当前分支、工作树内容、切换到的目标分支）合并：
+<pre>
+$ git checkout -m mytopic
+Auto-merging frotz
+</pre>
+在这种三路合并之后，本地的修改没有在索引文件中注册，所以```git diff```会显示从新的分支的提示之后所做的修改。
+
+* 示例3
+
+当使用```-m```选项切换分支发生合并冲突时，会看到如下所示：
+{% highlight string %}
+$ git checkout -m mytopic
+Auto-merging frotz
+ERROR: Merge conflict in frotz
+fatal: merge program failed
+{% endhighlight %}
+此时，```git diff```会显示上一个示例中干净合并的更改以及冲突文件中的更改。编辑并解决冲突，并用常规方式```git add```来标识它：
+<pre>
+$ edit frotz          # 编辑 frotz 文件中内容，然后重新添加
+$ git add frotz
+</pre>
+
+
+* 其他示例
+
+```git checkout```命令的主要功能就是签出一个分支的特定版本。默认是签出分支的```HEAD```版本。如下是一些用法示例：
+{% highlight string %}
+$ git checkout master                # 取出master版本的head。
+$ git checkout tag_name              # 在当前分支上 取出 tag_name 的版本
+$ git checkout master file_name      # 放弃当前对文件file_name的修改
+$ git checkout  commit_id file_name  # 取文件file_name的 在commit_id是的版本。commit_id为 git commit 时的sha值。
+
+
+# 从远程dev/1.5.4分支取得到本地分支/dev/1.5.4
+$ git checkout -b dev/1.5.4 origin/dev/1.5.4  
+
+#这条命令把hello.rb从HEAD中签出.
+$ git checkout -- hello.rb   
+
+#这条命令把当前目录所有修改的文件 从HEAD中签出并且把它恢复成未修改时的样子.
+$ git checkout .
+
+{% endhighlight %}
+注意：在使用```git checkout```时，如果其对应的文件被修改过，那么该修改会被覆盖掉。
 
 
 <br />
