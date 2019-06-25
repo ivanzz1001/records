@@ -304,7 +304,7 @@ void ShellInsert(SqList L, int dk)
 void ShellSort(SqList L, int dlta[], int t)
 {
 	for(k = 0;k<t;k++)
-		ShellInsert(L, data[k]);	//一趟增量为dlta[k]的插入排序
+		ShellInsert(L, dlta[k]);	//一趟增量为dlta[k]的插入排序
 }
 {% endhighlight %}
 
