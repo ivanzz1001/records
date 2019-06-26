@@ -301,7 +301,21 @@ $ git add readme.txt
 
 ![git-index-zone](https://ivanzz1001.github.io/records/assets/img/tools/git-index-zone.png)
 
-所谓的暂存区仅仅是```.git```目录下的index文件罢了。
+所谓的暂存区仅仅是```.git```目录下的index文件罢了，这也是为什么被称为index了。
+
+下面先查看一下当前项目的状态：
+{% highlight string %}
+$ git status
+On branch master
+
+Initial commit
+
+Changes to be committed:
+  (use "git rm --cached <file>..." to unstage)
+
+        new file:   readme.txt
+
+{% endhighlight %}
 
 
 
