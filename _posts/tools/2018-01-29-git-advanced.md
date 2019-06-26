@@ -226,6 +226,86 @@ Branch 'newBr' set up to track remote branch 'newBr' from 'origin'.
 
 ## 4. Git存储位置与方式
 
+Git是一个工具，只要熟练掌握它的操作就能完成工作中的绝大多数任务。我们很少会考虑Git历史提交数据存储在哪，又以何种方式存储，下面对此进行一下介绍。首先看一段代码实例：
+{% highlight string %}
+let obj = {
+  webName: "蚂蚁部落",
+  address: "青岛市南区"
+}
+obj.age = 4;
+console.log(obj.webName);
+console.log(obj.address);
+console.log(obj.age);
+{% endhighlight %}
+上面是一个```对象直接量```的简单演示，```对象直接量```以键/值对方式存储数据，通过键可以获取对应的值。
+
+本质上Git存储数据的方式也是如此，键就是数据内容```sha-1```，而值自然就是对象的内容。现在我们初始化一个全新的仓库```git-store```来进行测试：
+<pre>
+$ mkdir git-store
+$ cd git-store
+$ git init
+Initialized empty Git repository in F:/worksp/git-store/.git/
+$ ls -al
+total 8
+drwxr-xr-x 1 Administrator None 0 六月 26 10:03 ./
+drwxr-xr-x 1 Administrator None 0 六月 26 10:03 ../
+drwxr-xr-x 1 Administrator None 0 六月 26 10:03 .git/
+</pre>
+初始化一个全新的仓库之后，在目录中只有一个隐藏的```.git```文件夹。我们进入```.git/objects```目录，可以看到有如下两个目录：
+<pre>
+$ ls .git/objects/
+info/  pack/
+</pre>
+这两个子目录是系统自动创建的，可以看到当前并没有存储任何数据。
+
+下面开始向里面存储数据，代码如下：
+{% highlight string %}
+$ echo "蚂蚁部落" | git hash-object -w --stdin
+210a3e5558a2c25c0a577a3f2555c2f82e5529c6
+{% endhighlight %}
+上面```git hash-object```命令用来计算所要存储对象的```sha-1```值；```-w```选项用于指定对数据进行存储；```--stdin```选项表示内容是通过标准输入设备获取的。
+
+现在来看一下```.git/objects```目录中的内容：
+<pre>
+$ ls .git/objects/
+21/  info/  pack/
+$ ls .git/objects/21
+0a3e5558a2c25c0a577a3f2555c2f82e5529c6
+</pre>
+现在多出了一个子目录，名字是```21```，并且该文件夹下有一个名为 *0a3e5558a2c25c0a577a3f2555c2f82e5529c6*的文件，通过对比我们得出如下结论：
+
+* git的对象存储于```.git/objects```目录中
+
+* 以对象的```sha-1```值前两位作为子目录名称，具体存储对象内容的文件名为```sha-1```值的后38位
+
+现在我们查看*0a3e5558a2c25c0a577a3f2555c2f82e5529c6*文件的内容：
+{% highlight string %}
+$ cat .git/objects/21/0a3e5558a2c25c0a577a3f2555c2f82e5529c6
+xK▒▒OR04fx1▒▒ŬƗ▒+^L▒▒f▒
+~
+{% endhighlight %}
+可以看到是乱码。这是因为Git存储的并不是原始数据```蚂蚁部落```，而是通过zlib压缩的内容。
+
+下面根据```sha-1```值这个键来查看对应的值（也就是存储的数据）：
+<pre>
+$ git cat-file -p 210a3e5558a2c25c0a577a3f2555c2f82e5529c6
+蚂蚁部落
+</pre>
+
+## 5. Git暂存区深入理解
+我们知道可以通过```git add```命令将工作区中的内容加入暂存区，代码实例如下：
+<pre>
+$ git add readme.txt
+</pre>
+上述命令将工作区中的```readme.txt```文件加入到暂存区。从```暂存区```名字来理解，此区域好像是一个仓库，把将要提交的内容暂时存放于此。上述理解从感性上来说没什么问题， 并且有助于接受此概念。然而，暂存区的实质是什么呢？ 仅仅是一个文件罢了，截图如下：
+
+![git-index-zone](https://ivanzz1001.github.io/records/assets/img/tools/git-index-zone.png)
+
+所谓的暂存区仅仅是```.git```目录下的index文件罢了。
+
+
+
+
 
 
 <br />
