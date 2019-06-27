@@ -317,8 +317,49 @@ Changes to be committed:
 
 {% endhighlight %}
 
+## 6. Git版本的历史变迁记录
+我们执行```git log```命令可以看到Git提交的历史记录。那么这个commit链是如何组织起来的呢？ 我们首先看一下当前我们的提交的历史记录：
+{% highlight string %}
+$ git log
+commit 8223325b008ba973afe1e0df42aaa8c31716e840
+Author: ivanzz1001 <1181891136@qq.com>
+Date:   Thu Jun 27 10:40:01 2019 +0800
 
+    add helloworld
 
+commit 182339e9b659ea72202f1378ffd517d553893706
+Author: ivanzz1001 <1181891136@qq.com>
+Date:   Wed Jun 26 19:18:21 2019 +0800
+
+    test index zone
+
+{% endhighlight %}
+可以看到有两个提交，最新的提交是*8223325b008ba973afe1e0df42aaa8c31716e840*，我们也可以通过查看```.git/HEAD```来查看当前分支的最新提交：
+<pre>
+$ cat .git/HEAD
+ref: refs/heads/master
+
+$ cat .git/refs/heads/master
+8223325b008ba973afe1e0df42aaa8c31716e840
+</pre>
+从上面我们知道当前分支的最新提交是```822332```，那么其是如何找到其```父提交```(即Parent提交）的呢？ 我们执行如下命令：
+<pre>
+$ git cat-file -p 8223325b008ba973afe1e0df42aaa8c31716e840
+tree 6a79d37d5372e76f690ea2b66ddb7b410615e454
+parent 182339e9b659ea72202f1378ffd517d553893706
+author ivanzz1001 <1181891136@qq.com> 1561603201 +0800
+committer ivanzz1001 <1181891136@qq.com> 1561603201 +0800
+
+add helloworld
+
+$ git cat-file -p 6a79d37d5372e76f690ea2b66ddb7b410615e454
+100644 blob 210a3e5558a2c25c0a577a3f2555c2f82e5529c6    antzone.txt
+100644 blob 2d832d9044c698081e59c322d5a2a459da546469    hello.txt
+100644 blob d9b401251bb36c51ca5c56c2ffc8a24a78ff20ae    readme.txt
+</pre>
+从这里我们可以看到其父提交是*182339e9b659ea72202f1378ffd517d553893706*。由此可见，Git就是通过这样的方式一级一级的形成提交链表。
+
+注意，我们执行```git cat-file -p <commit-id>```，实际上查询的是```.git/objects```目录下的文件。其实不管是我们提交的普通代码文件，还是Git本身的提交记录信息都是存放于```.git/objects```目录中的。
 
 
 
