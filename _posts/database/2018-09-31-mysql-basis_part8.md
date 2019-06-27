@@ -269,7 +269,7 @@ mysql> show variables like 'sql_log_bin';
 1 row in set (0.00 sec)
 {% endhighlight %}
 
-如果要启用或者进制当前session的二进制日志功能，则可以将该变量设置为```ON```或者```OFF```。通过将当前session的```sql_log_bin```设置为```OFF```，这样就可以临时的对当前会话进制二进制日志功能，从而避免本会话在master上做的修改被同步到slave上。
+如果要启用或者禁止当前session的二进制日志功能，则可以将该变量设置为```ON```或者```OFF```。通过将当前session的```sql_log_bin```设置为```OFF```，这样就可以临时的对当前会话进制二进制日志功能，从而避免本会话在master上做的修改被同步到slave上。
 
 执行修改会话系统变量的操作是一个```受限```的操作，需要有相应的权限。另外需要注意的是，我们并不能在一个事务(transaction)或者子查询(subquery)中执行```sql_log_bin```的设置。
 

@@ -159,6 +159,8 @@ socket=/var/lib/mysql/mysql.sock
 6. [MySQL 在线开启/关闭GTID](https://blog.csdn.net/jslink_l/article/details/54574066)
 
 7. [mysql在线开启或禁用GTID模式](http://www.cnblogs.com/magmell/p/9223556.html)
+
+8. [mysql （master/slave）复制原理及配置](https://www.cnblogs.com/jirglt/p/3549047.html)
 <br />
 <br />
 <br />
