@@ -23,7 +23,7 @@ MySQL的复制特性允许支持单向的异步复制： 一个MySQL Server作�
 
 可以有很多种方式来建立两个服务器之间的同步，但是最好的方式取决于数据的呈现方式以及所使用的存储引擎。有两种核心的复制格式： 一种是Statement Based Replication(SBR)，会复制整个SQL语句； 另一种是Row Based Replication(RBR),只会复制所改变的数据行。当然你可以可以使用第三种方式：Mixed Based Replication(MBR)。关于不同的复制模式，我们后面会再进行详细介绍。
 
-从MySQL5.6.5版本起，支持基于全局事务标识(Global Transaction identifiers, GTIDs)的```事务复制```。当使用这种类型复制的时候，并不需要直接的使用日志文件，这极大的简化了很多常见的复制任务。因为采用```GTIDs```复制本身就是事务性质的，提交到master上的事务会同步应用到slave上。
+从MySQL5.6.5版本起(包括5.6.5版本)，支持基于全局事务标识(Global Transaction identifiers, GTIDs)的```事务复制```。当使用这种类型复制的时候，并不需要直接的使用日志文件，这极大的简化了很多常见的复制任务。因为采用```GTIDs```复制本身就是事务性质的，提交到master上的事务会同步应用到slave上。
 
 
 
@@ -201,7 +201,13 @@ PURGE BINARY LOGS TO 'mysql-bin.010';
 PURGE BINARY LOGS BEFORE '2008-04-02 22:46:26';
 {% endhighlight %}
 
-上面```BEFORE```变量```datetime_expr```必须为DATETIME类型的值（即格式必须为：```YYYY-MM-DD hh:mm:ss```)。该语句即使在slave正在复制时执行仍是安全的，这样在执行时就并不需要停止master。假如当前有一个处于active状态slave正在读取一个你尝试删除的日志，那么上述语句并不会删除该文件及其之后的文件，而只会删除更早期的文件。然而，假如有一个slave并未连接上，碰巧你执行上述命令把该slave上次读取的日志文件删除了，那么slave在连接上之后将不能再进行复制。
+上面语句分别表示： 
+
+* 删除```mysql-bin.010```之前的日志（不包括mysql-bin.010本身）
+
+* 删除```2008-04-02 22:46:26```时间点之前的日志
+
+PURGE语句中```BEFORE```变量```datetime_expr```必须为DATETIME类型的值（即格式必须为：```YYYY-MM-DD hh:mm:ss```)。该语句即使在slave正在复制时执行仍是安全的，这样在执行时就并不需要停止master。假如当前有一个处于active状态slave正在读取一个你尝试删除的日志，那么上述语句并不会删除该文件及其之后的文件，而只会删除更早期的文件。然而，假如有一个slave并未连接上，碰巧你执行上述命令把该slave上次读取的日志文件删除了，那么slave在连接上之后将不能再进行复制。
 
 为了安全的删除删除日志文件，通常我们遵循如下的步骤：
 
