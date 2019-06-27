@@ -43,6 +43,86 @@ HEAD处于游离状态时，我们可以很方便地在历史版本之间互相�
 ![git-head-branch](https://ivanzz1001.github.io/records/assets/img/tools/git-head-branch.jpg)
 
 
+## 3. 具体解决操作
+
+1） **查看当前分支状况**
+{% highlight string %}
+$ git status
+HEAD detached at e8c14b2
+nothing to commit, working directory clean
+$ git branch -v
+* (HEAD detached at e8c14b2) e8c14b2 add module.py
+  master                     d4d8f8a [ahead 2] Resolved conflict
+  topic/wip                  d4d8f8a Resolved conflict
+  wchar_support              954bdfd add new function: count_len(obj)
+{% endhighlight %}
+
+2） **新建一个temp分支，把当前提交的代码放到整个分支**
+{% highlight string %}
+$ git branch temp
+
+$ git checkout temp
+Switched to branch 'temp'
+
+$ git status
+On branch temp
+nothing to commit, working directory clean
+{% endhighlight %}
+
+3) **checkout要回到的那个分支**
+
+这里我们要回到```master```分支：
+<pre>
+$ git checkout master
+Switched to branch 'master'
+Your branch is ahead of 'origin/master' by 2 commits.
+  (use "git push" to publish your local commits)
+</pre>
+
+4) **然后merge刚才创建的临时分支**
+
+通过```merge```操作把临时分支上的提交合并到```master```分支上来：
+{% highlight string %}
+$ git merge temp
+Merge made by the 'recursive' strategy.
+ detached_head.txt | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 detached_head.txt
+
+{% endhighlight %}
+
+
+5) **查看合并后的结果，有冲突就解决**
+{% highlight string %}
+$ git status
+On branch master
+Your branch is ahead of 'origin/master' by 4 commits.
+  (use "git push" to publish your local commits)
+nothing to commit, working directory clean
+{% endhighlight %}
+
+6) **合并OK，就提交到远程**
+{% highlight string %}
+$ git push origin master
+Username for 'https://github.com': ivanzz1001
+Password for 'https://ivanzz1001@github.com':
+To https://github.com/ivanzz1001/sample.git
+ ! [rejected]        master -> master (fetch first)
+error: failed to push some refs to 'https://github.com/ivanzz1001/sample.git'
+hint: Updates were rejected because the remote contains work that you do
+hint: not have locally. This is usually caused by another repository pushing
+hint: to the same ref. You may want to first integrate the remote changes
+hint: (e.g., 'git pull ...') before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+{% endhighlight %}
+
+7) **删除刚才创建的临时分支**
+{% highlight string %}
+$ git branch -d temp
+Deleted branch temp (was 5266593).
+{% endhighlight %}
+
+
 
 
 <br />
