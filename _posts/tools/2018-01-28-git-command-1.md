@@ -882,7 +882,7 @@ $ git branch -vv
 * master        032de42 [origin/master: ahead 4] Merge branch 'temp'
   topic/wip     d4d8f8a Resolved conflict
   wchar_support 954bdfd add new function: count_len(obj)
-{% endhighlgiht %}
+{% endhighlight %}
 从上面我们看到，只有本地分支```master```追踪远程的```origin/master```分支。
 
 ## 12. git checkout命令
