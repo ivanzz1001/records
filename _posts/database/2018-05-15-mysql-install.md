@@ -643,6 +643,7 @@ mysql > source /root/CreateDB_app.sql
 
 9. [CentOS7离线安装MySQL](https://www.cnblogs.com/Orange42/p/8432185.html)
 
+10. [centos7 设置mariadb密码](https://www.cnblogs.com/lxg0/articles/5598205.html)
 
 <br />
 <br />
