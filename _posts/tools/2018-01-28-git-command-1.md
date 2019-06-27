@@ -876,6 +876,15 @@ Fast-forward
  create mode 100644 newfile.txt
 {% endhighlight %}
 
+* 查看分支的追踪关系
+{% highlight string %}
+$ git branch -vv
+* master        032de42 [origin/master: ahead 4] Merge branch 'temp'
+  topic/wip     d4d8f8a Resolved conflict
+  wchar_support 954bdfd add new function: count_len(obj)
+{% endhighlgiht %}
+从上面我们看到，只有本地分支```master```追踪远程的```origin/master```分支。
+
 ## 12. git checkout命令
 ```git checkout```命令用于切换分支或者恢复工作树文件。```git checkout```是git最常用的命令之一，同时也是一个很危险的命令，因为这条命令会重写工作区。基本语法格式如下：
 {% highlight string %}
