@@ -186,7 +186,7 @@ server-id=168079128
 
 当然你也可以不必为复制特别的创建一个账户，但是你应该清楚用于复制的账户信息会被明文的保存在```master信息库文件```或者表（table)中。因此为了避免不必要的用户信息泄露，最好还是创建一个只具有```REPLICATION SLAVE```权限的账户。
 
-要创建一个账户，使用```CREATE USER```语句，并通过```GRANT```语句为用户分配复制权限。例如我们下面在master上创建一个名称为```repl```的账户用于复制：
+要创建一个账户，使用```CREATE USER```语句，并通过```GRANT```语句为用户分配复制权限(*REPLICATION SLAVE*)。例如我们下面在master上创建一个名称为```repl```的账户用于复制：
 {% highlight string %}
 mysql> CREATE USER 'repl'@'%' IDENTIFIED BY 'replAa@123';
 mysql> GRANT REPLICATION SLAVE ON *.* TO 'repl'@'%';
@@ -212,7 +212,7 @@ mysql> select Host, User, Repl_slave_priv from mysql.user;
 注： 使用'FLUSH TABLES WITH READ LOCK' 会阻塞InnoDB类型表的提交操作(commit operation)被阻塞。
 </pre>
 
-假如在master上当前已经存在一些数据，在slave开启复制进程之前你想要先把这些数据同步到slave，则首先你必须在master主机上停止处理SQL，然后再获取master的binlog偏移并导出对应的日志数据，之后你才能够恢复master以继续处理SQL请求。假如你并未停止master执行相应的SQL语句，那么导出的```数据```和master```状态信息```很可能并不匹配，这样就会导致后续slave数据库的不一致性甚至导致slave数据库崩溃。
+假如在master上当前已经存在一些数据，在slave开启复制进程之前你想要先把这些数据同步到slave，则首先你必须在master主机上停止处理SQL，然后再获取当前master的binlog偏移并导出对应的日志数据，之后你才能够恢复master以继续处理SQL请求。假如你并未停止master执行相应的SQL语句，那么导出的```数据```和master```状态信息```很可能并不匹配，这样就会导致后续slave数据库的不一致性甚至导致slave数据库崩溃。
 
 假如你打算停止master以创建一个```数据快照```(data snapshot)，则可以跳过本步骤，直接在创建数据快照之后拷贝一份对应的binlog索引即可。在这种情况下，master在重启之后会创建一个新的binlog文件，slave就可以将这个新的binlog文件作为起始复制点。
 
@@ -235,9 +235,9 @@ mysql> SHOW MASTER STATUS;
 +----------------------+----------+--------------+------------------+-------------------+
 1 row in set (0.00 sec)
 {% endhighlight %}
-上面```File```这一列显示了binlog的文件名称，```Position```这一列显示了在对应日志文件中的偏移。在本例子中，binlog文件的名称为```master-logbin.000002```，position为747。在后续配置slave时这些信息，其指明了slave应该从这个```偏移点```来开启后续的复制进程。
+上面```File```这一列显示了binlog的文件名称，```Position```这一列显示了在对应日志文件中的偏移。在本例子中，binlog文件的名称为```master-logbin.000002```，position为747。请记录好这些信息，在后续建立slave时需要用到。这些信息指明了slave应该从这个```偏移点```来开启后续的复制进程。
 
-假如master在之前的运行过程中并未开启binlog功能，则通过执行```SHOW MASTER STATUS```或```mysqldump --master-data```后显示的binlog文件名称及position均为空。在这种情况下，后续如果你要指定slave的复制点的话，则日志文件名称指定为```''```, 偏移指定为```4```。
+假如master在之前的运行过程中并未开启binlog功能，则通过执行```SHOW MASTER STATUS```或```mysqldump --master-data```后显示的binlog文件名称及position均为空。在这种情况下，后续如果你要指定slave的复制点的话，则日志文件名称指定为空字符串```''```, 偏移指定为```4```。
 
 <br />
 通过上面的步骤就可以知道slave的起始复制点，然后就可以在这一点开启我们的日志复制进程。
@@ -279,7 +279,7 @@ ca-key.pem  client-cert.pem  ib_buffer_pool  ib_logfile0  ibtmp1       mysql.soc
 
 ### 1.5 使用mysqldump创建数据快照
 
-创建master中已有数据库快照的其中一种方法就是使用```mysqldump```工具来dump出所有你想要复制的数据库。一旦dump出来了所有的数据，然后你就可以将这些数据导入到slave，之后再开启复制进程。
+在已存在的master数据库中创建数据快照(snapshot)的其中一种方法就是使用```mysqldump```工具来dump出所有你想要复制的数据库。一旦dump出来了所有的数据，然后你就可以将这些数据导入到slave，之后再开启复制进程。
 
 下面的例子会将所有的数据库都dump到一个名称为```dumpdb.db```文件中，在dump时采用了```--master-data```选项，这样就会自动的加上```CHANGE MASTER TO```语句，从而在导入slave后可以开启复制进程：
 {% highlight string %}
@@ -322,7 +322,7 @@ USE `app`;
 
 假如你在导出数据时不使用```--master-data```选项，那么你必须在执行```mysqldump```前在另一个session中手动执行```FLUSH TABLES WITH READ LOCK```，等到数据完成之后退出该session以解除对表的读锁或直接再另外开一个session执行```UNLOCK TABLE```来解锁。并且你还需要通过执行```SHOW MASTER STATUS```来确定当前导出的数据快照所对应的binlog偏移，然后在后续启动slave时执行```CHANGE MASTER TO```。
 
-当然你也可以只导出指定的数据库，此种情况下请记住在slave处也必须要过滤掉那些你并不想要复制的数据库。例如：
+当然你也可以只导出指定的数据库，此种情况下请记住在slave处也必须要**过滤**掉那些你并不想要复制的数据库。例如：
 {% highlight string %}
 mysql> show databases;
 +--------------------+
@@ -376,7 +376,13 @@ USE `app`;
 -- Table structure for table `appinfo`
 --
 {% endhighlight %}
-上面只导出了```app```以及```test```这两个数据库。
+上面只导出了```app```以及```test```这两个数据库。我们在后续建立slave时，就需要忽略其他的数据库。
+
+
+之后，我们就可以将上面导出的数据拷贝到slave上，然后导入到slave数据库中：
+{% highlight string %}
+# mysql -uroot -ptestAa@123 < dbdump.db
+{% endhighlight %}
 
 
 ### 1.6 使用Raw数据文件创建数据快照
@@ -387,7 +393,7 @@ USE `app`;
 
 假如你当前使用的是```InnoDB```表，你可以使用```MySQL企业版备份组件```中的```mysqlbackup```命令来产生一致性的数据快照。该命令同样会记录快照所对应的binlog以及偏移。```MySQL企业版备份组件```是一个商业化收费套件，这里我们不进行介绍。
 
-上面介绍的两种方式都存在一定的不足，其实我们可以使用```冷备份```(cold backup)来获得```InnoDB```类型表的可靠数据快照： 在```slow shutdown```MySQL Server之后来拷贝数据。
+上面介绍的两种方式都存在一定的不足，其实我们可以使用```冷备份```(cold backup)来获得```InnoDB```类型表的可靠数据快照： 即在```slow shutdown```MySQL Server之后来拷贝数据。
 
 而如果要创建```MyISAM```类型表的```原始数据快照```(raw data snapshot)，你可以使用标准的```cp```或```copy```命令工具进行直接拷贝，或者使用```scp```或```rsync```进行远程拷贝。
 
