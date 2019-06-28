@@ -207,6 +207,18 @@ mysql> show variables like 'log_%';
 21 rows in set (0.00 sec)
 {% endhighlight %}
 
+**6) 查询当前binlog的格式**
+{% highlight string %}
+mysql> show variables like 'binlog_format';
++---------------+-------+
+| Variable_name | Value |
++---------------+-------+
+| binlog_format | ROW   |
++---------------+-------+
+1 row in set (0.00 sec)
+{% endhighlight %}
+ 
+
 ### 2.1 PURGE BINARY LOGS语法
 这里我们先说明一下查看MySQL数据库文件存放位置的方法：
 {% highlight string %}
