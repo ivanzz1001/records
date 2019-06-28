@@ -166,9 +166,16 @@ Oct 11 15:55:30 localhost.localdomain systemd[1]: Stopped MySQL Server.
 server-id=168079128
 {% endhighlight %}
 
-上面我们将```server-id```配置为```1921681002````。假如你要建立多个master，则每个master的server id都不能重复。
+上面我们将```server-id```配置为```1921681002```。修改完成之后重启mysql服务:
+{% highlight string %}
+# systemctl start mysqld
+# systemctl status mysqld
+{% endhighlight %}
 
-对于slave服务，你可以不用启用binlog功能。然而，假如你在slave上也启用了binlog功能，你可以用slave的binlog来做数据备份以及恢复，也可以通过该slave来构建更为复杂的复制拓扑： 例如将本slave作为其他slave的master。
+假如你要建立多个```slaves```，每一个```slave```都必须有一个唯一的```server-id```（不能与master或其他slave相冲突)。
+
+
+对于建立slave服务，你可以不用启用binlog功能。然而，假如你在slave上也启用了binlog功能，你可以用slave的binlog来做数据备份以及恢复，也可以通过该slave来构建更为复杂的复制拓扑(replication topology)。例如将本slave作为其他slave的master。
 <pre>
 说明： 假如你并未指定slave的server id，或者将其指定为0， 则slave会拒绝连接到master。
 </pre>
