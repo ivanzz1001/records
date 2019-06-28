@@ -630,7 +630,7 @@ thread_type: IO_THREAD | SQL_THREAD
 
 4. [MySQL主从复制(Master-Slave)实践](https://www.cnblogs.com/gl-developer/p/6170423.html)
 
-5. [](https://blog.csdn.net/ahzxj2012/article/details/54017969)
+5. [查看mysql主从配置的状态及修正 slave不启动问题](https://blog.csdn.net/ahzxj2012/article/details/54017969)
 
 
 <br />
