@@ -174,6 +174,39 @@ mysql> SHOW SLAVE HOSTS;
 
 * Slave_UUID: slave服务器的全局唯一ID，通常在slave服务器的```auto.cnf```文件中指定。
 
+**5） 查询当前日志配置相关信息**
+
+可以通过如下命令查询当前日志配置相关信息：
+{% highlight string %}
+mysql> show variables like 'log_%';
++----------------------------------------+------------------------------------+
+| Variable_name                          | Value                              |
++----------------------------------------+------------------------------------+
+| log_bin                                | ON                                 |
+| log_bin_basename                       | /var/lib/mysql/master-logbin       |
+| log_bin_index                          | /var/lib/mysql/master-logbin.index |
+| log_bin_trust_function_creators        | OFF                                |
+| log_bin_use_v1_row_events              | OFF                                |
+| log_builtin_as_identified_by_password  | OFF                                |
+| log_error                              | /var/log/mysqld.log                |
+| log_error_verbosity                    | 3                                  |
+| log_output                             | FILE                               |
+| log_queries_not_using_indexes          | OFF                                |
+| log_slave_updates                      | OFF                                |
+| log_slow_admin_statements              | OFF                                |
+| log_slow_slave_statements              | OFF                                |
+| log_statements_unsafe_for_binlog       | ON                                 |
+| log_syslog                             | OFF                                |
+| log_syslog_facility                    | daemon                             |
+| log_syslog_include_pid                 | ON                                 |
+| log_syslog_tag                         |                                    |
+| log_throttle_queries_not_using_indexes | 0                                  |
+| log_timestamps                         | UTC                                |
+| log_warnings                           | 2                                  |
++----------------------------------------+------------------------------------+
+21 rows in set (0.00 sec)
+{% endhighlight %}
+
 ### 2.1 PURGE BINARY LOGS语法
 这里我们先说明一下查看MySQL数据库文件存放位置的方法：
 {% highlight string %}
