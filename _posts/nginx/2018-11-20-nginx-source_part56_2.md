@@ -71,7 +71,7 @@ URL为```http://{domain-name}/page/1```匹配结尾数字为1~99时，配置生�
 
 表示执行正则匹配，但不区分大小写
 <pre>
-location ~* /\.(jpg|jpeg|gif) {
+location ~* /\.(jpg|jpeg|gif)$ {
     [ configuration C ]
 }
 </pre>
