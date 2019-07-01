@@ -114,6 +114,52 @@ openresty-1.13.6.2-1.el7.centos.x86_64.rpm        openresty-pcre-8.42-1.el7.cent
 openresty-openssl-1.1.0h-3.el7.centos.x86_64.rpm  openresty-zlib-1.2.11-3.el7.centos.x86_64.rpm
 </pre>
 
+直接```yum install```安装默认配置如下：
+{% highlight string %}
+# nginx -V
+nginx version: openresty/1.13.6.2
+built by gcc 4.8.5 20150623 (Red Hat 4.8.5-11) (GCC) 
+built with OpenSSL 1.1.0h  27 Mar 2018
+TLS SNI support enabled
+configure arguments: 
+--prefix=/usr/local/openresty/nginx --with-debug \
+--with-cc-opt='-DNGX_LUA_USE_ASSERT -DNGX_LUA_ABORT_AT_PANIC -O2 -DNGX_LUA_ABORT_AT_PANIC \
+-I/usr/local/openresty/zlib/include -I/usr/local/openresty/pcre/include \
+-I/usr/local/openresty/openssl/include' \
+--add-module=../ngx_devel_kit-0.3.0 --add-module=../echo-nginx-module-0.61 \
+--add-module=../xss-nginx-module-0.06 --add-module=../ngx_coolkit-0.2rc3 \
+--add-module=../set-misc-nginx-module-0.32 --add-module=../form-input-nginx-module-0.12 \
+--add-module=../encrypted-session-nginx-module-0.08 --add-module=../srcache-nginx-module-0.31 \
+--add-module=../ngx_lua-0.10.13 --add-module=../ngx_lua_upstream-0.07 \
+--add-module=../headers-more-nginx-module-0.33 --add-module=../array-var-nginx-module-0.05 \
+--add-module=../memc-nginx-module-0.19 --add-module=../redis2-nginx-module-0.15 \
+--add-module=../redis-nginx-module-0.3.7 --add-module=../ngx_stream_lua-0.0.5 \
+--with-ld-opt='-Wl,-rpath,/usr/local/openresty/luajit/lib -L/usr/local/openresty/zlib/lib -L/usr/local/openresty/pcre/lib \
+-L/usr/local/openresty/openssl/lib -Wl,-rpath,/usr/local/openresty/zlib/lib:/usr/local/openresty/pcre/lib:/usr/local/openresty/openssl/lib' \
+--sbin-path=/usr/sbin/nginx \
+--conf-path=/etc/nginx/nginx.conf \
+--pid-path=/var/run/nginx.pid \
+--error-log-path=/var/log/nginx/error.log \
+--lock-path=/var/lock/subsys/nginx \
+--with-pcre-jit --with-ipv6 --with-stream \
+--with-stream_ssl_module --with-stream_ssl_preread_module \
+--with-http_v2_module --with-mail --with-mail_ssl_module \
+--without-mail_pop3_module --without-mail_imap_module \
+--without-mail_smtp_module --with-http_stub_status_module \
+--with-http_realip_module --with-http_addition_module \
+--with-http_xslt_module --with-http_image_filter_module \
+--with-http_auth_request_module --with-http_secure_link_module \
+--with-http_random_index_module --with-http_gzip_static_module \
+--with-http_sub_module --with-http_dav_module --with-http_flv_module \
+--with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module \
+--with-http_degradation_module --with-http_slice_module --with-http_stub_status_module \
+--with-stream_realip_module --with-stream_geoip_module --with-stream_geoip_module=dynamic \
+--with-stream_ssl_preread_module --with-http_geoip_module --with-http_geoip_module=dynamic \
+--add-module=/root/rpmbuild/SOURCES/ngx_http_proxy_connect_module --with-select_module \
+--with-poll_module --with-threads --with-file-aio --with-dtrace-probes --with-stream \
+--with-stream_ssl_module --with-http_ssl_module
+{% endhighlight %}
+
 
 ## 2. 源代码编译安装openresty
 
