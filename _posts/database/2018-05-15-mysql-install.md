@@ -640,10 +640,11 @@ mysql > source /root/CreateDB_app.sql
 
 8. [MySQL字符集详解](https://www.cnblogs.com/wcwen1990/p/6917109.html)
 
-
 9. [CentOS7离线安装MySQL](https://www.cnblogs.com/Orange42/p/8432185.html)
 
 10. [centos7 设置mariadb密码](https://www.cnblogs.com/lxg0/articles/5598205.html)
+
+11. [centos7环境下mysql8.0.13安装、root密码重置及用户远程连接授权](https://blog.csdn.net/jinhaijing/article/details/83349104)
 
 <br />
 <br />
