@@ -299,6 +299,16 @@ UNLOCK TABLES;
 # mysql -uroot -ptestAa@123 < selected_db.sql
 {% endhighlight %}
 
+以上命令将备份的整个数据库```selected_db.sql```导入。
+
+2） **source命令导入**
+
+source命令导入数据库需要先登录到数据库终端：
+{% highlight string %}
+mysql> 
+{% endhighlight %}
+
+
 
 <br />
 <br />
