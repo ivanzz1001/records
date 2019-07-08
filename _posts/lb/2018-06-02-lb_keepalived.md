@@ -70,7 +70,14 @@ VRRP全称Virtual Router Redundancy Protocol，即虚拟路由冗余协议。可
 Heartbeat、Corosync、Keepalived这三个集群组件到底选哪个好？ 首先我想说明的是，Keepalived与Heartbeat、Corosync根本不是同一类型的(Heartbeat、Corosync是属于同一类型)。Keepalived使用的是vrrp协议方式，即虚拟路由冗余协议(Virtual Router Redundancy Protocol，简写为VRRP); Heartbeat或CoroSync是基于主机或网络服务的高可用方式。简单的说就是，**Keepalived的目的是模拟路由器的高可用，Heartbeat或Corosync的目的是实现Service的高可用**。
 
 
-所以，一般keepalived是实现前端高可用，常用的前端高可用组合有：LVS+Keeplived、Nginx+Keepalived、HAproxy+keepalived。而Heartbeat或Corosync是实现服务的高可用，常见的组合有Heartbeat v3(Corosync) + Pacemaker + NFS + Httpd实现Web服务的高可用、Heartbeat v3(Corosync) + Pacemaker + NFS + MySQL实现MySQL服务的高可用。总结一下，
+所以，一般keepalived是实现前端高可用，常用的前端高可用组合有：LVS+Keeplived、Nginx+Keepalived、HAproxy+keepalived。而Heartbeat或Corosync是实现服务的高可用，常见的组合有Heartbeat v3(Corosync) + Pacemaker + NFS + Httpd实现Web服务的高可用、Heartbeat v3(Corosync) + Pacemaker + NFS + MySQL实现MySQL服务的高可用。总结一下，Keepalived实现轻量级的高可用，一般用于前端高可用，且不需要共享存储，一般常用于两个节点之间的高可用； 而Heartbeat或Corosync一般用于服务的高可用，且需要共享存储，一般用于多个节点的高可用。
+
+<pre>
+补充：
+
+有博友可能会问，那heartbeat与corosync我们又应该选哪个好啊？ 我想说我们一般选用corosync，因为corosync的运行机制更优于heartbeat，
+就连从heartbeat分离出来的pacemaker都说在以后的开发当中更倾向于corosync，所以现在corosync+pacemaker是最佳组合。
+</pre>
 
 
 ## 4. keepalived的安装
@@ -411,9 +418,11 @@ virtual_server 10.10.10.3 1358 {
 
 1. [keepalived官网](https://www.keepalived.org/)
 
-2. [keepalived实现双机热备](https://www.cnblogs.com/jefflee168/p/7442127.html)
+2. [](https://blog.csdn.net/liupeifeng3514/article/details/79018116)
 
-3. [VRRP协议与keepalived原理及功能实例演示](https://blog.51cto.com/13322786/2162618)
+3. [keepalived实现双机热备](https://www.cnblogs.com/jefflee168/p/7442127.html)
+
+4. [VRRP协议与keepalived原理及功能实例演示](https://blog.51cto.com/13322786/2162618)
 
 <br />
 <br />
