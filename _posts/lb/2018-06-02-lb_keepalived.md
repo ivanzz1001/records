@@ -97,7 +97,7 @@ CentOS Linux release 7.3.1611 (Core)
 # cd keepalived_setup
 # wget https://www.keepalived.org/software/keepalived-2.0.17.tar.gz
 # tar -zxvf keepalived-2.0.17.tar.gz
-# cd keepalived-2.017
+# cd keepalived-2.0.17
 </pre>
 
 
@@ -227,6 +227,11 @@ net-snmp-libs.x86_64                   1:5.7.2-24.el7_2.1              @anaconda
     └── keepalived
 
 3 directories, 30 files
+</pre>
+这里将*/etc/keepalived/keepalived/*目录下的文件移动到*/etc/keepalived*目录，以使后面通过```systemd```能够找到：
+<pre>
+# mv /etc/keepalived/keepalived/* /etc/keepalived/
+# rm -rf /etc/keepalived/keepalived/
 </pre>
 
 4) **设置keepalived开机启动**
@@ -406,10 +411,311 @@ virtual_server 10.10.10.3 1358 {
     }
 }
 {% endhighlight %}
+这里我们简单说一下keepalived的配置文件：
+
+* 注释以```#```或者```!```开头，直到该行的结尾
+
+* 通常由global_defs、vrrp_instance、virtual_server这3大模块组成
+
+
+## 5. Keepalived实现双机热备
+keepalived的作用是检测后端TCP服务的状态。如果有一台提供TCP服务的后端节点死机，或者出现工作故障，keepalived会及时检测到，并将有故障的节点从系统中剔除； 当提供TCP服务的节点恢复并且正常提供服务后keepalived会自动将TCP服务的节点加入到集群中。这些工作都是keepalived自动完成，不需要人工干涉，需要人工做的只是修复发生故障的服务器，以下通过示例来演示。测试环境如下：
+<pre>
+keepalived主机：  192.168.79.128
+keepalived备机：  192.168.79.129
+
+http服务器1：     192.168.79.128
+http服务器2：     192.168.79.129
+http服务器3：     192.168.79.131
+
+vip:             192.168.79.180
+</pre>
+
+在进行具体工作之前，我们最好先关闭```SELinux```。执行如下命令查看当前SELinux状态：
+<pre>
+# getenforce
+Enabled
+</pre>
+有两种方式来执行关闭： 临时关闭与永久关闭
+
+* **临时关闭SELinux**
+<pre>
+# setenforce 0
+setenforce: SELinux is disabled
+</pre>
+
+* **永久关闭**
+
+修改*/etc/selinux/config*文件， 将*SELINUX=enforcing*改为*SELINUX=disabled*，然后重启操作系统即可。
+
+### 5.1 安装keepalived及nginx服务器
+
+1) **安装keepalived**
+
+在*192.168.79.128*以及*192.168.79.129*这两台主机上安装keepalived，具体安装方法参看本文前面章节。
+
+2） **安装nginx**
+
+在*192.168.79.128*、*192.168.79.129*、*192.168.79.131*这三台主机上安装nginx，具体安装方法这里不做介绍。安装完成之后启动nginx服务。
 
 
 
+### 5.2 keepalived配置
 
+* keepalived master配置
+
+在```192.168.79.128```主机上备份原来的```keepalived.conf```文件，然后将配置修改为如下：
+{% highlight string %}
+! Configuration File for keepalived 
+ 
+vrrp_instance VI_180{
+    state MASTER             #指定该节点为主节点，备用节点设置为BACKUP
+	interface ens33          #绑定虚拟IP的网络接口
+	
+	virtual_router_id 180    #VRRP组名，两个节点设置一样，以指明各个节点同属一VRRP组
+	
+	priority 102             #主节点优先级，数值在1~255，注意从节点必须必主节点的优先级低
+	advert_int 1             #组播信息发送间隔，两个节点需一致
+	
+	#设置验证信息，两个节点需一致
+	authentication{
+	    auth_type PASS
+		auth_pass 1111
+	}
+	
+	#指定虚拟IP，两个节点需设置一样
+	virtual_ipaddress{
+	    192.168.79.180
+	}
+} 
+
+!include conf/*.conf
+
+#虚拟IP服务
+virtual_server 192.168.79.180 80{
+    delay_loop 6             #设定检查间隔
+	lb_algo rr               #指定LVS算法
+	lb_kind DR               #指定LVS模式
+	persistence_timeout 10   #指定LVS持久连接设置
+	protocol TCP             #转发协议为TCP
+	
+	#后端实际TCP服务配置
+	real_server 192.168.79.128 80{
+	    weight 1
+	}
+	
+	real_server 192.168.79.129 80{
+	    weight 1
+	}
+	
+	real_server 192.168.79.131 80{
+	    weight 1
+	}
+}
+{% endhighlight %}
+
+* keepalived backup配置
+
+在```192.168.79.129```主机上备份原来的```keepalived.conf```文件，然后将配置修改为如下(主要修改了```state```以及```priority```两个字段）：
+{% highlight string %}
+! Configuration File for keepalived 
+ 
+vrrp_instance VI_180{
+    state BACKUP             #指定该节点为主节点，备用节点设置为BACKUP
+	interface ens33          #绑定虚拟IP的网络接口
+	
+	virtual_router_id 180    #VRRP组名，两个节点设置一样，以指明各个节点同属一VRRP组
+	
+	priority 80             #主节点优先级，数值在1~255，注意从节点必须必主节点的优先级低
+	advert_int 1             #组播信息发送间隔，两个节点需一致
+	
+	#设置验证信息，两个节点需一致
+	authentication{
+	    auth_type PASS
+		auth_pass 1111
+	}
+	
+	#指定虚拟IP，两个节点需设置一样
+	virtual_ipaddress{
+	    192.168.79.180
+	}
+} 
+
+!include conf/*.conf
+
+#虚拟IP服务
+virtual_server 192.168.79.180 80{
+    delay_loop 6             #设定检查间隔
+	lb_algo rr               #指定LVS算法
+	lb_kind DR               #指定LVS模式
+	persistence_timeout 10   #指定LVS持久连接设置
+	protocol TCP             #转发协议为TCP
+	
+	#后端实际TCP服务配置
+	real_server 192.168.79.128 80{
+	    weight 1
+	}
+	
+	real_server 192.168.79.129 80{
+	    weight 1
+	}
+	
+	real_server 192.168.79.131 80{
+	    weight 1
+	}
+}
+{% endhighlight %}
+
+### 5.3 启动keepalived服务
+
+1) **启动keepalived**
+
+执行如下命令启动主备keepalived服务，并查看启动状态：
+<pre>
+# systemctl start keepalived             //启动主
+# systemctl status keepalived
+● keepalived.service - LVS and VRRP High Availability Monitor
+   Loaded: loaded (/usr/lib/systemd/system/keepalived.service; enabled; vendor preset: disabled)
+   Active: active (running) since Mon 2019-07-08 03:10:48 PDT; 6s ago
+  Process: 103385 ExecStart=/usr/local/sbin/keepalived $KEEPALIVED_OPTIONS (code=exited, status=0/SUCCESS)
+ Main PID: 103388 (keepalived)
+   CGroup: /system.slice/keepalived.service
+           ├─103388 /usr/local/sbin/keepalived -D
+           ├─103389 /usr/local/sbin/keepalived -D
+           └─103390 /usr/local/sbin/keepalived -D
+
+Jul 08 03:10:48 localhost.localdomain Keepalived_vrrp[103390]: VRRP sockpool: [ifindex(2), family(IPv4), proto(112), unicast(0), fd(11,12)]
+Jul 08 03:10:52 localhost.localdomain Keepalived_vrrp[103390]: (VI_180) Receive advertisement timeout
+Jul 08 03:10:52 localhost.localdomain Keepalived_vrrp[103390]: (VI_180) Entering MASTER STATE
+Jul 08 03:10:52 localhost.localdomain Keepalived_vrrp[103390]: (VI_180) setting VIPs.
+Jul 08 03:10:52 localhost.localdomain Keepalived_vrrp[103390]: Sending gratuitous ARP on ens33 for 192.168.79.180
+Jul 08 03:10:52 localhost.localdomain Keepalived_vrrp[103390]: (VI_180) Sending/queueing gratuitous ARPs on ens33 for 192.168.79.180
+Jul 08 03:10:52 localhost.localdomain Keepalived_vrrp[103390]: Sending gratuitous ARP on ens33 for 192.168.79.180
+Jul 08 03:10:52 localhost.localdomain Keepalived_vrrp[103390]: Sending gratuitous ARP on ens33 for 192.168.79.180
+Jul 08 03:10:52 localhost.localdomain Keepalived_vrrp[103390]: Sending gratuitous ARP on ens33 for 192.168.79.180
+Jul 08 03:10:52 localhost.localdomain Keepalived_vrrp[103390]: Sending gratuitous ARP on ens33 for 192.168.79.180
+
+# systemctl start keepalived             //启动备
+# systemctl status keepalived
+● keepalived.service - LVS and VRRP High Availability Monitor
+   Loaded: loaded (/usr/lib/systemd/system/keepalived.service; enabled; vendor preset: disabled)
+   Active: active (running) since Mon 2019-07-08 18:17:45 CST; 2min 21s ago
+  Process: 48763 ExecStart=/usr/local/sbin/keepalived $KEEPALIVED_OPTIONS (code=exited, status=0/SUCCESS)
+ Main PID: 48767 (keepalived)
+   Memory: 932.0K
+   CGroup: /system.slice/keepalived.service
+           ├─48767 /usr/local/sbin/keepalived -D
+           ├─48768 /usr/local/sbin/keepalived -D
+           └─48769 /usr/local/sbin/keepalived -D
+
+Jul 08 18:17:43 localhost.localdomain Keepalived_vrrp[48769]: Registering Kernel netlink command channel
+Jul 08 18:17:43 localhost.localdomain Keepalived_vrrp[48769]: Opening file '/etc/keepalived/keepalived.conf'.
+Jul 08 18:17:43 localhost.localdomain Keepalived_vrrp[48769]: Assigned address 192.168.79.129 for interface ens33
+Jul 08 18:17:43 localhost.localdomain Keepalived_vrrp[48769]: Assigned address fe80::7e75:c1ed:6f41:49d4 for interface ens33
+Jul 08 18:17:43 localhost.localdomain Keepalived_vrrp[48769]: Registering gratuitous ARP shared channel
+Jul 08 18:17:43 localhost.localdomain Keepalived_vrrp[48769]: (VI_180) removing VIPs.
+Jul 08 18:17:43 localhost.localdomain Keepalived_vrrp[48769]: (VI_180) Entering BACKUP STATE (init)
+Jul 08 18:17:43 localhost.localdomain Keepalived_vrrp[48769]: VRRP sockpool: [ifindex(2), family(IPv4), proto(112), unicast(0), fd(11,12)]
+Jul 08 18:17:44 localhost.localdomain Keepalived_healthcheckers[48768]: Gained quorum 1+0=1 <= 3 for VS [192.168.79.180]:tcp:80
+Jul 08 18:17:45 localhost.localdomain systemd[1]: Started LVS and VRRP High Availability Monitor.
+</pre>
+
+2) **查看keepalived主机IP**
+
+在```192.168.79.128```上查看主机IP：
+{% highlight string %}
+# ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN qlen 1
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: ens33: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    link/ether 00:0c:29:15:61:68 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.79.128/24 brd 192.168.79.255 scope global dynamic ens33
+       valid_lft 1444sec preferred_lft 1444sec
+    inet 192.168.79.180/32 scope global ens33
+       valid_lft forever preferred_lft forever
+    inet6 fe80::2a0f:9dce:2a6d:9278/64 scope link 
+       valid_lft forever preferred_lft forever
+{% endhighlight %}
+可以看到在```master keepalived```主机上绑定了vip，同样我们可以查看```backup keepalived```主机，我们看到此时并没有绑定vip。
+
+### 5.4 测试keepalived
+
+我们通过浏览器请求VIP上面的http服务：
+<pre>
+# curl -X GET http://192.168.79.180/
+</pre>
+可以看到服务正常返回。
+
+接着我们关掉```master keepalived```,即关掉*192.168.79.128*上的keepalived服务，执行如下命令：
+<pre>
+# systemctl stop keepalived
+# systemctl status keepalived
+● keepalived.service - LVS and VRRP High Availability Monitor
+   Loaded: loaded (/usr/lib/systemd/system/keepalived.service; enabled; vendor preset: disabled)
+   Active: inactive (dead) since Mon 2019-07-08 03:34:39 PDT; 7s ago
+  Process: 103385 ExecStart=/usr/local/sbin/keepalived $KEEPALIVED_OPTIONS (code=exited, status=0/SUCCESS)
+ Main PID: 103388 (code=exited, status=0/SUCCESS)
+
+Jul 08 03:34:38 localhost.localdomain systemd[1]: Stopping LVS and VRRP High Availability Monitor...
+Jul 08 03:34:38 localhost.localdomain Keepalived[103388]: Stopping
+Jul 08 03:34:38 localhost.localdomain Keepalived_vrrp[103390]: (VI_180) sent 0 priority
+Jul 08 03:34:38 localhost.localdomain Keepalived_vrrp[103390]: (VI_180) removing VIPs.
+Jul 08 03:34:38 localhost.localdomain Keepalived_healthcheckers[103389]: Shutting down service [192.168.79.128]:tcp:80 from VS [192.168.79.180]:tcp:80
+Jul 08 03:34:38 localhost.localdomain Keepalived_healthcheckers[103389]: Shutting down service [192.168.79.129]:tcp:80 from VS [192.168.79.180]:tcp:80
+Jul 08 03:34:38 localhost.localdomain Keepalived_healthcheckers[103389]: Shutting down service [192.168.79.131]:tcp:80 from VS [192.168.79.180]:tcp:80
+Jul 08 03:34:39 localhost.localdomain Keepalived_vrrp[103390]: Stopped - used 0.019591 user time, 0.489784 system time
+Jul 08 03:34:39 localhost.localdomain Keepalived[103388]: Stopped Keepalived v2.0.17 (06/25,2019)
+Jul 08 03:34:39 localhost.localdomain systemd[1]: Stopped LVS and VRRP High Availability Monitor.
+</pre>
+之后我们查看备机*192.168.79.129*主机上的keepalived服务：
+{% highlight string %}
+# ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN qlen 1
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: ens33: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    link/ether 00:0c:29:6f:14:dc brd ff:ff:ff:ff:ff:ff
+    inet 192.168.79.129/24 brd 192.168.79.255 scope global dynamic ens33
+       valid_lft 1695sec preferred_lft 1695sec
+    inet 192.168.79.180/32 scope global ens33
+       valid_lft forever preferred_lft forever
+    inet6 fe80::7e75:c1ed:6f41:49d4/64 scope link 
+       valid_lft forever preferred_lft forever
+{% endhighlight %}
+可以看到vip绑定到了```192.168.79.129```主机上。然后我们再请求nginx服务，发现仍可以正常工作。
+
+
+之后我们重启```192.168.79.128```主机上的keepalived服务，可以发现vip又回到了*192.168.79.128*这台master keepalived主机上，而在*192.168.79.129*这台backup keepalived主机上的vip解绑了。
+
+### 5.5 查看vrrp数据包
+我们在局域网内的三台主机上抓包：
+
+* keepalived主机： 192.168.79.128
+
+* keepalived备机： 192.168.79.129
+
+* http服务器1： 192.168.79.128
+
+执行以下命令抓包(keepalived默认多播地址是```224.0.0.18```，可以通过vrrp_mcast_group4选项进行修改）：
+{% highlight string %}
+# tcpdump -i ens33 -nn host 224.0.0.18
+tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+listening on ens33, link-type EN10MB (Ethernet), capture size 65535 bytes
+03:47:52.775392 IP 192.168.79.128 > 224.0.0.18: VRRPv2, Advertisement, vrid 180, prio 102, authtype simple, intvl 1s, length 20
+03:47:53.776295 IP 192.168.79.128 > 224.0.0.18: VRRPv2, Advertisement, vrid 180, prio 102, authtype simple, intvl 1s, length 20
+03:47:54.777258 IP 192.168.79.128 > 224.0.0.18: VRRPv2, Advertisement, vrid 180, prio 102, authtype simple, intvl 1s, length 20
+03:47:55.778509 IP 192.168.79.128 > 224.0.0.18: VRRPv2, Advertisement, vrid 180, prio 102, authtype simple, intvl 1s, length 20
+03:47:56.779592 IP 192.168.79.128 > 224.0.0.18: VRRPv2, Advertisement, vrid 180, prio 102, authtype simple, intvl 1s, length 20
+{% endhighlight %}
+可以看到每秒中产生一个多播数据包。
+ 
 
 <br />
 <br />
