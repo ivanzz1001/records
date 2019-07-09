@@ -417,6 +417,16 @@ virtual_server 10.10.10.3 1358 {
 
 * 通常由global_defs、vrrp_instance、virtual_server这3大模块组成
 
+上面的示例中，在real_server里面加上了针对HTTP的健康检查，另外其实我们可以加上针对TCP的监看检查，例如：
+{% highlight string %}
+TCP_CHECK {
+    connect_timeout 10
+    nb_get_retry 3
+    delay_before_retry 3
+    connect_port 17443
+}
+{% endhighlight %}
+
 
 ## 5. Keepalived实现双机热备
 keepalived的作用是检测后端TCP服务的状态。如果有一台提供TCP服务的后端节点死机，或者出现工作故障，keepalived会及时检测到，并将有故障的节点从系统中剔除； 当提供TCP服务的节点恢复并且正常提供服务后keepalived会自动将TCP服务的节点加入到集群中。这些工作都是keepalived自动完成，不需要人工干涉，需要人工做的只是修复发生故障的服务器，以下通过示例来演示。测试环境如下：
@@ -565,6 +575,7 @@ virtual_server 192.168.79.180 80{
 	}
 }
 {% endhighlight %}
+
 
 ### 5.3 启动keepalived服务
 
