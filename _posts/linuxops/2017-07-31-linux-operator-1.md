@@ -286,6 +286,14 @@ Settings for eth0:
 </pre>
 上面我们看到```eth0```接口所使用的是```思科万兆网卡```。
 
+此外，我们还可以通过如下命令来查看相应的网卡信息：
+{% highlight string %}
+# hwconfig |grep Network
+Network:        eth0 (bonding): 29:31:52:a8:e9:a6
+Network:        slave0 (igb): Intel 82580 Gigabit Network Connection, 28:31:52:a8:e1:d6, 1000Mb/s <full-duplex>
+Network:        slave1 (igb): Intel 82580 Gigabit Network Connection, 28:31:52:a8:e1:d6, 1000Mb/s <full-duplex>
+{% endhighlight %}
+
 
 ## 3. 查看详细的物理硬盘信息
 我们可以通过```smartctl```命令来查看某一块硬盘的详细信息：
