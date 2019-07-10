@@ -46,6 +46,73 @@ description: Centos7 中防火墙的关闭问题
 ![linux-iptables-firewall](https://ivanzz1001.github.io/records/assets/img/linuxops/linuxops_iptables_firewall.png)
 
 
+## 2. SELinux
+SELinux(Security-Enhanced Linux)是美国国家安全局(NSA)对于强制访问控制的实现，是Linux历史上最杰出的新安全子系统。但是一般我们都不用它，因为它管的东西太多了，想做安全可以用防火墙等其他措施。可以通过如下方式查看当前SELinux的状态：
+<pre>
+# getenforce
+Disabled
+</pre>
+
+上面显示SELinux已经被禁用。假如没有被禁用的话，我们可以有如下两种方式来关闭```SELinux```:
+
+1) **临时关闭**
+<pre>
+# setenforce 0
+setenforce: SELinux is disabled
+</pre>
+
+2) **永久关闭**
+
+修改*/etc/selinux/config*文件， 将*SELINUX=enforcing*改为*SELINUX=disabled*，然后```重启```操作系统即可
+
+
+## 3. firewalld
+Centos7默认使用的防火墙是```firewall```，而不是```iptables```。
+
+* 查看当前firewall的状态
+<pre>
+# systemctl list-unit-files | grep firewalld
+firewalld.service                           disabled
+# systemctl status firewalld
+● firewalld.service - firewalld - dynamic firewall daemon
+   Loaded: loaded (/usr/lib/systemd/system/firewalld.service; disabled; vendor preset: enabled)
+   Active: inactive (dead)
+     Docs: man:firewalld(1)
+</pre>
+上面表示```firewalld```已经加载，但未被启用。
+
+* 启用firewalld，并设为开机启动
+<pre>
+# systemctl start firewalld
+# systemctl enable firewalld
+</pre>
+
+* 关闭firewalld，并禁止开机启动
+<pre>
+# systemctl stop firewalld
+# systemctl disable firewalld
+</pre>
+
+## 4. iptables
+
+* 查看当前iptables状态
+<pre>
+#  service iptables status
+Redirecting to /bin/systemctl status  iptables.service
+Unit iptables.service could not be found.
+</pre>
+上面命令报错，这是因为CentOS7版本后防火墙默认使用firewalld。
+
+* 关闭iptables，并禁止开机启动
+<pre>
+# service iptables stop
+# chkconfig iptables off
+</pre>
+
+* 启动iptables
+<pre>
+# service iptables start
+</pre>
 
 <br />
 <br />
