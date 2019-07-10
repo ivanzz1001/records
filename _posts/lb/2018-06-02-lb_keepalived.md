@@ -727,6 +727,42 @@ listening on ens33, link-type EN10MB (Ethernet), capture size 65535 bytes
 {% endhighlight %}
 可以看到每秒中产生一个多播数据包。
  
+## 6. 补充
+很多时候keepalived/fwmark还会搭配iptables来使用。一般我们可以先在iptables的mangle表对数据流量进行标记，然后在keepalived中根据相应的标记进行流量转发。例如：
+<pre>
+# iptables -t mangle -L
+Chain PREROUTING (policy ACCEPT)
+target     prot opt source               destination         
+MARK       tcp  --  anywhere             server-ceph01         tcp dpt:17443 MAC ! F8:98:EF:7E:9E:8B MARK set 0x96be3
+MARK       tcp  --  anywhere             server-ceph01         tcp dpt:pcsync-https MAC ! F8:98:EF:7E:9E:8B MARK set 0x10b5b
+MARK       tcp  --  anywhere             server-ceph01         tcp dpt:https MAC ! F8:98:EF:7E:9E:8B MARK set 0x192b
+MARK       tcp  --  anywhere             server-ceph01         tcp dpt:17480 MAC ! F8:98:EF:7E:9E:8B MARK set 0x96c08
+MARK       tcp  --  anywhere             server-ceph01         tcp dpt:irdmi MAC ! F8:98:EF:7E:9E:8B MARK set 0x109a0
+MARK       tcp  --  anywhere             server-ceph01         tcp dpt:http MAC ! F8:98:EF:7E:9E:8B MARK set 0x2a8
+</pre>
+上面第一条表示： 对于发送到目标端口为17443的数据流量（目标网卡不应该为F8:98:EF:7E:9E:8B)，将其标志为617443(0x96be3)
+
+那么此时，我们可以在keepalived做如下配置以处理带有该标志的流量：
+{% highlight string %}
+virtual_server fwmark 617443 17443 {
+    delay_loop 5
+    lb_algo rr
+    lb_kind DR
+    persistence_timeout 0
+    protocol TCP
+
+    real_server 192.168.79.129 17443 {
+		weight 1
+	}
+
+	real_server 192.168.79.131 17443 {
+		weight 1
+	}
+}
+{% endhighlight %}
+
+
+
 
 <br />
 <br />
