@@ -493,7 +493,7 @@ target     prot opt source               destination
 {% endhighlight %}
 会保存当前的防火墙规则设置，命令行下通过iptables配置的规则在下次重启后会失效，当然这也是为了防止错误的配置防火墙。默认读取和保存的配置文件地址为*/etc/sysconfig/iptables*。
 
-## 2.5 修改iptables
+### 2.5 修改iptables
 先看当前规则：
 <pre>
 # iptables -nL --line-number
