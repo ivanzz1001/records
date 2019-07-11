@@ -516,7 +516,7 @@ num  target     prot opt source               destination
 3    ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0
 </pre>
 
-### 2.5 设置chain的默认策略
+### 2.6 设置chain的默认策略
 <pre>
 # iptables -P INPUT DROP
 # iptables -P FORWARD ACCEPT
