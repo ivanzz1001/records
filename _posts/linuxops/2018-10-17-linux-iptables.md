@@ -27,27 +27,213 @@ Usage: iptables -[ACD] chain rule-specification [options]
        iptables -P chain target [options]
        iptables -h (print this help information)
 {% endhighlight %} 
-1) **iptables基本命令**
+### 1.1  iptables基本命令
 <pre>
---append  -A chain                 添加一个规则到链的末尾
---check   -C chain                 检查某一条链是否存在
---delete  -D chain                 删除匹配的链
---delete  -D chain rulenum         删除指定链的某一条规则
---insert  -I chain [rulenum]       插入一条规则到指定的链
---replace -R chain rulenum         修改指定链中的某一条规则
---list    -L [chain [rulenum]]     列出指定链中的规则
---list-rules -S [chain [rulenum]]  打印出指定链中的规则
---flush   -F [chain]               删除指定链中的规则
---zero    -Z [chain [rulenum]]     将指定链中的规则计数器置为0
---new     -N chain                 创建一条用户自定义链
---delete-chain   -X [chain]        删除一条用户自定义链
---policy  -P chain target          该表某条链的策略
---rename-chain  -E old-chain new-chain  修改链的名称
+--append  -A chain                      添加一个规则到链的末尾
+--check   -C chain                      检查某一条链是否存在
+--delete  -D chain                      删除匹配的链
+--delete  -D chain rulenum              删除指定链的某一条规则
+--insert  -I chain [rulenum]            根据给出的规则序号向所选链中插入一条或更多规则。所以，如果规则序号为1，
+                                        规则会被插入链的头部。这也是不指定规则序号时的默认方式。
+
+--replace -R chain rulenum              修改指定链中的某一条规则
+--list    -L [chain [rulenum]]          列出指定链中的规则
+--list-rules -S [chain [rulenum]]       打印出指定链中的规则
+--flush   -F [chain]                    删除指定链中的规则
+--zero    -Z [chain [rulenum]]          把指定链，或者表中的所有链上的所有计数器清零
+--new     -N chain                      创建一条用户自定义链
+--delete-chain   -X [chain]             删除一条用户自定义链
+--policy  -P chain target               该表某条链的策略
+--rename-chain  -E old-chain new-chain  修改链的名称(只有用户自定义链的名称可以被修改）
 </pre>
 
-2) **iptables选项参数**
+### 1.2 iptables选项参数
+如下是iptables常用的一些选项参数：
 <pre>
+[!] --protocol  -p proto                规则或者包检查的协议。指定协议可以是tcp、udp、icmp中的一个或全部，也可以是数值，代表这些协议中的某一个。
+                                        当然也可以使用在/etc/protocols中定义的协议名。在协议名前加'!'表示相反的规则。数字0相当于all。Protocol
+                                        all会匹配所有协议，而且这是缺省的选项。在和check命令结合时，all可以不被使用
+
+[!] --source    -s address[/mask][...]  指定源地址，可以是主机名、网络名或IP地址。mask说明可以是网络掩码或清楚的数字。标志--src是这个选项的简写。
+
+[!] --destination -d address[/mask][...] 指定目标地址。标志--dst是这个选项的简写
+
+--jump -j target                        执行指定的动作
+
+--goto -g chain                         跳转到指定的链
+
+--match  -m match                       扩展匹配
+
+--numeric     -n                        以数字的形式显示IP地址和端口
+
+[!] --in-interface -i input name[+]     匹配由指定网络接口进入的数据包
+[!] --out-interface -o output name[+]   由指定接口发出的数据包
+
+[!] --fragment  -f                      这意味着在分片的包中，规则只询问第二及以后的片
+--exact       -x                        扩展数字。显示包和字节计数器的精确值，代替用K、M、G表示的约数。这个选项仅能用于-L选项
+
+--line-numbers                          当列表显示规则时，在每个规则前面加上行号，与该规则在链中的位置相对应。
 </pre>
+
+如下是一些扩展选项，通常需要跟在```-m```选项的后面，以表示对其进行扩展：
+
+1) **针对tcp的一些扩展选项**
+
+当```--protocol tcp```被指定，且其他匹配的扩展未被指定时，这些扩展被装载。它提供以下选项：
+<pre>
+--source-port [!] [port[:port]]         源端口或端口范围指定，也可以使用服务名或端口号。如果使用端口范围，若首端口号忽略则默认为0，若尾端口号忽略则
+                                        默认为65535。这个选项可以简写为--sport
+--destionation-port [!] [port:[port]]   目标端口或端口范围指定。这个选项可以使用--dport别名来代替
+
+--tcp-flags [!] mask comp               匹配指定的TCP标记。第一个参数是我们要检查的标记，一个用逗号分开的列表，第二个参数是用逗号分开的标记表,是必须
+                                        被设置的。标记如下：SYN ACK FIN RST URG PSH ALL NONE。例如我们有如下这条命令：
+                                                iptables -A FORWARD -p tcp --tcp-flags SYN,ACK,FIN,RST SYN
+                                        上面这条命令只匹配那些SYN标志被设置而ACK、FIN和RST标记没有被设置的包
+
+[!] --syn                               只匹配那些设置了SYN位而清除了ACK和FIN位的TCP包。这些包用于TCP连接初始化时发出请求。例如，大量的这种包进入一个
+                                        接口发生堵塞时会阻止进入的TCP连接，而出去的TCP连接不会受到影响。这等于：--tcp-flags SYN,RST,ACK SYN
+
+--tcp-option [!] number                 匹配设置了TCP选项的数据包
+</pre>
+
+
+2) **针对udp的一些扩展选项**
+
+当```--protocol udp```被指定，且其他匹配的扩展未被指定时，这些扩展被装载。它提供以下选项：
+<pre>
+--source-port [!] [port:[port]]         源端口或端口范围指定  
+--destionation-port [!] [port:[port]]   目标端口或端口范围指定
+</pre>
+
+3） **针对icmp的一些扩展选项**
+
+当```protocol icmp```被指定,且其他匹配的扩展未被指定时,该扩展被装载。它提供以下选项：
+<pre>
+--icmp-type [!] typename               这个选项允许指定ICMP类型，可以是一个数值型的ICMP类型，或者是某个由命令iptables -p icmp -h所显示的ICMP类型名
+</pre>
+
+4) **针对mac的一些扩展选项**
+<pre>
+--mac-source [!] address               匹配物理地址。注意它只对来自以太设备并进入PREROUTING、FORWORD和INPUT链的包有效。
+</pre>
+例如，我们添加一条如下的iptables规则：
+{% highlight string %}
+# iptables -A PREROUTING -d 10.4.18.69/32 -p tcp -m tcp --dport 17443 -m mac ! --mac-source F8:98:EF:7E:9E:1B -j MARK --set-xmark 0x96be3/0xffffffff
+{% endhighlight %}
+上面为```-m tcp```匹配添加了```--dport```扩展选项； 另外为```-m mac```添加了```--mac-source```扩展选项。
+
+5） **针对limit的扩展选项**
+<pre>
+--limit rate             最大平均匹配速率：可赋的值有'/second', '/minute', '/hour', or '/day'这样的单位，默认是3/hour
+
+--limit-burst number     待匹配包初始个数的最大值:若前面指定的极限还没达到这个数值,则概数字加1.默认值为5
+</pre>
+例如我们添加一条如下的iptables规则：
+{% highlight string %}
+# iptables -R INPUT 1 -p tcp --dport 22 -m limit --limit 3/minute --limit-burst 8 -j LOG
+{% endhighlight %}
+上面为```-m limit```添加了两个扩展选项。
+
+6） **针对multiport的扩展选项**
+
+这个模块匹配一组源端口或目标端口,最多可以指定15个端口。只能和```-p tcp```或者```-p udp```连着使用。
+<pre>
+--source-port [port[, port]]          如果源端口是其中一个给定端口则匹配
+--destination-port [port[, port]]     如果目标端口是其中一个给定端口则匹配
+--port [port[, port]]                 若源端口和目的端口相等并与某个给定端口相等,则匹配
+</pre>
+
+7) **针对mark的扩展选项**
+
+这个模块与netfilter过滤器标记字段匹配（就可以在下面设置为使用MARK标记）
+<pre>
+--mark value [/mask]                  匹配那些无符号标记值的包（如果指定mask，在比较之前会给掩码加上逻辑的标记）
+</pre>
+
+8) **针对owner的扩展选项**
+
+此模块是为本地生成包匹配创建者的不同特征。只能用于OUTPUT链，而且即使这样一些包（如ICMP ping应答）还是有可能没有所有者，因此永远不会匹配
+<pre>
+--uid-owner userid                  如果给出有效的user id，那么匹配它的进程产生的包
+--gid-owner groupid                 如果给出有效的group id，那么匹配它的进程产生的包
+--sid-owner seessionid              根据给出的会话组匹配该进程产生的包
+</pre>
+
+9） **针对state的扩展选项**
+
+此模块，当与连接跟踪结合使用时，允许访问包的连接跟踪状态
+<pre>
+--state state
+</pre>
+这里state是一个逗号分割的匹配连接状态列表。可能的状态是:```INVALID```表示包是未知连接，```ESTABLISHED```表示是双向传送的连接，```NEW```表示包为新的连接，否则是非双向传送的，而```RELATED```表示包由新连接开始，但是和一个已存在的连接在一起，如FTP数据传送，或者一个ICMP错误。
+
+10) **针对unclean的扩展选项**
+
+此模块没有可选项，不过它试着匹配那些奇怪的、不常见的包。处在实验中
+
+11) **针对tos的扩展选项**
+
+此模块匹配IP包首部的8位tos（服务类型）字段（也就是说，包含在优先位中）
+<pre>
+--tos tos
+</pre>
+这个参数可以是一个标准名称，（用iptables -m tos -h 察看该列表），或者数值。
+
+### 1.3 targets介绍
+iptables的```-j```选项后面对应的是要执行的target。其中有些target具有一些扩展选项，下面我们会一并介绍：
+
+1） **ACCEPT**
+
+表示接收匹配的数据包
+
+2） **DROP**
+
+表示丢弃匹配的数据包
+
+3) **REDIRECT**
+
+表示重定向匹配的数据包。
+
+4) **SNAT**
+
+源地址转换。
+
+5) **DNAT**
+
+目标地址转换
+
+6) **MASQUERAD**
+
+IP伪装，用于ADSL。
+
+7) **MARK**
+
+用来设置包的netfilter标记值。只适用于mangle表。其有如下一些扩展选项：
+<pre>
+--set-mark mark
+--set-xmark mark/mask
+</pre>
+例如，我们通过如下命令对进来的数据包设置标志：
+{% highlight string %}
+iptables -A PREROUTING -d 10.4.18.69/32 -p tcp -m tcp --dport 80 -m mac ! --mac-source F8:98:EF:7E:9E:1B -j MARK --set-xmark 0x2a8/0xffffffff
+{% endhighlight %}
+
+
+8） **LOG**
+
+为匹配的包开启内核记录。当在规则中设置了这一选项后，linux内核会通过printk()打印一些关于全部匹配包的信息（诸如IP包头字段等）。其有如下一些扩展选项：
+<pre>
+--log-level level          记录级别（数字或参看 syslog.conf(5)）
+
+--log-prefix prefix        在纪录信息前加上特定的前缀：最多14个字母长，用来和记录中其他信息区别
+
+--log-tcp-sequence         记录TCP序列号。如果记录能被用户读取那么这将存在安全隐患
+
+--log-tcp-options          记录来自TCP包头部的选项
+
+--log-ip-options           记录来自IP包头部的选项
+</pre>
+
 
 ## 2. iptables的基本使用 
 如下我们简单列出iptables命令的基本使用方法，以作参考。
@@ -274,6 +460,8 @@ num  target     prot opt source               destination
 **[参看]**
 
 1. [linux系统中查看己设置iptables规则](https://www.cnblogs.com/zhaogaojian/p/8186220.html)
+
+2. [iptables](https://blog.csdn.net/qq_42743215/article/details/81637090)
 
 <br />
 <br />
