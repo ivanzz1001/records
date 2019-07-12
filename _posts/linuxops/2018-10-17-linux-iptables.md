@@ -263,7 +263,7 @@ iptables -t nat -A POSTROUTING -s 192.168.1.0/24 -j SNAT --to 202.106.18.8
 </pre>
 例如，我们通过如下命令对进来的数据包设置标志：
 {% highlight string %}
-# iptables -A PREROUTING -d 10.4.18.69/32 -p tcp -m tcp --dport 80 -m mac ! --mac-source F8:98:EF:7E:9E:1B -j MARK --set-xmark 0x2a8/0xffffffff
+# iptables -t mangle -A PREROUTING -d 10.4.18.69/32 -p tcp -m tcp --dport 80 -m mac ! --mac-source F8:98:EF:7E:9E:1B -j MARK --set-xmark 0x2a8/0xffffffff
 {% endhighlight %}
 
 
@@ -690,6 +690,26 @@ iptables -t nat -A POSTROUTING -p $pro -d $Dst_Host --dport $Dst_Port -j SNAT --
 iptables -t nat -L -n --line-number
 {% endhighlight %}
 
+3) **补充说明**
+
+这里不知道大家有没有想过，到达```服务器B```的请求，其响应是怎么返回的呢？ 这是因为当我们在```PREROUTING```做DNAT时，系统会默认在```POSTROUTING```中设置反转项，以处理返回的响应消息， 所以```prerouting```与```postrouting```互为兄弟关系，同样```input```与```output```也互为兄弟关系。下面我们来看一下请求与响应的处理流程吧：
+<pre>
+数据流向     时  期               操 作             源IP:PORT                     目标IP:PORT
+----------------------------------------------------------------------------------------------------
+  请求     packet in             用户访问           1.2.3.4:5                   10.138.108.103:8001
+  请求     prerouting            dnat              1.2.3.4:5                   192.168.1.1:8001        (1)
+  请求     routing decision      判断是否转发        1.2.3.4:5                  192.168.1.1:8001
+  请求     postrouting           snat              10.138.108.103:X            192.168.1.1:8001        (2)
+  请求     packet out            转发包             10.138.108.103:X            192.168.1.1:8001
+
+  响应     packet in             服务器响应         192.168.1.1:8001            10.138.108.103:X
+  响应     prerouting            dnat              192.168.1.1:8001            1.2.3.4:5               (3)   
+  响应     routing decision      判断是否转发       192.168.1.1:8001             1.2.3.4:5 
+  响应     postrouting           snat              10.138.108.103:8001         1.2.3.4:5               (4)
+  响应     packet out            转发包             10.138.108.103:8001         1.2.3.4:5 
+</pre>
+从上面我们看到,```(1)、(4)```互为兄弟反转关系， ```(2)、(3)```也互为兄弟反转关系。当我们在设置```(1)```的时候，系统默认会为我们添加```(4)```； 当我们设置```(2)```的时候，系统默认会为我们添加```(3)```。
+
 
 <br />
 <br />
@@ -705,6 +725,8 @@ iptables -t nat -L -n --line-number
 4. [iptables 设置端口转发/映射](https://blog.csdn.net/light_jiang2016/article/details/79029661)
 
 5. [Linux的iptables常用配置范例](http://www.ha97.com/3928.html)
+
+6. [为啥使用ＳＮＡＴ设置了数据包的源地址之后，使用抓包工具没抓到源地址](https://www.cnblogs.com/honpey/p/9066494.html)
 
 <br />
 <br />
