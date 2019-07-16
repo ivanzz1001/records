@@ -163,6 +163,7 @@ int main(int arc, char *argv[])
 -L/usr/local/protobuf/lib -lprotobuf -lpthread -lz -lstdc++
 
 或者
+# export PKG_CONFIG_PATH=/usr/local/protobuf/lib/pkgconfig/
 # g++ -o addressbook_write address.pb.cc addressbook_write.cpp -std=c++11 `pkg-config --cflags --libs protobuf` 
 # ls
 addressbook_write  addressbook_write.cpp  address.pb.cc  address.pb.h  address.proto
@@ -231,6 +232,7 @@ int main(int argc, char *argv[])
 -L/usr/local/protobuf/lib -lprotobuf -lpthread -lz -lstdc++
 
 或者
+# export PKG_CONFIG_PATH=/usr/local/protobuf/lib/pkgconfig/
 # g++ -o addressbook_read address.pb.cc addressbook_read.cpp -std=c++11 `pkg-config --cflags --libs protobuf` 
 # ls
 addressbook.bin  addressbook_read  addressbook_read.cpp  addressbook_write  addressbook_write.cpp  address.pb.cc  address.pb.h  address.proto
