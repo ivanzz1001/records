@@ -255,6 +255,144 @@ Hello, World!
 
 ## 6. Linux下链接库的路径顺序
 
+### 6.1 运行时链接库的搜索顺序
+Linux程序在运行时对动态链接库的搜索顺序如下：
+
+1） 在编译目标代码时所传递的动态库搜索路径（注意，这里指的是通过```-Wl,rpath=<path1>:<path2>```或```-R```选项传递的运行时动态库搜索路径，而不是通过```-L```选项传递的）
+
+例如：
+<pre>
+# gcc -Wl,-rpath,/home/arc/test,-rpath,/lib/,-rpath,/usr/lib/,-rpath,/usr/local/lib test.c
+
+或者
+# gcc -Wl,-rpath=/home/arc/test:/lib/:/usr/lib/:/usr/local/lib test.c
+</pre>
+
+2） 环境变量```LD_LIBRARY_PATH```指定的动态库搜索路径；
+
+3） 配置文件*/etc/ld.so.conf*中所指定的动态库搜索路径(更改*/etc/ld.so.conf*之后，一定要执行命令ldconfig，该命令会将*/etc/ld.so.conf*文件中所有路径下的库载入内存）;
+
+4） 默认的动态库搜索路径*/lib*；
+
+5） 默认的动态库搜索路径*/usr/lib*;
+
+### 6.2 编译时与运行时动态库查找的比较
+下面是对编译时库的查找与运行时库的查找做一个简单的比较：
+
+1) 编译时查找的是静态库或动态库， 而运行时，查找的是动态库；
+
+2） 编译时可以用```-L```指定查找路径，或者用环境变量```LIBRARY_PATH```， 而运行时可以用```-Wl,rpath```或者```-R```选项，或者修改*/etc/ld.so.conf*，或者设置环境变量```LD_LIBRARY_PATH```;
+
+3) 编译时用的链接器是```ld```，而运行时用的链接器是```/lib/ld-linux.so.2```
+
+4) 编译时与运行时都会查找默认路径*/lib*、*/usr/lib*
+
+5) 编译时还有一个默认路径*/usr/local/lib*，而运行时不会默认查找该路径；
+
+<pre>
+说明： -Wl,rpath选项虽然是在编译时传递的，但是其实是工作在运行时。其本身其实也不算是gcc的一个选项，而是ld的选项，gcc只不过
+      是一个包装器而已。我们可以执行man ld来进一步了解相关信息
+</pre>
+
+### 6.3 补充:gcc使用-Wl,-rpath
+
+1) **-Wl,-rpath**
+
+加上```-Wl,-rpath```选项的作用就是指定```程序运行时```的库搜索目录，是一个链接选项，生效于设置的环境变量之前(LD_LIBRARY_PATH)。下面我们通过一个例子来说明：
+
+{% highlight string %}
+// add.h
+int add(int i, int j);
+ 
+// add.c
+#include "add.h"
+ 
+int add(int i, int j)
+{
+	return i + j;
+}
+ 
+// main.c
+#include <stdio.h>
+#include <stdlib.h>
+#include "add.h"
+ 
+int main(int argc, char *argv[]) 
+{
+	printf("1 + 2 = %d\n", add(1, 2));
+	return 0;
+}
+{% endhighlight %}
+```add.h```和```add.c```用于生成一个so库，实现了一个简单的加法，main.c中引用共享库计算1 + 2：
+<pre>
+# 编译共享库
+gcc add.c -fPIC -shared -o libadd.so
+# 编译主程序
+gcc main.o -L. -ladd -o app
+</pre>
+编译好后运行依赖库：
+{% highlight string %}
+# ldd app
+linux-vdso.so.1 (0x00007ffeb23ab000)
+libadd.so => not found
+libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007febb7dd0000)
+/lib64/ld-linux-x86-64.so.2 (0x00007febb83d0000
+# ./app
+./app: error while loading shared libraries: libadd.so: cannot open shared object file: No such file or directory
+{% endhighlight %}
+可以看到， ```libadd.so```这个库没有找到，程序也无法运行，要运行它必须要把当前目录添加到环境变量或者搜索路径中去。但是如果在链接时加上```-Wl,rpath```选项之后：
+{% highlight string %}
+# gcc -c -o main.o main.c
+# gcc -Wl,-rpath=`pwd` main.o -L. -ladd -o app
+# ldd app
+linux-vdso.so.1 (0x00007fff8f4e3000)
+libadd.so => /data/code/c/1-sys/solib/libadd.so (0x00007faef8428000)
+libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007faef8030000)
+/lib64/ld-linux-x86-64.so.2 (0x00007faef8838000)
+# ./app
+1 + 2 = 3
+{% endhighlight %}
+依赖库的查找路径就找到了，程序能正常运行。
+
+下面我们再来看一下生成的可执行文件```app```，执行如下命令：
+<pre>
+#  readelf app -d
+
+Dynamic section at offset 0xe08 contains 26 entries:
+  Tag        Type                         Name/Value
+ 0x0000000000000001 (NEEDED)             Shared library: [libadd.so]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+ 0x000000000000000f (RPATH)              Library rpath: [/root/test]
+ 0x000000000000000c (INIT)               0x400578
+ 0x000000000000000d (FINI)               0x400784
+ 0x0000000000000019 (INIT_ARRAY)         0x600df0
+ 0x000000000000001b (INIT_ARRAYSZ)       8 (bytes)
+ 0x000000000000001a (FINI_ARRAY)         0x600df8
+ 0x000000000000001c (FINI_ARRAYSZ)       8 (bytes)
+ 0x000000006ffffef5 (GNU_HASH)           0x400298
+ 0x0000000000000005 (STRTAB)             0x400408
+ 0x0000000000000006 (SYMTAB)             0x4002d0
+ 0x000000000000000a (STRSZ)              189 (bytes)
+ 0x000000000000000b (SYMENT)             24 (bytes)
+ 0x0000000000000015 (DEBUG)              0x0
+ 0x0000000000000003 (PLTGOT)             0x601000
+ 0x0000000000000002 (PLTRELSZ)           96 (bytes)
+ 0x0000000000000014 (PLTREL)             RELA
+ 0x0000000000000017 (JMPREL)             0x400518
+ 0x0000000000000007 (RELA)               0x400500
+ 0x0000000000000008 (RELASZ)             24 (bytes)
+ 0x0000000000000009 (RELAENT)            24 (bytes)
+ 0x000000006ffffffe (VERNEED)            0x4004e0
+ 0x000000006fffffff (VERNEEDNUM)         1
+ 0x000000006ffffff0 (VERSYM)             0x4004c6
+ 0x0000000000000000 (NULL)               0x0
+</pre>
+可以看到是在编译后的程序中包含了库的搜索路径。
+
+
+2) **-Wl,rpath-link**
+
+```-Wl,rpath-link```是设置编译链接时候的顺序，例如app运行依赖libadd.so，但是libadd.so又依赖libadd_ex.so，```rpath-link```就是指定libadd_ex.so的路径。和```-Wl,rpath```相比工作的时间不同，一个在链接期间，一个在运行期间。
 
 <br />
 <br />
@@ -268,6 +406,8 @@ Hello, World!
 3. [PKG_CONFIG_PATH变量 与 ld.so.conf 文件](http://www.cnblogs.com/s_agapo/archive/2012/04/24/2468925.html)
 
 4. [Linux下运行时链接库的路径顺序](https://blog.csdn.net/npu_wy/article/details/38642191)
+
+5. [gcc使用-Wl,-rpath解决so库版本冲突](https://www.dyxmq.cn/linux/gcc-option-wl-rpath.html)
 <br />
 <br />
 <br />
