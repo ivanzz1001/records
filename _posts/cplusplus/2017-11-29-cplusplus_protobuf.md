@@ -13,6 +13,34 @@ description: protobuf通信协议
 <!-- more -->
 
 ## 1. protobuf的安装
+1）**准备必要安装环境**
+
+在Centos下通过源代码安装protobuf，通常要求系统已经安装有如下一些工具：
+
+* autoconf
+
+* automake
+
+* libtool
+
+* make
+
+* g++
+
+* unzip
+
+我们可以执行如下命令来检查相关的工具是否安装：
+<pre>
+# yum list installed | grep autoconf
+Repodata is over 2 weeks old. Install yum-cron? Or run: yum makecache fast
+autoconf.noarch                        2.69-11.el7                     @base 
+</pre>
+或者直接运行相应的命令，看是否可以执行：
+<pre>
+# autoconf -v
+autoconf: error: no input file
+</pre>
+
 1) **下载安装包并解压**
 <pre>
 # mkdir protobuf-inst
