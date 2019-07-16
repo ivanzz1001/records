@@ -188,11 +188,11 @@ addressbook.bin  addressbook_write  addressbook_write.cpp  address.pb.cc  addres
 
 
 void ListPerson(const tutorial::AddressBook& address_book){
-                for(int i = 0; i < address_book.person_size(); i++){
-                                const tutorial::Person &person = address_book.person(i);
-
-                                std::cout<<person.name() << "  " << person.age() << std::endl;
-                }
+	for(int i = 0; i < address_book.person_size(); i++){
+		const tutorial::Person &person = address_book.person(i);
+		
+		std::cout<<person.name() << "  " << person.age() << std::endl;
+	}
 }
 
 
