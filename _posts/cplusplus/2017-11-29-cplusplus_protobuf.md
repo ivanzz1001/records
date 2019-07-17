@@ -67,9 +67,90 @@ person.ParseFromIstream(&input);
 cout << "Name: " << person.name() << endl;
 cout << "E-mail: " << person.email() << endl;
 {% endhighlight %}
+你可以向上述消息格式中添加新的field，但仍可保持消息的向下兼容性： 当解析到原先老的二进制数据时，会将后面新添加的field直接忽略。因此，假如你采用protobuf作为数据通信协议的话，你就可以很好的扩展协议，而不必担心会破坏原有的代码。
 
+### 1.2 为什么不采用XML?
 
+在序列化结构性数据时，protobuf对比XML具有很多优势：
 
+* 更简单
+
+* 比XML所产生的数据量小3至10倍
+
+* 比XML快20到100倍
+
+* 较少产生歧义性
+
+* 所产生的数据访问类对象在编程中更容易使用
+
+例如，假如我们想要表示一个具有name与email属性的Person对象，用XML的话需要如下：
+{% highlight string %}
+<person>
+    <name>John Doe</name>
+    <email>jdoe@example.com</email>
+  </person>
+{% endhighlight %}
+而当用protobuf消息来传递时格式如下（注： 这里是protobuf消息的文本格式表示）：
+{% highlight string %}
+# Textual representation of a protocol buffer.
+# This is *not* the binary format used on the wire.
+person {
+  name: "John Doe"
+  email: "jdoe@example.com"
+}
+{% endhighlight %}
+当这样一条消息被编码成protobuf二进制格式后，它也许只需要占用28字节并且只需花费100~200纳秒来进行解析。如果采用XML格式至少需要69个字节（假如把空格之类的全移除），并且需要花费5000~10000纳秒来进行解析。
+
+另外，当我们要操纵protobuf时，也更为简便：
+{% highlight string %}
+ cout << "Name: " << person.name() << endl;
+  cout << "E-mail: " << person.email() << endl;
+{% endhighlight %}
+而如果用XML的话，我们需要通过如下方式操作：
+{% highlight string %}
+ cout << "Name: "
+       << person.getElementsByTagName("name")->item(0)->innerText()
+       << endl;
+  cout << "E-mail: "
+       << person.getElementsByTagName("email")->item(0)->innerText()
+       << endl;
+{% endhighlight %}
+值得指出的是，protobuf并不是在所有方面都比XML好，比如protobuf并不适合用来处理一些文本标记语言（HTML等），因为如果用protobuf的话你并不能很好的将文本与相应的结构进行分离。另外，XML具有更好的（人类）可读性与编辑性，而二进制protobuf通常不适合人类阅读。
+
+### 1.3 proto3简介
+当前protobuf的最新版本是版本3（也被称为proto3)，其提供了一些新的特性。proto3简化了protobuf语言，使其更容易使用，也使得其可被用于更多的编程语言：当前的proto3已经支持Java, C++, Python, Java Lite, Ruby, JavaScript, Objective-C, and C#。另外，你也可以使用go protoc编译器为Go语言生成proto3代码，请参看[golang/protobuf](https://github.com/golang/protobuf)
+
+值得注意的是，protobuf的这两个版本(proto2、proto3)的API并不完全兼容。为了避免对现有用户造成不便，在新发布的protobuf版本中仍加持续支持proto2.
+
+后续相关章节我们会更为详细的介绍proto3.
+
+### 1.4 protobuf的一点历史
+Google最先开发protobuf的时候主要是为了处理索引服务器(index server)请求与响应。在开发protobuf之前，我们可能通常需要编写类似如下的代码来处理对应的请求与响应：
+{% highlight string %}
+if (version == 3) {
+   ...
+ } else if (version > 4) {
+   if (version == 5) {
+     ...
+   }
+   ...
+ }
+{% endhighlight %}
+同样如上面这种明确格式化的协议也使得要发布新的协议版本变得十分复杂，因为开发者必须要确定发出请求(request)的服务器与实际处理请求的服务器必须要双方都能理解新的协议版本。
+
+protobuf就是被设计用来解决很多有关这方面问题的：
+
+* 可以很容易的引入新的field，并且中间的服务器并不需要被另行通知即可解析所有的字段；
+
+* protobuf数据格式具有很好的自我描述性，并且可以被更多的编程语言所处理
+
+然而，假如仅仅只是这样的话，用户仍必须手写代码来解析相应的数据。因此，protobuf还提供了如下一些特性：
+
+* 可以自动化产生序列化与反序列化代码，以避免手写代码来解析
+
+* 为了支持短生命周期的RPC请求，在数据持久化存储方面人们也开始使用protobuf来作为一种方便的数据自我描述格式（如bigtable)
+
+* 服务器RPC接口也作为protobuf文件的一部分被声明，然后通过protoc编译器产生相应的stub类，之后用户可以重写相应的方法来实现服务器接口
 
 
 ## 2. protobuf的安装
