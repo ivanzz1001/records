@@ -11,8 +11,68 @@ description: protobuf通信协议
 
 
 <!-- more -->
+## 1. protobuf简介
+Protocol Buffers(也被称为protobuf)是Google开发的一种跨语言、跨平台、可扩展的用于序列化数据的机制，相比较XML和json格式而言，google protobuf更小、更快捷也更简单。你只需对想要的数据结构化定义一次，然后就可以用编译器(protoc)生成特定编程语言的代码来简单的实现对结构化数据的读写。当前protobuf支持多种语言：C++、Java、Python、C#、Go、Objective-C、JavaScript、Ruby、PHP、Dart。
 
-## 1. protobuf的安装
+### 1.1 protobuf是如何工作的？
+在protocol buffer消息类型文件```.proto```中，我们可以定义需要实现序列化的结构化数据信息。每一条protocol buffer消息都是一个小的逻辑记录，包含了一系列的```name-value```键值对。如下是一个基础的```.proto```文件示例，定义了一个person对象包含的一些信息：
+<pre>
+message Person {
+  required string name = 1;
+  required int32 id = 2;
+  optional string email = 3;
+
+  enum PhoneType {
+    MOBILE = 0;
+    HOME = 1;
+    WORK = 2;
+  }
+
+  message PhoneNumber {
+    required string number = 1;
+    optional PhoneType type = 2 [default = HOME];
+  }
+
+  repeated PhoneNumber phone = 4;
+}
+</pre>
+如上所示，每一条消息类型都有一个或多个编号唯一的field，并且每一个field都具有名称和类型。其中类型可以是：
+
+* numbers(integer or floating-point)
+
+* booleans
+
+* strings
+
+* raw bytes
+
+* protobuf message类型（这使得结构化数据可以具有层次性）
+
+另外，你可以用```optional```、```required```、```repeated```等关键字来修饰某个field。更多关于```.proto```文件的信息我们后面会详细介绍。
+
+一旦定义好了上述消息类型，就可以使用protobuf编译器(protoc)生成对应语言的数据访问类(class)，这些类会提供简单的方法来访问这些数据成员（如name()、set_name())，并且还会提供方法来将这种消息序列化成二进制数据，或者将二进制数据解析为消息类型。因此，假如你选择使用C++语言的话，对上述示例运行protoc编译器将会生成一个```Person```类，之后你就可以在应用程序中使用该类来分发、序列化以及获取```Person```消息。你可以编写类似如下的代码：
+{% highlight string %}
+Person person;
+person.set_name("John Doe");
+person.set_id(1234);
+person.set_email("jdoe@example.com");
+fstream output("myfile", ios::out | ios::binary);
+person.SerializeToOstream(&output);
+{% endhighlight %}
+之后，你也可以将消息重新从文件中读回：
+{% highlight string %}
+fstream input("myfile", ios::in | ios::binary);
+Person person;
+person.ParseFromIstream(&input);
+cout << "Name: " << person.name() << endl;
+cout << "E-mail: " << person.email() << endl;
+{% endhighlight %}
+
+
+
+
+
+## 2. protobuf的安装
 1）**准备必要安装环境**
 
 在Centos下通过源代码安装protobuf，通常要求系统已经安装有如下一些工具：
@@ -41,7 +101,7 @@ autoconf.noarch                        2.69-11.el7                     @base
 autoconf: error: no input file
 </pre>
 
-1) **下载安装包并解压**
+2) **下载安装包并解压**
 <pre>
 # mkdir protobuf-inst
 # cd protobuf-inst
@@ -52,7 +112,7 @@ protobuf-all-3.8.0.tar.gz
 # cd protobuf-3.8.0
 </pre>
 
-2) **编译并安装protobuf**
+3) **编译并安装protobuf**
 <pre>
 # ./configure --prefix=/usr/local/protobuf
 # make
@@ -79,6 +139,11 @@ Testsuite summary for Protocol Buffers 3.8.0
 # make install
 # ls /usr/local/protobuf/
 bin  include  lib
+
+# pkg-config --cflags protobuf
+-pthread -I/usr/local/protobuf/include  
+# pkg-config --libs protobuf
+-L/usr/local/protobuf/lib -lprotobuf 
 </pre>
 至此，安装已经完成。
 
@@ -96,7 +161,7 @@ dyninst-x86_64.conf  kernel-3.10.0-514.el7.x86_64.conf  libiscsi-x86_64.conf  my
 
 ```注：``` 这里我们为了较为详细的演示protobuf的相关编译、运行步骤，暂时都未设置这些环境变量
 
-## 2. protobuf程序示例(C++版）
+## 3. protobuf程序示例(C++版）
 该程序的大致功能是： 定义一个```Person```结构体，以及存放Person信息的```AddressBook```，然后一个写程序向一个文件写入该结构体信息，另一个程序从文件中读出该信息并打印到输出中.
 
 1) **编写address.proto文件**
@@ -188,7 +253,7 @@ int main(int arc, char *argv[])
 执行如下命令进行编译(注： 这里需要加上```-std=c++11```)：
 <pre>
 # gcc -o addressbook_write address.pb.cc addressbook_write.cpp -std=c++11 -I/usr/local/protobuf/include \
--L/usr/local/protobuf/lib -lprotobuf -lpthread -lz -lstdc++
+-L/usr/local/protobuf/lib -lprotobuf -lpthread -lstdc++
 
 或者
 # export PKG_CONFIG_PATH=/usr/local/protobuf/lib/pkgconfig/
@@ -257,7 +322,7 @@ int main(int argc, char *argv[])
 执行如下命令进行编译(注： 这里需要加上```-std=c++11```)：
 <pre>
 # gcc -o addressbook_read address.pb.cc addressbook_read.cpp -std=c++11 -I/usr/local/protobuf/include \
--L/usr/local/protobuf/lib -lprotobuf -lpthread -lz -lstdc++
+-L/usr/local/protobuf/lib -lprotobuf -lpthread -lstdc++
 
 或者
 # export PKG_CONFIG_PATH=/usr/local/protobuf/lib/pkgconfig/
