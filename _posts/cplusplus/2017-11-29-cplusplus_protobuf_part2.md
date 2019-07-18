@@ -249,7 +249,308 @@ protobuf编译器在编译```.proto```文件时会搜索```-I```或```--proto_pa
 我们可以在```proto2```消息中导入```proto3```消息类型，或者相反。但proto2中的枚举不能被用在proto3语法中。通常建议不要混合使用。
 
 ## 6. 内嵌类型
+你可以在一个message类型中定义和使用其他message类型。如下示例，我们在SearchResponse中定义了Result消息类型：
+{% highlight string %}
+message SearchResponse {
+  message Result {
+    required string url = 1;
+    optional string title = 2;
+    repeated string snippets = 3;
+  }
+  repeated Result result = 1;
+}
+{% endhighlight %}
+假如你想要在```SearchResponse```外边复用```Result```消息类型的话，你可以使用```Parent.Type```来引用。例如：
+{% highlight string %}
+message SomeOtherMessage {
+  optional SearchResponse.Result result = 1;
+}
+{% endhighlight %}
+目前来说，内嵌类型的深度暂时没有限制（但不建议有太深的内嵌）：
+{% highlight string %}
+message Outer {                  // Level 0
+  message MiddleAA {  // Level 1
+    message Inner {   // Level 2
+      required int64 ival = 1;
+      optional bool  booly = 2;
+    }
+  }
+  message MiddleBB {  // Level 1
+    message Inner {   // Level 2
+      required int32 ival = 1;
+      optional bool  booly = 2;
+    }
+  }
+}
+{% endhighlight %}
 
+### 6.1 Groups
+Groups是在消息中定义内嵌类型的另一种方式，例如：
+{% highlight string %}
+message SearchResponse {
+  repeated group Result = 1 {
+    required string url = 2;
+    optional string title = 3;
+    repeated string snippets = 4;
+  }
+}
+{% endhighlight %}
+上面SearchResponse包含了一个Result列表。
+
+```说明```： 不要使用Groups这种方式来定义内嵌类型，该方式已经过时。使用前面介绍的第一种方式。
+
+## 7. 更新消息类型
+ 
+假如我们当前的消息类型已经不能很好的满足需求的时候（例如我们想要在message中添加一个新的field），在不破坏向下兼容的情况下，我们可以很简单的更新Message类型。但是请注意，需要遵循如下规则：
+
+* 不要修改现存字段(field)的编号
+
+* 添加一个新的字段(field)，并将字段设为optional或者repeated，同时为该新字段设置合适的默认值。这意味着我们的新代码仍可识别该消息的```旧格式```，同时老代码也仍能识别消息的```新格式```（其会简单的忽略该新添加的未知字段）。
+
+* 可以将```Non-required```字段简单的移除。但是移除时，可能需要将该字段所占用的```字段编号```保留，以免后续新添加的字段用到该字段编号（使用```reserved```来保留字段编号）
+
+* 将```none-required```字段设置为extensions
+
+* int32, uint32, int64, uint64,bool 之间是兼容的
+
+* sint32 与 sint64 之间是兼容的
+
+* string 与 bytes之间是兼容的
+
+* fixed32 与 sfixed32之间是兼容的，fixed64 与 sfixed64之间是兼容的
+
+* optional与repeated之间也是兼容的
+
+* 通常来说修改默认值是允许的
+
+* enum与int32, uint32, int64,uint64是兼容的
+
+## 8. Extensions
+```Extensions```允许你在消息中声明某一个范围内字段编号是用作第三方扩展的。其实```扩展```就是为一个字段(filed)预留的恶一个占位符，后续就可以在其他的```.proto```文件中添加新的字段到该占位符中。例如：
+{% highlight string %}
+message Foo {
+  // ...
+  extensions 100 to 199;
+}
+{% endhighlight %}
+上面显示[100,199]范围内的字段编号被保留用于以后的扩展。因此其他用户可以在自己的```.proto```文件中先导入上述```.proto```文件，然后再使用该保留的字段编号范围来对```Foo```消息进行扩展。例如：
+{% highlight string %}
+extend Foo {
+  optional int32 bar = 126;
+}
+{% endhighlight %}
+我们添加了一个```bar```字段到原来的```Foo```消息中，其中字段编号为126.
+
+当Foo消息被序列化时，扩展的bar字段会被正常的序列化进去。然而我们```访问扩展字段```与```访问普通字段```有些不同，我们有专门的方法来访问扩展字段。如下是C++语言中访问扩展字段的方法：
+{% highlight string %}
+Foo foo;
+foo.SetExtension(bar, 15);
+{% endhighlight %}
+
+相似的，```Foo```类还还提供了如下的一些模板方法来访问扩展字段：
+<pre>
+HasExtension()
+ClearExtension()
+GetExtension()
+MutableExtension()
+AddExtension()
+</pre>
+值得注意的是，扩展字段可以是任何类型，包括message类型，但是不能是```oneof```或者```map```类型
+
+
+### 8.1 内嵌扩展
+我们可以在另一个messageB中对messageA进行扩展，例如：
+{% highlight string %}
+message Baz {
+  extend Foo {
+    optional int32 bar = 126;
+  }
+  ...
+}
+{% endhighlight %}
+在这种情况下，如果我们要通过C++来访问扩展的话，可以通过如下方式：
+{% highlight string %}
+Foo foo;
+foo.SetExtension(Baz::bar, 15);
+{% endhighlight %}
+
+注： 我们通常不建议使用此种方式，这里也不对此种使用方式做更多说明。
+
+### 8.2 选择扩展字段编号
+在扩展字段时，很重要的一点是两个不同的用户不会使用相同的```字段编号```来对消息进行扩展（这会导致数据被损坏）。假如你向保留的扩展字段编号的范围很大的话，可以采用如下这种方式：
+{% highlight string %}
+message Foo {
+  extensions 1000 to max;
+}
+{% endhighlight %}
+这里max为2^29-1，即 536,870,911。
+
+同时我们应该注意不要选在[19000,19999]范围内的字段编号，该范围内字段编号通常为系统保留。其中19000可以用FieldDescriptor::kFirstReservedNumber来引用；19999可以用FieldDescriptor::kLastReservedNumber来引用。
+
+## 9. Oneof
+假如在一个message中有很多字段(field)是```optional```的，并且这些字段在同一时间内至多只有一个会被设置，我们可以使用```Oneof```特征来节省内存空间。
+
+oneof中的字段类似于```optional```字段，只不过oneof中的所有字段都共享相同的内存空间（类似于C语言中的union)，并且oneof在同一时间内最多只有一个字段会被设置。设置oneof中的任何一个字段都会清除其他字段的值。我们可以根据自己所选定的编程语言通过case()或者WhichOneof()方法来检查到底哪一个字段被设置了。
+
+### 9.1 Oneof的使用
+如果要在```.proto```文件中定义一个```oneof```，那么可以使用```oneof```关键字后面跟随对应的名称即可。例如：
+{% highlight string %}
+message SampleMessage {
+  oneof test_oneof {
+     string name = 4;
+     SubMessage sub_message = 9;
+  }
+}
+{% endhighlight %}
+我们可以在```oneof```中添加任何字段，但是不能使用```required```、```optional```、```repeated```关键词来修饰。假如我们要添加一个```repeated```字段到oneof中，这是禁止的，此时我们可以直接在message中添加该repeated字段。
+
+在通过```protoc```编译生成的代码中，```oneof```中的每一个字段同样会生成对应的getter、settter方法。
+
+### 9.2 Oneof特征
+* 设置oneof中的某一个字段会自动的清空oneof中的其他字段的值（因为它们共享存储空间），因此假如你你设定多个oneof字段的值，那么之后最后设置的那个字段值有效
+{% highlight string %}
+SampleMessage message;
+message.set_name("name");
+CHECK(message.has_name());
+message.mutable_sub_message();   // Will clear name field.
+CHECK(!message.has_name());
+{% endhighlight %}
+
+* 假如解析器遇到多个oneof中的字段，那么只有遇到的最后一个oneof字段有效
+
+* 扩展字段并不允许oneof
+
+* oneof中的字段并不能是repeated的
+
+* 假如你将某个oneof字段设置有默认值，那么该字段是会被序列化的，并且针对该字段调用```case```,会返回```字段被设置```
+
+* 假如你采用C++的话，请确保代码不会造成内存被破坏。如下的示例代码会导致程序崩溃，因为调用set_name()时会将sub_message分配的内存给删除
+{% highlight string %}
+SampleMessage message;
+SubMessage* sub_message = message.mutable_sub_message();
+message.set_name("name");      // Will delete sub_message
+sub_message->set_...            // Crashes here
+{% endhighlight %}
+
+* 假如你采用C++，并且使用Swap()来交换两个带oneof的message，则交换之后每个message都带有对方的一个oneof字段
+{% highlight string %}
+SampleMessage msg1;
+msg1.set_name("name");
+SampleMessage msg2;
+msg2.mutable_sub_message();
+msg1.swap(&msg2);
+CHECK(msg1.has_sub_message());
+CHECK(msg2.has_name());
+{% endhighlight %}
+
+### 9.3 Oneof兼容性问题
+在添加或移除oneof中的字段时要特别小心。假如检查某个oneof的值返回None或NOT_SET的话，可能对应两种情况：
+
+* 该oneof并未被设置
+
+* 设置了另一个不同版本的oneof(比如我们在oneof的第一个版本中有2个字段，在第二个版本中新添加了一个字段后变成了3个字段）
+
+## 10. Maps
+假如你想要定义一个map的话，可以通过如下方式：
+{% highlight string %}
+map<key_type, value_type> map_field = N;
+{% endhighlight %}
+这里```key_type```可以是```整数类型```或```字符串类型```(任何scalar类型都可以，除浮点类型与bytes类型外）。另外，enum类型不能作为key_type。value_type可以是除map类型外的任何类型。
+
+例如：
+{% highlight string %}
+map<string, Project> projects = 3;
+{% endhighlight %}
+
+1) **Map的特征**
+
+* map并不支持Extensions
+
+* map并不能使用repeated、optional、required等关键词修饰
+
+* 序列化或遍历map中的元素时并没有特定的顺序
+
+
+2） **向下兼容性**
+
+map语法定义的数据在网络上传输时等价于如下格式：
+{% highlight string %}
+message MapFieldEntry {
+  optional key_type key = 1;
+  optional value_type value = 2;
+}
+
+repeated MapFieldEntry map_field = N;
+{% endhighlight %}
+因此即使protobuf的实现并不支持map的话，其仍然可以处理对应的数据。
+
+## 11. Packages
+我们可以为某个```.proto```文件添加一个```package```(可选）以防止消息类型的冲突（类似于namespace的概念）：
+{% highlight string %}
+package foo.bar;
+message Open { ... }
+{% endhighlight %}
+当我们在定义自己的message类型时可通过如下的方式来引用别的package中的类型：
+{% highlight string %}
+message Foo {
+  ...
+  required foo.bar.Open open = 1;
+  ...
+}
+{% endhighlight %}
+
+再用protoc编译器产生对应的代码时，会根据我们选定的语言对```package```做不同的处理：
+
+* C++语言中会产生对应的c++ namespace。比如上面```Open```将会在foo::bar名称空间中
+
+* Java语言会产生对应的Java package，
+
+* Python语言会忽略该```package```指令
+
+* Go语言会忽略该```package```指令
+
+通常情况下我们建议使用```package```以防止名称冲突。
+
+## 12. 定义Service
+假如你想要在一个RPC系统中使用message类型，你可以在```.proto```文件中定义RPC服务接口(interface)，之后protobuf编译器就会产生对应的服务接口代码和stubs。比如，我们想定义一个RPC服务，其有一个方法Search，参数为```SearchRequest```，返回结果为```SearchResponse```，那么可以如下定义```.proto```文件：
+{% highlight string %}
+service SearchService {
+  rpc Search (SearchRequest) returns (SearchResponse);
+}
+{% endhighlight %}
+默认情况下，protobuf编译器会产生一个抽象接口```SearchService```和一个具体的```stub```实现（类似于EJB的skeleton与stub概念）。stub会把所有的请求发送到```RpcChannel```，之后由我们对RpcChannel的具体实现来真正发送出去。比如，我们有一个RpcChannel其实现了序列化消息，然后把该序列化后的消息通过HTTP发送到服务器。因此，对于C++来说其可能产生类似如下的代码：
+{% highlight string %}
+using google::protobuf;
+
+protobuf::RpcChannel* channel;
+protobuf::RpcController* controller;
+SearchService* service;
+SearchRequest request;
+SearchResponse response;
+
+void DoSearch() {
+  // You provide classes MyRpcChannel and MyRpcController, which implement
+  // the abstract interfaces protobuf::RpcChannel and protobuf::RpcController.
+  channel = new MyRpcChannel("somehost.example.com:1234");
+  controller = new MyRpcController;
+
+  // The protocol compiler generates the SearchService class based on the
+  // definition given above.
+  service = new SearchService::Stub(channel);
+
+  // Set up the request.
+  request.set_query("protocol buffers");
+
+  // Execute the RPC.
+  service->Search(controller, request, response, protobuf::NewCallback(&Done));
+}
+
+void Done() {
+  delete service;
+  delete channel;
+  delete controller;
+}
+{% endhighlight %}
 
 
 <br />
