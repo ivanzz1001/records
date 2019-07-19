@@ -551,6 +551,247 @@ void Done() {
   delete controller;
 }
 {% endhighlight %}
+如上所示，所有的service类都实现了```Service```接口。
+
+
+另外，在服务器一端，这可以用来实现一个RPC Server，并通过其来注册相关的服务，如下所示：
+{% highlight string %}
+using google::protobuf;
+
+class ExampleSearchService : public SearchService {
+ public:
+  void Search(protobuf::RpcController* controller,
+              const SearchRequest* request,
+              SearchResponse* response,
+              protobuf::Closure* done) {
+    if (request->query() == "google") {
+      response->add_result()->set_url("http://www.google.com");
+    } else if (request->query() == "protocol buffers") {
+      response->add_result()->set_url("http://protobuf.googlecode.com");
+    }
+    done->Run();
+  }
+};
+
+int main() {
+  // You provide class MyRpcServer.  It does not have to implement any
+  // particular interface; this is just an example.
+  MyRpcServer server;
+
+  protobuf::Service* service = new ExampleSearchService;
+  server.ExportOnPort(1234, service);
+  server.Run();
+
+  delete service;
+  return 0;
+}
+{% endhighlight %}
+假如你并不想要将protobuf嵌入到你自己的RPC系统中，那么你可以使用```gRPC```： 它是Google所开发的一个跨语言跨平台的开源RPC系统。gRPC可以很好的协同protobuf工作，并且通过特定的protobuf编译器插件可以直接从```.proto```文件生成相应的RPC代码。然而由于使用proto2与proto3产生的客户端、服务器服务器代码存在一些潜在的兼容性问题，因此我们建议当使用```gPRC```服务时使用proto3。
+
+说明： 要想生成上述代码可能需要在```.proto```文件中加上如下选项
+<pre>
+option cc_generic_services = true;
+</pre>
+
+## 13. Options
+我们可以在```.proto```文件中添加一系列的```options```。通过在```.proto```文件中添加options，虽然其并不会改变文件中相关声明（message、service等）的含义，但是在一个特定上下文下却可能影响对相关声明的处理。完整的```option```列表定义在*google/protobuf/descriptor.proto*。
+
+其中有一些```选项```是文件级别(file-level)的选项，这意味着它们应该写在最外层，而不应该放在message、enum、或service内；有一些```选项```是属于消息级别(message-level)的选项，这意味着它们应该放在message定义中；有一些选项是属于字段级别(field-level)的选项，这意味着它们只能用在字段定义中。当前并没有针对enum types、enum values、service types、service methods的选项。
+
+如下我们列出一些常用的选项：
+
+* java_package(file option): 指定你要生成的Java类所需要使用的包名。假如并未在```.proto```文件汇中指定```java_package```选项的话， 则默认会使用```package```关键字所指定的包名。假如我们并不生成Java代码的话，则本选项并不会起任何作用
+<pre>
+option java_package = "com.example.foo";
+</pre>
+
+* java_outer_classname(file option): 用于指定最外层Java类的名称。假如并在```.proto```文件中显式指定本选项的话，则会将```.proto```文件名按驼峰格式转换为类名（例如foo_bar.proto会转换为FooBar.java)。假如我们并不生成Java代码的话，则本选项不会起任何作用
+<pre>
+option java_outer_classname = "Ponycopter";
+</pre>
+
+* optimize_for (file option): 可以被设置的值有```SPEED```、```CODE_SIZE```或```LITE_RUNTIME```，这会以如下方式影响C++和Java生成器
+{% highlight string %}
+SPEED(default): protobuf编译器会产生序列化、反序列化以及对相关message操作的代码，这些代码都被高度的优化，
+
+CODE_SIZE: protobuf编译器将会产生最小的代码，会依赖反射等机制来实现序列化、反序列化等操作。产生的代码量会比较少，
+           但是运行效率会较低。这通常适用于有大量.proto文件，但对效率要求较低的场合
+
+LITE_RUNTIME: protobuf编译器将会产生依赖于libprotobuf-lite库的类(而不是默认的libprotobuf库）。产生的代码仍会
+              像SPEED那样被高度优化，但是有些特性会被阉割。
+{% endhighlight %}
+
+如下是使用本选项的格式：
+<pre>
+option optimize_for = CODE_SIZE;
+</pre>
+
+* cc_generic_services, java_generic_services, py_generic_services (file options): 用于告诉protobuf编译器在产生C++、Java、Python等代码时是否针对```service```定义产生对应的抽象代码。通常情况下，默认值为为```true```。然而自从2.3.0版本以来，考虑到在具体的RPC实现时，由所对应的[code generator plugins](https://developers.google.com/protocol-buffers/docs/reference/cpp/google.protobuf.compiler.plugin.pb)能够生成更符合系统要求的代码，因此将默认值就改为了```false```，表示依赖plugins来生成service代码：
+<pre>
+// This file relies on plugins to generate service code.
+option cc_generic_services = false;
+option java_generic_services = false;
+option py_generic_services = false;
+</pre>
+
+* cc_enable_arenas (file option)： 表示针对生成的C++代码启用```arena allocation```
+
+* message_set_wire_format (message option): 假如设置为```true```，则生成的二进制格式(binary format)会兼容Google内部的一种称为```MessageSet``` 老格式。非Google内部员工的话，通常不会用到此选项
+<pre>
+message Foo {
+  option message_set_wire_format = true;
+  extensions 4 to max;
+}
+</pre>
+
+* packed (field option): 假如在一个由```repeated```修饰的数值类型字段上将此选项设置为```true```的话，则会使用一种更为紧凑的编码方式。通常使用此选项并不会产生任何缺陷，但是假如在```2.3.0```版本之前，当解析器收到```packed```的数据时则会将忽略相应的字段，因此这可能会造成不兼容性。在```2.3.0```版本（包括该版本）之后，则通产不会产生任何问题。
+<pre>
+repeated int32 samples = 4 [packed=true];
+</pre>
+
+* deprecated (field option): 假如将此选项设置为true，则表明该该字段已经过时，在新的代码中不应该被使用。在大多数语言中其并不会产生任何实质性影响。在Java语言中，其会被标记上```@Deprecated```注释。假如对应的字段(field)并不会被任何人使用，可以考虑使用```reserved```来阻止新用户继续使用它。本选项的使用格式如下：
+<pre>
+optional int32 old_field = 6 [deprecated=true];
+</pre>
+
+### 13.1 自定义选项
+protobuf甚至允许你定义和使用自己的选项(option)。值得指出的是这是一个```高级特性```，大部分人并不需要用到此特性。由于```options```是定义在*google/protobuf/descriptor.proto*文件的messages中的，因此在定义我们自己的选项时就相当于```扩展```(extend)这些message。例如：
+<pre>
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.MessageOptions {
+  optional string my_option = 51234;
+}
+
+message MyMessage {
+  option (my_option) = "Hello world!";
+}
+</pre>
+上面我们通过继承MessageOptions定义了一个新的```消息级别```(message-level）的选项。当我们使用此选项的时候，选项名称必须用一对小括号```()```括起来，用于指示这是我们的扩充的自定义选项。在C++中，我们可以采用类似于如下的代码来读取```my_option```选项的值：
+{% highlight string %}
+string value = MyMessage::descriptor()->options().GetExtension(my_option);
+{% endhighlight %}
+上面```MyMessage::descriptor()->options()```会为```MyMessage```返回一个```MessageOptions```对象，然后就可以从它来读取自定义选项。
+
+类似的，在Java中我们可以用如下代码：
+{% highlight string %}
+String value = MyProtoFile.MyMessage.getDescriptor().getOptions()
+  .getExtension(MyProtoFile.myOption);
+{% endhighlight %}
+在Python中，我们可以用如下代码：
+{% highlight string %}
+value = my_proto_file_pb2.MyMessage.DESCRIPTOR.GetOptions()
+  .Extensions[my_proto_file_pb2.my_option]
+{% endhighlight %}
+在protobuf语言中，我们可以为每一种类型都扩展自定义选项，参看如下示例：
+{% highlight string %}
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FileOptions {
+  optional string my_file_option = 50000;
+}
+extend google.protobuf.MessageOptions {
+  optional int32 my_message_option = 50001;
+}
+extend google.protobuf.FieldOptions {
+  optional float my_field_option = 50002;
+}
+extend google.protobuf.EnumOptions {
+  optional bool my_enum_option = 50003;
+}
+extend google.protobuf.EnumValueOptions {
+  optional uint32 my_enum_value_option = 50004;
+}
+extend google.protobuf.ServiceOptions {
+  optional MyEnum my_service_option = 50005;
+}
+extend google.protobuf.MethodOptions {
+  optional MyMessage my_method_option = 50006;
+}
+
+option (my_file_option) = "Hello world!";
+
+message MyMessage {
+  option (my_message_option) = 1234;
+
+  optional int32 foo = 1 [(my_field_option) = 4.5];
+  optional string bar = 2;
+}
+
+enum MyEnum {
+  option (my_enum_option) = true;
+
+  FOO = 1 [(my_enum_value_option) = 321];
+  BAR = 2;
+}
+
+message RequestType {}
+message ResponseType {}
+
+service MyService {
+  option (my_service_option) = FOO;
+
+  rpc MyMethod(RequestType) returns(ResponseType) {
+    // Note:  my_method_option has type MyMessage.  We can set each field
+    //   within it using a separate "option" line.
+    option (my_method_option).foo = 567;
+    option (my_method_option).bar = "Some string";
+  }
+}
+{% endhighlight %}
+
+值得指出的是，假如你想要在一个package中使用另一个package定义的自定义选项，那么你必须加上对应的```package-name```前缀，参看如下示例：
+{% highlight string %}
+// foo.proto
+import "google/protobuf/descriptor.proto";
+package foo;
+extend google.protobuf.MessageOptions {
+  optional string my_option = 51234;
+}
+// bar.proto
+import "foo.proto";
+package bar;
+message MyMessage {
+  option (foo.my_option) = "Hello world!";
+}
+{% endhighlight %}
+上面在```bar.proto```中定义了```bar```这个package，现在要使用```foo.proto```文件中```foo```这个package定义的选项，因此需要加上前缀```foo```。
+
+最后一点就是，由于自定义选项是扩展(extensions)，因此因此你必须为该字段(field)指定一个编号。在上面的例子中，我们使用的编号范围是50000-99999，该范围内的编号被保留用作```各组织```内部使用，因此我们可以在自己的应用程序中自由的使用。假如你想要在一些公开的应用程序(public applications)中使用自定义选项，你最好确保所对应的字段编号是全球唯一的。为了获取全局唯一的字段编号，你可以发送邮件到[protobuf global extension registry](https://github.com/protocolbuffers/protobuf/blob/master/docs/options.md)进行登记。
+
+我们可以只使用一个```字段编号```来声明多个自定义选项，那就是将这些选项放到一个子消息(sub-message)中。参看如下：
+{% highlight string %}
+message FooOptions {
+  optional int32 opt1 = 1;
+  optional string opt2 = 2;
+}
+
+extend google.protobuf.FieldOptions {
+  optional FooOptions foo_options = 1234;
+}
+
+// usage:
+message Bar {
+  optional int32 a = 1 [(foo_options).opt1 = 123, (foo_options).opt2 = "baz"];
+  // alternative aggregate syntax (uses TextFormat):
+  optional int32 b = 2 [(foo_options) = { opt1: 123 opt2: "baz" }];
+}
+{% endhighlight %}
+上面我们定义了一个自定义选项```foo_options```，但是其拥有两个属性。我们通过```FooOptions```封装了```opt1```和```opt2```。
+
+同样，每一个选项类型(file-level, message-level, field-level等）都有其自己的```字段编号空间```(number space)，这意味着我们可以在FieldOptions与MessageOptions中有相同的字段编号的自定义选项。
+
+## 14. 将.proto文件生成class
+为了将```.proto```文件中的message类型生成对应的Java、Python、C++代码，你需要运行protobuf编译器```protoc```。
+
+```protoc```的调用方式类似于如下：
+{% highlight string %}
+# protoc --proto_path=IMPORT_PATH --cpp_out=DST_DIR --java_out=DST_DIR --python_out=DST_DIR path/to/file.proto
+{% endhighlight %}
+
+* ```--proto_path```选项的主要作用是当解析到```.proto```文件的import指令时，应该从哪个目录导入。假如省略此选项的话，则默认导入目录为当前目录。如果需要导入多个目录的话，可以多次使用本选项。本选项的缩写形式为```-I```
+
+
 
 
 <br />
@@ -563,6 +804,8 @@ void Done() {
 2. [全方位评测：Protobuf性能到底有没有比JSON快5倍？](http://www.52im.net/forum.php?mod=viewthread&tid=772#lastpost)
 
 3. [Protobuf github](https://github.com/google/protobuf/tree/master/src/google/protobuf)
+
+4. [codedump](https://www.codedump.info/?p=169)
 
 <br />
 <br />
