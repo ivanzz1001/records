@@ -75,8 +75,15 @@ bin  include  lib  share
 # export PKG_CONFIG_PATH=/usr/local/protobuf/lib/pkgconfig/:/usr/local/cares/lib/pkgconfig/:/usr/local/gperftools/lib/pkgconfig/      //编译时
 # export LIBRARY_PATH=$LIBRARY_PATH:/usr/local/protobuf/lib/:/usr/local/cares/lib/:/usr/local/gperftools/lib/               //编译时
 </pre>
-
-接着执行如下命令进行安装：
+修改Makefile文件，在*PERFTOOLS_CHECK_CMD*命令最后加上```pkg-config```，最后如下：
+{% highlight string %}
+PERFTOOLS_CHECK_CMD = $(CC) $(CPPFLAGS) $(CFLAGS) -o $(TMPOUT) test/build/perftools.c -lprofiler $(LDFLAGS) `pkg-config --cflags libprofiler`
+{% endhighlight %}
+然后执行如下命令检查编译环境是否有问题：
+<pre>
+# make run_dep_checks
+</pre>
+其实，这里我们可以不用安装```perftools```，检查时发现有```perftools```方面的错误，但都是test里面的，因此可以忽略跳过。最后接着执行如下命令进行安装：
 <pre>
 # make 
 # make prefix=/usr/local/grpc
