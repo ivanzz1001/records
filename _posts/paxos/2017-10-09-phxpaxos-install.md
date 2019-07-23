@@ -25,13 +25,13 @@ GCC-4.8及以上版本。
 ## 1.2 编译前的第三方库准备
 首先我们看一下各目录的依赖关系。如下：
 
-|      目录         |       编译对象         |     内部依赖                       |           第三方库依赖  |
+|      目录          |       编译对象          |     内部依赖                       |           第三方库依赖  |
 |:------------------|:-----------------------|:-----------------------------------|:------------------------|
-|根目录             |  libphxpaxos.a         |      无                            | protobuf,leveldb        |           
+|根目录              |  libphxpaxos.a         |      无                            | protobuf,leveldb        |           
 |plugin             |  libphxpaxos_plugin.a  | libphxpaxos.a	                  | glog                    |
-|sample/phxelection |  可执行程序	         | libphxpaxos.a,libphxpaxos_plugin.a | 无                      |
-|sample/phxecho	    |  可执行程序	         | libphxpaxos.a,libphxpaxos_plugin.a | 无                      |
-|sample/phxkv	    |  可执行程序	         | libphxpaxos.a,libphxpaxos_plugin.a | grpc                    |
+|sample/phxelection |  可执行程序	             | libphxpaxos.a,libphxpaxos_plugin.a | 无                      |
+|sample/phxecho	    |  可执行程序	             | libphxpaxos.a,libphxpaxos_plugin.a | 无                      |
+|sample/phxkv	    |  可执行程序	             | libphxpaxos.a,libphxpaxos_plugin.a | grpc                    |
 |src/ut	            |  单元测试	             | 无	                              | gtest,gmock             |
 
 
