@@ -1018,7 +1018,8 @@ article header.article-info>p.article-time:before {
 
 article .article-content {
   padding: 1.5em 4%;
-  color: #413f3f;
+  /*color: #413f3f;*/
+  color: #000000;    /*modified by ivanzz1001 20190724*/
   font-size: 100%;
 }
 
