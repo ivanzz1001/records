@@ -68,11 +68,9 @@ Paxos协议是分布式系统设计中的一个非常重要的协议，本文转
 ###### 总结
 
 Multi-Paxos通过改变Promise(b)的生效范围至全局Instance，从而使得一些唯一节点的连续提交获得去Prepare的效果。
-<pre>
-题外话：这里提一下我所观察到的Multi-Paxos的一个误区，很多人认为Multi-Paxos是由leader驱动去掉Prepare的，更有说在有Leader
-       的情况下才能完成Multi-Paxos算法，这都是理解有误。大家看到这里也应该明白这里的因果关系，Multi-Paxos是适用某种请求
-       特征情况下的优化，而不是要求请求满足这种特征。所以Multi-Paxos接受并行提交。
-</pre>
+
+>题外话：这里提一下我所观察到的Multi-Paxos的一个误区，很多人认为Multi-Paxos是由leader驱动去掉Prepare的，更有说在有Leader的情况下才能完成Multi-Paxos算法，这都是理解有误。大家看到这里也应该明白这里的因果关系，Multi-Paxos是适用某种请求特征情况下的优化，而不是要求请求满足这种特征。所以Multi-Paxos接受并行提交。
+
 
 ## 2. Leader
 为何还要说Leader， 虽然Multi-Paxos允许并行提交，但这种情况下效率是要退化到朴素Paxos的，所以我们并不希望长时间处于这种情况。Leader的作用是希望大部分时间都只有一个节点在提交，这样才能发挥Multi-Paxos的优化效果。
