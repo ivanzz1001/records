@@ -1071,8 +1071,9 @@ article .article-content h4, article .article-content h5 {
 
 article .article-content h6 {
 	font-size: 125%;
+	font-weight: bold;
 	margin-top: 1.3em;
-	margin-bottom: 1.3em;
+	margin-bottom: 1.3em
 }
 
 
