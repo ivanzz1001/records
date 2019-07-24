@@ -40,7 +40,7 @@ Paxos协议是分布式系统设计中的一个非常重要的协议，本文转
 1(A)的意思是A节点产生的编号1， 2(B)标识编号2由节点B产生。绿色表示Accept通过，红色表示拒绝。
 </pre>
 
-**下图描述了A/B/C三个节点并进行提交的演进过程:**
+### 下图描述了A/B/C三个节点并进行提交的演进过程
 
 ![paxos-multi-evolution](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_multi_evolution.jpg)
 
