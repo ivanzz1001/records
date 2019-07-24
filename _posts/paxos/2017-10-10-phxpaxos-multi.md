@@ -48,7 +48,9 @@ Paxos协议是分布式系统设计中的一个非常重要的协议，本文转
 
 这种情况下NodeA节点几乎每个Instance都收到其他节点发来的Prepare，导致Promise编号过大，迫使自己不断提升编号来Prepare。这种情况并未能找到任何的优化突破口。
 
-**下图描述了只有A节点提交的演进过程：**
+<br />
+
+##### 下图描述了只有A节点提交的演进过程
 
 ![paxos-multi-a](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_multi_a.jpg)
 
@@ -81,7 +83,8 @@ Multi-Paxos通过改变Promise(b)的生效范围至全局Instance，从而使得
 
 怎么得到一个Leader，真的非常之简单，Lamport的论文甚至的不屑一提。我们观察Multi-Paxos算法，首先能做Accept(b)必然b已经被Promise了，而连续的Accept(b)被打断，必然是由于Promise(b)被提升了，也就是出现了其他节点的提交（提交会先Prepare从而提升b）。那么重点来了，如何避免其他节点进行提交，我们只需要做一件事即可完成：
 
-**收到来自其他节点的Accept，则进行一段时间的拒绝提交请求**
+<br />
+##### 收到来自其他节点的Accept，则进行一段时间的拒绝提交请求
 
 这个解读起来就是各个节点都想着不要去打破这种连续的Accept状态，而当有一个节点在连续的Accept，那么其他节点必然持续不断的拒绝请求。这个Leader就这样无形的被产生出来了，我们压根没有刻意去```选举```，它就是来自于Multi-Paxos算法。
 <pre>
