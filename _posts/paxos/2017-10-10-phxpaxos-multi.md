@@ -64,6 +64,7 @@ Paxos协议是分布式系统设计中的一个非常重要的协议，本文转
 重点： 不Prepare直接Accept为啥是安全的？ 因为Accept的b已经被Promise过。
 </pre>
 
+
 **总结：**
 
 Multi-Paxos通过改变Promise(b)的生效范围至全局Instance，从而使得一些唯一节点的连续提交获得去Prepare的效果。
