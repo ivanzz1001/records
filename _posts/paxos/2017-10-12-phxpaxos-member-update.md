@@ -73,6 +73,8 @@ Multi-Paxos决议出的有序系列，一般被用来作为状态机的状态转
 
 4. [腾讯开源的 Paxos库 PhxPaxos 代码解读-](https://www.cnblogs.com/lijingshanxi/p/10250878.html)
 
+5. [Paxos算法学习问题汇总](https://blog.csdn.net/pecywang/article/details/78728160)
+
 <br />
 <br />
 <br />
