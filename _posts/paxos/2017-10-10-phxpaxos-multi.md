@@ -43,6 +43,7 @@ Paxos协议是分布式系统设计中的一个非常重要的协议，本文转
 **下图描述了A/B/C三个节点并进行提交的演进过程:**
 
 ![paxos-multi-evolution](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_multi_evolution.jpg)
+
 这种情况下NodeA节点几乎每个Instance都收到其他节点发来的Prepare，导致Promise编号过大，迫使自己不断提升编号来Prepare。这种情况并未能找到任何的优化突破口。
 
 **下图描述了只有A节点提交的演进过程：**
@@ -52,6 +53,7 @@ Paxos协议是分布式系统设计中的一个非常重要的协议，本文转
 这种情况我们会立即发现，在没有其他节点提交的干扰下，每次Prepare的编号都是一样的。于是乎我们想，为何不把Promised(b)变成全局的？ 来看下图：
 
 ![paxos-multi-b](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_multi_b.png)
+
 假设我们在```Instance i```进行Prepare(b)，我们要求对这个b进行Promise的生效范围是```Instance[i,+∞)```，那么在```i```之后我们就无需做任何Prepare了。可想而知，假设上图```Instance 1```之后都没有任何除```NodeA```之外其他节点的提交，我们就可以预期接下来NodeA的Accept都是可以通过的。那么这个去(除）Prepare状态什么时候打破？我们来看有其他节点进行提交的情况：
 
 ![paxos-multi-c](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_multi_c.jpg)
