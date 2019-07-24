@@ -264,6 +264,7 @@ $(document).ready(function(){
 	  
 	  <!-- modified by ivan1001 20190724 -->
       <!-- if (alt) $(this).after('<span class="caption">' + alt + '</span>'); -->
+	  if (alt) $(this).after('<span class="caption"></span>');
       $(this).wrap('<a href="' + this.src + '" title="' + alt + '" class="fancybox"></a>');
     });
     $(this).find('.fancybox').each(function(){
