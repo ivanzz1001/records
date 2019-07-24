@@ -49,7 +49,8 @@
       noBackToTopLinks: false,
       title: 'Table Of Content',
       minimumHeaders: 3,
-      headers: 'h1, h2, h3, h4, h5, h6',
+	  headers: 'h1, h2, h3, h4',             //modified by ivanzz1001
+      //headers: 'h1, h2, h3, h4, h5, h6',
       listType: 'ol', //'ol', // values: [ol|ul]   //modified by ivan1001
       showEffect: 'show', // values: [show|slideDown|fadeIn|none]
       showSpeed: 0 // set to 0 to deactivate effect
