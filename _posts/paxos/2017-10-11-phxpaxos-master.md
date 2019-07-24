@@ -24,12 +24,12 @@ Master的应用非常广泛。比如在分布式存储里面，我们希望读�
 ## 3. Paxos的工程应用
 这个涉及到Paxos工程上API设计以及状态机，这里先不展开讲，来看一张图相信大家就懂了，图片来自论文"Paxos Made Live"。
 
-![paxos-made-live](https://ivanzz1001.github.io/records/assets/img/paxos_made_live.jpg)
+![paxos-made-live](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_made_live.jpg)
 
 Paxos的应用简明来讲就是由算法确定一个操作系列，通过编写这些操作系列的callback(也就是状态机的状态转移函数），使得节点进行相同顺序的callback，从而保证各个节点的状态一致。
 
 ## 4. Master选举租约算法
-![paxos-be-master](https://ivanzz1001.github.io/records/assets/img/paxos_be_master.jpg)
+![paxos-be-master](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_be_master.jpg)
 
 BeMaster是一个操作，这个操作很简单，就是提议```自己```成为master，图片里面```A节点```希望自己成为Master。任何节点都可以发起这个操作尝试将自己提升为Master，除了已经得知别人已被选为Master。当得知别人选为Master后，必须等待```timeout```长度的时间，才能发起BeMaster操作。而如果是获知自己成为Master，那么从BeMaster开始的timeout时间内可认为自己是Master，如图示，T2-T3的时间窗内，视作Master的```任期```。
 
@@ -53,11 +53,11 @@ Paxos算法的读者，应该可以很轻松回答这个问题。
 
 只需要在Master任期内成功完成一次BeMaster操作，即可延长Master任期，在正常情况下这样不断迭代下去，一般会使得Master非常的稳定。
 
-![paxos-master-a](https://ivanzz1001.github.io/records/assets/img/paxos_master_a.jpg)
+![paxos-master-a](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_master_a.jpg)
 
 上图可以看到在多次的BeMaster选举里面，我们需要给每一个任期赋予一个version，这是为什么？下面通过一个例子来解释这个问题。
 
-![paxos-master-b](https://ivanzz1001.github.io/records/assets/img/paxos_master_b.jpg)
+![paxos-master-b](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_master_b.jpg)
 
 这个图示情况是NodeA不断在续任，但NodeC可能与NodeA无法通信或者其他原因，在获知NodeA第二次续任成功后就再也收不到任何消息了，于是当NodeC认为A的Master任期过期后，即可尝试发起BeMaster操作。这就违背了算法的保证了，出现了NodeA在任期内，但NodeC发起BeMaster操作的情况。
 
