@@ -254,39 +254,135 @@ PHXKV_GRPCSERVER_SYS_LIB=$(PHXPAXOS_LIB_PATH)/libphxpaxos_plugin.a $(CARES_LIB_P
 到此为止，所有相关目录都已经编译完成。
 
 
-
-
 ## 2. 测试phxpaxos
-执行如下命令简单测试一下phxpaxos:
+如下我们先简单的测试一下phxpaxos给出的三个示例程序。
+
+### 2.1 sample/phxecho的测试
+phxecho并不是一个真实的服务器，其只是展示了如何使用phxpaxos。
+
+1） **创建日志目录**
+
+在运行phxecho时，我们需要先创建一个名称为```log```的子目录，执行如下命令：
 <pre>
-// sample/phxecho目录
-# mkdir -p log
+# pwd
+/root/paxos-inst/phxpaxos-1.1.3/sample/phxecho
+# mkdir log
 # cat run_echo.sh
+</pre>
+
+
+2) **启动phxecho**
+
+接着我们开启3个命令行窗口来分别运行下面三条命令：
+{% highlight string %}
+# ./phxecho 127.0.0.1:11111 127.0.0.1:11111,127.0.0.1:11112,127.0.0.1:11113     
+# ./phxecho 127.0.0.1:11112 127.0.0.1:11111,127.0.0.1:11112,127.0.0.1:11113 
+#./phxecho 127.0.0.1:11113 127.0.0.1:11111,127.0.0.1:11112,127.0.0.1:11113
+{% endhighlight %}
+
+3） **简单测试phxecho**
+
+在其中一个命令行窗口输入消息：
+{% highlight string %}
 # ./phxecho 127.0.0.1:11111 127.0.0.1:11111,127.0.0.1:11112,127.0.0.1:11113
-# ./phxecho 127.0.0.1:11112 127.0.0.1:11111,127.0.0.1:11112,127.0.0.1:11113
-# ./phxecho 127.0.0.1:11113 127.0.0.1:11111,127.0.0.1:11112,127.0.0.1:11113
+run paxos ok
+echo server start, ip 127.0.0.1 port 11111
+
+please input: <echo req value>
+hello,world
+[SM Execute] ok, smid 1 instanceid 0 value hello,world
+echo resp value hello,world
+
+please input: <echo req value>
+how are you?
+[SM Execute] ok, smid 1 instanceid 1 value how are you?
+echo resp value how are you?
+
+please input: <echo req value>
+{% endhighlight %}
+上面可以看到phxecho采用Multi-Paxos来使三个节点达成一致性。
+
+现在我们先关掉```11113```这一个节点所运行的phxecho，可以看到集群仍能够正常的工作。现在我们将```11112```节点也关掉，继续进行测试：
+{% highlight string %}
+please input: <echo req value>
+good afternoon
+{% endhighlight %}
+此时发现，程序被卡住。而如果此时我们重启```11112```节点，则程序又可以正常的运行，达成一致性。
+
+### 2.2 sample/phxelection的测试
+本示例演示了如何使用paxos来进行master的选举。我们分别在三个命令行窗口执行如下命令：
+<pre>
+# ./phxelection 127.0.0.1:11111 127.0.0.1:11111,127.0.0.1:11112,127.0.0.1:11113
+# ./phxelection 127.0.0.1:11112 127.0.0.1:11111,127.0.0.1:11112,127.0.0.1:11113
+# ./phxelection 127.0.0.1:11113 127.0.0.1:11111,127.0.0.1:11112,127.0.0.1:11113
+</pre>
+运行后可以看到能够正常的进行master的选举，并通过version不断的续期。
 
 
-//测试性能,src/ut目录
+### 2.3 sample/phxkv的测试
+本示例演示了paxos是如何保存kv值的。请参看如下步骤：
+
+1） **创建相关目录**
+
+执行```prepare_dir.sh```脚本创建程序运行所需的相关目录：
+<pre>
+# chmod 777 prepare_dir.sh 
+# ./prepare_dir.sh 
+</pre>
+
+2) **运行服务器程序**
+
+分别在三个命令行窗口运行如下命令：
+<pre>
+#./phxkv_grpcserver 127.0.0.1:21111 127.0.0.1:11111 127.0.0.1:11111,127.0.0.1:11112,127.0.0.1:11113 ./storage/kvdb_0 ./storage/paxoslog_0
+#./phxkv_grpcserver 127.0.0.1:21112 127.0.0.1:11112 127.0.0.1:11111,127.0.0.1:11112,127.0.0.1:11113 ./storage/kvdb_1 ./storage/paxoslog_1
+#./phxkv_grpcserver 127.0.0.1:21113 127.0.0.1:11113 127.0.0.1:11111,127.0.0.1:11112,127.0.0.1:11113 ./storage/kvdb_2 ./storage/paxoslog_2
+</pre>
+
+3) **运行客户端程序**
+
+在另一个命令行窗口执行如下命令：
+<pre>
+#./phxkv_client_tools 127.0.0.1:21112 put key_hello value_paxos 0
+#./phxkv_client_tools 127.0.0.1:21112 getlocal key_hello
+#./phxkv_client_tools 127.0.0.1:21112 getglobal key_hello
+#./phxkv_client_tools 127.0.0.1:21112 delete key_hello 0
+
+#./phxkv_client_tools 127.0.0.1:21111 put key_hello value_paxos 0
+#./phxkv_client_tools 127.0.0.1:21111 getlocal key_hello
+#./phxkv_client_tools 127.0.0.1:21111 getglobal key_hello
+#./phxkv_client_tools 127.0.0.1:21111 delete key_hello 0
+
+#./phxkv_client_tools 127.0.0.1:21113 put key_hello value_paxos 0
+#./phxkv_client_tools 127.0.0.1:21113 getlocal key_hello
+#./phxkv_client_tools 127.0.0.1:21113 getglobal key_hello
+#./phxkv_client_tools 127.0.0.1:21113 delete key_hello 0
+</pre>
+可以看到每次调用```put```来设置或修改值的时候，对应kv的version就会增加1，后续再需要对value进行修改，所对应的的version必须要正确，否则将不能修改成功。其实就是演示了一个分布式乐观锁的概念。
+
+
+### 2.4 src/ut的测试
+本目录是对phxpaxos的一个单元性测试。参看如下：
+<pre>
 # ./phxpaxos_ut 
 [==========] Running 27 tests from 6 test cases.
 [----------] Global test environment set-up.
 [----------] 7 tests from MultiDatabase
 [ RUN      ] MultiDatabase.ClearAllLog
-[       OK ] MultiDatabase.ClearAllLog (255 ms)
+[       OK ] MultiDatabase.ClearAllLog (43 ms)
 [ RUN      ] MultiDatabase.PUT_GET
-[       OK ] MultiDatabase.PUT_GET (162 ms)
+[       OK ] MultiDatabase.PUT_GET (15 ms)
 [ RUN      ] MultiDatabase.Del
-[       OK ] MultiDatabase.Del (206 ms)
+[       OK ] MultiDatabase.Del (18 ms)
 [ RUN      ] MultiDatabase.GetMaxInstanceID
-[       OK ] MultiDatabase.GetMaxInstanceID (192 ms)
+[       OK ] MultiDatabase.GetMaxInstanceID (16 ms)
 [ RUN      ] MultiDatabase.Set_Get_MinChosenInstanceID
-[       OK ] MultiDatabase.Set_Get_MinChosenInstanceID (163 ms)
+[       OK ] MultiDatabase.Set_Get_MinChosenInstanceID (14 ms)
 [ RUN      ] MultiDatabase.Set_Get_SystemVariables
-[       OK ] MultiDatabase.Set_Get_SystemVariables (182 ms)
+[       OK ] MultiDatabase.Set_Get_SystemVariables (18 ms)
 [ RUN      ] MultiDatabase.Set_Get_MasterVariables
-[       OK ] MultiDatabase.Set_Get_MasterVariables (170 ms)
-[----------] 7 tests from MultiDatabase (1337 ms total)
+[       OK ] MultiDatabase.Set_Get_MasterVariables (14 ms)
+[----------] 7 tests from MultiDatabase (139 ms total)
 
 [----------] 2 tests from NodeID
 [ RUN      ] NodeID.IPPort2NodeID
@@ -299,21 +395,21 @@ PHXKV_GRPCSERVER_SYS_LIB=$(PHXPAXOS_LIB_PATH)/libphxpaxos_plugin.a $(CARES_LIB_P
 [ RUN      ] Timer.AddTimer
 [       OK ] Timer.AddTimer (36 ms)
 [ RUN      ] Timer.PopTimer
-[       OK ] Timer.PopTimer (479 ms)
-[----------] 2 tests from Timer (517 ms total)
+[       OK ] Timer.PopTimer (492 ms)
+[----------] 2 tests from Timer (529 ms total)
 
 [----------] 3 tests from WaitLock
 [ RUN      ] WaitLock.Lock
 [       OK ] WaitLock.Lock (62 ms)
 [ RUN      ] WaitLock.LockTimeout
-[       OK ] WaitLock.LockTimeout (32 ms)
+[       OK ] WaitLock.LockTimeout (31 ms)
 [ RUN      ] WaitLock.TooMuchLockWating
-[       OK ] WaitLock.TooMuchLockWating (28 ms)
-[----------] 3 tests from WaitLock (125 ms total)
+[       OK ] WaitLock.TooMuchLockWating (55 ms)
+[----------] 3 tests from WaitLock (148 ms total)
 
 [----------] 6 tests from Acceptor
 [ RUN      ] Acceptor.OnPrepare_Promise
-[       OK ] Acceptor.OnPrepare_Promise (1 ms)
+[       OK ] Acceptor.OnPrepare_Promise (0 ms)
 [ RUN      ] Acceptor.OnPrepare_Reject
 [       OK ] Acceptor.OnPrepare_Reject (1 ms)
 [ RUN      ] Acceptor.OnPrepare_PersistFail
@@ -321,10 +417,10 @@ PHXKV_GRPCSERVER_SYS_LIB=$(PHXPAXOS_LIB_PATH)/libphxpaxos_plugin.a $(CARES_LIB_P
 [ RUN      ] Acceptor.OnAccept_Pass
 [       OK ] Acceptor.OnAccept_Pass (0 ms)
 [ RUN      ] Acceptor.OnAccept_Reject
-[       OK ] Acceptor.OnAccept_Reject (0 ms)
+[       OK ] Acceptor.OnAccept_Reject (1 ms)
 [ RUN      ] Acceptor.OnAccept_PersistFail
-[       OK ] Acceptor.OnAccept_PersistFail (1 ms)
-[----------] 6 tests from Acceptor (4 ms total)
+[       OK ] Acceptor.OnAccept_PersistFail (0 ms)
+[----------] 6 tests from Acceptor (2 ms total)
 
 [----------] 7 tests from Proposer
 [ RUN      ] Proposer.NewValue
@@ -338,15 +434,16 @@ PHXKV_GRPCSERVER_SYS_LIB=$(PHXPAXOS_LIB_PATH)/libphxpaxos_plugin.a $(CARES_LIB_P
 [ RUN      ] Proposer.OnAcceptReply_Skip
 [       OK ] Proposer.OnAcceptReply_Skip (0 ms)
 [ RUN      ] Proposer.OnAcceptReply_Reject
-[       OK ] Proposer.OnAcceptReply_Reject (3 ms)
+[       OK ] Proposer.OnAcceptReply_Reject (0 ms)
 [ RUN      ] Proposer.OnAcceptReply_Pass
 [       OK ] Proposer.OnAcceptReply_Pass (0 ms)
-[----------] 7 tests from Proposer (6 ms total)
+[----------] 7 tests from Proposer (0 ms total)
 
 [----------] Global test environment tear-down
-[==========] 27 tests from 6 test cases ran. (1994 ms total)
+[==========] 27 tests from 6 test cases ran. (818 ms total)
 [  PASSED  ] 27 tests.
 </pre>
+
 
 
 
