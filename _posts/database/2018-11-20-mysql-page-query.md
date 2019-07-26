@@ -163,11 +163,11 @@ SELECT id FROM foo.bar FORCE INDEX(PRI) LIMIT 10 OFFSET 0
 
 *题外话：* 我们在执行MySQL limit分页时，通常需要有一个明确的结果返回顺序，否则就可能会出现在不同的页面出现相同的查询记录。因此通常我们会使用order by语句对查询的结果按主键进行排序；或者通过上面讲的以主键作为where查询条件，这样就能保证按主键的顺序正常返回结果。因此我们经常看到如下写法：
 {% highlight string %}
-SELECT * FROM `cdb_posts` ORDER BY pid LIMIT 1000000,30
+SELECT * FROM cdb_posts ORDER BY pid LIMIT 1000000,30
 
 
 //在第2个LIMIT前面我们可以不用再加ORDER BY了，因此此时where条件的查询默认就会使用主键索引来进行，因此默认就是主键排序了
-SELECT * FROM `cdb_posts` WHERE pid >= (SELECT pid FROM  `cdb_posts` ORDER BY pid LIMIT 1000000,1) LIMIT 30
+SELECT * FROM cdb_posts WHERE pid >= (SELECT pid FROM  cdb_posts ORDER BY pid LIMIT 1000000,1) LIMIT 30
 {% endhighlight %}
 
 ## 2. MySQL Limit分页查询
