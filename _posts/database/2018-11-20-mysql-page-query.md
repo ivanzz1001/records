@@ -145,19 +145,19 @@ SELECT id FROM foo.bar FORCE INDEX(PRI) LIMIT 10 OFFSET 0
 
 由此可见，对于查询结果的返回顺序，主要是受```索引的影响```。通常情况由如下：
 
-1） **明确指定了查询时所要采用的索引**
+1） 明确指定了查询时所要采用的索引
 
 如上我们通过```FORCE INDEX```语句强制指定了所采用的索引，则按该索引顺序返回结果。
 
-2） **带where条件的查询**
+2） 带where条件的查询
 
 这种情况下假如在where条件上创建了索引，那么就按该索引顺序返回结果；否则通常会按主键的顺序来返回结果
 
-3） **不带where条件的查询**
+3） 不带where条件的查询
 
 如果是```select *```这样的查询，通常会按主键顺序返回结果； 否则需要根据查询优化器来分析返回结果的顺序。
 
-4） **带有order by的查询**
+4） 带有order by的查询
 
 本身这种查询只是引导数据库再对查询后的结果做进一步的排序。（注： 数据库所采用的排序算法并不一定是稳定的排序算法，因此多次执行相同的语句查询返回的结果可能会并不一样）
 
@@ -169,6 +169,31 @@ SELECT * FROM `cdb_posts` ORDER BY pid LIMIT 1000000,30
 //在第2个LIMIT前面我们可以不用再加ORDER BY了，因此此时where条件的查询默认就会使用主键索引来进行，因此默认就是主键排序了
 SELECT * FROM `cdb_posts` WHERE pid >= (SELECT pid FROM  `cdb_posts` ORDER BY pid LIMIT 1000000,1) LIMIT 30
 {% endhighlight %}
+
+## 2. MySQL Limit分页查询
+
+### 2.1 limit用法
+在我们使用查询语句的时候，经常要返回前几条或者中间某几行数据，这个时候怎么办呢？不用担心，mysql已经为我们提供了这样一个功能：
+{% highlight string %}
+SELECT * FROM table LIMIT [offset,] rows | `rows OFFSET offset`
+{% endhighlight %}
+*LIMIT*子句可以被用于强制*SELECT*语句返回指定的记录数。*LIMIT*接受一个或两个数字参数，且参数必须是整数常量。如果给定两个参数，第一个参数指定第一个返回记录行的```偏移量```，第二个参数指定返回记录行的最大数目。初始记录行的偏移量是0（而不是1）。
+
+为了与PostgreSQL兼容，MySQL也支持: LIMIT rows OFFSET offset
+% highlight string %}
+mysql> SELECT * FROM table LIMIT 5,10; // 检索记录行 6-15 
+{% endhighlight %}
+
+为了检索从某一个偏移量到记录集的结束所有的记录行，可以指定第二个参数为-1：
+{% highlight string %}
+mysql> SELECT * FROM table LIMIT 95,-1; // 检索记录行 96-last.
+{% endhighlight %}
+
+如果只给定一个参数，它表示返回最大的记录行数目：
+{% highlight string %}
+mysql> SELECT * FROM table LIMIT 5; //检索前 5 个记录行 
+{% endhighlight %}
+换句话说，```LIMIT n```等价于```LIMIT 0,n```。
 
 
 
