@@ -163,95 +163,14 @@ SELECT id FROM foo.bar FORCE INDEX(PRI) LIMIT 10 OFFSET 0
 
 *题外话：* 我们在执行MySQL limit分页时，通常需要有一个明确的结果返回顺序，否则就可能会出现在不同的页面出现相同的查询记录。因此通常我们会使用order by语句对查询的结果按主键进行排序；或者通过上面讲的以主键作为where查询条件，这样就能保证按主键的顺序正常返回结果。因此我们经常看到如下写法：
 {% highlight string %}
-SELECT * FROM cdb_posts ORDER BY pid LIMIT 1000000,30
+SELECT * FROM `cdb_posts` ORDER BY pid LIMIT 1000000,30
 
 
 //在第2个LIMIT前面我们可以不用再加ORDER BY了，因此此时where条件的查询默认就会使用主键索引来进行，因此默认就是主键排序了
-SELECT * FROM cdb_posts WHERE pid >= (SELECT pid FROM  cdb_posts ORDER BY pid LIMIT 1000000,1) LIMIT 30
+SELECT * FROM `cdb_posts` WHERE pid >= (SELECT pid FROM  `cdb_posts` ORDER BY pid LIMIT 1000000,1) LIMIT 30
 {% endhighlight %}
 
-## 2. MySQL Limit分页查询
 
-### 2.1 limit用法
-在我们使用查询语句的时候，经常要返回前几条或者中间某几行数据，这个时候怎么办呢？不用担心，mysql已经为我们提供了这样一个功能：
-{% highlight string %}
-SELECT * FROM table LIMIT [offset,] rows | `rows OFFSET offset`
-{% endhighlight %}
-*LIMIT*子句可以被用于强制*SELECT*语句返回指定的记录数。*LIMIT*接受一个或两个数字参数，且参数必须是整数常量。如果给定两个参数，第一个参数指定第一个返回记录行的```偏移量```，第二个参数指定返回记录行的最大数目。初始记录行的偏移量是0（而不是1）。
-
-为了与PostgreSQL兼容，MySQL也支持: LIMIT rows OFFSET offset
-% highlight string %}
-mysql> SELECT * FROM table LIMIT 5,10; // 检索记录行 6-15 
-{% endhighlight %}
-
-为了检索从某一个偏移量到记录集的结束所有的记录行，可以指定第二个参数为-1：
-{% highlight string %}
-mysql> SELECT * FROM table LIMIT 95,-1; // 检索记录行 96-last.
-{% endhighlight %}
-
-如果只给定一个参数，它表示返回最大的记录行数目：
-{% highlight string %}
-mysql> SELECT * FROM table LIMIT 5; //检索前 5 个记录行 
-{% endhighlight %}
-换句话说，```LIMIT n```等价于```LIMIT 0,n```。
-
-### 2.2 MySQL分页查询语句的性能分析
-MySQL分页sql语句，如果和```MSSQL``` 的TOP语法相比，那么MySQL的LIMIT语法要显得优雅了许多。使用它来分页是再自然不过的事情了。
-
-1） **最基本的分页方式**
-<pre>
-SELECT ... FROM ... WHERE ... ORDER BY ... LIMIT ...
-</pre>
-在中小数据量的情况下，这样的SQL足够用了，唯一需要注意的问题就是确保使用了索引。举例来说，如果实际SQL类似下面语句，那么在category_id与id这两列建立复合索引比较好：
-<pre>
-SELECT * FROM articles WHERE category_id = 123 ORDER BY id LIMIT 50, 10
-</pre>
-
-2) **子查询的分页方式**
-
-随着数据量的增加，页数会越来越多，查看后几页的SQL就可能类似：
-<pre>
-SELECT * FROM articles WHERE category_id = 123 ORDER BY id LIMIT 10000, 10
-</pre>
-一言以蔽之，就是越往后分页，LIMIT语句的偏移量就会越大，速度也会明显变慢。此时，我们可以通过```子查询```的方式来提高分页效率，大致如下：
-{% highlight string %}
-SELECT * FROM articles WHERE  id >=  
-(SELECT id FROM articles  WHERE category_id = 123 ORDER BY id LIMIT 10000, 1) LIMIT 10
-{% endhighlight %}
-
-3) **JOIN分页方式**
-
-此种方式大致如下：
-{% highlight string %}
-SELECT * FROM `content` AS t1   
-JOIN (SELECT id FROM `content` ORDER BY id desc LIMIT ".($page-1)*$pagesize.", 1) AS t2   
-WHERE t1.id <= t2.id ORDER BY t1.id desc LIMIT $pagesize; 
-{% endhighlight %}
-经过测试，join分页和子查询分页的效率基本在一个等级上，消耗的时间也基本一致。
-
-为什么会这样呢？因为子查询是在索引上完成的，而普通的查询是在数据文件上完成的。通常来说，索引文件要比数据文件小得多，所以操作起来也会更有效率。
-
-实际可以利用类似*策略模式*的方式去处理分页，比如判断如果是100页以内，就使用最基本的分页方式，大于100页，则使用子查询的分页方式。
-
-### 2.3 MySQL LIMIT分页性能问题
-对于有大数据量的mysql表来说，使用LIMIT分页存在很严重的性能问题。假如我们需要查询从1000000之后的30条记录：
-{% highlight string %}
-SQL代码1：平均用时6.6秒 SELECT * FROM `cdb_posts` ORDER BY pid LIMIT 1000000 , 30
-
-SQL代码2：平均用时0.6秒 SELECT * FROM `cdb_posts` WHERE pid >= (SELECT pid FROM  
-`cdb_posts` ORDER BY pid LIMIT 1000000 , 1) LIMIT 30
-{% endhighlight %}
-因为要取出所有字段内容，第一种需要跨越大量数据块并取出，而第二种基本上是根据索引字段定位后，才取出相应的内容，效率自然大大提升。对limit的优化，不是直接用limit，而是首先获取到offset的id，然后直接用limit size来获取数据。
-
-可以看出，越往后分页，LIMIT语句的偏移量就会越大，两者速度差距也会越来越明显。
-
-实际可以利用类似*策略模式*的方式去处理分页，比如判断如果是100页以内，就使用最基本的分页方式，大于100页，则使用子查询的分页方式。
-
-###### 优化思想： 避免数据量大时扫描过多的记录
-
-![mysql-limit-query](https://ivanzz1001.github.io/records/assets/img/db/mysql-limit-query.png)
-
-为了保证index索引列连续，可以为每个表加一个自增字段，并且加上索引。
 
 
 <br />
