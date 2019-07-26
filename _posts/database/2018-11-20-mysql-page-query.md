@@ -174,6 +174,9 @@ SELECT * FROM `cdb_posts` WHERE pid >= (SELECT pid FROM  `cdb_posts` ORDER BY pi
 
 ### 2.1 limit用法
 在我们使用查询语句的时候，经常要返回前几条或者中间某几行数据，这个时候怎么办呢？不用担心，mysql已经为我们提供了这样一个功能：
+{% highlight string %}
+SELECT * FROM table LIMIT [offset,] rows | `rows OFFSET offset`
+{% endhighlight %}
 
 
 
