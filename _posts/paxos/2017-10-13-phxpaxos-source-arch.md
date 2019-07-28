@@ -24,6 +24,9 @@ phxpaxos的整体类图结构如下所示：
 
 ![paxos-class-diagram](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_class_diagram.jpg)
 
+图中```PNode```代表着一个PhxPaxos节点，其拥有多个Group，并关联着DFNetwork对象。DFNetwork拥有m_oUDPRecv、m_oUDPSend、m_oTcpIOThread三个属性，分别控制着UDP数据包的接收、UDP数据包的发送，以及TCP数据的处理。EventLoop是整个TCP请求事件驱动器，MessageEvent代表着一个具体的TCP socket连接对象。
+
+>phxpaxos中，对于TCPsocket的读写是完全分离的，一个socket连接要么只能读，要么只能写。
 
 <br />
 <br />
