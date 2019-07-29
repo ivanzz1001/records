@@ -28,6 +28,61 @@ phxpaxos的整体类图结构如下所示：
 
 >phxpaxos中，对于TCPsocket的读写是完全分离的，一个socket连接要么只能读，要么只能写。
 
+
+## 2. phxpaxos数据的接收与发送流程
+本节我们将介绍phxpaxos中数据的接收与发送流程，中间暂时不会涉及到任何与业务相关的操作。
+
+### 2.1 UDP数据包的发送
+UDP数据包的发送是由```UDPSend```这个类来完成的。参看如下发送流程：
+
+![paxos-udp-send](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_udp_send.jpg)
+
+对于UDP数据的发送，整体流程较为简单，这里不再赘述。
+
+
+### 2.2 UDP数据的接收
+UDP数据包的接收主要由```UDPRecv```和```IOLoop```两个类来负责。参看如下接收流程：
+
+![paxos-udp-receive](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_udp_receive.jpg)
+
+两个类的分工很明确，UDPRecv类负责从socket里面获取UDP数据包，IOLoop管理着一个消息队列和定时器队列。UDPRecv获取到的数据包会被投送到IOLoop的消息队列中，以做后续的进一步处理。
+
+
+### 2.3 TCP数据包的发送
+对于TCP包的发送，主要由```TcpIOThread```来负责。但是TcpIOThread其实封装了如下三种对象：
+
+* TcpAcceptor对象
+
+* TcpRead对象数组
+
+* TcpWrite对象数组
+
+phxpaxos这样划分，可以使得每一个对象所完成的功能十分的纯粹。下面我们就简要来看一下针对TCP数据包的发送流程：
+
+![paxos-tcp-write](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_tcp_write.jpg)
+
+此处结构比较复杂，涉及到众多的对象，我们先来梳理一下这些对象之间的关系：
+
+![paxos-tcp-write](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_tcp_arch.jpg)
+通过上面的类图，我们可以很清楚的发现作者的意图： 一个TcpWrite对象关联着一个TcpClient以及一个EventLoop。其中EventLoop作为TCP读写事件的驱动器，不断的监听对应的socket上是否具有读写事件；TcpClient对象的作用是用于建立MessageEvent，为EventLoop提供源源不断的动力。
+
+通过上面的分析，TCP数据包的发送过程就一目了然了。
+
+
+
+### 2.4 TCP数据包的接收
+
+对于TCP包的接收，因为一般先要接受来自对端的TCP连接，因此还涉及到TcpAccepter对象，连接建立后才能接收到对方发来的数据。如下我们给出接收流程：
+
+![paxos-tcp-read](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_tcp_read.jpg)
+
+在上面MessageEvent::OnRead()后面其实还有一长串流程：
+
+![paxos-tcp-process](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_tcp_process.jpg)
+
+
+到此为止，整个数据的发送与接收流程就已经介绍完毕。
+
 <br />
 <br />
 **参看：**
