@@ -83,6 +83,44 @@ phxpaxos这样划分，可以使得每一个对象所完成的功能十分的纯
 
 到此为止，整个数据的发送与接收流程就已经介绍完毕。
 
+
+## 3. phxpaxos的初始化
+这里我们以phxecho为例来探讨一下phxpaxos的初始化过程，以进一步了解paxos的运行机理。
+
+![paxos-startup](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_startup.jpg)
+
+### 3.1 phxpaxos日志存储
+
+默认情况下，我们会在phxecho程序运行的当前目录下创建```logpath_<ip>_<port>```文件夹，用于保存phxpaxos的操作日志。现在我们来大体看一下该文件夹的结构：
+<pre>
+# tree logpath_127.0.0.1_11111
+logpath_127.0.0.1_11111
+└── g0
+    ├── 000015.log
+    ├── 000016.ldb
+    ├── CURRENT
+    ├── LOCK
+    ├── LOG
+    ├── LOG.old
+    ├── MANIFEST-000013
+    └── vfile
+        ├── 0.f
+        ├── LOG
+        └── meta
+
+2 directories, 10 files
+</pre>
+我们可以看到，对于每一个group，有一个单独的目录来存放其oplog。里面leveldb主要用于存放```instanceID```、```SystemVariables```以及```MasterVariables```；而vfile文件夹会存放我们提交过的```proposal```信息，从而有我们整个操作的完整记录，每条记录的格式如下所示：
+{% highlight string %}
+|-----------------------------------------------------
+|  Length       |  InstanceID     |   message        |
+| (4 bytes)     |    (8 bytes)    |                  |
+|-----------------------------------------------------
+{% endhighlight %}
+其中Length字段保存的是InstanceID与message的总长度，即8+length(message)
+
+
+
 <br />
 <br />
 **参看：**
