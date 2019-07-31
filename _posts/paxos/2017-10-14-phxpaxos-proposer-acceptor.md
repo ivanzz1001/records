@@ -270,7 +270,301 @@ void Instance :: CheckNewValue()
 
 2） 如果当前Instance所关联的Learner检测到还有一些老的提议没有学习到，则这里会禁止提交。假如不禁止进行强行提交的话，也会因为Proposer ID过低而被其他Acceptor所拒绝，因此后续我们得不断的提高Proposer ID，这样不但浪费时间而且占用带宽。因此在我们明确知道Learner还有一些旧的提议没有学习完之前，我们拒绝提交。
 
-3） 
+3） 若本Instance只是作为一个Follower的话，不参与提交
+
+4） 若当前节点并不是集群中的一员的话,禁止提交
+>注： 在我们的示例程序中，我们通过如下方式运行
+>./phxecho 127.0.0.1:11111 127.0.0.1:11111,127.0.0.1:11112,127.0.0.1:11113 
+>这样当前节点就已经是集群中一员了。在Config::Init()函数中会将后面3个节点信息添加到SystemVSM中
+
+
+5) 启动提交
+{% highlight string %}
+m_oCommitCtx.StartCommit(m_oProposer.GetInstanceID());
+{% endhighlight %}
+关于```m_oProposer```是如何初始化并产生新的proposerID的，我们会在后面通过相关章节进行讲解。
+
+6) 根据提交时设置的超时时间，来判断我们是否要启动定时器（目前我们将超时时间设置为-1，因此并不需要启动超时定时器）
+{% highlight string %}
+if (m_oCommitCtx.GetTimeoutMs() != -1)
+{
+    m_oIOLoop.AddTimer(m_oCommitCtx.GetTimeoutMs(), Timer_Instance_Commit_Timeout, m_iCommitTimerID);
+}
+    
+{% endhighlight %}
+
+7) proposer发起新的提交
+
+默认情况下，我们并不使用*membership*，*m_oOptions.bOpenChangeValueBeforePropose*的值也为false，因此我们会直接进入proposer的提交。
+{% highlight string %}
+m_oProposer.NewValue(m_oCommitCtx.GetCommitValue());
+{% endhighlight %}
+
+### 2.2 Proposer::NewValue()
+接着上面，我们先来看Proposer::NewValue()函数：
+{% highlight string %}
+int Proposer :: NewValue(const std::string & sValue)
+{
+    BP->GetProposerBP()->NewProposal(sValue);
+
+    if (m_oProposerState.GetValue().size() == 0)
+    {
+        m_oProposerState.SetValue(sValue);
+    }
+
+    m_iLastPrepareTimeoutMs = START_PREPARE_TIMEOUTMS;
+    m_iLastAcceptTimeoutMs = START_ACCEPT_TIMEOUTMS;
+
+    if (m_bCanSkipPrepare && !m_bWasRejectBySomeone)
+    {
+        BP->GetProposerBP()->NewProposalSkipPrepare();
+
+        PLGHead("skip prepare, directly start accept");
+        Accept();
+    }
+    else
+    {
+        //if not reject by someone, no need to increase ballot
+        Prepare(m_bWasRejectBySomeone);
+    }
+
+    return 0;
+}
+{% endhighlight %}
+1) 设置我们要提交的值设置到```m_oProposerState```中，通常情况下一轮新的Paxos提交，初始*m_oProposerState.GetValue()*的值为空。这里我们设置的值为：
+<pre>
+|---------------------------------
+| StateMachineID |   message     |
+|   (4Bytes)     |               |
+----------------------------------
+</pre>
+
+2) 设置prepare的超时时间与accept的超时时间
+<pre>
+m_iLastPrepareTimeoutMs = START_PREPARE_TIMEOUTMS;   //2s
+m_iLastAcceptTimeoutMs = START_ACCEPT_TIMEOUTMS;     //1s
+</pre>
+
+3) 执行Prepare操作。
+
+满足如下场景，允许跳过prepare阶段：
+>本节点之前执行国Prepare阶段，并且Prepare阶段的直接结果为Accept
+
+当不满足上述场景时，需要执行完整的Paxos两阶段流程。这里我们虽然使用的是Multi-Paxos，但通常第一次提交我们还是要执行Prepare，因此下面我们来详细的分析一下Prepare()函数。
+
+### 2.3 Prepare阶段
+
+本函数正式进入我们在```Paxos理论```中介绍的Prepare阶段，我们来看：
+{% highlight string %}
+void Proposer :: Prepare(const bool bNeedNewBallot)
+{
+    PLGHead("START Now.InstanceID %lu MyNodeID %lu State.ProposalID %lu State.ValueLen %zu",
+            GetInstanceID(), m_poConfig->GetMyNodeID(), m_oProposerState.GetProposalID(),
+            m_oProposerState.GetValue().size());
+
+    BP->GetProposerBP()->Prepare();
+    m_oTimeStat.Point();
+    
+    ExitAccept();
+    m_bIsPreparing = true;
+    m_bCanSkipPrepare = false;
+    m_bWasRejectBySomeone = false;
+
+    m_oProposerState.ResetHighestOtherPreAcceptBallot();
+    if (bNeedNewBallot)
+    {
+        m_oProposerState.NewPrepare();
+    }
+
+    PaxosMsg oPaxosMsg;
+    oPaxosMsg.set_msgtype(MsgType_PaxosPrepare);
+    oPaxosMsg.set_instanceid(GetInstanceID());
+    oPaxosMsg.set_nodeid(m_poConfig->GetMyNodeID());
+    oPaxosMsg.set_proposalid(m_oProposerState.GetProposalID());
+
+    m_oMsgCounter.StartNewRound();
+
+    AddPrepareTimer();
+
+    PLGHead("END OK");
+
+    BroadcastMessage(oPaxosMsg);
+}
+{% endhighlight %}
+
+发起Prepare主要做4件事情：
+
+1） Proposer状态重置，表明当前开始进入Prepare阶段
+<pre>
+ExitAccept();
+m_bIsPreparing = true;
+m_bCanSkipPrepare = false;
+m_bWasRejectBySomeone = false;
+</pre>
+
+2) 按需使用编号
+{% highlight string %}
+m_oProposerState.ResetHighestOtherPreAcceptBallot();
+if (bNeedNewBallot)
+{
+    m_oProposerState.NewPrepare();
+}
+{% endhighlight %}
+这里```按需```的意思是指，当有其他节点明确拒绝了该提案，按Paxos协议必须使用新的提案编号重写发起提案；而如果并无其他节点拒绝，即由于超时等原因导致的重新发起提案，可沿用原来的编号。
+
+3) 构造PaxosMsg
+
+通过如下方式构造PaxosMsg:
+{% highlight string %}
+PaxosMsg oPaxosMsg;
+oPaxosMsg.set_msgtype(MsgType_PaxosPrepare);
+oPaxosMsg.set_instanceid(GetInstanceID());
+oPaxosMsg.set_nodeid(m_poConfig->GetMyNodeID());
+oPaxosMsg.set_proposalid(m_oProposerState.GetProposalID());
+{% endhighlight %}
+这里我们查看```paxos_msg.proto```文件，其消息格式如下：
+{% highlight string %}
+message PaxosMsg
+{
+	required int32 MsgType = 1;
+	optional uint64 InstanceID = 2;
+	optional uint64 NodeID = 3;
+	optional uint64 ProposalID = 4;
+	optional uint64 ProposalNodeID = 5;
+	optional bytes Value = 6;
+	optional uint64 PreAcceptID = 7;
+	optional uint64 PreAcceptNodeID = 8;
+	optional uint64 RejectByPromiseID = 9;
+	optional uint64 NowInstanceID = 10;
+	optional uint64 MinChosenInstanceID = 11;
+	optional uint32 LastChecksum = 12;
+	optional uint32 Flag = 13;
+	optional bytes SystemVariables = 14;
+	optional bytes MasterVariables = 15;
+};
+{% endhighlight %}
+
+4） 清除消息计数器，以开启新的一轮消息记录
+<pre>
+m_oMsgCounter.StartNewRound();
+</pre>
+
+5) 设置Prepare超时定时器。
+{% highlight string %}
+void Proposer :: OnPrepareTimeout()
+{
+    PLGHead("OK");
+
+    if (GetInstanceID() != m_llTimeoutInstanceID)
+    {
+        PLGErr("TimeoutInstanceID %lu not same to NowInstanceID %lu, skip",
+                m_llTimeoutInstanceID, GetInstanceID());
+        return;
+    }
+
+    BP->GetProposerBP()->PrepareTimeout();
+    
+    Prepare(m_bWasRejectBySomeone);
+}
+{% endhighlight %}
+Prepare超时原因有很多，比如网络丢包。当Prepare超时时，处理方式也很简单，重新执行Prepare()。注： 这里用```m_llTimeoutInstanceID```来标识一个Prepare超时定时器，因为可能有很多定时器同时在运行。
+
+6) 发送Prepare消息
+{% highlight string %}
+int Base :: BroadcastMessage(const PaxosMsg & oPaxosMsg, const int iRunType, const int iSendType)
+{
+    if (m_bIsTestMode)
+    {
+        return 0;
+    }
+
+    BP->GetInstanceBP()->BroadcastMessage();
+
+    if (iRunType == BroadcastMessage_Type_RunSelf_First)
+    {
+        if (m_poInstance->OnReceivePaxosMsg(oPaxosMsg) != 0)
+        {
+            return -1;
+        }
+    }
+    
+    string sBuffer;
+    int ret = PackMsg(oPaxosMsg, sBuffer);
+    if (ret != 0)
+    {
+        return ret;
+    }
+
+    ret = m_poMsgTransport->BroadcastMessage(m_poConfig->GetMyGroupIdx(), sBuffer, iSendType);
+
+    if (iRunType == BroadcastMessage_Type_RunSelf_Final)
+    {
+        m_poInstance->OnReceivePaxosMsg(oPaxosMsg);
+    }
+
+    return ret;
+}
+{% endhighlight %}
+
+这里在消息发送之前依然会再进行一次检查，看是否有必要进行发送。这里可能主要涉及到两个时间段，这两个时间段内整个集群的状态都可能会发生改变：
+
+* Prepare准备过程所耗费的时间段
+
+* Prepare定时器超时时间段（因为第二次Prepare()也同样会调用到BroadcastMessage()函数）
+
+接着我们再来看对Paxos消息的打包：
+{% highlight string %}
+int Base :: PackMsg(const PaxosMsg & oPaxosMsg, std::string & sBuffer)
+{
+    std::string sBodyBuffer;
+    bool bSucc = oPaxosMsg.SerializeToString(&sBodyBuffer);
+    if (!bSucc)
+    {
+        PLGErr("PaxosMsg.SerializeToString fail, skip this msg");
+        return -1;
+    }
+
+    int iCmd = MsgCmd_PaxosMsg;
+    PackBaseMsg(sBodyBuffer, iCmd, sBuffer);
+
+    return 0;
+}
+{% endhighlight %}
+上面先调用protobuf相关序列化函数来进行序列化，之后再调用PackBaseMsg进行进一步的打包。打包后的消息类似如下：
+<pre>
+|------------------------------------------------------------------------------------------------------------------------
+|              |     Header                              |                                               |              |
+|    GroupID   |-----------------------------------------|                  PaxosMsg                     |    checksum  |
+|              | header_len |   Header_content           |                                               |              |
+|------------------------------------------------------------------------------------------------------------------------
+|   group_id   |   len      | gid   | rid | cmd | version| MsgType | InstanceID  | NodeID   | ProposalID |  crc32_sum   |
+|    4byte     |  (2Byte)   |8byte  |8byte|4byte| 4byte  |  4byte  |   8byte     |  8byte   |  8byte     |    4byte     |
+-------------------------------------------------------------------------------------------------------------------------
+</pre>
+消息打完包之后，接着调用如下函数发往相应的节点：
+{% highlight string %}
+int Communicate :: BroadcastMessage(const int iGroupIdx, const std::string & sMessage, const int iSendType)
+{
+    const std::set<nodeid_t> & setNodeInfo = m_poConfig->GetSystemVSM()->GetMembershipMap();
+    
+    for (auto & it : setNodeInfo)
+    {
+        if (it != m_iMyNodeID)
+        {
+            Send(iGroupIdx, it, NodeInfo(it), sMessage, iSendType);
+        }
+    }
+
+    return 0;
+}
+{% endhighlight %}
+注意上面并不会发送给节点自身。后续收到其他节点的返回消息时，我们默认节点自身已经promise了。
+
+### 2.4 MsgType_PaxosPrepareReply阶段
+
+
+## 3. Acceptor
+
 
 
 
