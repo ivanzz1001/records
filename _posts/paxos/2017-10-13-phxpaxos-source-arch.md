@@ -89,6 +89,8 @@ phxpaxos这样划分，可以使得每一个对象所完成的功能十分的纯
 
 ![paxos-startup](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_startup.jpg)
 
+group对象的初始化较为复杂，我们会在后面相关章节进行进一步的分析。
+
 ### 3.1 phxpaxos日志存储
 
 默认情况下，我们会在phxecho程序运行的当前目录下创建```logpath_<ip>_<port>```文件夹，用于保存phxpaxos的操作日志。现在我们来大体看一下该文件夹的结构：
