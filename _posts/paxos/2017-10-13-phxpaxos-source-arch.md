@@ -110,14 +110,27 @@ logpath_127.0.0.1_11111
 
 2 directories, 10 files
 </pre>
-我们可以看到，对于每一个group，有一个单独的目录来存放其oplog。里面leveldb主要用于存放```instanceID```、```SystemVariables```以及```MasterVariables```；而vfile文件夹会存放我们提交过的```proposal```信息，从而有我们整个操作的完整记录，每条记录的格式如下所示：
+我们可以看到，对于每一个group，有一个单独的目录来存放其oplog。里面leveldb主要用于存放```instanceID```、```SystemVariables```以及```MasterVariables```；而vfile文件夹会存放我们提交过的```proposal```信息，从而有我们整个操作的完整记录。
+
+```vfile```文件夹下有如下三类文件：
+{% highlight string %}
+<x>.f文件： 用于记录我们Accept过的proposal。为了使文件不至于过大，通常本文件会以100MB作为分隔，<x>的编号随之递增，
+           因此随着程序的运行，可能会有0.f、1.f、2.f等文件
+
+LOG文件： 用于保存操作<x>.f文件时的时间等信息
+
+meta文件： 其作为vfile文件夹下的一个元数据文件。因为vfile文件夹下可能会有众多文件0.f、1.f、2.f等，meta文件会用来记录
+          当前我们要操作的是哪个文件，里面会记录我们要操作的文件编号，即<x>的值，并加了一个crc32的值对其进行校验，防止
+          由于某些误操破坏了meta文件。
+{% endhighlight %}
+```<x>.f```文件中每条记录的格式如下所示：
 {% highlight string %}
 |-----------------------------------------------------
 |  Length       |  InstanceID     |   message        |
 | (4 bytes)     |    (8 bytes)    |                  |
 |-----------------------------------------------------
 {% endhighlight %}
-其中Length字段保存的是InstanceID与message的总长度，即8+length(message)
+其中Length字段保存的是InstanceID与message的总长度，即8+length(message)。
 
 
 
