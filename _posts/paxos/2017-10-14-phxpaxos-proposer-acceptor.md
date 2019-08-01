@@ -561,12 +561,421 @@ int Communicate :: BroadcastMessage(const int iGroupIdx, const std::string & sMe
 注意上面并不会发送给节点自身。后续收到其他节点的返回消息时，我们默认节点自身已经promise了。
 
 ### 2.4 MsgType_PaxosPrepareReply阶段
+当收到发来的网络消息时，首先会回调Instance::OnReceive()函数，假如我们收到的是Paxos消息，则会回调到Instance::OnReceivePaxosMsg()函数，现在我们来看一下当收到*MsgType_PaxosPrepareReply*消息时的回调函数*Instance::ReceiveMsgForProposer()*:
+{% highlight string %}
+int Instance :: ReceiveMsgForProposer(const PaxosMsg & oPaxosMsg)
+{
+    if (m_poConfig->IsIMFollower())
+    {
+        PLGErr("I'm follower, skip this message");
+        return 0;
+    }
 
+    ///////////////////////////////////////////////////////////////
+    
+    if (oPaxosMsg.instanceid() != m_oProposer.GetInstanceID())
+    {
+        if (oPaxosMsg.instanceid() + 1 == m_oProposer.GetInstanceID())
+        {
+            //Exipred reply msg on last instance.
+            //If the response of a node is always slower than the majority node, 
+            //then the message of the node is always ignored even if it is a reject reply.
+            //In this case, if we do not deal with these reject reply, the node that 
+            //gave reject reply will always give reject reply. 
+            //This causes the node to remain in catch-up state.
+            //
+            //To avoid this problem, we need to deal with the expired reply.
+            if (oPaxosMsg.msgtype() == MsgType_PaxosPrepareReply)
+            {
+                m_oProposer.OnExpiredPrepareReply(oPaxosMsg);
+            }
+            else if (oPaxosMsg.msgtype() == MsgType_PaxosAcceptReply)
+            {
+                m_oProposer.OnExpiredAcceptReply(oPaxosMsg);
+            }
+        }
+
+        BP->GetInstanceBP()->OnReceivePaxosProposerMsgInotsame();
+        //PLGErr("InstanceID not same, skip msg");
+        return 0;
+    }
+
+    if (oPaxosMsg.msgtype() == MsgType_PaxosPrepareReply)
+    {
+        m_oProposer.OnPrepareReply(oPaxosMsg);
+    }
+    else if (oPaxosMsg.msgtype() == MsgType_PaxosAcceptReply)
+    {
+        m_oProposer.OnAcceptReply(oPaxosMsg);
+    }
+
+    return 0;
+}
+{% endhighlight %}
+在这里我们首先会处理前一个paxos instance所返回来的过期(Expired)消息，因为假如集群中某个节点一直落后于整个集群的话，那么当该节点返回reject响应时我们可能仍需要忽略。若我们不处理这些reject响应，则使得该节点后续可能都会一直返回reject响应。
+
+接着调用Proposer::OnPrepareReply()来处理prepare响应：
+{% highlight string %}
+void Proposer :: OnPrepareReply(const PaxosMsg & oPaxosMsg)
+{
+    PLGHead("START Msg.ProposalID %lu State.ProposalID %lu Msg.from_nodeid %lu RejectByPromiseID %lu",
+            oPaxosMsg.proposalid(), m_oProposerState.GetProposalID(), 
+            oPaxosMsg.nodeid(), oPaxosMsg.rejectbypromiseid());
+
+    BP->GetProposerBP()->OnPrepareReply();
+    
+    if (!m_bIsPreparing)
+    {
+        BP->GetProposerBP()->OnPrepareReplyButNotPreparing();
+        //PLGErr("Not preparing, skip this msg");
+        return;
+    }
+
+    if (oPaxosMsg.proposalid() != m_oProposerState.GetProposalID())
+    {
+        BP->GetProposerBP()->OnPrepareReplyNotSameProposalIDMsg();
+        //PLGErr("ProposalID not same, skip this msg");
+        return;
+    }
+
+    m_oMsgCounter.AddReceive(oPaxosMsg.nodeid());
+
+    if (oPaxosMsg.rejectbypromiseid() == 0)
+    {
+        BallotNumber oBallot(oPaxosMsg.preacceptid(), oPaxosMsg.preacceptnodeid());
+        PLGDebug("[Promise] PreAcceptedID %lu PreAcceptedNodeID %lu ValueSize %zu", 
+                oPaxosMsg.preacceptid(), oPaxosMsg.preacceptnodeid(), oPaxosMsg.value().size());
+        m_oMsgCounter.AddPromiseOrAccept(oPaxosMsg.nodeid());
+        m_oProposerState.AddPreAcceptValue(oBallot, oPaxosMsg.value());
+    }
+    else
+    {
+        PLGDebug("[Reject] RejectByPromiseID %lu", oPaxosMsg.rejectbypromiseid());
+        m_oMsgCounter.AddReject(oPaxosMsg.nodeid());
+        m_bWasRejectBySomeone = true;
+        m_oProposerState.SetOtherProposalID(oPaxosMsg.rejectbypromiseid());
+    }
+
+    if (m_oMsgCounter.IsPassedOnThisRound())
+    {
+        int iUseTimeMs = m_oTimeStat.Point();
+        BP->GetProposerBP()->PreparePass(iUseTimeMs);
+        PLGImp("[Pass] start accept, usetime %dms", iUseTimeMs);
+        m_bCanSkipPrepare = true;
+        Accept();
+    }
+    else if (m_oMsgCounter.IsRejectedOnThisRound()
+            || m_oMsgCounter.IsAllReceiveOnThisRound())
+    {
+        BP->GetProposerBP()->PrepareNotPass();
+        PLGImp("[Not Pass] wait 30ms and restart prepare");
+        AddPrepareTimer(OtherUtils::FastRand() % 30 + 10);
+    }
+
+    PLGHead("END");
+}
+{% endhighlight %}
+此函数按如下步骤对响应消息进行处理：
+
+1） 首先当前Proposer检查自身是否处于preparing阶段
+
+2） 检查proposalID是否相同
+
+3） MsgCounter用于记录当前收到来自哪些节点的响应，以及收到的响应结果（promised/reject)
+
+4) 如果本轮prepare通过，那么进入Accept()；否则开启定时器以进行下一轮的投票。
+
+### 2.5 发起Accept请求
+当Prepare阶段成功之后，proposer就会发起Accept请求：
+{% highlight string %}
+void Proposer :: Accept()
+{
+    PLGHead("START ProposalID %lu ValueSize %zu ValueLen %zu", 
+            m_oProposerState.GetProposalID(), m_oProposerState.GetValue().size(), m_oProposerState.GetValue().size());
+
+    BP->GetProposerBP()->Accept();
+    m_oTimeStat.Point();
+    
+    ExitPrepare();
+    m_bIsAccepting = true;
+    
+    PaxosMsg oPaxosMsg;
+    oPaxosMsg.set_msgtype(MsgType_PaxosAccept);
+    oPaxosMsg.set_instanceid(GetInstanceID());
+    oPaxosMsg.set_nodeid(m_poConfig->GetMyNodeID());
+    oPaxosMsg.set_proposalid(m_oProposerState.GetProposalID());
+    oPaxosMsg.set_value(m_oProposerState.GetValue());
+    oPaxosMsg.set_lastchecksum(GetLastChecksum());
+
+    m_oMsgCounter.StartNewRound();
+
+    AddAcceptTimer();
+
+    PLGHead("END");
+
+    BroadcastMessage(oPaxosMsg, BroadcastMessage_Type_RunSelf_Final);
+}
+{% endhighlight %}
+1) 生成PaxosMsg
+<pre>
+|-------------------------------------------------------------------------------------------
+|  MsgType  |  InstanceID   |   NodeID    |  ProposalID   |    Value     |    LastChecksum  |
+|   4Byte   |    8Byte      |   8Byte     |    8Byte      |     变长      |      4Byte      |
+----------------------------------------------------------------------------------------------
+</pre>
+
+2) 添加Accept超时定时器，比如网络丢包。当Accept超时时，处理方式也很简单，重新从Prepare开始
+
+3） 向集群各个节点发起Accept请求
+
+### 2.6 对Accept响应的处理
+当收到对应消息时，首先会回调*Instance::OnReceive()*函数，对于Paxos消息会回调到*Instance::OnReceivePaxosMsg()*，对于MsgType_PaxosAcceptReply消息，会回调*Instance::ReceiveMsgForProposer()*，接着再调用到*Proposer::OnAcceptReply()*，现在我们来看一看该函数：
+{% highlight string %}
+void Proposer :: OnAcceptReply(const PaxosMsg & oPaxosMsg)
+{
+    PLGHead("START Msg.ProposalID %lu State.ProposalID %lu Msg.from_nodeid %lu RejectByPromiseID %lu",
+            oPaxosMsg.proposalid(), m_oProposerState.GetProposalID(), 
+            oPaxosMsg.nodeid(), oPaxosMsg.rejectbypromiseid());
+
+    BP->GetProposerBP()->OnAcceptReply();
+
+    if (!m_bIsAccepting)
+    {
+        //PLGErr("Not proposing, skip this msg");
+        BP->GetProposerBP()->OnAcceptReplyButNotAccepting();
+        return;
+    }
+
+    if (oPaxosMsg.proposalid() != m_oProposerState.GetProposalID())
+    {
+        //PLGErr("ProposalID not same, skip this msg");
+        BP->GetProposerBP()->OnAcceptReplyNotSameProposalIDMsg();
+        return;
+    }
+
+    m_oMsgCounter.AddReceive(oPaxosMsg.nodeid());
+
+    if (oPaxosMsg.rejectbypromiseid() == 0)
+    {
+        PLGDebug("[Accept]");
+        m_oMsgCounter.AddPromiseOrAccept(oPaxosMsg.nodeid());
+    }
+    else
+    {
+        PLGDebug("[Reject]");
+        m_oMsgCounter.AddReject(oPaxosMsg.nodeid());
+
+        m_bWasRejectBySomeone = true;
+
+        m_oProposerState.SetOtherProposalID(oPaxosMsg.rejectbypromiseid());
+    }
+
+    if (m_oMsgCounter.IsPassedOnThisRound())
+    {
+        int iUseTimeMs = m_oTimeStat.Point();
+        BP->GetProposerBP()->AcceptPass(iUseTimeMs);
+        PLGImp("[Pass] Start send learn, usetime %dms", iUseTimeMs);
+        ExitAccept();
+        m_poLearner->ProposerSendSuccess(GetInstanceID(), m_oProposerState.GetProposalID());
+    }
+    else if (m_oMsgCounter.IsRejectedOnThisRound()
+            || m_oMsgCounter.IsAllReceiveOnThisRound())
+    {
+        BP->GetProposerBP()->AcceptNotPass();
+        PLGImp("[Not pass] wait 30ms and Restart prepare");
+        AddAcceptTimer(OtherUtils::FastRand() % 30 + 10);
+    }
+
+    PLGHead("END");
+}
+{% endhighlight %}
+
+1) 若当前并不accepting阶段，直接返回；
+
+2） 若proposalID不匹配，直接返回
+
+3） MsgCounter记录相关的返回消息
+
+4） 如果本轮Accept被采纳，则向Learnner发出通知消息；否则重新发起Prepare请求
 
 ## 3. Acceptor
+Acceptor作为提案的被动参与者，也分为OnPrepare和OnAccept阶段。
+
+### 3.1 OnPrepare阶段
+当收到其他节点发送过来的Prepare请求时，首先会调用到*Instance::OnReceive()*，之后再回调到*Instance::OnReceivePaxosMsg()*，之后经过相关调用回调到*Acceptor :: OnPrepare()*:
+{% highlight string %}
+int Acceptor :: OnPrepare(const PaxosMsg & oPaxosMsg)
+{
+    PLGHead("START Msg.InstanceID %lu Msg.from_nodeid %lu Msg.ProposalID %lu",
+            oPaxosMsg.instanceid(), oPaxosMsg.nodeid(), oPaxosMsg.proposalid());
+
+    BP->GetAcceptorBP()->OnPrepare();
+    
+    PaxosMsg oReplyPaxosMsg;
+    oReplyPaxosMsg.set_instanceid(GetInstanceID());
+    oReplyPaxosMsg.set_nodeid(m_poConfig->GetMyNodeID());
+    oReplyPaxosMsg.set_proposalid(oPaxosMsg.proposalid());
+    oReplyPaxosMsg.set_msgtype(MsgType_PaxosPrepareReply);
+
+    BallotNumber oBallot(oPaxosMsg.proposalid(), oPaxosMsg.nodeid());
+    
+    if (oBallot >= m_oAcceptorState.GetPromiseBallot())
+    {
+        PLGDebug("[Promise] State.PromiseID %lu State.PromiseNodeID %lu "
+                "State.PreAcceptedID %lu State.PreAcceptedNodeID %lu",
+                m_oAcceptorState.GetPromiseBallot().m_llProposalID, 
+                m_oAcceptorState.GetPromiseBallot().m_llNodeID,
+                m_oAcceptorState.GetAcceptedBallot().m_llProposalID,
+                m_oAcceptorState.GetAcceptedBallot().m_llNodeID);
+        
+        oReplyPaxosMsg.set_preacceptid(m_oAcceptorState.GetAcceptedBallot().m_llProposalID);
+        oReplyPaxosMsg.set_preacceptnodeid(m_oAcceptorState.GetAcceptedBallot().m_llNodeID);
+
+        if (m_oAcceptorState.GetAcceptedBallot().m_llProposalID > 0)
+        {
+            oReplyPaxosMsg.set_value(m_oAcceptorState.GetAcceptedValue());
+        }
+
+        m_oAcceptorState.SetPromiseBallot(oBallot);
+
+        int ret = m_oAcceptorState.Persist(GetInstanceID(), GetLastChecksum());
+        if (ret != 0)
+        {
+            BP->GetAcceptorBP()->OnPreparePersistFail();
+            PLGErr("Persist fail, Now.InstanceID %lu ret %d",
+                    GetInstanceID(), ret);
+            
+            return -1;
+        }
+
+        BP->GetAcceptorBP()->OnPreparePass();
+    }
+    else
+    {
+        BP->GetAcceptorBP()->OnPrepareReject();
+
+        PLGDebug("[Reject] State.PromiseID %lu State.PromiseNodeID %lu", 
+                m_oAcceptorState.GetPromiseBallot().m_llProposalID, 
+                m_oAcceptorState.GetPromiseBallot().m_llNodeID);
+        
+        oReplyPaxosMsg.set_rejectbypromiseid(m_oAcceptorState.GetPromiseBallot().m_llProposalID);
+    }
+
+    nodeid_t iReplyNodeID = oPaxosMsg.nodeid();
+
+    PLGHead("END Now.InstanceID %lu ReplyNodeID %lu",
+            GetInstanceID(), oPaxosMsg.nodeid());;
+
+    SendMessage(iReplyNodeID, oReplyPaxosMsg);
+
+    return 0;
+}
+{% endhighlight %}
+OnPrepare函数看似并未做任何有效性校验，但这部分校验是必不可少的，并未省去，而是出现在了调用OnPrepare的Instance类的上层函数中。这里的校验主要是保证参数中的instance ID与acceptor一致。
+
+若发过来的提案编号（BallotNumber)```大于等于```当前Acceptor所承诺(promised)的提案编号，则对对新发送过来的提案编号进行promise，并返回其上一次所承诺的提案信息给proposer； 否则，则返回拒绝消息给proposer。
+
+我们在进行promise时，会把当前所promise的信息写入到LevelDB与LogStore当中。写入到LogStore中的消息格式如下：
+<pre>
+|------------------------------------------------------------------
+|  Length   |   InstanceID      |    AcceptorStateData            |
+|   4Byte   |     8Byte         |                                 |
+-------------------------------------------------------------------
+
+1) Length字段用于保存InstanceID与AcceptorStateData所占用的空间总和
+2) AcceptorStateData消息格式如下
+message AcceptorStateData
+{
+	required uint64 InstanceID = 1;
+	required uint64 PromiseID = 2;
+	required uint64 PromiseNodeID = 3;
+	required uint64 AcceptedID = 4;
+	required uint64 AcceptedNodeID = 5;
+	required bytes AcceptedValue = 6;
+	required uint32 Checksum = 7;
+}
+</pre>
+
+写入到LevelDB的消息格式如下：
+<pre>
+-------------------------------------------------------------
+|        Key         |         Value                        |
+-------------------------------------------------------------
+
+1) key为instanceID
+2) Value为本记录在LogStore中的位置，包括logstore文件名、偏移、校验值。logstore文件名还记得以前我们讲述过的vfile目录下的0.f、1.f这样的文件吗？
+</pre>
+
+### 3.2 OnAccept阶段
+当收到其他节点发送过来的Accept请求时，会回调执行到Acceptor::OnAccess()函数：
+{% highlight string %}
+void Acceptor :: OnAccept(const PaxosMsg & oPaxosMsg)
+{
+    PLGHead("START Msg.InstanceID %lu Msg.from_nodeid %lu Msg.ProposalID %lu Msg.ValueLen %zu",
+            oPaxosMsg.instanceid(), oPaxosMsg.nodeid(), oPaxosMsg.proposalid(), oPaxosMsg.value().size());
+
+    BP->GetAcceptorBP()->OnAccept();
+
+    PaxosMsg oReplyPaxosMsg;
+    oReplyPaxosMsg.set_instanceid(GetInstanceID());
+    oReplyPaxosMsg.set_nodeid(m_poConfig->GetMyNodeID());
+    oReplyPaxosMsg.set_proposalid(oPaxosMsg.proposalid());
+    oReplyPaxosMsg.set_msgtype(MsgType_PaxosAcceptReply);
+
+    BallotNumber oBallot(oPaxosMsg.proposalid(), oPaxosMsg.nodeid());
+
+    if (oBallot >= m_oAcceptorState.GetPromiseBallot())
+    {
+        PLGDebug("[Promise] State.PromiseID %lu State.PromiseNodeID %lu "
+                "State.PreAcceptedID %lu State.PreAcceptedNodeID %lu",
+                m_oAcceptorState.GetPromiseBallot().m_llProposalID, 
+                m_oAcceptorState.GetPromiseBallot().m_llNodeID,
+                m_oAcceptorState.GetAcceptedBallot().m_llProposalID,
+                m_oAcceptorState.GetAcceptedBallot().m_llNodeID);
+
+        m_oAcceptorState.SetPromiseBallot(oBallot);
+        m_oAcceptorState.SetAcceptedBallot(oBallot);
+        m_oAcceptorState.SetAcceptedValue(oPaxosMsg.value());
+        
+        int ret = m_oAcceptorState.Persist(GetInstanceID(), GetLastChecksum());
+        if (ret != 0)
+        {
+            BP->GetAcceptorBP()->OnAcceptPersistFail();
+
+            PLGErr("Persist fail, Now.InstanceID %lu ret %d",
+                    GetInstanceID(), ret);
+            
+            return;
+        }
+
+        BP->GetAcceptorBP()->OnAcceptPass();
+    }
+    else
+    {
+        BP->GetAcceptorBP()->OnAcceptReject();
+
+        PLGDebug("[Reject] State.PromiseID %lu State.PromiseNodeID %lu", 
+                m_oAcceptorState.GetPromiseBallot().m_llProposalID, 
+                m_oAcceptorState.GetPromiseBallot().m_llNodeID);
+        
+        oReplyPaxosMsg.set_rejectbypromiseid(m_oAcceptorState.GetPromiseBallot().m_llProposalID);
+    }
+
+    nodeid_t iReplyNodeID = oPaxosMsg.nodeid();
+
+    PLGHead("END Now.InstanceID %lu ReplyNodeID %lu",
+            GetInstanceID(), oPaxosMsg.nodeid());
+
+    SendMessage(iReplyNodeID, oReplyPaxosMsg);
+}
+{% endhighlight %}
+如果收到的Accept请求的提案编号（BallotNumber)```大于等于```当前Acceptor所承诺(promised)的，那么会对发送过来的提案进行promise，并持久化到LevelDB与PaxosLog中，持久化格式与上面OnPrepare中的一模一样； 否则返回拒绝消息给proposer。
 
 
+## 4. 总结
+本章简要介绍了Paxos算法的原理，了解到Paxos算法的三大角色：Proposer、Acceptor、Learner。讲解了Proposer、Acceptor两个角色的主要代码实现，以及二者如何参与到Prepare、Accept两个阶段中。
 
+至于最后一个角色Learner，原本的理解认为应该是参与度最低的，逻辑最少的角色。但PhxPaxos中，Learner是三者中实现最复杂的，这部分内容将在下一章单独讲解。
 
 
 
