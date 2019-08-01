@@ -102,6 +102,115 @@ void Learner :: OnProposerSendSuccess(const PaxosMsg & oPaxosMsg)
 }
 {% endhighlight %}
 
+1) 若当前Learner收到的MsgType_PaxosLearner_ProposerSendSuccess消息多对应的instanceID并不是当前Learner所期望学习的instanceID，则直接跳过；
+
+2） 若当前Learner所对应的Acceptor并没有accept任何提案，则直接跳过；
+
+3） 若当前Learner对应的Acceptor所accept的提案(BallotNumber)等于当前收到的PaxosMsg提案，则成功学习到所对应的提案值。
+
+4） 将学习到的提案值发送给follower
+{% highlight string %}
+void Learner :: TransmitToFollower()
+{
+    if (m_poConfig->GetMyFollowerCount() == 0)
+    {
+        return;
+    }
+    
+    PaxosMsg oPaxosMsg;
+    
+    oPaxosMsg.set_msgtype(MsgType_PaxosLearner_SendLearnValue);
+    oPaxosMsg.set_instanceid(GetInstanceID());
+    oPaxosMsg.set_nodeid(m_poConfig->GetMyNodeID());
+    oPaxosMsg.set_proposalnodeid(m_poAcceptor->GetAcceptorState()->GetAcceptedBallot().m_llNodeID);
+    oPaxosMsg.set_proposalid(m_poAcceptor->GetAcceptorState()->GetAcceptedBallot().m_llProposalID);
+    oPaxosMsg.set_value(m_poAcceptor->GetAcceptorState()->GetAcceptedValue());
+    oPaxosMsg.set_lastchecksum(GetLastChecksum());
+
+    BroadcastMessageToFollower(oPaxosMsg, Message_SendType_TCP);
+
+    PLGHead("ok");
+}
+{% endhighlight %}
+
+
+正常情况下，所有节点处于online状态，共同参与paxos选举。因此，各个节点的instanceID一致。为了避免冲突，paxos建议只由主节点的proposer发起提案，这样保证接受提案与习得提案编号一致。
+
+此时，Learn习得的提案值实际上就是本节点Accept的数据，因此，learn只更新内存状态即可，无需再次落盘（acceptor已经落盘）。最后，如果存在follower节点，数据同步到follower（follower节点不参与paxos算法，相当于某个paxos节点的同步备）。
+
+## 3. 提案值追赶
+一点节点处于落后状态，它就无法再参与到paxos提案选举中来。这时需要由learner发起主动学习完成追赶。
+
+PhxPaxos启动时(Instance :: Init()中），会开启learner定时器。learner定时器发送learn请求到各个节点，发送请求携带本节点的instanceID，NodeID信息：
+{% highlight string %}
+void Learner :: AskforLearn_Noop(const bool bIsStart)
+{
+    Reset_AskforLearn_Noop();
+
+    m_bIsIMLearning = false;
+
+    m_poCheckpointMgr->ExitCheckpointMode();
+
+    AskforLearn();
+    
+    if (bIsStart)
+    {
+        AskforLearn();
+    }
+}
+{% endhighlight %}
+上面AskforLearn()就会发送MsgType_PaxosLearner_AskforLearn到各个节点。各个节点收到请求后，Instance::OnReceive()会回调Instance::OnReceivePaxosMsg()，之后再回调到Instance::ReceiveMsgForLearner()，最后回调到如下函数：
+{% highlight string %}
+void Learner :: OnAskforLearn(const PaxosMsg & oPaxosMsg)
+{
+    BP->GetLearnerBP()->OnAskforLearn();
+    
+    PLGHead("START Msg.InstanceID %lu Now.InstanceID %lu Msg.from_nodeid %lu MinChosenInstanceID %lu", 
+            oPaxosMsg.instanceid(), GetInstanceID(), oPaxosMsg.nodeid(),
+            m_poCheckpointMgr->GetMinChosenInstanceID());
+    
+    SetSeenInstanceID(oPaxosMsg.instanceid(), oPaxosMsg.nodeid());
+
+    if (oPaxosMsg.proposalnodeid() == m_poConfig->GetMyNodeID())
+    {
+        //Found a node follow me.
+        PLImp("Found a node %lu follow me.", oPaxosMsg.nodeid());
+        m_poConfig->AddFollowerNode(oPaxosMsg.nodeid());
+    }
+    
+    if (oPaxosMsg.instanceid() >= GetInstanceID())
+    {
+        return;
+    }
+
+    if (oPaxosMsg.instanceid() >= m_poCheckpointMgr->GetMinChosenInstanceID())
+    {
+        if (!m_oLearnerSender.Prepare(oPaxosMsg.instanceid(), oPaxosMsg.nodeid()))
+        {
+            BP->GetLearnerBP()->OnAskforLearnGetLockFail();
+
+            PLGErr("LearnerSender working for others.");
+
+            if (oPaxosMsg.instanceid() == (GetInstanceID() - 1))
+            {
+                PLGImp("InstanceID only difference one, just send this value to other.");
+                //send one value
+                AcceptorStateData oState;
+                int ret = m_oPaxosLog.ReadState(m_poConfig->GetMyGroupIdx(), oPaxosMsg.instanceid(), oState);
+                if (ret == 0)
+                {
+                    BallotNumber oBallot(oState.acceptedid(), oState.acceptednodeid());
+                    SendLearnValue(oPaxosMsg.nodeid(), oPaxosMsg.instanceid(), oBallot, oState.acceptedvalue(), 0, false);
+                }
+            }
+            
+            return;
+        }
+    }
+    
+    SendNowInstanceID(oPaxosMsg.instanceid(), oPaxosMsg.nodeid());
+}
+{% endhighlight %}
 
 <br />
 <br />
