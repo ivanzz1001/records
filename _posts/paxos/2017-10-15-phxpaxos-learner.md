@@ -159,7 +159,35 @@ void Learner :: AskforLearn_Noop(const bool bIsStart)
     }
 }
 {% endhighlight %}
-上面AskforLearn()就会发送MsgType_PaxosLearner_AskforLearn到各个节点。各个节点收到请求后，Instance::OnReceive()会回调Instance::OnReceivePaxosMsg()，之后再回调到Instance::ReceiveMsgForLearner()，最后回调到如下函数：
+上面AskforLearn()就会发送MsgType_PaxosLearner_AskforLearn到各个节点:
+{% highlight string %}
+void Learner :: AskforLearn()
+{
+    BP->GetLearnerBP()->AskforLearn();
+
+    PLGHead("START");
+
+    PaxosMsg oPaxosMsg;
+
+    oPaxosMsg.set_instanceid(GetInstanceID());
+    oPaxosMsg.set_nodeid(m_poConfig->GetMyNodeID());
+    oPaxosMsg.set_msgtype(MsgType_PaxosLearner_AskforLearn);
+
+    if (m_poConfig->IsIMFollower())
+    {
+        //this is not proposal nodeid, just use this val to bring followto nodeid info.
+        oPaxosMsg.set_proposalnodeid(m_poConfig->GetFollowToNodeID());
+    }
+
+    PLGHead("END InstanceID %lu MyNodeID %lu", oPaxosMsg.instanceid(), oPaxosMsg.nodeid());
+
+    BroadcastMessage(oPaxosMsg, BroadcastMessage_Type_RunSelf_None, Message_SendType_TCP);
+    BroadcastMessageToTempNode(oPaxosMsg, Message_SendType_UDP);
+}
+{% endhighlight %}
+注意上面是采用TCP方式向各个节点发送学习请求的。
+
+各个节点收到请求后，Instance::OnReceive()会回调Instance::OnReceivePaxosMsg()，之后再回调到Instance::ReceiveMsgForLearner()，最后回调到如下函数：
 {% highlight string %}
 void Learner :: OnAskforLearn(const PaxosMsg & oPaxosMsg)
 {
@@ -216,13 +244,180 @@ void Learner :: OnAskforLearn(const PaxosMsg & oPaxosMsg)
 下述文字截取自[《微信自研生产级paxos类库PhxPaxos实现原理介绍》](https://mp.weixin.qq.com/s?__biz=MzI4NDMyNTU2Mw==&mid=2247483695&idx=1&sn=91ea422913fc62579e020e941d1d059e&scene=21#wechat_redirect)：
 >上文说到当各台机器的当前运行实例编号不一致的时候，就需要Learner介入工作来对齐数据了。Learner通过其他机器拉取到当前实例的chosen value，从而跳转到下一个编号的实例，如此反复最终将自己的实例编号更新到与其他机器一致。那么这里学习一个实例的网络延时代价是一个RTT。可能这个延迟看起来还不错，但是当新的数据仍然通过一个RTT的代价不断写入的时候，而落后的机器仍然以一个RTT来进行学习，这样会出现很难追上的情况。
 >
->这里需要改进，我们可以提前获取差距，批量打包进行学习。比如A机器Learner记录当前实例编号是 x， B机器是y， 而 x<y， 那么B机器通过通信获取这个差距，将(x,y]的choosen value一起打包发送给A机器， A机器进行批量的学习。这是一个很不错的方法。
+>这里需要改进，我们可以提前获取差距，批量打包进行学习。比如A机器Learner记录当前实例编号是 x， B机器是y， 而 x<y， 那么B机器通过通信获取这个差距，将[x,y]的choosen value一起打包发送给A机器， A机器进行批量的学习。这是一个很不错的方法。
 >
 >但仍然不够快，当落后的数据极大，B机器发送数据需要的网络耗时也将变大，那么发送数据的过程中，A机器处于一种空闲状态，由于paxos另外一个瓶颈在于写盘，如果不能利用这段时间来进行写盘，那性能仍然堪忧。我们参考流式传输，采用类似的方法实现Learner的边发边学，B机器源源不断的往A机器输送数据，而A机器只需要收到一个实例最小单元的包体，即可立即解开进行学习并完成写盘。
 >
 >具体的实现大概是先进行一对一的协商，建立一个Session通道，在Session通道里直接采用直塞的方式无脑发送数据。当然也不是完全无脑，Session通过心跳机制进行维护，一旦Session断开即停止发送。
 
+我们参考流式传输，采用类似的方法实现Learner的边发边学，B机器源源不断的往A机器输送数据，而A机器只需要收到一个实例最小单元的包体，即可立即解开进行学习并完成写盘。这部分实际上封装在网络层，来看如何做到A机器接收到一个最小的示例单元：
+{% highlight string %}
+int MessageEvent :: OnRead()
+{
+    if (m_iLeftReadLen > 0)
+    {
+        return ReadLeft();
+    }
+    
+    int iReadLen = m_oSocket.receive(m_sReadHeadBuffer + m_iLastReadHeadPos, sizeof(int) - m_iLastReadHeadPos);
+    if (iReadLen == 0)
+    {
+        BP->GetNetworkBP()->TcpOnReadMessageLenError();
+           PLErr("read head fail, readlen %d, socket broken", iReadLen);
+        return -1;
+    }
 
+    m_iLastReadHeadPos += iReadLen;
+    if (m_iLastReadHeadPos < (int)sizeof(int))
+    {
+        PLImp("head read pos %d small than sizeof(int) %zu", m_iLastReadHeadPos, sizeof(int));
+        return 0;
+    }
+    
+    m_iLastReadHeadPos = 0;
+    int niLen = 0;
+    int iLen = 0;
+    memcpy((char *)&niLen, m_sReadHeadBuffer, sizeof(int));
+    iLen = ntohl(niLen) - 4;
+    
+    if (iLen < 0 || iLen > MAX_VALUE_SIZE)
+    {
+        PLErr("need to read len wrong %d", iLen);
+        return -2; 
+    }
+
+    m_oReadCacheBuffer.Ready(iLen);
+
+    m_iLeftReadLen = iLen;
+    m_iLastReadPos = 0;
+    
+    //second read maybe no data read, so readlen == 0 is ok.
+    bool bAgain = false;
+    iReadLen = m_oSocket.receive(m_oReadCacheBuffer.GetPtr(), iLen, &bAgain);
+    if (iReadLen == 0)
+    {
+        if (!bAgain)
+        {
+            PLErr("second read data fail, readlen %d, no again, socket broken", iReadLen);
+            return -1;
+        }
+        else
+        {
+            PLErr("second read data, readlen %d need again", iReadLen);
+            return 0;
+        }
+    }
+
+    if (iReadLen == iLen)
+    {
+        ReadDone(m_oReadCacheBuffer, iLen);
+        m_iLeftReadLen = 0;
+        m_iLastReadPos = 0;
+    }
+    else if (iReadLen < iLen)
+    {
+        m_iLastReadPos = iReadLen;
+        m_iLeftReadLen = iLen - iReadLen;
+
+        PLImp("read buflen %d small than except len %d", iReadLen, iLen);
+    }
+    else
+    {
+        PLErr("read buflen %d large than except len %d", iReadLen, iLen);
+        return -2;
+    }
+
+    return 0;
+}
+{% endhighlight %}
+Learner发送过来的数据包格式如下：
+<pre>
+|------------------------------------------------
+|  Packet_length   |         Packet             |
+|     4Byte        |                            |
+-------------------------------------------------     
+</pre>
+其中```Packet_length```包括其本身占用的4个字节，因此实际的Packet占用的字节数为(Packet_length - 4)。
+
+OnRead()函数由以下两部分组成：
+
+* 首先读取数据包大小，这个过程可能需要分多次完成；
+
+* 读取指定数据包大小的数据，这部分也可能需要分多次完成；
+
+当单个数据包读完，已获得完整的```“最小实例单元”```，通过ReadDone()将数据包发往Node节点进行处理。
+
+至于心跳，其实就是PhxPaxos中的ACK机制。在LearnerSender :: SendLearnedValue()中，每发送一条记录需要执行一次CheckAck。如果检查失败，将终止发送。每条记录发送后，LearnerSender要求对端发送一个异步的ack响应，这个过程是异步的。CheckAck()的逻辑如下：
+{% highlight string %}
+const bool LearnerSender :: CheckAck(const uint64_t llSendInstanceID)
+{
+    m_oLock.Lock();
+
+    if (llSendInstanceID < m_llAckInstanceID)
+    {
+        m_iAckLead = LearnerSender_ACK_LEAD;
+        PLGImp("Already catch up, ack instanceid %lu now send instanceid %lu", 
+                m_llAckInstanceID, llSendInstanceID);
+        m_oLock.UnLock();
+        return false;
+    }
+
+    while (llSendInstanceID > m_llAckInstanceID + m_iAckLead)
+    {
+        uint64_t llNowTime = Time::GetSteadyClockMS();
+        uint64_t llPassTime = llNowTime > m_llAbsLastAckTime ? llNowTime - m_llAbsLastAckTime : 0;
+
+        if ((int)llPassTime >= LearnerSender_ACK_TIMEOUT)
+        {
+            BP->GetLearnerBP()->SenderAckTimeout();
+            PLGErr("Ack timeout, last acktime %lu now send instanceid %lu", 
+                    m_llAbsLastAckTime, llSendInstanceID);
+            CutAckLead();
+            m_oLock.UnLock();
+            return false;
+        }
+
+        BP->GetLearnerBP()->SenderAckDelay();
+        //PLGErr("Need sleep to slow down send speed, sendinstaceid %lu ackinstanceid %lu",
+                //llSendInstanceID, m_llAckInstanceID);
+        
+        m_oLock.WaitTime(20);
+    }
+
+    m_oLock.UnLock();
+
+    return true;
+}
+{% endhighlight %}
+
+1) 若当前发送的instanceID已经小于ACK的instanceID，则直接返回false，表明不需要再继续发送了
+
+2） 若当前已经有比较多的instanceID未被确认，则循环等待一段时间，等待ACK的到达
+
+## 5. 关于选中(chosen)
+在整个讲解learner中，我们一直在强调```选中（chosen)提案```或```选中(chosen)值```。这个过程提出以下疑问，并尝试解答：
+
+1） *问： learner如何知道某个提案被选中呢？*
+
+答： 本文第2节的```选中(chosen)通知```是通知各个learner值是否已被选中的一种常规方式。
+
+2） *问： 如果某个值被选中后，提案发起节点异常，选中消息未发出会如何？*
+
+答： 重新发起选举，新的被选中的提案编号不同，但提案值保持不变。
+
+3） *问： “2 选中通知” 中，只更新了内存状态，在持久化数据中，如何区分一个值的状态时accept还是chosen呢？*
+
+答： 如果当前的instanceID为N，在N-1之前的所有提案值都是chosen的。但instanceID未N的提案值可能是chosen状态，也可能是accept状态。
+
+4） *问： 为何非chosen状态的数据也需要落盘？*
+
+答： 参见P2C的不变性，即Prepare和Accept阶段做过的承诺、接受过的值即便节点重启等异常情况下也需要保持不变。
+
+5) *我还有一个instance类初始化的问题*
+
+答： Instance类本章尚未涉及，我们会留在后面相关章节进行解答。
+
+## 6. Learner运行流程
 
 <br />
 <br />
