@@ -1,6 +1,6 @@
 ---
 layout: post
-title: phxpaxos源码分析： Proposer与Accepter
+title: phxpaxos源码分析： Learner
 tags:
 - paxos
 categories: paxos
@@ -211,6 +211,18 @@ void Learner :: OnAskforLearn(const PaxosMsg & oPaxosMsg)
     SendNowInstanceID(oPaxosMsg.instanceid(), oPaxosMsg.nodeid());
 }
 {% endhighlight %}
+
+## 4. 更快的对齐数据
+下述文字截取自[《微信自研生产级paxos类库PhxPaxos实现原理介绍》](https://mp.weixin.qq.com/s?__biz=MzI4NDMyNTU2Mw==&mid=2247483695&idx=1&sn=91ea422913fc62579e020e941d1d059e&scene=21#wechat_redirect)：
+>上文说到当各台机器的当前运行实例编号不一致的时候，就需要Learner介入工作来对齐数据了。Learner通过其他机器拉取到当前实例的chosen value，从而跳转到下一个编号的实例，如此反复最终将自己的实例编号更新到与其他机器一致。那么这里学习一个实例的网络延时代价是一个RTT。可能这个延迟看起来还不错，但是当新的数据仍然通过一个RTT的代价不断写入的时候，而落后的机器仍然以一个RTT来进行学习，这样会出现很难追上的情况。
+>
+>这里需要改进，我们可以提前获取差距，批量打包进行学习。比如A机器Learner记录当前实例编号是 x， B机器是y， 而 x<y， 那么B机器通过通信获取这个差距，将(x,y]的choosen value一起打包发送给A机器， A机器进行批量的学习。这是一个很不错的方法。
+>
+>但仍然不够快，当落后的数据极大，B机器发送数据需要的网络耗时也将变大，那么发送数据的过程中，A机器处于一种空闲状态，由于paxos另外一个瓶颈在于写盘，如果不能利用这段时间来进行写盘，那性能仍然堪忧。我们参考流式传输，采用类似的方法实现Learner的边发边学，B机器源源不断的往A机器输送数据，而A机器只需要收到一个实例最小单元的包体，即可立即解开进行学习并完成写盘。
+>
+>具体的实现大概是先进行一对一的协商，建立一个Session通道，在Session通道里直接采用直塞的方式无脑发送数据。当然也不是完全无脑，Session通过心跳机制进行维护，一旦Session断开即停止发送。
+
+
 
 <br />
 <br />

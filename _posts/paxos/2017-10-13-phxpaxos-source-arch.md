@@ -132,7 +132,19 @@ meta文件： 其作为vfile文件夹下的一个元数据文件。因为vfile�
 | (4 bytes)     |    (8 bytes)    |                  |
 |-----------------------------------------------------
 {% endhighlight %}
-其中Length字段保存的是InstanceID与message的总长度，即8+length(message)。
+其中Length字段保存的是InstanceID与message的总长度，即8+length(message)。上面message消息格式如下：
+{% highlight string %}
+message AcceptorStateData
+{
+	required uint64 InstanceID = 1;
+	required uint64 PromiseID = 2;
+	required uint64 PromiseNodeID = 3;
+	required uint64 AcceptedID = 4;
+	required uint64 AcceptedNodeID = 5;
+	required bytes AcceptedValue = 6;
+	required uint32 Checksum = 7;
+}
+{% endhighlight %}
 
 
 
