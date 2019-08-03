@@ -418,6 +418,9 @@ const bool LearnerSender :: CheckAck(const uint64_t llSendInstanceID)
 答： Instance类本章尚未涉及，我们会留在后面相关章节进行解答。
 
 ## 6. Learner运行流程
+PhxPaxos中Learner的整体运行流程如下：
+
+
 
 <br />
 <br />
