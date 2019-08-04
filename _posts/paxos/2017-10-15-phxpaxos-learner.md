@@ -420,6 +420,10 @@ const bool LearnerSender :: CheckAck(const uint64_t llSendInstanceID)
 ## 6. Learner运行流程
 PhxPaxos中Learner的整体运行流程如下：
 
+## 7. 总结
+经过前面的讲解(Proposer、Acceptor、Learner)，paxos协议的算法实现已经分析完成。Phxpaxos并未对paxos做任何变种，甚至还做了一点简化。
+
+下一节，我们将介绍paxos made simple中另一个重要概念：状态机。当然，这里提到的```简化```也会提及。
 
 
 <br />
@@ -431,6 +435,8 @@ PhxPaxos中Learner的整体运行流程如下：
 2. [PhxPaxos源码解析（1）之概述篇](https://blog.csdn.net/weixin_41713182/article/details/88147487)
 
 3. [PhxPaxos源码分析之Proposer、Acceptor](https://www.jianshu.com/p/2a78c6215e6d)
+
+4. [一致性协议](https://www.jianshu.com/p/0b475b430abe?utm_campaign=maleskine&utm_content=note&utm_medium=seo_notes&utm_source=recommendation)
 
 <br />
 <br />
