@@ -41,7 +41,9 @@ Checkpoint机制相关类图如下：
 
 ![paxos-checkpoint](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_checkpoint.jpg)
 
+参照上一节讲的功能及类图补充说明如下：
 
+* **Replayer**： replay线程。当业务状态机已经消费指定paxos log后，交由Checkpoint重新执行。由Checkpoint relay的数据允许被删除
 
 
 
