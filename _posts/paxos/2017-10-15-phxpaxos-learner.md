@@ -420,6 +420,11 @@ const bool LearnerSender :: CheckAck(const uint64_t llSendInstanceID)
 ## 6. Learner运行流程
 PhxPaxos中Learner的整体运行流程如下：
 
+![paxos-learner](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_learner.jpg)
+
+
+
+
 ## 7. 总结
 经过前面的讲解(Proposer、Acceptor、Learner)，paxos协议的算法实现已经分析完成。Phxpaxos并未对paxos做任何变种，甚至还做了一点简化。
 
