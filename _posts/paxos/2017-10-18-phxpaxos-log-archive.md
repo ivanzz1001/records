@@ -45,6 +45,138 @@ Checkpoint机制相关类图如下：
 
 * **Replayer**： replay线程。当业务状态机已经消费指定paxos log后，交由Checkpoint重新执行。由Checkpoint relay的数据允许被删除
 
+* **Cleaner**: paxos log清理线程，根据配置的保留条数等清理paxos log
+
+* **CheckpointSender**: 归档数据发送线程。将归档数据发往其他节点，用于归档数据同步。
+
+* **CheckpointReceiver**： 归档数据接收器。接收其他节点发送过来的归档数据。通常归档数据接收完成之后，就会调用*Learner::OnSendCheckpoint_End()*，之后要求我们LoadCheckpointState()
+
+* **CheckpointMgr**： Checkpoint机制管理器，统一管理整个归档机制。
+
+## 3. 状态机(StateMachine)
+
+再来看StateMachine接口，这次我们重点关注Checkpoint相关接口：
+{% highlight string %}
+class StateMachine
+{
+public:
+
+    virtual const uint64_t GetCheckpointInstanceID(const int iGroupIdx) const;
+
+    virtual int LockCheckpointState();
+    virtual int GetCheckpointState(const int iGroupIdx, std::string& sDirPath,
+                                   std::vector<std::string>& vecFileList);
+    virtual void UnLockCheckpointState();
+    virtual int LoadCheckpointState(const int iGroupIdx, const std::string& sCheckpointTmpFileDirPath,
+                                    const std::vector<std::string>& vecFileList, const uint64_t llCheckpointInstanceID);
+
+    virtual bool ExecuteForCheckpoint(const int iGroupIdx, const uint64_t llInstanceID,
+                                      const std::string& sPaxosValue);
+};
+{% endhighlight %}
+接口说明如下：
+
+* GetCheckpointInstanceID(): Checkpoint所指向的最大InstanceID，在此之前的paxos log数据状态机已经不需要了。但通常为了其他节点的数据对齐需要，我们仍然会保留其之前的SetHoldPaxosLogCount()个paxos log
+
+* LockCheckpointState(): 用于开发者锁定状态机Checkpoint数据，这个锁定的意思是指这份数据文件不能被修改、移动和删除。因为接下来PhxPaxos就要将这些文件发送给其他节点，而如果这个过程中出现了修改，则发送的数据可能乱掉。
+
+* GetCheckpointState(): PhxPaxos获取Checkpoint文件列表，从而将文件发送给其他节点
+
+* UnLockCheckpointState(): 当PhxPaxos发送Checkpoint数据到其他节点后，会调用解锁函数，解除对开发者的状态机Checkpoint数据的锁定
+
+* LoadCheckpointState(): 当一个节点获得来自其他节点的Checkpoint数据时，会调用这个函数，将这份数据交由开发者进行处理（开发者往往要做的事情就是将这份Checkpoint数据覆盖当前节点的数据），当调用此函数完成后，PhxPaxos将会进行进程自杀操作，通过重启来完成一个新Checkpoint数据的启动。
+
+* ExecuteForCheckpoint(): paxos log归档的replay接口
+
+## 4. Replayer
+Replayer是一个独立的线程，负责将选中的提案值Checkpoint操作。实现逻辑非常简单，读取本机的Checkpoint InstanceID，定时和*Max Chosen InstanceID*比较，如果Checkpoint落后于*Max Chosen InstanceID*，则通过调用状态机的*ExecuteForCheckpoint()*进行重演:
+{% highlight string %}
+void Replayer :: run()
+{
+    PLGHead("Checkpoint.Replayer [START]");
+    uint64_t llInstanceID = m_poSMFac->GetCheckpointInstanceID(m_poConfig->GetMyGroupIdx()) + 1;
+
+    while (true)
+    {
+        if (m_bIsEnd)
+        {
+            PLGHead("Checkpoint.Replayer [END]");
+            return;
+        }
+
+        if (!m_bCanrun)
+        {
+            //PLGImp("Pausing, sleep");
+            m_bIsPaused = true;
+            Time::MsSleep(1000);
+            continue;
+        }
+        //本节点的所有提案值已全部重演
+        if (llInstanceID >= m_poCheckpointMgr->GetMaxChosenInstanceID())
+        {
+            //PLGImp("now maxchosen instanceid %lu small than excute instanceid %lu, wait",
+            //m_poCheckpointMgr->GetMaxChosenInstanceID(), llInstanceID);
+            Time::MsSleep(1000);
+            continue;
+        }
+        //重演
+        bool bPlayRet = PlayOne(llInstanceID);
+
+        if (bPlayRet)
+        {
+            PLGImp("Play one done, instanceid %lu", llInstanceID);
+            llInstanceID++;
+        }
+        else
+        {
+            PLGErr("Play one fail, instanceid %lu", llInstanceID);
+            Time::MsSleep(500);
+        }
+    }
+}
+{% endhighlight %}
+PlayOne()的实现逻辑如下：
+{% highlight string %}
+bool Replayer :: PlayOne(const uint64_t llInstanceID)
+{
+    //读取数据库中的paxos log
+    AcceptorStateData oState;
+    int ret = m_oPaxosLog.ReadState(m_poConfig->GetMyGroupIdx(), llInstanceID, oState);
+
+    if (ret != 0)
+    {
+        return false;
+    }
+    //调用状态机的ExecuteForCheckpoint
+    bool bExecuteRet = m_poSMFac->ExecuteForCheckpoint(
+                           m_poConfig->GetMyGroupIdx(), llInstanceID, oState.acceptedvalue());
+
+    if (!bExecuteRet)
+    {
+        PLGErr("Checkpoint sm excute fail, instanceid %lu", llInstanceID);
+    }
+
+    return bExecuteRet;
+}
+{% endhighlight %}
+
+## 5. Paxos Log清理(Cleaner)
+在PhxPaxos中，每个Group启动一个Cleaner线程清理本Group的paxos log。在Group中，instanceID是不断递增的，每个instanceID对应一个paxos log，当加入Checkpoint之后，我们有三个关键的instanceID:
+
+* **min Chosen InstanceID**： 本节点，选定提案的最小instanceID，即最老的paxos log所对应的instanceID
+
+* **Checkpoint instanceID**: 本节点，Checkpoint确定的最大instanceID，即在这之前的paxos log数据Checkpoint都已经不需要了。
+
+* **max Chosen InstanceID**: 本节点，选定提案的最大instanceID，即最新的paxos log所对应的instanceID
+
+>注意: 这里强调的是*本节点*， 不同节点数据可能不同
+
+除此之外，还有一个配置： Node::SetHoldPaxosLogCount()控制需要保留多少在StateMachine::GetCheckpointInstanceID()之前的PaxosLog。保留一定数量的PaxosLog的目的在于，如果其他节点数据不对齐，可以通过保留的这部分paxos log完成对齐，而不需要checkpoint数据介入。
+
+正常情况下，三者关系如下：
+
+![paxos-instance-id](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_instance_id.jpg)
+
 
 
 <br />

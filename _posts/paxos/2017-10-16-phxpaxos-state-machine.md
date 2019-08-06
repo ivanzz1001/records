@@ -338,7 +338,7 @@ int SystemVSM :: UpdateSystemVariables(const SystemVariables& oVariables)
 >
 >**在已有集群删除机器**
 >
->*在任意一个已有的成员节点中调用Node::RemoveMember()
+>* 在任意一个已有的成员节点中调用Node::RemoveMember()
 >
 >如果所有节点都希望立即获得这个成员变更操作的通知，可通过options.h设置Options::pMembershipChangeCallback回调函数
 
