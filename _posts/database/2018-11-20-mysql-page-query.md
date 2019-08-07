@@ -253,6 +253,9 @@ SQL代码2：平均用时0.6秒 SELECT * FROM `cdb_posts` WHERE pid >= (SELECT p
 
 为了保证index索引列连续，可以为每个表加一个自增字段，并且加上索引。
 
+## 3. mysql orderby limit翻页数据重复的问题
+
+
 
 <br />
 <br />
@@ -266,6 +269,8 @@ SQL代码2：平均用时0.6秒 SELECT * FROM `cdb_posts` WHERE pid >= (SELECT p
 3. [MySQL order by limit 分页数据重复问题](https://www.jianshu.com/p/544c319fd838)
 
 3. [InnoDB索引](https://www.cnblogs.com/cjsblog/p/8447325.html)
+
+4. [mysql orderby limit 翻页数据重复的问题](https://www.cnblogs.com/wuwenshuai/p/7158389.html)
 
 <br />
 <br />
