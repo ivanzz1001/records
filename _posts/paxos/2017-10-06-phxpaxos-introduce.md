@@ -136,7 +136,7 @@ Proposer只需要与多数派的Acceptor交互，即可完成一个值的确定�
 
 下图例子是一个工程上比较常规的实现方式：
 
-![paxos-product](https://ivanzz1001.github.io/records/assets/img/paxos_product.png)
+![paxos-product](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_product.png)
 这里提出一个新的概念，这里三台机器，每台机器运行着相同的实例```i```，实例里整合了Acceptor、Proposer、Learner、State Machine四个角色，三台机器的相同编号实例共同构成了一个paxos group的概念，一个请求只需要灌进paxos group里面就可以了。根据paxos的特点，paxos group可以将这个请求随意写往任意一个Proposer，由Proposer来进行提交。paxos group是一个虚设的概念，只是为了方便解释，事实上是请求随意丢到三台机器任意一个Proposer就可以了。
 
 那么具体这四个角色是如何工作的呢？首先，由于Acceptor和Proposer在同一个进程里面，那么保证他们处于同一个实例是很简单的事情； 其次，当一个值被确认之后，也可以很方便的传送给State Machine去进行状态转移； 最后，当出现状态异常，实例落后或者收不到其他机器的回应，剩下的事情就交给Learner去解决。就这样一整合，一下事情就变得简单了。
@@ -169,7 +169,7 @@ Leader就是领导者的意思，顾名思义我们希望有一个Proposer的领
 这里先定义一个名词叫Paxos消息，这里指的是paxos为了去确定一个值，算法运行过程中需要的通信产生的消息。下图通过一个异步消息处理模型去构建一个响应paxos消息系统，从而完成Paxos系统的搭建：
 
 
-![paxos-model](https://ivanzz1001.github.io/records/assets/img/paxos_model.png)
+![paxos-model](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_model.png)
 
 这里分为四个部分：
 
@@ -206,14 +206,14 @@ Leader就是领导者的意思，顾名思义我们希望有一个Proposer的领
 但一台机器搞几十个、几百个端口也是比较龌龊的手法，所以我们在生产级的paxos库上，实现了基于一个network IO搭配多组paxos group的结构：
 
 
-![paxos-group](https://ivanzz1001.github.io/records/assets/img/paxos_group.png)
+![paxos-group](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_group.png)
 
 如上图，每个group里面都有完整的Paxos逻辑，只需要给paxos消息增加一个group的标识，通过network IO的处理，将不同group的消息输送到对应的group里面处理。这样我们一台机器只需要一个私有端口，即可完成多个状态机的并行处理。
 
 至此，我们可以获得一个多个paxos group的系统，完整结构如下：
 
 
-![paxos-multi-group](https://ivanzz1001.github.io/records/assets/img/paxos_multi_group.jpeg)
+![paxos-multi-group](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_multi_group.jpeg)
 
 ###### 更快的对齐数据
 上文说到当各台机器的当前运行实例编号不一致的时候，就需要Learner介入工作来对齐数据了。Learner通过其他机器拉取到当前实例的chosen value，从而跳转到下一个编号的实例。如此反复最终将自己的实例编号更新到与其他机器一致。那么这里学习一个实例的网络延时代价是一个RTT。可能这个延迟看起来还不错，但是当新的数据仍然通过一个RTT的代价不断写入的时候，而落后的机器仍然以一个RTT来进行学习，这样会出现很难追上的情况。
@@ -238,7 +238,7 @@ paxos数据，即通过paxos确认下来的有序的多个值，后面我们称�
 
 一个状态机能构建出一份状态数据，那么搞一个镜像状态机就可以同样构建出一份镜像状态数据了：
 
-![paxos-state](https://ivanzz1001.github.io/records/assets/img/paxos_state.png)
+![paxos-state](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_state.png)
 
 如上图，用两个状态转移完全一致的状态机，分别管理不同的状态数据，通过灌入相同的paxos log，最终出来的状态数据是完全一致的。
 
