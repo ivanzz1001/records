@@ -192,11 +192,93 @@ Paxos算法本身不保证终止性，当出现写冲突时算法可能永远终
 ![paxos-write-fix](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_write_fix.jpeg)
 
 ### 2.3 挑战3： 复杂的现网场景
-###### 机械盘RaidCache
+###### 2.3.1 机械盘RaidCache
 
 RaidCache以电池作为后盾，可以在WriteBack模式下持有待写盘的数据批量写盘，以极大提升机械盘的写盘性能；缺点在于当电池掉电时，为了数据安全必须从WriteBack模式切换到WriteThrough模式，写盘性能急剧下降（真实的机械盘）。磁盘从WB降级为WT是现网运营中常见的问题，通常1~2小时后电池充电完毕即可重回WB模式，我们来看看这1~2小时磁盘退化的影响。
 
-单次磁盘退化导致磁盘写操作耗时和失败率升高，通常情况下，
+单次磁盘退化导致磁盘写操作耗时和失败率升高，通常情况下被Paxos协议本身的多数派所容忍；但是本机作为Proposer主动发起写时，写盘失败带来的就是单次写请求失败，前端会自动跳转对机重试，此时问题来了： 磁盘退化者写失败之前将LogEntry置于Pending，对机重试的最终结果将Pending推成Chosen，但此时requestid表明Chosen值源于磁盘退化者，对机写被抢占，返回最终失败。
+
+简单的说，磁盘退化期间写最终失败较高：通过将requestid前传到对机，让对机用已有的requestid重试可以将写最终失败降低1个数量级。
+
+###### 2.3.2 PLog对齐
+
+当单机包含KW级别的PLog时，保持系统中所有PLog均处于对齐状态就变得很困难；但只有在所有PLog均处于对齐状态时，系统才能保持最大化的可用性。经历一番权衡后，我们的系统中挂载了以下逻辑（按时效性排序）来保证PLog对齐：
+
+* 失败（本地落后）触发异步Catch-up
+
+* 三级超时队列： 如果LogEntry超时后依旧处于Pending状态，就触发协议写重试；
+
+* 全量数据校验： 校验数据一致性的同时也触发PLog对齐
+
+###### 2.3.3 LearnerOnly模式
+机器重启后发现文件丢失，数据被回退了怎么办？Paxos协议保证了觉大部分情况下强一致性和可用性，但不是全部。
+
+某LogEntry承诺机器A的Paxos请求后，因为数据回退状态清空，重新上线后承诺机器B的Paxos请求，但是前后两次承诺相互矛盾，从而导致数据不一致。
+
+上述描述的是拜占庭失败导致的数据不一致，这种失败违反了Paxos协议的假设前提；但现网运营中确实又需要处理这种情况，从而有了LearnerOnly模式的引入。
+
+* LearnerOnly模式下，本机只接收Chosen后的LogEntry，不参与Paxos协议写，也就不会违背任何承诺；
+
+* 三级超时队列，使得LogEntry尽快走向Chosen
+
+* 异步Catch-Up和全量数据校验使得系统PLog较快对齐
+
+假设进入LearnerOnly模式2小时后，系统中旧LogEntry处于Pending状态的可能性可以忽略不计，那么该机可以解除LearnerOnly模式。
+
+## 3. 成果
+除了上文描述的优化外，我们还定制了一套本地迁移的方案用于新旧架构的平滑切换，由于篇幅限制，在此就不一一展开了。最终我们实现了千台机器安全无故障的从QuorumKV架构切换到新架构，下面同步下新架构的性能数据和容灾能力。
+
+### 3.1 性能数据
+压力测试条件： Value约120B，读写3.3:1
+
+压力测试机型： 64GB内存，机械盘
+
+```表13``` 新旧架构性能对比 
+
+![paxos-store-cmp](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_store_cmp.jpg)
+
+```图14``` 新旧架构平均耗时和最终失败对比
+
+![paxos-time-cmp](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_time_cmp.jpg)
+
+具体数据如```表13```所示，可以看出在请求量相当的条件下，新架构在平均耗时和最终失败上都优于旧架构；并且新架构只需要6台机器。
+
+>备注： 新架构部署上少了3台机器，带来单机约50%的内存和磁盘增长（容纳3份数据）
+
+### 3.2 系统可用性
+1) **实例1： 网络故障期间可用性对比**
+
+```图15``` 网络故障期间 PaxosStore内存云首次访问失败率监控曲线
+
+![paxos-store-bad](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_store_bad.jpg)
+
+```图16``` 网络故障期间QuorumKV内存云首次访问失败率监控曲线
+
+![paxos-store-fail](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_store_fail.jpg)
+
+某次内网故障期间（持续约半小时），PaxosStore内存云展现了卓越的容灾能力： 图15为故障期间PaxosStore内存云的首次访问失败率监控，可以看到失败率是十分平稳的（因为网络故障期间前端请求有所降低，失败率反而小了些）；与之对应QuorumKV内存云则表现不理想。
+
+>备注： 需要强调的是得益于微信后台整体优秀的容灾设计，用户对本次网络故障感知度很低
+
+
+2) **某城市切换架构前后失败率对比**
+
+```图17``` PaxosStore内存云首次访问失败率监控曲线
+
+![paxos-memkv-fail1](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_memkv_fail1.jpg)
+
+```图18``` QuorumKV内存云首次访问失败率监控曲线
+
+![paxos-memkv-fail2](https://ivanzz1001.github.io/records/assets/img/paxos/paxos_memkv_fail2.jpg)
+
+图17和图18分别给出了新旧架构KV首次访问失败率监控曲线（百万分之一），可以看到切换后系统的首次访问成功率从5个9提升至6个9，系统可用性得以增强。
+
+>备注： 此处为极为微观的数据，前端会有简单的重试达到100%成功
+
+## 4. 小结
+全新的内存云存储，通过精简的PLog As DB、分布式强一致性读写协议等一连串优化，在性能上得到显著提升；结合DirectIO存储系统，PLog全量对齐等，系统首次访问失败率指标下降一个量级。
+
+PaxosStore是微信内部一次大规模paxos工程改造实践，创新地实现了非租约Paxos架构。
 
 
 <br />
