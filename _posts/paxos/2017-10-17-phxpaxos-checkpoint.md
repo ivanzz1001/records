@@ -1,6 +1,6 @@
 ---
 layout: post
-title: phxpaxos: 状态机Checkpoint详解
+title: phxpaxos状态机Checkpoint详解
 tags:
 - paxos
 categories: paxos
