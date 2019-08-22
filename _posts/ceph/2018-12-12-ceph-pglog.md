@@ -83,6 +83,8 @@ Ceph在进行故障恢复的时候会经过Peering的过程。简要来说，pee
 
 2. [ceph RGW类流程图](https://blog.csdn.net/ysr1990813/article/details/84142039)
 
+3. [分布式存储Ceph之PG状态详解](https://blog.didiyun.com/index.php/2018/11/08/didiyun-ceph-pg/)
+
 <br />
 <br />
 <br />
