@@ -81,6 +81,8 @@ Ceph在进行故障恢复的时候会经过Peering的过程。简要来说，pee
 
 1. [基于pglog的Ceph一致性存储问题](http://udn.yyuap.com/thread-103051-1-1.html)
 
+2. [ceph RGW类流程图](https://blog.csdn.net/ysr1990813/article/details/84142039)
+
 <br />
 <br />
 <br />
