@@ -107,6 +107,16 @@ go-mysql-elasticsearch
 
 ## 2. go-mysql-elasticsearch注意事项
 
+在使用go-mysql-elasticsearch时需要注意如下一些事项：
+
+* 所支持的MySQL版本小于8.0
+
+* 所支持的ES版本小于6.0
+
+* mysql binlog的格式必须为row格式
+
+* MySQL binlog_row_image必须为```FULL```格式，假如使用```MINIMAL```或```noblob```的话，则在更新主键数据时有可能会造成一些字段的丢失。
+
 
 ## 3. go-mysql-elasticsearch配置文件
 
@@ -121,6 +131,10 @@ go-mysql-elasticsearch
 2. [Git go-mysql-elasticsearch](https://github.com/siddontang/go-mysql-elasticsearch)
 
 3. [Go1.1.1新功能module的介绍及使用](https://blog.csdn.net/benben_2015/article/details/82227338)
+
+4. [安全考虑，binlog_row_image建议尽量使用FULL](https://blog.csdn.net/actiontech/article/details/81701362)
+
+5. [MySQL 5.7贴心参数之binlog_row_image](https://www.cnblogs.com/gomysql/p/6155160.html)
 
 <br />
 <br />
