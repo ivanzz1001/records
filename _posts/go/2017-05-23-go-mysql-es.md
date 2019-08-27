@@ -115,10 +115,182 @@ go-mysql-elasticsearch
 
 * mysql binlog的格式必须为row格式
 
-* MySQL binlog_row_image必须为```FULL```格式，假如使用```MINIMAL```或```noblob```的话，则在更新主键数据时有可能会造成一些字段的丢失。
+* MySQL binlog_row_image必须为```FULL```格式，假如使用```MINIMAL```或```noblob```的话，则在更新主键数据时有可能会造成一些字段的丢失。MariaDB只支持full row image格式。
+
+* 在运行过程中修改表结构
+
+* 需要同步的MySQL表要有主键(Primary Key)，当前已经支持了复合主键。例如，主键是(a,b)，那么我们将会使用```a:b```来作为key。主键数据将会作为Es中的'id'。
+
+* 首先需要在Es中创建好相应的关联映射，因为通常默认的映射将不能够实现精确的查找
+
+* mysqldump必须与go-mysql-elasticsearch运行在同一个节点。假如没有mysqldump的话，则go-mysql-elasticsearch将只会尝试同步binlog，而不会原来的初始数据
+
+* 通常不建议再一个SQL语句中改变太多的行
 
 
 ## 3. go-mysql-elasticsearch配置文件
+
+在具体介绍介绍配置文件(.toml)之前，我们先看看go-mysql-elasticsearch中自带的示例配置etc/river.toml:
+{% highlight string %}
+# MySQL address, user and password
+# user must have replication privilege in MySQL.
+my_addr = "127.0.0.1:3306"
+my_user = "root"
+my_pass = ""
+my_charset = "utf8"
+
+# Set true when elasticsearch use https
+#es_https = false
+# Elasticsearch address
+es_addr = "127.0.0.1:9200"
+# Elasticsearch user and password, maybe set by shield, nginx, or x-pack
+es_user = ""
+es_pass = ""
+
+# Path to store data, like master.info, if not set or empty,
+# we must use this to support breakpoint resume syncing. 
+# TODO: support other storage, like etcd. 
+data_dir = "./var"
+
+# Inner Http status address
+stat_addr = "127.0.0.1:12800"
+
+# pseudo server id like a slave 
+server_id = 1001
+
+# mysql or mariadb
+flavor = "mysql"
+
+# mysqldump execution path
+# if not set or empty, ignore mysqldump.
+mysqldump = "mysqldump"
+
+# if we have no privilege to use mysqldump with --master-data,
+# we must skip it.
+#skip_master_data = false
+
+# minimal items to be inserted in one bulk
+bulk_size = 128
+
+# force flush the pending requests if we don't have enough items >= bulk_size
+flush_bulk_time = "200ms"
+
+# Ignore table without primary key
+skip_no_pk_table = false
+
+# MySQL data source
+[[source]]
+schema = "test"
+
+# Only below tables will be synced into Elasticsearch.
+# "t_[0-9]{4}" is a wildcard table format, you can use it if you have many sub tables, like table_0000 - table_1023
+# I don't think it is necessary to sync all tables in a database.
+tables = ["t", "t_[0-9]{4}", "tfield", "tfilter"]
+
+# Below is for special rule mapping
+
+# Very simple example
+# 
+# desc t;
+# +-------+--------------+------+-----+---------+-------+
+# | Field | Type         | Null | Key | Default | Extra |
+# +-------+--------------+------+-----+---------+-------+
+# | id    | int(11)      | NO   | PRI | NULL    |       |
+# | name  | varchar(256) | YES  |     | NULL    |       |
+# +-------+--------------+------+-----+---------+-------+
+# 
+# The table `t` will be synced to ES index `test` and type `t`.
+[[rule]]
+schema = "test"
+table = "t"
+index = "test"
+type = "t"
+
+# Wildcard table rule, the wildcard table must be in source tables 
+# All tables which match the wildcard format will be synced to ES index `test` and type `t`.
+# In this example, all tables must have same schema with above table `t`;
+[[rule]]
+schema = "test"
+table = "t_[0-9]{4}"
+index = "test"
+type = "t"
+
+# Simple field rule 
+#
+# desc tfield;
+# +----------+--------------+------+-----+---------+-------+
+# | Field    | Type         | Null | Key | Default | Extra |
+# +----------+--------------+------+-----+---------+-------+
+# | id       | int(11)      | NO   | PRI | NULL    |       |
+# | tags     | varchar(256) | YES  |     | NULL    |       |
+# | keywords | varchar(256) | YES  |     | NULL    |       |
+# +----------+--------------+------+-----+---------+-------+
+#
+[[rule]]
+schema = "test"
+table = "tfield"
+index = "test"
+type = "tfield"
+
+[rule.field]
+# Map column `id` to ES field `es_id`
+id="es_id"
+# Map column `tags` to ES field `es_tags` with array type 
+tags="es_tags,list"
+# Map column `keywords` to ES with array type
+keywords=",list"
+
+# Filter rule 
+#
+# desc tfilter;
+# +-------+--------------+------+-----+---------+-------+
+# | Field | Type         | Null | Key | Default | Extra |
+# +-------+--------------+------+-----+---------+-------+
+# | id    | int(11)      | NO   | PRI | NULL    |       |
+# | c1    | int(11)      | YES  |     | 0       |       |
+# | c2    | int(11)      | YES  |     | 0       |       |
+# | name  | varchar(256) | YES  |     | NULL    |       |
+# +-------+--------------+------+-----+---------+-------+
+#
+[[rule]]
+schema = "test"
+table = "tfilter"
+index = "test"
+type = "tfilter"
+
+# Only sync following columns
+filter = ["id", "name"]
+
+# id rule
+#
+# desc tid_[0-9]{4};
+# +----------+--------------+------+-----+---------+-------+
+# | Field    | Type         | Null | Key | Default | Extra |
+# +----------+--------------+------+-----+---------+-------+
+# | id       | int(11)      | NO   | PRI | NULL    |       |
+# | tag      | varchar(256) | YES  |     | NULL    |       |
+# | desc     | varchar(256) | YES  |     | NULL    |       |
+# +----------+--------------+------+-----+---------+-------+
+#
+[[rule]]
+schema = "test"
+table = "tid_[0-9]{4}"
+index = "test"
+type = "t"
+# The es doc's id will be `id`:`tag`
+# It is useful for merge muliple table into one type while theses tables have same PK 
+id = ["id", "tag"]
+{% endhighlight %}
+通过上面我们看到，基本上可分为```全局```、```[[source]]```、```[[rule]]```三种配置节点。下面我们就分别介绍一下。
+
+### 3.1 全局配置
+
+### 3.2 Source配置
+
+### 3.3 Rule配置
+
+
+
 
 
 
