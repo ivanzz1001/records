@@ -28,7 +28,7 @@ description: mysqlbinlog工具的使用
 
 1. [mysqlbinlog工具的使用](https://blog.csdn.net/u012982280/article/details/81453662)
 
-
+2. [MySQL 5.7贴心参数之binlog_row_image](https://www.cnblogs.com/gomysql/p/6155160.html)
 
 <br />
 <br />
