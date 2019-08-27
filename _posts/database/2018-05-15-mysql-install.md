@@ -151,6 +151,30 @@ Transaction Summary
 ===========================================================================================================================================================================
 Install  1 Package (+3 Dependent packages)
 
+# rpm -qpl ./mysql-community-client-5.7.27-1.el7.x86_64.rpm
+/usr/bin/mysql
+/usr/bin/mysql_config_editor
+/usr/bin/mysqladmin
+/usr/bin/mysqlbinlog
+/usr/bin/mysqlcheck
+/usr/bin/mysqldump
+/usr/bin/mysqlimport
+/usr/bin/mysqlpump
+/usr/bin/mysqlshow
+/usr/bin/mysqlslap
+/usr/share/doc/mysql-community-client-5.7.27
+/usr/share/doc/mysql-community-client-5.7.27/COPYING
+/usr/share/doc/mysql-community-client-5.7.27/README
+/usr/share/man/man1/mysql.1.gz
+/usr/share/man/man1/mysql_config_editor.1.gz
+/usr/share/man/man1/mysqladmin.1.gz
+/usr/share/man/man1/mysqlbinlog.1.gz
+/usr/share/man/man1/mysqlcheck.1.gz
+/usr/share/man/man1/mysqldump.1.gz
+/usr/share/man/man1/mysqlimport.1.gz
+/usr/share/man/man1/mysqlpump.1.gz
+/usr/share/man/man1/mysqlshow.1.gz
+/usr/share/man/man1/mysqlslap.1.gz
 </pre>
 
 接着我们再安装一个mysql客户端开发所用到的lib库：
