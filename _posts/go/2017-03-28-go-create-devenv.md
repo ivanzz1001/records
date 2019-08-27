@@ -77,6 +77,8 @@ api  bin  favicon.ico  lib  pkg  robots.txt  src  test  VERSION
 # ls  /usr/local/go
 api  AUTHORS  bin  CONTRIBUTING.md  CONTRIBUTORS  doc  favicon.ico  lib  LICENSE  misc  PATENTS  pkg  README.md  robots.txt  src  test  VERSION
 # ln -s /usr/local/go/bin/go /usr/bin/go
+# ln -s /usr/local/go/bin/godoc /usr/bin/godoc
+# ln -s /usr/local/go/bin/gofmt /usr/bin/gofmt
 </pre>
 
 
