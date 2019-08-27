@@ -102,7 +102,7 @@ go version go1.8.3 linux/amd64
 
 >注： 如果我们经常需要切换根工作目录，我们其实也可以在对应的目录下创建一个env.cfg文件，然后在我们要切换到对应的根工作目录下时，先执行该根目录下的'source env.cfg'命令。下面给出env.cfg文件的一个示例：
 >
->cat env.cfg 
+># cat env.cfg
 >export GOROOT=/usr/local/go/
 >export GOPATH=/home/work/another-space
 >export GOBIN=/usr/local/go/
