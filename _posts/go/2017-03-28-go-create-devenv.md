@@ -70,6 +70,15 @@ Linux bogon 3.10.0-514.el7.x86_64 #1 SMP Tue Nov 22 16:42:41 UTC 2016 x86_64 x86
 # ls /usr/lib/golang/
 api  bin  favicon.ico  lib  pkg  robots.txt  src  test  VERSION
 </pre>
+或者我们也可以直接到[go官网](https://golang.org/)去翻墙下载，然后直接解压到对应的安装目录即可：
+<pre>
+# wget https://dl.google.com/go/go1.12.9.linux-amd64.tar.gz
+# tar -zxvf go1.12.9.linux-amd64.tar.gz -C /usr/local/
+# ls  /usr/local/go
+api  AUTHORS  bin  CONTRIBUTING.md  CONTRIBUTORS  doc  favicon.ico  lib  LICENSE  misc  PATENTS  pkg  README.md  robots.txt  src  test  VERSION
+# ln -s /usr/local/go/bin/go /usr/bin/go
+</pre>
+
 
 在/etc/profile文件中添加如下：
 <pre>
