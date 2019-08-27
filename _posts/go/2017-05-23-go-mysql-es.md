@@ -285,6 +285,42 @@ id = ["id", "tag"]
 
 ### 3.1 全局配置
 
+全局配置主要有如下配置项：
+
+* my_addr： MySQL地址
+
+* my_user: 连接MySQL的用户，通常要求具有复制(replication)权限
+
+* my_pass: 连接MySQL用户对应的密码
+
+* my_charset: 连接所使用的字符编码
+
+* es_https: 假如elasticsearch使用https的话，请将此选项设置为true
+
+* es_addr: es的地址
+
+* es_user: es对应的用户
+
+* es_pass: es对应用户的密码
+
+* data_dir: 用户存放数据的目录，比如存放master.info信息。我们通常需要使用此目录来保存同步进程，以支持在同步中断后的恢复。
+
+* stat_addr: 内部的http状态地址，我们可以通过此地址来查看当前的同步状态信息
+
+* server_id: 一个pseudo server id
+
+* flavor: 用于指定使用的是mysql还是mariadb数据库
+
+* mysqldump： 用于指定mysqldump的执行路径。假如没有设置，或设置为空，则会忽略mysqldump
+
+* skip_master_data: 假如我们没有权限来使用```mysqldump --master-data```时，我们必须将本选项设置为true，以进行跳过
+
+* bulk_size: 一个bulk可以插入的最少条目数(item)
+
+* flush_bulk_time: 假如当前我们并没有足够条目(item)，则在flush_bulk_time后会强制刷新所挂起的请求
+
+* skip_no_pk_table： 跳过没有主键的数据库表
+
 ### 3.2 Source配置
 
 ### 3.3 Rule配置
