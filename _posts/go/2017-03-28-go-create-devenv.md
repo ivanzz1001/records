@@ -92,13 +92,20 @@ export GOARCH=amd64
 export PATH=$PATH:$GOROOT:$GOBIN
 </pre>
 
-上面我们将/opt/gowork/目录作为我们的根工作目录， 然后我们执行如下命令：
+上面我们将/opt/gowork/目录作为我们的根工作目录（注意： 通常我们会在根目录下创建src目录用于存放我们的项目源代码）， 然后我们执行如下命令：
 <pre>
 # source /etc/profile
 # go version
 # go version
 go version go1.8.3 linux/amd64
 </pre>
+
+>注： 如果我们经常需要切换根工作目录，我们其实也可以在对应的目录下创建一个env.cfg文件，然后在我们要切换到对应的根工作目录下时，先执行该根目录下的'source env.cfg'命令。下面给出env.cfg文件的一个示例：
+>
+>cat env.cfg 
+>export GOROOT=/usr/local/go/
+>export GOPATH=/home/work/another-space
+>export GOBIN=/usr/local/go/
 
 ### 2.2 测试
 我们在```GOPATH```指定的根目录下创建```test```工程:
