@@ -322,13 +322,146 @@ id = ["id", "tag"]
 * skip_no_pk_table： 跳过没有主键的数据库表
 
 ### 3.2 Source配置
+在go-mysql-elasticsearch中，你必须在source节点中配置你需要将哪些数据库表同步到elasticsearch。source配置节点的基本格式如下：
+{% highlight string %}
+[[source]]
+schema = "test"
+tables = ["t1", t2]
+
+[[source]]
+schema = "test_1"
+tables = ["t3", t4]
+{% endhighlight %}
+其中```schema```用于指定数据库名，而```tables```用于指定所要同步的表。
+
+假如你想同步一个数据库中的所有表，那么你可以使用通配符：
+<pre>
+[[source]]
+schema = "test"
+tables = ["*"]
+
+# When using an asterisk, it is not allowed to sync multiple tables
+# tables = ["*", "table"]
+</pre>
+
 
 ### 3.3 Rule配置
+默认情况下，go-mysql-elasticsearch将会使用mysql的表名(table name)来作为es的索引及类型名称，使用mysql数据库表的字段名作为es的字段名。例如，有一个数据库表```blog```，则在ES中默认对应的index及type名都为```blog```，假如数据库表中的一个字段为```title```，则在es中默认对应的字段名也为```title```。
+
+>注意： go-mysql-elasticsearch会使用小写的名称来作为ES的index及type名称。例如，你有一个数据库表，其名称为BLOG，则在es中对应的index及type名为blog
+
+```Rule```可以让你改变这种名称映射规则，rule节点的配置格式如下：
+{% highlight string %}
+[[rule]]
+schema = "test"
+table = "t1"
+index = "t"
+type = "t"
+parent = "parent_id"
+id = ["id"]
+
+    [rule.field]
+    mysql = "title"
+    elastic = "my_title"
+{% endhighlight %}
+在上面的例子中，我们使用新的index及type名称```t```来替换默认的```t1```，使用字段名```my_title```来替换```title```。
+
+###### 3.3.1 Rule字段类型
+为了将mysql中的一列映射成为Es中的另外一种类型，你可以通过如下方式来定义字段类型：
+{% highlight string %}
+[[rule]]
+schema = "test"
+table = "t1"
+index = "t"
+type = "t"
+
+    [rule.field]
+    // This will map column title to elastic search my_title
+    title="my_title"
+
+    // This will map column title to elastic search my_title and use array type
+    title="my_title,list"
+
+    // This will map column title to elastic search title and use array type
+    title=",list"
+
+    // If the created_time field type is "int", and you want to convert it to "date" type in es, you can do it as below
+    created_time=",date"
+{% endhighlight %}
+上面的修正符```list```会把一个类似于```a,b,c```这样的mysql字符串转换成es的数组类型```{"a","b","c"}```，假如在es上你需要通过这些字段来进行过滤(filter)的话，这通常很有用处。
+
+###### 3.3.2 Wildcard table
+因为go-mysql-elasticsearch只允许你设置哪些mysql表需要进行同步，但假如有一个很大的数据库表被拆分成了很多子表的话，例如table_0000,table_0001,...,table_1023，那么如果我们要在一个rule中列出这些表，将会十分困难。
+
+幸运的是go-mysql-elasticsearch支持表通配符：
+{% highlight string %}
+[[source]]
+schema = "test"
+tables = ["test_river_[0-9]{4}"]
+
+[[rule]]
+schema = "test"
+table = "test_river_[0-9]{4}"
+index = "river"
+type = "river"
+{% endhighlight %}
+```test_river_[0-9]{4}```是一个表通配的定义，其代表着*test_river_0000*到*test_river_9999*，同时在```rule```节点设置的table也应该要相同。
+
+在上面的例子中，假如你有1024个子表，则所有的这些子表都会被同步到es的river索引中。
+
+###### 3.3.3 Parent-Child关系
+当前已不使用，这里不做介绍。
+
+###### 3.3.4 Filter fields
+你可以使用filter来指定需要同步哪些字段：
+{% highlight string %}
+[[rule]]
+schema = "test"
+table = "tfilter"
+index = "test"
+type = "tfilter"
+
+# Only sync following columns
+filter = ["id", "name"]
+{% endhighlight %}
+在上面的例子中，我们只会同步MySQL数据库表的```id```和```name```列到Es。
+
+###### 3.3.5 忽略没有主键(PK)的表
+当你同步一个没有主键的table时，你会看到如下错误信息：
+<pre>
+schema.table must have a PK for a column
+</pre>
+你可以在配置文件中类忽略这些表：
+{% highlight string %}
+# Ignore table without a primary key
+skip_no_pk_table = true
+{% endhighlight %}
 
 
+###### 3.3.6 Elasticsearch Pipeline
+你可以使用Ingest Node Pipeline来预处理文档，比如进行Json字符串解码，合并字段（field)等等。
+{% highlight string %}
+[[rule]]
+schema = "test"
+table = "t1"
+index = "t"
+type = "_doc"
 
+# pipeline id
+pipeline = "my-pipeline-id"
+{% endhighlight %}
+注意： 你需要手动创建pipeline，并且Es版本应该>=5.0
 
+## 4. 为什么不使用其他rivers
+尽管也有一些其他的MySQL-Es同步方案，比如elasticsearch-river-jdbc、elasticsearch-river-mysql，但我仍使用Go来开发了go-mysql-elasticsearch，这是为什么？ 
 
+* 定制化： 我想要可以指定哪些表可以进行同步，可以指定index及type的名称，甚至es中field的名称
+
+* 使用binlog来实现增量更新，并且当服务重启的时候可以从上一次同步中断点进行恢复
+
+* 作为一个通用的同步框架，不仅仅适用于MySQL-Elasticsearch之间的同步，稍加修改也可以实现MySQL-Redis、MySQL-Memcached之间的同步
+
+* 支持数据库表通配，我们可能有很多类似于table_0000-table_1023这样的子表，但是共用同一个elasticsearch的index及type
 
 <br />
 <br />
