@@ -477,6 +477,8 @@ pipeline = "my-pipeline-id"
 
 5. [MySQL 5.7贴心参数之binlog_row_image](https://www.cnblogs.com/gomysql/p/6155160.html)
 
+6. [Creating a project with Go modules](http://www.jetbrains.com/help/go/create-a-project-with-vgo-integration.html)
+
 <br />
 <br />
 <br />
