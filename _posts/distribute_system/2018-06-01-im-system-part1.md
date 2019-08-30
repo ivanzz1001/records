@@ -18,7 +18,6 @@ IM作为非常经典的服务器系统，其设计时候的考量具备代表性
 
 ## 1. 整体架构
 
-<<<<<<< HEAD
 ![im-arch](https://ivanzz1001.github.io/records/assets/img/distribute/im/im-arch.png)
 
 以上架构图中，分为几个部分：
