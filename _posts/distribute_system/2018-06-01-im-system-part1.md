@@ -67,7 +67,6 @@ SSO向auth系统返回验证token结果
 
 如果验证成功，auth系统在redis中存储客户端的路由信息，即客户端在哪个gate上登录
 </pre>
-
 6. auth系统向gate返回验证登录结果
 
 7. gate向客户端返回授权结果
