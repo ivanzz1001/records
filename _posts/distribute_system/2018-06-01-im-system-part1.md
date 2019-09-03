@@ -53,22 +53,23 @@ IM作为非常经典的服务器系统，其设计时候的考量具备代表性
 
 ![im-login](https://ivanzz1001.github.io/records/assets/img/distribute/im/im-login.png)
 
-1. 客户端通过统一登录系统验证登录密码等；
+1: 客户端通过统一登录系统验证登录密码等；
 
-2. SSO验证客户端用户名、密码之后，生成登录token并返回给客户端；
+2: SSO验证客户端用户名、密码之后，生成登录token并返回给客户端；
 
-3. 客户端使用UID和返回的token向gate发起授权验证请求；
+3: 客户端使用UID和返回的token向gate发起授权验证请求；
 
-4. gate同步调用logic server的验证接口
+4: gate同步调用logic server的验证接口
 
-5. logic server请求SSO系统验证token合法性:<pre>
+5: logic server请求SSO系统验证token合法性:
+<pre>
 SSO向auth系统返回验证token结果
 
 如果验证成功，auth系统在redis中存储客户端的路由信息，即客户端在哪个gate上登录
 </pre>
-6. auth系统向gate返回验证登录结果
+6: auth系统向gate返回验证登录结果
 
-7. gate向客户端返回授权结果
+7: gate向客户端返回授权结果
 
 
 
