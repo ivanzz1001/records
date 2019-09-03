@@ -61,8 +61,7 @@ IM作为非常经典的服务器系统，其设计时候的考量具备代表性
 
 4. gate同步调用logic server的验证接口
 
-5. logic server请求SSO系统验证token合法性:
-<pre>
+5. logic server请求SSO系统验证token合法性:<pre>
 SSO向auth系统返回验证token结果
 
 如果验证成功，auth系统在redis中存储客户端的路由信息，即客户端在哪个gate上登录
