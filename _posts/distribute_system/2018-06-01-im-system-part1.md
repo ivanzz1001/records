@@ -18,9 +18,7 @@ IM作为非常经典的服务器系统，其设计时候的考量具备代表性
 
 ## 1. 整体架构
 
-![im-arch](https://ivanzz1001.github.io/records/assets/img/distribute/im/im-arch.png)
-
-以上架构图中，分为几个部分：
+整体架构中，分为如下几个部分：
 
 * 客户端： 支持IO、Android系统
 
@@ -29,6 +27,8 @@ IM作为非常经典的服务器系统，其设计时候的考量具备代表性
 * 逻辑层： 负责IM系统中各逻辑功能的实现
 
 * 存储层： 存储IM系统相关的数据，主要包括Redis缓存系统（用于保存用户状态及路由数据）、消息数据
+
+![im-arch](https://ivanzz1001.github.io/records/assets/img/distribute/im/im-arch.png)
 
 上图中几部分的交互如下：
 
@@ -62,10 +62,11 @@ IM作为非常经典的服务器系统，其设计时候的考量具备代表性
 4. gate同步调用logic server的验证接口
 
 5. logic server请求SSO系统验证token合法性:
+<pre>
+SSO向auth系统返回验证token结果
 
-* SSO向auth系统返回验证token结果
-
-* 如果验证成功，auth系统在redis中存储客户端的路由信息，即客户端在哪个gate上登录
+如果验证成功，auth系统在redis中存储客户端的路由信息，即客户端在哪个gate上登录
+</pre>
 
 6. auth系统向gate返回验证登录结果
 
