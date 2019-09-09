@@ -670,6 +670,8 @@ mysql > source /root/CreateDB_app.sql
 
 11. [centos7环境下mysql8.0.13安装、root密码重置及用户远程连接授权](https://blog.csdn.net/jinhaijing/article/details/83349104)
 
+12. [C++连接MySQL数据库](https://www.cnblogs.com/shiyingzhi/p/7896259.html)
+
 <br />
 <br />
 <br />
