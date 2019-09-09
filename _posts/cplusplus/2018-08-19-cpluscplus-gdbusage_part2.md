@@ -160,7 +160,7 @@ Id GId Target Id Frame
 </pre>
 类似于在创建线程时打印出的```[New ...]```这样的消息，```Switching to```后面的消息打印也依赖于你所使用的系统
 
-* **thread apply [thread-id-list | all [-ascending]] command**: 本命令允许你在一个或多个线程上应用指定的```command```。如果要在所有线程上按降序的方式应用某个```command```，那么使用 'thread apply all command'; 如果要在所有线程上按升序的方式应用某个```command```，那么使用'thread apply all -ascending command';
+* thread apply [thread-id-list | all [-ascending]] command: 本命令允许你在一个或多个线程上应用指定的```command```。如果要在所有线程上按降序的方式应用某个```command```，那么使用 'thread apply all command'; 如果要在所有线程上按升序的方式应用某个```command```，那么使用'thread apply all -ascending command';
 
 * **thread name [name]**: 本命令用于为当前线程指定一个名称。假如并未指定参数的话，那么任何已存在的由用户指定的名称都将被移除。命名后线程的名称会出现在```info threads```的显示信息中。
 
