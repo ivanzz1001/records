@@ -672,6 +672,10 @@ mysql > source /root/CreateDB_app.sql
 
 12. [C++连接MySQL数据库](https://www.cnblogs.com/shiyingzhi/p/7896259.html)
 
+13. [mysql windows开发包下载](https://dev.mysql.com/downloads/mysql/)
+
+14. [mysql windows开发包安装实例](https://www.cnblogs.com/rysinal/p/7565259.html)
+
 <br />
 <br />
 <br />
