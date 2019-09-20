@@ -163,6 +163,126 @@ description: IM服务器设计
 典型算法逻辑部分描述IM系统核心组件及其协作关系，结构图如下：
 
 ![52im-logic](https://ivanzz1001.github.io/records/assets/img/distribute/im/52im_logic.jpg)
+客户端从Iplist服务获取接入层IP地址（也可以采用域名的方式解析得到接入层IP地址)，建立与接入层的连接（可能为短连接），从而实现客户端与IM服务器的数据交互；业务线服务器可以通过服务器端API建立与IM服务器的联系，向客户端推送消息；客户端上报到业务服务器的消息，IM服务器会通过mq投递给业务服务器。
+
+以下将对各子业务的工作原理进行逐一介绍。
+
+###### 登录授权(auth)流程原理
+![52im-auth](https://ivanzz1001.github.io/records/assets/img/distribute/im/52im-auth.jpg)
+
+1) 客户端通过统一登陆系统实现登陆，得到token
+
+2） 客户端用uid和token向msg-gate发起授权验证请求
+
+3）msg-gate同步调用msg-logic的验证接口
+
+4) msg-logic请求sso系统验证token的合法性 
+
+5) msg-gate得到登陆结果后，设置session状态，并向客户端返回授权结果
+
+###### 登出(logout)流程原理
+![52im-logout](https://ivanzz1001.github.io/records/assets/img/distribute/im/52im-logout.jpg)
+
+1) 客户端发起logout请求，msg-gate设置对应peer为未登录状态
+
+2) msg-gate给客户端一个ack响应
+
+3） msg-gate通知msg-logic用户登出
+
+###### 踢人(kickout)流程原理
+用户请求授权时，可能在另一个设备（同类型设备）开着软件处于登陆状态，这种情况需要系统将那个设备踢下线，如下图：
+
+![52im-kickout](https://ivanzz1001.github.io/records/assets/img/distribute/im/52im-kickout.jpg)
+
+1) 1~5步，参看Auth流程
+
+2) logic检索Redis，查看是否该用户在其他地方登陆
+
+3） 如果在其他地方登陆，发起kickout命令。（如果没有登陆，整个流程结束）
+
+4) Gate向用户发起kickout请求，并在短时间内（确保客户端收到kickout数据）关闭socket连接
+
+###### 上报(c2s)流程原理
+
+![52im-c2s](https://ivanzz1001.github.io/records/assets/img/distribute/im/52im-c2s.jpg)
+
+1) 客户端向gate发送数据
+
+2） gate回一个ack包，向客户端确认已经收到数据；
+
+3） gate将数据包传递给logic
+
+4） Logic根据数据投递目的地，选择对应的mq队列进行投递
+
+5） 业务服务器得到数据
+
+###### 推送(s2c)流程原理
+
+![52im-s2c](https://ivanzz1001.github.io/records/assets/img/distribute/im/52im-s2c.jpg)
+1) 业务线调用push数据接口sendMsg
+
+2) Logic向redis检索目标用户状态。如果目标用户不在线，丢弃数据（未来可根据业务场景定制化逻辑）；如果用户在线，查询到用户连接的接入层gate
+
+3) Logic向用户所在gate发送数据
+
+4) Gate向用户推送数据。（如果用户不在线，通知logic用户不在线）
+
+5） 客户端收到数据后向gate发送ack反馈
+
+6） gate将ack信息传递给logic层，用于其他可能的逻辑处理（如日志、确认送达等）
+
+###### 单对单聊天(c2c)流程原理
+![52im-c2c](https://ivanzz1001.github.io/records/assets/img/distribute/im/52im-c2c.jpg)
+
+1) App1向gate1发送信息（信息最终要发给App2）
+
+2） Gate1将信息投递给logic
+
+3） Logic收到信息后，将信息进行存储
+
+4） 存储成功后，logic向gate1发送ack
+
+5） Gate1将ack信息发送给App1
+
+6） Logic检索Redis，查找APP2在线状态。如果App2未登录，流程结束
+
+7） 如果App2登录到了gate2，logic将消息发往gate2
+
+8) Gate2将消息发给App2（如果发现App2不在线，丢弃消息即可，这种概率极低，后续离线消息可保证消息不丢）
+
+9） App2向Gate2发送ack
+
+10） Gate2将ack信息发送给logic
+
+11) Logic将消息状态设置为已送达
+
+
+注： 在第6步和第7步之间，启动计时器(DelayedQueue或哈希环，时间如5秒)，计时时间到后，探测该条消息状态，如果消息未送达，考虑通过APNS、米推、个推进行推送。
+
+
+###### 群聊(c2g)流程原理
+
+这里我们采用```扩散写```(而非扩散读）的方式。
+
+群聊是多人社交的基本诉求，一个群友在群内发了一条消息：
+<pre>
+1) 在线的群友能第一时间收到消息
+
+2） 离线的群友能在登录后收到消息
+</pre> 
+
+由于```“消息风暴扩散系数”```的存在，群消息的复杂度要远高于单对单消息。如下是群聊里涉及到的一些数据库表设计：
+
+* 群基础表： 用来描述一个群的基本信息
+<pre>
+im_group_msgs(group_id, group_name,create_user, owner, announcement, create_time)
+</pre>
+
+* 群成员表: 用来描述一个群中的成员信息
+<pre>
+im_group_users(group_id, user_id)
+</pre>
+
 
 
 
