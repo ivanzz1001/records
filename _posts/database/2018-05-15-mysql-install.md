@@ -676,6 +676,8 @@ mysql > source /root/CreateDB_app.sql
 
 14. [mysql windows开发包安装实例](https://www.cnblogs.com/rysinal/p/7565259.html)
 
+15. [MySQL C API](https://dev.mysql.com/doc/refman/5.7/en/c-api.html)
+
 <br />
 <br />
 <br />
