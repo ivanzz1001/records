@@ -142,6 +142,11 @@ public:
 	//说明： 用于等待当前已经有处于"成功"状态的空闲连接
 	bool WaitGoodNotEmpty(DWORD dwMilliseconds);
 
+	//说明：此处我们另外提供IsAllBad()函数来判断是否有“好”的连接，因为“好”的连接有可能被Borrow()出去了，因此我们并不能通过
+	// 直接查看good_connections是否为空来判断（注： 非线程安全，不能严格判断当前所有连接都处于bad状态，通常我们只会用此函数来
+	// 进行一些非严格的健康检查与程序恢复)
+	bool IsAllBad();
+
 	MySQLConnection *Borrow();
 
 	MySQLConnection *Borrow(DWORD dwMilliseconds);
@@ -283,12 +288,13 @@ bool MySQLConnectionPool::Init(char databaseURL[], int databasePort, char usrNam
 	this->passwd = std::string(passwd);
 	this->schema = std::string(schema);
 
-	if (max_conn <= 0)
-		max_conn = 5;
+	this->max_conn = max_conn;
+	if (this->max_conn <= 0)
+		this->max_conn = 5;
 	else if (max_conn > 50)
-		max_conn = 50;
+		this->max_conn = 50;
 
-	for (int i = 0x0; i < max_conn; i++){
+	for (int i = 0x0; i < this->max_conn; i++){
 		MySQLConnection *conn = new MySQLConnection(this);
 		if (conn->Init() == false){
 			delete conn;
@@ -362,6 +368,15 @@ bool MySQLConnectionPool::WaitGoodNotEmpty(DWORD dwMilliseconds){
 	return ret;
 }
 
+
+//说明：此处我们另外提供IsAllBad()函数来判断是否有“好”的连接，因为“好”的连接有可能被Borrow()出去了，因此我们并不能通过
+// 直接查看good_connections是否为空来判断（注： 非线程安全，不能严格判断当前所有连接都处于bad状态，通常我们只会用此函数来
+// 进行一些非严格的健康检查与程序恢复)
+bool MySQLConnectionPool::IsAllBad(){
+	int badCnt = unsafe_bad_connections.size();
+
+	return badCnt == max_conn;
+}
 
 
 MySQLConnection * MySQLConnectionPool::Borrow(){
