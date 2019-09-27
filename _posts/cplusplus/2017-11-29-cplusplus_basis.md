@@ -274,6 +274,8 @@ int main(int argc,char *argv[])
 
 6. [leetcode刷题](http://www.cnblogs.com/grandyang/p/4606334.html)
 
+7. [C++书籍推荐](https://www.cnblogs.com/awesome-share/p/10056179.html)
+
 <br />
 <br />
 <br />
