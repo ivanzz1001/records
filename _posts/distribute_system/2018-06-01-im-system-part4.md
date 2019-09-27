@@ -369,7 +369,111 @@ IOS采用APNS、Android真后台保活，同时增加米推、个推。基本思
 ## 3. 协议设计
 ### 3.1 IM协议总体定义
 
+TCP的数据协议如下图所示，包括header和body两部分：
 
+![52im-protocol](https://ivanzz1001.github.io/records/assets/img/distribute/im/51im-protocol.jpg)
+
+消息头总共20个字节，具体信息如下表：
+
+![52im-detail](https://ivanzz1001.github.io/records/assets/img/distribute/im/51im-detaill.jpg)
+
+
+### 3.2 各具体的IM协议体定义
+
+消息体协议采用ProtocolBuffer(谷歌)协议(详见文章[《Protobuf通信协议详解：代码演示、详细原理介绍等》](http://www.52im.net/thread-323-1-1.html))，版本3.0.0，该协议在序列化效率、压缩、可扩展方面都具有优势。以下为主要流程涉及的协议。
+
+###### 认证(auth)
+
+![52im-auth-msg](https://ivanzz1001.github.io/records/assets/img/distribute/im/51im-auth-msg.jpg)
+
+###### 登出(logout)
+
+![52im-logout-msg](https://ivanzz1001.github.io/records/assets/img/distribute/im/51im-logout-msg.jpg)
+
+###### 踢人(kickout)
+
+![52im-kickout-msg](https://ivanzz1001.github.io/records/assets/img/distribute/im/51im-kickout-msg.jpg)
+
+###### 心跳(keepalive, noop)
+
+心跳包消息体为空。
+
+###### 单对单聊天(c2c)
+
+![52im-c2c-msg](https://ivanzz1001.github.io/records/assets/img/distribute/im/51im-c2c-msg.jpg)
+
+
+###### 群聊(c2g)
+
+![52im-c2g-msg](https://ivanzz1001.github.io/records/assets/img/distribute/im/51im-c2g-msg.jpg)
+
+###### 拉离线(pull)
+
+![52im-pull-msg](https://ivanzz1001.github.io/records/assets/img/distribute/im/51im-pull-msg.jpg)
+
+
+###### 控制类(ctrl)协议
+
+![52im-ctrl-msg](https://ivanzz1001.github.io/records/assets/img/distribute/im/51im-ctrl-msg.jpg)
+
+## 4. 存储设计
+
+### 4.1 MySQL数据库
+
+MySQL数据库采用utf8mb4编码格式（emoji字符问题）
+
+### 4.2 主要表结构
+
+**发送消息表：**
+
+保存某个用户发送了哪些消息，用于复现用户聊天场景（消息漫游功能需要)
+
+![52im-send-table](https://ivanzz1001.github.io/records/assets/img/distribute/im/51im-send-table.jpg)
+
+
+**推送消息表：**
+
+保存某个用户收到了哪些消息。
+
+![52im-recv-table](https://ivanzz1001.github.io/records/assets/img/distribute/im/51im-recv-table.jpg)
+
+**群基本信息表：**
+
+![52im-group-basic](https://ivanzz1001.github.io/records/assets/img/distribute/im/51im-group-basic.jpg)
+
+
+**群用户关系表：**
+
+![52im-group-relationship](https://ivanzz1001.github.io/records/assets/img/distribute/im/51im-group-relationship.jpg)
+
+### 4.3 水平分库
+
+![52im-table-split](https://ivanzz1001.github.io/records/assets/img/distribute/im/51im-table-split.jpg)
+
+
+### 4.4 Redis缓存
+
+**用户状态及路由信息：**
+
+Redis缓存以uid为key，检索channel(socketid)、last_packet_time等。
+
+Gate层， Session以channel(socketid)为key，检索uid及其他信息。
+
+交互接口： gate->logic，通过将channel转换为uid作为key； logic->gate，将uid转换为channel作为key。
+
+**其他缓存信息：**
+
+你觉得该怎么存就怎么存。
+
+### 4.5 文件及图片存储
+
+采用商用云存储。
+
+### 4.6 数据归档
+
+可考虑采用HBase、HDFS作为数据归档，或者相关云存储服务。
+
+>注： 安全部分略，其他非核心功能略。
 
 
 
