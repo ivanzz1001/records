@@ -12,7 +12,7 @@ description: IM服务器设计
 <!-- more -->
 
 
-## 1. 现在前面
+## 1. 写在前面
 ### 1.1 引言
 如果在没有太多经验可借鉴的情况下，要设计一套完整可用的移动端IM架构，难度是相当大的。原因在于，IM系统（尤其是移动端IM系统）是多种技术和领域知识的横向应用综合体：网络编程、通信安全、高并发编程、移动端开发等，如果要包含实时音视频聊天的话，还要加上难度更大的音视频编解码技术（内行都知道，把音视频编解码及相关技术玩透的，博士学位都可以混出来了），凡此种种，加上移动网络的特殊性、复杂性，设计和开发难度不言而喻。
 
@@ -274,15 +274,45 @@ description: IM服务器设计
 由于```“消息风暴扩散系数”```的存在，群消息的复杂度要远高于单对单消息。如下是群聊里涉及到的一些数据库表设计：
 
 * 群基础表： 用来描述一个群的基本信息
-<pre>
+{% highlight string %}
 im_group_msgs(group_id, group_name,create_user, owner, announcement, create_time)
-</pre>
+{% endhighlight %}
 
 * 群成员表: 用来描述一个群中的成员信息
-<pre>
+{% highlight string %}
 im_group_users(group_id, user_id)
-</pre>
+{% endhighlight %}
 
+* 用户接收消息表： 用来描述一个用户的所有收到的群消息（与单对单消息表是同一个表）
+{% highlight string %}
+im_message_recieve（msg_id,msg_from,msg_to, group_id，msg_seq, msg_content, send_time, msg_type, deliverd, cmd_id）
+{% endhighlight %}
+
+* 用户发送消息表： 用来描述一个用户发送了哪些消息
+{% highlight string %}
+im_message_send (msg_id,msg_from,msg_to, group_id，msg_seq, msg_content, send_time, msg_type, cmd_id)
+{% endhighlight %}
+
+**业务场景举例：**
+
+* 1) 一个群中有X, A, B, C, D共5个成员，成员X发了一条消息；
+
+* 2) 成员A和B在线，期望实时收到消息；
+
+* 3) 成员C与D离线，期望未来拉取到离线消息
+
+
+**群聊流程如下图所示：**
+
+![52im-c2g](https://ivanzz1001.github.io/records/assets/img/distribute/im/51im-c2g.jpg)
+
+**群聊流程详细说明：**
+
+* 1. X向gate发送信息（信息最终要发给这个群，A、B在线）
+
+* 2. Gate将消息发给logic
+
+* 3. 
 
 
 
