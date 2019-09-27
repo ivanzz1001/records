@@ -493,6 +493,8 @@ DWORD MySQLConnectionPool::FixBadConnections_unsafe(){
 
 			if (pConnection->Connect()){
 				unsafe_bad_connections.erase(it++);
+
+				EnterCriticalSection(&connCs);
 				if (good_connections.empty()){
 					good_connections.push_back(pConnection);
 					::WakeConditionVariable(&goodNotEmpty);
@@ -507,6 +509,7 @@ DWORD MySQLConnectionPool::FixBadConnections_unsafe(){
 				pConnection->lastFixTick = 0;
 				pConnection->failFixCnt = 0;
 				pConnection->nextFixPeriod = 0x0;
+				LeaveCriticalSection(&connCs);
 			}
 			else{
 				//才用指数退避的方式进行重连
