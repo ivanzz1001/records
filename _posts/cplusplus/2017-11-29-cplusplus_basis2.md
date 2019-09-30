@@ -194,6 +194,26 @@ global address: 0xd34cdc60 point: 0x1b1c010 value: 3
 delete: 0xd34cdc60
 </pre>
 
+关于此种情况还有如下：
+{% highlight string %}
+int main(int argc, char *argv[])
+{
+	A a = A(20);
+	printf("global address: 0x%x point: 0x%x value: %d\n", &a, a.x, a.y);
+	
+	return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o test test.cpp -lstdc++ -std=c++11
+# ./test
+address: 0x81dcdff0 point: 0x874010 value: 20
+global address: 0x81dcdff0 point: 0x874010 value: 20
+delete: 0x81dcdff0
+</pre>
+
+
 ## 3. 赋值构造函数
 1) **对象以值传递方式从函数返回，且接受返回值的对象已经初始化过**
 {% highlight string %}
@@ -228,7 +248,7 @@ int main(int argc, char *argv[])
 	c = a;
 	printf ("global address: %x, point: %x, value: %d\n", &c, c.x, c.y);
 	
-    return 0;
+	return 0;
 }
 {% endhighlight %}
 编译运行：
@@ -245,7 +265,8 @@ delete: 0xc36068d0
 
 ## 4. 移动构造函数
 {% highlight string %}
-int main(int argc, char *argv[]){
+int main(int argc, char *argv[])
+{
 	A a(A(200));
 	
 	printf("global address: 0x%x point: 0x%x value: %d\n", &a, a.x, a.y);
