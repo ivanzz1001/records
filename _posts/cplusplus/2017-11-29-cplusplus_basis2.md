@@ -16,11 +16,11 @@ description: C/C++基础
 ## 1. 前言
 C++中经常用到拷贝构造函数、赋值构造函数，这些函数的调用时机各有区别，这里进行简单总结：
 {% highlight string %}
-A (A& a);                       //拷贝构造函数
-A (const A& a);                 //拷贝构造函数
-A& operator= (const A& a);     //赋值构造函数(拷贝赋值)
+A();                           //默认构造函数
+A(const A& a);                 //拷贝构造函数
+A(A&& a);                     //移动构造函数
+A& operator=(const A& a);     //赋值构造函数(拷贝赋值)
 A& operator=(A&& a);           //赋值构造函数(移动赋值)
-A (A&& a);                     //移动构造函数
 {% endhighlight %}
 
 先写一个类，用作之后的示例：
