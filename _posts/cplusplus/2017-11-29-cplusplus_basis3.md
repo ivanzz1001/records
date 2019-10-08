@@ -284,10 +284,290 @@ void f(Ptr p)
 	p->m = 7;    //(p.operator->())->m = 7
 }
 {% endhighlight %}
-在实现智能指针时重载```->```操作符就变得十分有用。
+
+```->```运算符重载经常会被用于实现智能指针。标准库中的智能指针```unique_ptr```以及```shared_ptr```均对```->```进行运算符重载。
+
+值得注意的是，对于普通的指针，通常在使用```->```时其与单目运算符```*```、```[]```具有相同的含义，例如：
+{% highlight string %}
+p−>m == (∗p).m           //is true
+(∗p).m == p[0].m        // is true
+p−>m == p[0].m          // is true
+{% endhighlight %}
+但是对于```->```重载运算符，一般天然是没有这样相同含义的保证。如果要提供类似相同的含义，我们通常需要进行进一步的重载保证：
+{% highlight string %}
+template<typename T>
+class Ptr {
+	Y∗ p;
+
+public:
+	Y∗ operator−>() { return p; }            // dereference to access member
+	Y& operator∗() { return ∗p; }            // dereference to access whole object
+	Y& operator[](int i) { return p[i]; }    // dereference to access element
+	// ...
+};
+{% endhighlight %}
+>注：运算符->重载必须是一个非静态(non-static)成员函数，并且其返回值必须是一个指针或者是一个可以使用->的类对象。
+
+虽然```->```与```.```操作符含义相似，但是我们并不能对```.```(成员选择符)运算符进行重载。
 
 
 ### 2.4 Increment and Decrement
+
+在智能指针(smart pointer)被发明之后，通常我们还会提供自增操作(++)与自减操作(--)，以使其更类似于C++的内置类型。在C++运算符中，increment 与 decrement运算符较为特殊，其既可以作为前置运算符，也可作为后置运算符。因此，我们在运算符重载时需要提供前置与后置两种，例如：
+{% highlight string %}
+template<typename T>
+class Ptr{
+	T *ptr;
+	T *array;
+	int sz;
+
+public:
+	template<int N>
+	      Ptr(T *p, T(&a)[N]);      //bind to array a, sz == N, initial value p
+
+	Ptr(T *p, T *a, int s);         //bind to array a of size s, initial value p
+
+	Ptr(T *p);                      //bind to single object, sz == 0, initial value p
+
+	Ptr& operator++();              //prefix
+	Ptr operator++(int);            //postfix
+
+	Ptr& operator--();              //prefix
+	Ptr operator--(int);            //postfix
+
+	T& operator*();                 //prefix
+};
+{% endhighlight %}
+
+在上述的运算符重载函数中，参数int用于指明该运算符是进行的后置重载。在该函数中参数int是不会被使用到，其仅仅是作为一个dummy用于区分是前置运算符重载还是后置运算符重载。
+
+
+### 2.5 Allocation and Deallocation
+
+1) **理论介绍**
+
+我们知道new运算符会调用*operator new()*来获得其所需要的内存，类似地，delete运算符会通过调用*operator delete()*来释放其所占用的内存。用户可以对全局的*operator new()*与*operator delete()*进行重载，也可以对某个特定类(particular class)进行的*operator new()*与*operator delete()*进行重载。
+
+使用标准库(standard-library)中的```size_t```类型作为参数，我们可以通过如下方式来对全局(global)的new/delete运算符进行重载，例如：
+{% highlight string %}
+void * operator new(size_t);               //use for individual object
+void * operator new[](size_t);             //use for array
+void operator delete(void *, size_t);      //use for individual object
+void operator delete[](void *, size_t);    //use for array
+{% endhighlight %}
+
+当我们需要在自由空间(free store)上为```X```类型的对象分配内存时，我们就可以使用new操作符，其就会调用*operator new(sizeof(X))*来分配内存；类似地，当我们需要在自由空间上通过new来为含有N个元素且类型为```X```的数组分配空间时，其就会调用```operator new[](N*sizeof(X))```。new表达式也许会分配多于参数所指定的```N*sizeof(X)```大小的内存，这在为字符串分配空间时经常会这样。
+
+通常我们并推荐对全局的operator new()与operator delete()进行重载，因为这造成的影响太大。更好的选择是，单独为某个class提供new/delete运算符重载。该class可以是多个派生类的基类。在如下的例子中，Employee类就为其本身及其派生类提供了一个特定的allocator与deallocator:
+{% highlight string %}
+class Employee{
+public:
+	//...
+
+	void * operator new(size_t);
+	void operator delete(void *, size_t);
+
+	void * operator new[](size_t);
+	void operator delete(void *, size_t);
+};
+{% endhighlight %}
+对于*operator new()*与*operator delete()*函数，其实际上是static成员。因此其并没有this指针，也并不能修改一个对象。它们只负责提供相应的空间，使得可以通过constructor来初始化一个对象，以及通过destructor来释放一个对象占用的空间。
+{% highlight string %}
+void *Employee::operator new(size_t s)
+{
+	//allocate s bytes of memory and return a pointer to it
+}
+
+void Employee::operator delete(void *p, size_t s)
+{
+	if(p){     //delete only if p!=0;
+
+	      //assume p points to s bytes of memory allocated by Employee::operator new()
+	      //and free that memory for reuse
+	}
+}
+{% endhighlight %}
+到此为止，对于为什么要使用神秘的```size_t```参数就变得显而易见了。size_t用于指定被删除对象的大小。删除一个普通的(plain)Employee对象我们可以传递sizeof(Employee)；而删除一个派生自Employee的Manager对象，假如Manager并没有其自身的operator delete()函数时，其所传递的值就为sizeof(Manager)。这样就使得一个class-specific allocator不用在每次内存分配时另外保存额外的size信息。自然地，一个class-specific allocator也可以保存size_t信息(类似于通用的allocator)，这样调用operator delete()删除时就可以忽略size_t参数。然而，如果不提供size_t参数，这通常使得我们难以较大的提高内存分配速率。
+
+编译器如何为operator delete()提供正确的size_t呢？delete运算符会匹配所要删除对象的类型。假如我们通过一个父对象的指针来删除一个派生类对象的话，则父类必须要有一个virtual析构函数来提供正确的对象空间大小：
+{% highlight string %}
+Employee∗ p = new Manager;   // potential trouble (the exact type is lost)
+// ...
+delete p;                    // hope Employee has a virtual destructor
+{% endhighlight %}
+通常，deallocator会在析构函数之后被调用（析构函数知道其对应的类大小）
+
+
+2) **示例**
+
+当我们在C++中使用new和delete时，其实执行的是全局的::operator new()和::operator delete()。首先我们来看一个简单的例子：
+{% highlight string %}
+class Foo{...};
+Foo *pf = new Foo;
+
+delete pf;
+{% endhighlight %}
+上面的代码底层执行的是什么呢？
+<pre>
+new包含两阶段的操作：首先调用::operator new()分配内存; 之后调用 Foo::Foo()构造对象内容
+
+delete也分为两部分的操作： 首先调用Foo::~Foo()将对象析构； 之后调用::operator delete()释放内存
+</pre>
+如下我们给出一个示例对new/delete进行重载：
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include<iostream>
+using namespace std;
+
+class Foo
+{
+public:
+	int _id;
+	long _data;
+	string _str;
+public:
+	Foo():_id(0){
+		cout<<"default constructor.this="<<this<<" id="<<_id<<endl;
+	}
+	Foo(int i):_id(i){
+		cout<<"constructor.this="<<this<<" id="<<_id<<endl;
+	}
+	~Foo() {
+		cout<<"destructor.this="<<this<<" id="<<_id<<endl;
+	}
+	
+	static void* operator new(size_t size);
+	
+	static void operator delete(void* pdead,size_t size);
+	
+	static void* operator new[](size_t size);
+	
+	static void operator delete[](void* pdead,size_t size);
+};
+
+void* Foo::operator new(size_t size)
+{
+	Foo* p = (Foo *)malloc(size);
+	char *q = (char *)p;
+	long *r = (long *)(p+4);
+	*r = 20;
+	
+	cout<<"调用了Foo::operator new"<<endl;
+	return p;
+}
+
+void Foo::operator delete(void *pdead,size_t size)
+{
+	cout<<"调用了Foo::operator delete"<<endl;
+	free(pdead);
+}
+
+void* Foo::operator new[](size_t size)
+{
+	Foo* p  = (Foo*)malloc(size);
+	cout<<"调用了Foo::operator new[]"<<endl;
+	return p;
+}
+
+void Foo::operator delete[](void *pdead, size_t size)
+{
+	cout<<"调用了Foo::operator delete[]"<<endl;
+	free(pdead);
+}
+
+int main(int argc, char *argv[])
+{
+	Foo* pf = new Foo(7);
+	Foo* pf1 = new Foo[10];
+
+	cout<<"_data:"<<pf->_data<<std::endl;
+
+	delete pf;
+	delete[] pf1;
+
+	return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o test test.cpp -lstdc++
+# ./test
+调用了Foo::operator new
+constructor.this=0x1880010 id=7
+调用了Foo::operator new[]
+default constructor.this=0x1880038 id=0
+default constructor.this=0x1880050 id=0
+default constructor.this=0x1880068 id=0
+default constructor.this=0x1880080 id=0
+default constructor.this=0x1880098 id=0
+default constructor.this=0x18800b0 id=0
+default constructor.this=0x18800c8 id=0
+default constructor.this=0x18800e0 id=0
+default constructor.this=0x18800f8 id=0
+default constructor.this=0x1880110 id=0
+_data:0
+destructor.this=0x1880010 id=7
+调用了Foo::operator delete
+destructor.this=0x1880110 id=0
+destructor.this=0x18800f8 id=0
+destructor.this=0x18800e0 id=0
+destructor.this=0x18800c8 id=0
+destructor.this=0x18800b0 id=0
+destructor.this=0x1880098 id=0
+destructor.this=0x1880080 id=0
+destructor.this=0x1880068 id=0
+destructor.this=0x1880050 id=0
+destructor.this=0x1880038 id=0
+调用了Foo::operator delete[]
+</pre>
+最后看结果和我们预想的一样，::operator new()和::operator delete()都被重载了，并且执行顺序也是我们预想的。但是如果使用全局的::operator new和::operator delete()会怎样呢？
+{% highlight string %}
+int main(int argc, char *argv[])
+{
+	Foo* pf = ::new Foo(7);
+	Foo* pf1 = ::new Foo[10];
+
+	cout<<"_data:"<<pf->_data<<std::endl;
+
+	::delete pf;
+	::delete[] pf1;
+
+	return 0x0;
+}
+{% endhighlight %}
+
+编译运行：
+<pre>
+# gcc -o test test.cpp -lstdc++
+# ./test
+constructor.this=0xcb7010 id=7
+default constructor.this=0xcb7038 id=0
+default constructor.this=0xcb7050 id=0
+default constructor.this=0xcb7068 id=0
+default constructor.this=0xcb7080 id=0
+default constructor.this=0xcb7098 id=0
+default constructor.this=0xcb70b0 id=0
+default constructor.this=0xcb70c8 id=0
+default constructor.this=0xcb70e0 id=0
+default constructor.this=0xcb70f8 id=0
+default constructor.this=0xcb7110 id=0
+_data:0
+destructor.this=0xcb7010 id=7
+destructor.this=0xcb7110 id=0
+destructor.this=0xcb70f8 id=0
+destructor.this=0xcb70e0 id=0
+destructor.this=0xcb70c8 id=0
+destructor.this=0xcb70b0 id=0
+destructor.this=0xcb7098 id=0
+destructor.this=0xcb7080 id=0
+destructor.this=0xcb7068 id=0
+destructor.this=0xcb7050 id=0
+destructor.this=0xcb7038 id=0
+</pre>
+看到我们重载的函数被屏蔽了，因为使用的是全局::operator new()和::operator delete()。
+
+
 
 
 
