@@ -567,6 +567,129 @@ destructor.this=0xcb7038 id=0
 </pre>
 看到我们重载的函数被屏蔽了，因为使用的是全局::operator new()和::operator delete()。
 
+## 3. 友元
+在C++类中，一个普通的成员函数通常具有如下特征：
+
+* 成员函数能够访问类中所声明的私有成员
+
+* 成员函数的作用范围是其所属类
+
+* 成员函数必须通过一个object来调用（即要有this指针）
+
+通过将一个成员函数声明为```static```，这可以使得其具有上面的头两个特性。通过将一个非成员函数声明为friend，则可以具有第一个特性。将一个函数声明为friend，使得其可以访问对应类的私有成员，但其作用域却可以保持与类相独立。
+
+举个例子，我们可以定义一个操作符用于实现Matrix与Vector的乘积。自然，Matrix与Vector都隐藏了各自的实现细节，并各自提供了一整套函数来操作内部细节。然而，我们的*乘积函数*并不能是双方的成员函数，同时我们也并不希望提供一个低层级(low-level)的函数来使得每个用户都能够完整的读写Matric与Vector。为了避免此问题，我们可以将```operator *()```声明为双方的friend:
+{% highlight string %}
+constexpr rc_max {4};      // row and column size
+
+class Matrix;
+
+class Vector {
+	float v[rc_max];
+
+	// ...
+	friend Vector operator∗(const Matrix&, const Vector&);
+};
+
+class Matrix {
+	Vector v[rc_max];
+
+	// ...
+	friend Vector operator∗(const Matrix&, const Vector&);
+};
+{% endhighlight %}
+
+现在```operator *()```就能够深入到Vector与Matrix的内部实现细节。这可能需要复杂的实现技术，如下是一个简易版本：
+{% highlight string %}
+Vector operator∗(const Matrix& m, const Vector& v)
+{
+	Vector r;
+	for (int i = 0; i!=rc_max; i++) { // r[i] = m[i] * v;
+		r.v[i] = 0;
+		for (int j = 0; j!=rc_max; j++)
+			r.v[i] += m.v[i].v[j] ∗ v.v[j];
+	}
+	return r;
+}
+{% endhighlight %}
+
+一个友元函数的声明既可以放在类的public部分，也可以放在private部分，与位置无关。类似于成员函数，friend函数也是被显示的声明在类中，因此其也作为对应类接口的一部分。
+
+一个类的成员函数可以是另一个类的友元函数。例如：
+{% highlight string %}
+class List_iterator{
+	//...
+	int * next();
+};
+
+class List{
+	friend int * List_iterator::next();
+	//...
+};
+{% endhighlight %}
+另外，还有一种简便的方法可以使得一个类的所有成员函数均是另一个类的友元。例如：
+{% highlight string %}
+class List {
+	friend class List_iterator;
+	// ...
+};
+{% endhighlight %}
+上述friend的声明使得List_interator的所有成员函数均是List的朋友。
+
+将一个类声明为友元，使得该类的每一个函数均可访问相应类的私有变量。但这可能会破坏类的封装特性，使用友元类的时候要特别小心，一般也只会用在具有紧密关联的两个类间。
+
+另外，也可以将一个template参数声明为友元：
+{% highlight string %}
+template<typename T>
+class X {
+	friend T;
+	friend class T; // redundant ‘‘class’’
+	// ...
+};
+{% endhighlight %}
+
+### 3.1 友元的查找
+在进行友元查找时，其遵循的规则为：
+<pre>
+1） 一个友元(friend)必须在一个封闭区域内被事先声明
+
+或
+
+2） 在被声明为friend的类外即刻定义
+</pre>
+
+假若当前有namespace::N，则定义在namespace::N{}外部且在该名称空间之后类或函数，均不能成为namespace::N中某个类的友元。如下举例：
+{% highlight string %}
+class C1{};            //will become friend of N::C
+void f1();             //will become friend of N::C
+
+namespace N{
+	class C2{};        //will become friend of C
+	void f2(){}        //will become friend of C
+
+	class C{
+		int x;
+
+	public:
+		friend class C1;       //OK(previously defined)
+		friend void f1();   
+
+		friend class C3;       //OK(defined in enclosing namespace)
+		friend void f3();
+		friend class C4;       //first declared in N and assume to be in N
+		friend void f4();
+	};
+
+
+	class C3{};                  //friend of C
+	void f3(){C x; x.x = 1;}     //OK, friend of C
+
+}  //namespace N
+
+class C4{};                    //not friend of N::C
+void f4(){N::C x; x.x = 1;}    //error: x is private and f4()is not a friend of N::C
+{% endhighlight %}
+
 
 
 
@@ -576,7 +699,7 @@ destructor.this=0xcb7038 id=0
 
 **[参看]:**
 
-
+1. [C++ 内存管理之重载operator new 和operator delete](https://blog.csdn.net/u014303647/article/details/80328317)
 
 
 <br />
