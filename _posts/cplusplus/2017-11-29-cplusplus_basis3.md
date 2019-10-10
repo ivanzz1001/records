@@ -567,6 +567,46 @@ destructor.this=0xcb7038 id=0
 </pre>
 看到我们重载的函数被屏蔽了，因为使用的是全局::operator new()和::operator delete()。
 
+### 2.6 输出运算符重载
+这里直接给出一个示例：
+{% highlight string %}
+#include <iostream>
+
+class Person{
+private:
+	std::string name;
+	int age;
+	
+public:
+	Person(std::string name, int age):name(name),age(age){}
+	
+	friend std::ostream & operator<<(std::ostream &os, const Person &person){
+		os<<"name:"<<person.name<<"  age:"<<person.age<<std::endl;
+		return os;
+	}
+	
+};
+
+int main(int argc, char *argv[]){
+
+	Person person1("test1", 10);
+	Person person2("test2", 20);
+	
+	std::cout<<person1<<person2<<std::endl;
+	
+	return 0x0;
+}
+{% endhighlight %}
+
+编译运行：
+<pre>
+# gcc -o test test.cpp -lstdc++
+# ./test
+name:test1  age:10
+name:test2  age:20
+
+</pre>
+
 ## 3. 友元
 在C++类中，一个普通的成员函数通常具有如下特征：
 
