@@ -422,6 +422,8 @@ void MyMethod(T myarr){
 
 7. [c++中模板使用时候typename和class的区别](https://blog.csdn.net/u011619422/article/details/44218473)
 
+8. [STL源码剖析---移动advance和距离distance](https://blog.csdn.net/qq_41822235/article/details/83076790)
+
 <br />
 <br />
 <br />
