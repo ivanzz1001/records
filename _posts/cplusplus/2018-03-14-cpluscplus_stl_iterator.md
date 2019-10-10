@@ -238,6 +238,7 @@ struct bidirectional_iterator_tag:public forward_iterator_tag{};
 struct random_access_iterator_tag:public bidirectional_iterator_tag{};
 {% endhighlight %}
 
+
 ### 3.4 利用迭代器种类更有效的实现distance函数
 回到distance函数，有了前面的基础，我们可以根据不同迭代器种类实现distance函数（distance.cpp)：
 {% highlight string %}
