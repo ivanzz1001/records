@@ -268,7 +268,7 @@ delete: 0xc36068d0
 {% highlight string %}
 int main(int argc, char *argv[])
 {
-	A a(A(200));
+	A a(std::move(A(200)));
 	
 	printf("global address: 0x%x point: 0x%x value: %d\n", &a, a.x, a.y);
 	
