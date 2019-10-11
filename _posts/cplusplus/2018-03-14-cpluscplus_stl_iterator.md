@@ -340,6 +340,47 @@ c-array distance:4
 
 上面通过STL定义的```iterator_traits```模板可以萃取不同种类的迭代器特性，```iterator_traits```还对指针和常量指针有特化版本，因此也可以萃取原生指针的特性。具体实现如下：
 {% highlight string %}
+template <class _Tp, class _Distance> struct input_iterator {
+  typedef input_iterator_tag iterator_category;
+  typedef _Tp                value_type;
+  typedef _Distance          difference_type;
+  typedef _Tp*               pointer;
+  typedef _Tp&               reference;
+};
+
+struct output_iterator {
+  typedef output_iterator_tag iterator_category;
+  typedef void                value_type;
+  typedef void                difference_type;
+  typedef void                pointer;
+  typedef void                reference;
+};
+
+template <class _Tp, class _Distance> struct forward_iterator {
+  typedef forward_iterator_tag iterator_category;
+  typedef _Tp                  value_type;
+  typedef _Distance            difference_type;
+  typedef _Tp*                 pointer;
+  typedef _Tp&                 reference;
+};
+
+
+template <class _Tp, class _Distance> struct bidirectional_iterator {
+  typedef bidirectional_iterator_tag iterator_category;
+  typedef _Tp                        value_type;
+  typedef _Distance                  difference_type;
+  typedef _Tp*                       pointer;
+  typedef _Tp&                       reference;
+};
+
+template <class _Tp, class _Distance> struct random_access_iterator {
+  typedef random_access_iterator_tag iterator_category;
+  typedef _Tp                        value_type;
+  typedef _Distance                  difference_type;
+  typedef _Tp*                       pointer;
+  typedef _Tp&                       reference;
+};
+
 template <class _Iterator>
 struct iterator_traits {
   typedef typename _Iterator::iterator_category iterator_category;
@@ -371,6 +412,7 @@ struct iterator_traits<const _Tp*> {
 ### 3.5 小结
 
 STL使用迭代器算法和容器结合，利用迭代器```型别```可以针对不同迭代器编写更加高效的算法，这一点很重要的思想就是： 利用C++重载机制和参数推导机制将```运行期```决议问题提前到```编译期```决议，也就是说，我们不需要在运行时判断迭代器的类型，而是在编译期就已经决定。这很符合C++模板编程的理念。在后续STL学习中，我们会实现自己的各种容器，也必须实现各种各样的迭代器，因此迭代器的学习还远没有停止。
+
 
 
 ## 4. C++中模板使用时候typename和class的区别
@@ -423,6 +465,10 @@ void MyMethod(T myarr){
 7. [c++中模板使用时候typename和class的区别](https://blog.csdn.net/u011619422/article/details/44218473)
 
 8. [STL源码剖析---移动advance和距离distance](https://blog.csdn.net/qq_41822235/article/details/83076790)
+
+9. [traits - wiki](https://en.wikipedia.org/wiki/Trait_(computer_programming))
+
+10. [活用C++模板之traits](https://m.2cto.com/kf/201208/149791.html)
 
 <br />
 <br />
