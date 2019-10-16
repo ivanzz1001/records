@@ -394,6 +394,30 @@ Dynamic section at offset 0xe08 contains 26 entries:
 
 ```-Wl,rpath-link```是设置编译链接时候的顺序，例如app运行依赖libadd.so，但是libadd.so又依赖libadd_ex.so，```rpath-link```就是指定libadd_ex.so的路径。和```-Wl,rpath```相比工作的时间不同，一个在链接期间，一个在运行期间。
 
+
+## 7. gcc编译头文件查找路径
+关于gcc编译时的查找路径，[GCC The C Preprocessor: Search Path](http://gcc.gnu.org/onlinedocs/cpp/Search-Path.html)描述的比较清楚，我在这里将其复制出来：
+
+By default, the preprocessor looks for header files included by the quote form of the directive #include "file" first relative to the directory of the current file, and then in a preconfigured list of standard system directories. For example, if /usr/include/sys/stat.h contains #include "types.h", GCC looks for types.h first in /usr/include/sys, then in its usual search path.
+
+For the angle-bracket form #include <file>, the preprocessor’s default behavior is to look only in the standard system directories. The exact search directory list depends on the target system, how GCC is configured, and where it is installed. You can find the default search directory list for your version of CPP by invoking it with the -v option. For example,
+
+cpp -v /dev/null -o /dev/null
+There are a number of command-line options you can use to add additional directories to the search path. The most commonly-used option is -Idir, which causes dir to be searched after the current directory (for the quote form of the directive) and ahead of the standard system directories. You can specify multiple -I options on the command line, in which case the directories are searched in left-to-right order.
+
+If you need separate control over the search paths for the quote and angle-bracket forms of the ‘#include’ directive, you can use the -iquote and/or -isystem options instead of -I. See Invocation, for a detailed description of these options, as well as others that are less generally useful.
+
+If you specify other options on the command line, such as -I, that affect where the preprocessor searches for header files, the directory list printed by the -v option reflects the actual search path used by the preprocessor.
+
+Note that you can also prevent the preprocessor from searching any of the default system header directories with the -nostdinc option. This is useful when you are compiling an operating system kernel or some other program that does not use the standard C library facilities, or the standard C library itself.
+
+除此之外，我们还可以通过相应的环境变量来指定头文件的搜索路径：
+<pre>
+export C_INCLUDE_PATH=XXXX:$C_INCLUDE_PATH
+export CPLUS_INCLUDE_PATH=XXX:$CPLUS_INCLUDE_PATH
+</pre>
+可以将以上代码添加到/etc/profile末尾。
+
 <br />
 <br />
 
@@ -408,6 +432,8 @@ Dynamic section at offset 0xe08 contains 26 entries:
 4. [Linux下运行时链接库的路径顺序](https://blog.csdn.net/npu_wy/article/details/38642191)
 
 5. [gcc使用-Wl,-rpath解决so库版本冲突](https://www.dyxmq.cn/linux/gcc-option-wl-rpath.html)
+
+6. [Linux 中C/C++ search path(头文件搜索路径)](https://www.cnblogs.com/jhj117/p/8671459.html)
 <br />
 <br />
 <br />
