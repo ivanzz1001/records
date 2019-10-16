@@ -296,7 +296,7 @@ ASSERT_STREQ(str1, str2)         EXPECT_STREQ(str1, str2)          the two C str
 ASSERT_STRNE(str1, str2)         EXPECT_STRNE(str1, str2)          the two C strings have different content
 ASSERT_STRCASEEQ(str1, str2)     EXPECT_STRCASEEQ(str1, str2)      the two C strings have the same content, ignoring case 
 ASSERT_STRCASENE(str1, str2)     EXPECT_STRCASENE(str1, str2)      the two C strings have different content, ignoring case
-{% endhighlight %
+{% endhighlight %}
 
 
 ## 5. 事件机制
