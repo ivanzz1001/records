@@ -139,6 +139,7 @@ Install the project...
 -- Installing: /usr/local/lib64/pkgconfig/gtest_main.pc
 </pre>
 之后将/usr/local/lib64/pkgconfig添加到PKG_CONFIG_PATH中：
+
 <pre>
 # vi /etc/profile
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/lib/pkgconfig/:/usr/local/lib64/pkgconfig/
@@ -170,6 +171,7 @@ int main(int argc, char *argv[])
 	return RUN_ALL_TESTS();
 }
 {% endhighlight %}
+
 执行如下命令进行编译：
 <pre>
 # gcc -o hello_test hello_test.cpp -lstdc++ -std=c++11 `pkg-config --cflags --libs gtest`
