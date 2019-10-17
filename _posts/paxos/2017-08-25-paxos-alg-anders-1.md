@@ -24,7 +24,7 @@ Paxos算法实现的是分布式系统多个节点之上数据的一致性，这
 
 下面是Basic Paxos算法，注意这个算法只具有在多个冲突请求中选出一个的功能，并不具备序列化多个请求依次执行的功能。
 
-Paxos算法包含Proposer、Acceptor、Learner等角色。实现的时候采用一组固定数目Server,每个Server同时担任上述三个角色，多个Client将自己的请求值Value_i随机发给一个Server处理，然后这一组Server经过协商后得出统一的一个值Chosen_Value，这个值必须被每个Server学习到。同时回复给所有发起请求的Client。
+Paxos算法包含Proposer、Acceptor、Learner等角色。实现的时候采用一组固定数目Server,每个Server同时担任上述三个角色，多个Client将自己的请求值```Value_i```随机发给一个Server处理，然后这一组Server经过协商后得出统一的一个值Chosen_Value，这个值必须被每个Server学习到。同时回复给所有发起请求的Client。
 
 具体算法流程如下，为避免歧义，关键字眼Proposer,Proposal,Accept,Value,Choose等保留英文原文。
 
