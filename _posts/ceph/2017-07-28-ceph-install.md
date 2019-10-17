@@ -47,15 +47,21 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 ### 1.1 下载ceph源码
 
-这里我们下载ceph-10.2.10版本：
+这里我们下载ceph-10.2.10版本。我们有如下几种方法：
+
+1） **直接克隆指定版本**
 <pre>
-# wget https://github.com/ceph/ceph/archive/v10.2.10.tar.gz
-# tar -zxvf v10.2.10.tar.gz
-# ls
-ceph-10.2.10  v10.2.10.tar.gz
+# git clone https://github.com/ceph/ceph.git -b v10.2.10 --depth 1
+# ls -al .
+./                  .git/               .gitmodule_mirrors  .mailmap            .peoplemap          
+../                 .gitignore          .gitmodules         .organizationmap    
+# git submodule update --force --init --recursive
+# git log -s
 </pre>
 
-注： 在ceph官网下载的tar.gz包缺少文件，用git clone下载的ceph包比较全，因此我们采用如下方法
+
+2) **克隆整个ceph工程**
+在ceph官网下载的tar.gz包缺少文件，用git clone下载的ceph包比较全，因此我们采用如下方法
 <pre>
 # git clone --recursive https://github.com/ceph/ceph.git  
 </pre>
@@ -63,9 +69,120 @@ ceph-10.2.10  v10.2.10.tar.gz
 <pre>
 # git submodule update --force --init --recursive
 </pre>
-进入ceph源码目录，git checkout jewel切换到jewel版本:
+
+克隆完成后，我们使用```git branch -a```命令来查看所有的分支：
 <pre>
-# git checkout jewel
+# git branch -a
+* master
+  remotes/origin/BZ-1650306
+  remotes/origin/HEAD -> origin/master
+  remotes/origin/argonaut
+  remotes/origin/bobtail
+  remotes/origin/ceph-facts-role
+  remotes/origin/cuttlefish
+  remotes/origin/dumpling
+  remotes/origin/emperor
+  remotes/origin/firefly
+  remotes/origin/giant
+  remotes/origin/guits-add_dep
+  remotes/origin/guits-fix_simple_activate_fs
+  remotes/origin/hammer
+  remotes/origin/hammer-next
+  remotes/origin/infernalis
+  remotes/origin/jewel
+  remotes/origin/jewel-next
+  remotes/origin/joscollin-patch-1
+  remotes/origin/joscollin-patch-2
+  remotes/origin/kraken
+  remotes/origin/luminous
+  remotes/origin/luminous-no-scripts
+  remotes/origin/master
+  remotes/origin/mimic
+  remotes/origin/mimic-new
+  remotes/origin/nautilus
+  remotes/origin/revert-26048-luminous-37977
+  remotes/origin/rh-luminous
+  remotes/origin/rh-luminous_old
+  remotes/origin/v
+  remotes/origin/v10.2.0
+  remotes/origin/wip-36686-luminous
+  remotes/origin/wip-41038-nautilus
+  remotes/origin/wip-41238-nautilus
+  remotes/origin/wip-add-diag-suite
+  remotes/origin/wip-cd-vol-size
+  remotes/origin/wip-ceph-volume-tests-no-dashboard
+  remotes/origin/wip-daemonwatchdog-testing6
+  remotes/origin/wip-ldapauth-wusui
+  remotes/origin/wip-luminous-conf-error-message
+  remotes/origin/wip-pcuzner-testing
+  remotes/origin/wip-perf-keys
+  remotes/origin/wip-qa-rgw-swift-server
+  remotes/origin/wip-qa-rgw-swift-server-nautilus
+  remotes/origin/wip-rm37865
+  remotes/origin/wip-smoke-use-ca
+  remotes/origin/wip-zafman-26971-diag
+</pre>
+另外也可以通过```git tag```命令来查询所有标签：
+<pre>
+# git tag -l
+mark-v0.70-wip
+v0.1
+v0.10
+v0.11
+v0.12
+v0.13
+v0.14
+v0.15
+v0.16
+v0.16.1
+v0.17
+v0.18
+v0.19
+v0.19.1
+v0.2
+v0.20
+v0.20.1
+v0.20.2
+</pre>
+然后使用如下命令切换到```10.2.10```版本：
+<pre>
+# git checkout v10.2.10
+</pre>
+
+3) **克隆指定tag或commitID**
+
+对于一个大工程，我们很适合采用此方法。
+
+* 首先新建一个文件夹```ceph-10.2.10```
+<pre>
+# mkdir ceph-10.2.10
+# cd ceph-10.2.10
+</pre>
+
+* 接着在当前目录```ceph-10.2.10```创建一个空repository:
+<pre>
+# git init
+</pre>
+
+* 之后将其添加到一个远程仓库：
+<pre>
+# git remote add my-ceph https://github.com/ceph/ceph.git  
+</pre>
+
+* 之后fetch一个commit(或branch 或tag)
+<pre>
+# git fetch my-ceph v10.2.10     //注意此处v10.2.10为远程ceph仓库对应的一个tag
+</pre>
+
+* 将本地仓库的master分支reset为指定的commit
+<pre>
+# git reset --hard FETCH_HEAD
+</pre>
+
+* 最后再更新submodules
+<pre>
+# git submodule update --force --init --recursive
+# git log -s
 </pre>
 
 ### 1.2 编译ceph
@@ -78,7 +195,12 @@ ceph-10.2.10  v10.2.10.tar.gz
 # ./install-deps.sh
 </pre>
 
-2) **生成相关编译文件**
+2) **编译ceph**
+其实ceph编译有两种方式，一种是运行autogen.sh后接着运行configure，接着运行make编译，编译完成后用make install安装。还有另外一种是直接编译成deb包。下面我们就分别介绍一下这两种方式。
+
+###### 方式1
+
+* 1.1 生成相关编译文件
 
 执行如下命令预先生成编译时需要的相关文件：
 <pre>
@@ -91,7 +213,7 @@ ceph-10.2.10  v10.2.10.tar.gz
 # yum install gcc-c++
 {% endhighlight %}
 
-3) **生成Makefile文件**
+* 1.2 生成Makefile文件
 
 执行如下命令生成编译对应的Makefile文件：
 <pre>
@@ -116,9 +238,24 @@ ceph-10.2.10  v10.2.10.tar.gz
 </pre>
 >如果不想要依赖于google-perftools，请使用: ./configure --without-tcmalloc
 
-4) **编译**
+* 1.3 编译
 
-直接执行make命令编译即可：
+直接执行make命令即可：
+<pre>
+# make
+</pre>
+>注：最后make编译的过程中，如果遇到编译器错误，可以添加-j参数指定处理器数量，make -j2
+
+* 1.4 安装
+<pre>
+# make install
+</pre>
+执行make install命令安装到本地，这一步也可以通过手动移动二进制文件和配置文件到相应目录。其中，二进制文件放到/usr/bin，库文件放到/usr/lib,配置文件存入/etc/ceph。
+
+###### 方式2
+
+略，暂时不做介绍。
+
 
 
 
@@ -286,6 +423,8 @@ get bar
 3. [rocksdb 安装全过程 & 一些问题解决方法](https://blog.csdn.net/weixin_38976558/article/details/91616093)
 
 4. [ceph（jewel版）编译](https://blog.csdn.net/weixin_34137799/article/details/92231040)
+
+5. [源码编译ceph](https://blog.csdn.net/yuanfang_way/article/details/77076219)
 <br />
 <br />
 <br />
