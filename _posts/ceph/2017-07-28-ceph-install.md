@@ -186,7 +186,7 @@ v0.20.2
 </pre>
 
 ### 1.2 编译ceph
-下载完ceph源码，我们先参看一下```README.md```的说明(或查看官网[ceph编译说明](https://docs.ceph.com/docs/master/install/build-ceph/))，以了解大体编译步骤。
+下载完ceph源码，我们先参看一下```README.md```的说明(或查看官网[ceph编译说明](https://docs.ceph.com/docs/master/install/build-ceph/))，以了解大体编译步骤（请保持环境干净，否则可能引起不必要的麻烦。笔者编译时就因为事先安装过rocksdb而出现问题)。
 
 1) **安装依赖项**
 
@@ -236,7 +236,7 @@ v0.20.2
 # yum install libedit-devel
 # yum install expat-devel
 </pre>
->如果不想要依赖于google-perftools，请使用: ./configure --without-tcmalloc
+>如果不想要依赖于google-perftools，请使用: ./configure --without-tcmalloc；如果需要调试可以加上--with-debug选项
 
 * 1.3 编译
 
@@ -245,6 +245,19 @@ v0.20.2
 # make
 </pre>
 >注：最后make编译的过程中，如果遇到编译器错误，可以添加-j参数指定处理器数量，make -j2
+
+此外编译过程中可能出现如下错误：
+{% highlight string %}
+Usage:   
+  pip install [options] <requirement specifier> [package-index-options] ...
+  pip install [options] -r <requirements file> [package-index-options] ...
+  pip install [options] [-e] <vcs project url> ...
+  pip install [options] [-e] <local project path> ...
+  pip install [options] <archive url/path> ...
+
+no such option: --use-wheel
+{% endhighlight %}
+这是因为有一些版本的pip并不支持```--use-wheel```选项，遇到此种情况，我们找到对应的Makefile，将```--use-wheel```选项去掉即可。
 
 * 1.4 安装
 <pre>
@@ -260,7 +273,7 @@ v0.20.2
 
 
 ## 3. 编译安装rocksdb
-rocksdb起源于Facebook的实验室项目，实现了一个高性能的快速存储器，是基于C++编写的key value数据库，很多软件都是采用内置rocksdb的方式运行。因此这里我们先介绍一下rocksdb的安装。
+rocksdb起源于Facebook的实验室项目，实现了一个高性能的快速存储器，是基于C++编写的key value数据库，很多软件都是采用内置rocksdb的方式运行。因此这里我们先介绍一下rocksdb的安装。（ceph中会自动下载rocksdb模块，不需要像此处进行额外安装，否则可能会引起很多不必要的麻烦）
 
 
 1) **下载rocksdb源码**
