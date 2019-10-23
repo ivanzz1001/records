@@ -61,6 +61,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 
 2) **克隆整个ceph工程**
+
 在ceph官网下载的tar.gz包缺少文件，用git clone下载的ceph包比较全，因此我们采用如下方法
 <pre>
 # git clone --recursive https://github.com/ceph/ceph.git  
@@ -196,6 +197,7 @@ v0.20.2
 </pre>
 
 2) **编译ceph**
+
 其实ceph编译有两种方式，一种是运行autogen.sh后接着运行configure，接着运行make编译，编译完成后用make install安装。还有另外一种是直接编译成deb包。下面我们就分别介绍一下这两种方式。
 
 ###### 方式1
