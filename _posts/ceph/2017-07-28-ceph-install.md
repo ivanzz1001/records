@@ -440,6 +440,8 @@ get bar
 4. [ceph（jewel版）编译](https://blog.csdn.net/weixin_34137799/article/details/92231040)
 
 5. [源码编译ceph](https://blog.csdn.net/yuanfang_way/article/details/77076219)
+
+6. [手动编译配置ceph](https://my.oschina.net/linuxhunter/blog/682013)
 <br />
 <br />
 <br />
