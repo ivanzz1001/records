@@ -196,6 +196,11 @@ v0.20.2
 # ./install-deps.sh
 </pre>
 
+这里注意，需要把pip版本进行一下升级，比如本文编译时升级到了```pip-19.3.1```，否则可能遇到一些编译方面的问题。执行如下命令：
+<pre>
+# pip install --upgrade pip
+</pre>
+
 2) **编译ceph**
 
 其实ceph编译有两种方式，一种是运行autogen.sh后接着运行configure，接着运行make编译，编译完成后用make install安装。还有另外一种是直接编译成deb包。下面我们就分别介绍一下这两种方式。
@@ -238,7 +243,7 @@ v0.20.2
 # yum install libedit-devel
 # yum install expat-devel
 </pre>
->如果不想要依赖于google-perftools，请使用: ./configure --without-tcmalloc；如果需要调试可以加上--with-debug选项
+>如果不想要依赖于google-perftools，请使用: ./configure --without-tcmalloc；如果需要调试以及编译测试程序可以加上```--with-debug```选项
 
 * 1.3 编译
 
