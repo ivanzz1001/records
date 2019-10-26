@@ -442,6 +442,14 @@ get bar
 5. [源码编译ceph](https://blog.csdn.net/yuanfang_way/article/details/77076219)
 
 6. [手动编译配置ceph](https://my.oschina.net/linuxhunter/blog/682013)
+
+7. [ceph源码包官方下载](http://download.ceph.com/tarballs/)
+
+8. [ceph 阿里云镜像](http://mirrors.aliyun.com/ceph/tarballs/)
+
+9. [ceph编译安装教程](https://www.jianshu.com/p/2618036d7ec7)
+
+10. [ceph源代码部署测试环境](https://my.oschina.net/linuxhunter/blog/686606?p={{page}})
 <br />
 <br />
 <br />
