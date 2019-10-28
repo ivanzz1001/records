@@ -279,14 +279,12 @@ no such option: --use-wheel
 执行make install命令安装到本地，这一步也可以通过手动移动二进制文件和配置文件到相应目录。其中，二进制文件放到/usr/bin，库文件放到/usr/lib,配置文件存入/etc/ceph。
 
 >说明： 采用make来编译时可能会遇到有些test目录并不会编译，因此我们可以选择cmake来编译(cmake版本应该大于等于2.8.11)。命令如下
->
-># mkdir build
->
-># cd build
->
-># cmake [options] /path/to/ceph/src/dir
->
-># make
+<pre>
+# mkdir build
+# cd build
+# cmake [options] /path/to/ceph/src/dir
+# make
+</pre>
 
 ###### 方式2
 
@@ -470,9 +468,7 @@ get bar
 
 9. [ceph编译安装教程](https://www.jianshu.com/p/2618036d7ec7)
 
-10. [ceph源代码部署测试环境](https://my.oschina.net/linuxhunter/blog/686606?p={{page}})
-
-11. [Developer Guide (Quick)](https://github.com/ceph/ceph/blob/jewel-next/doc/dev/quick_guide.rst)
+10. [Developer Guide](https://github.com/ceph/ceph/blob/jewel-next/doc/dev/quick_guide.rst)
 <br />
 <br />
 <br />
