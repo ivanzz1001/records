@@ -278,13 +278,7 @@ no such option: --use-wheel
 </pre>
 执行make install命令安装到本地，这一步也可以通过手动移动二进制文件和配置文件到相应目录。其中，二进制文件放到/usr/bin，库文件放到/usr/lib,配置文件存入/etc/ceph。
 
->说明： 采用make来编译时可能会遇到有些test目录并不会编译，因此我们可以选择cmake来编译(cmake版本应该大于等于2.8.11)。命令如下
-<pre>
-# mkdir build
-# cd build
-# cmake [options] /path/to/ceph/src/dir
-# make
-</pre>
+
 
 ###### 方式2
 
