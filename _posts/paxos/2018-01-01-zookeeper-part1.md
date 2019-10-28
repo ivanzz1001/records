@@ -7,24 +7,15 @@ categories: paxos
 description: Zookeeper的安装及使用
 ---
 
+Apache ZooKeeper是由Apache Hadoop的子项目发展而来，于2010年11月正式成为了Apache的顶级项目。Zookeeper为分布式应用提供了高效且可靠的分布式协调服务、提供了诸如统一命名服务、配置管理和分布式锁等分布式的基础服务。在解决分布式数据一致性方面，Zookeeper并没有直接采用paxos算法，而是采用了一种被称为```ZAB```(Zookeeper Atomic Broadcast)的一致性协议。
 
-本文首先会对zookeeper做一个简单介绍，之后再给出相应的示例展示zookeeper的用法。
+本文我们将首先对Zookeeper进行一个整体上的介绍，包括Zookeeper的设计目标、由来以及它的基本概念，然后将会重点介绍ZAB这一Zookeeper中非常重要的一致性协议。
 
 <!-- more -->
 
 
 ## 1. zookeeper简介
-zookeeper是一个中心化的服务，主要用于：
 
-* 维护配置信息
-
-* 提供名称服务
-
-* 分布式同步
-
-* 组服务(group service)
-
-上面所有的这些服务，通常都是作为整个分布式系统中的一个模块被使用。假如我们每一次都需要自己来实现这样一些服务的话，则可能会变得十分繁琐且容易出错，因此我们将其独立出来形成一个标准化的东西就很有必要。
 
 
 
