@@ -224,7 +224,7 @@ v0.20.2
 
 执行如下命令生成编译对应的Makefile文件：
 <pre>
-# ./configure 
+# ./configure --with-rbd --with-debug --with-rados --with-radosgw
 </pre>
 在执行configure过程中可能会提示需要安装相应的软件包，执行如下命令安装：
 <pre>
@@ -249,9 +249,23 @@ v0.20.2
 
 直接执行make命令即可：
 <pre>
-# make
 # make check
+============================================================================
+Testsuite summary for ceph 10.2.10
+============================================================================
+# TOTAL: 141
+# PASS:  138
+# SKIP:  0
+# XFAIL: 0
+# FAIL:  3
+# XPASS: 0
+# ERROR: 0
+============================================================================
+
+# make
 </pre>
+上面有少数几个编译make check失败，暂时不去深究。
+
 >注：最后make编译的过程中，如果遇到编译器错误，可以添加-j参数指定处理器数量，make -j2
 
 此外编译过程中可能出现如下错误：
@@ -269,7 +283,6 @@ no such option: --use-wheel
 {% highlight string %}
 # grep -rn "use-wheel" ./
 # sed -i 's/--use-wheel//g' ./src/Makefile
-
 {% endhighlight %}
 
 * 1.4 安装
