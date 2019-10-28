@@ -264,7 +264,10 @@ Usage:
 
 no such option: --use-wheel
 {% endhighlight %}
-这是因为有一些版本的pip并不支持```--use-wheel```选项，遇到此种情况，我们找到对应的Makefile，将```--use-wheel```选项去掉即可。
+这是因为新版本(9.0.1之后)的pip并不支持```--use-wheel```选项，遇到此种情况，我们找到对应的Makefile，将```--use-wheel```选项去掉即可。例如替换*./src/tools/setup-virtualenv.sh*中的```--use-wheel```选项，可以执行如下命令：
+{% highlight string %}
+# sed -i 's/--use-wheel//g' ./setup-virtualenv.sh 
+{% endhighlight %}
 
 * 1.4 安装
 <pre>
