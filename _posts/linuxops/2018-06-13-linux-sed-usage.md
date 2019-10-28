@@ -68,6 +68,15 @@ The quick brown fox jumps over the lazy dog.
 The quick brown fox jumps over the lazy dog.
 The quick brown fox jumps over the lazy dog.
 </pre>
+如果要修改原文件，可以添加```-i```选项。例如：
+<pre>
+# sed -i 's/dog/cat/g' ./data1
+# cat data1
+The quick brown fox jumps over the lazy cat.
+The quick brown fox jumps over the lazy cat.
+The quick brown fox jumps over the lazy cat.
+The quick brown fox jumps over the lazy cat.
+</pre>
 
 
 ### 1.2 在命令行中使用多个编辑器命令
