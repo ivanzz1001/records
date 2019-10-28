@@ -266,7 +266,8 @@ no such option: --use-wheel
 {% endhighlight %}
 这是因为新版本(9.0.1之后)的pip并不支持```--use-wheel```选项，遇到此种情况，我们找到对应的Makefile，将```--use-wheel```选项去掉即可。例如替换*./src/tools/setup-virtualenv.sh*中的```--use-wheel```选项，可以执行如下命令：
 {% highlight string %}
-# sed -i 's/--use-wheel//g' ./setup-virtualenv.sh 
+# grep -rn "use-wheel" ./
+# sed -i 's/--use-wheel//g' ./src/Makefile
 {% endhighlight %}
 
 * 1.4 安装
@@ -274,6 +275,12 @@ no such option: --use-wheel
 # make install
 </pre>
 执行make install命令安装到本地，这一步也可以通过手动移动二进制文件和配置文件到相应目录。其中，二进制文件放到/usr/bin，库文件放到/usr/lib,配置文件存入/etc/ceph。
+
+>说明： 采用make来编译时可能会遇到有些test目录并不会编译，因此我们可以选择cmake来编译(cmake版本应该大于等于2.8.11)。命令如下
+>mkdir build
+>cd build
+>cmake [options] /path/to/ceph/src/dir
+>make
 
 ###### 方式2
 
