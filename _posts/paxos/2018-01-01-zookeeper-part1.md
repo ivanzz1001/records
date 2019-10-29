@@ -72,7 +72,31 @@ Session的sessionTimeout值用来设置一个客户端会话的超时时间。�
 
 在谈到分布式的时候，我们通常说的“节点”是指组成集群的每一台机器。然而，在Zookeeper中，“节点”分为两类，第一类同样是指构成集群的机器，我们称之为机器节点； 第二类则是指数据模型中的数据单元，我们称之为数据节点———ZNode。Zookeeper将所有数据存储在内存中，数据模型是一棵树(ZNode Tree)，由斜杠(/)进行分割的路径，就是一个Znode，例如/foo/path1。每个ZNode上都会保存自己的数据内容，同时还会保存一系列属性信息。
 
-在Zookeeper中，ZNode可以分为持久节点和临时节点两类。所谓持久节点是指一旦这个ZNode被创建了，除非主动进行ZNode移除操作，否者这个ZNode将一直保存在Zookeeper上。而临时节点就不一样了，它的生命周期和客户端会话绑定。
+在Zookeeper中，ZNode可以分为持久节点和临时节点两类。所谓持久节点是指一旦这个ZNode被创建了，除非主动进行ZNode移除操作，否者这个ZNode将一直保存在Zookeeper上。而临时节点就不一样了，它的生命周期和客户端会话绑定，一旦客户端会话失效，那么这个客户端所创建的所有临时节点都会被移除。另外，Zookeeper还允许用户为每个节点添加一个特殊的属性： SEQUENTIAL。一旦节点被标记上这个属性，那么这个节点被创建的时候，Zookeeper会自动在其节点后面追加一个整形数字，这个整形数字是一个由父节点维护的自增数字。
+
+4） **版本**
+
+在上面我们提到，Zookeeper的每个ZNode上都会存储数据，对应于每个ZNode，Zookeeper都会为其维护一个叫做```Stat```的数据结构，Stat中记录了这个ZNode的三个数据版本，分别是version(当前ZNode的版本）、cversion(当前ZNode子节点的版本）和aversion(当前ZNode的ACL版本）。
+
+5） **Watcher**
+
+Watcher(事件监听器），是Zookeeper中的一个很重要的特性。Zookeeper允许用户在指定节点上注册一些Watcher，并且在一些特定事件触发的时候，Zookeeper服务端会将事件通知到感兴趣的客户端上去，该机制是Zookeeper实现分布式协调服务的重要特性。
+
+6） **ACL**
+
+Zookeeper采用ACL(Access Control Lists)策略来进行权限控制，类似于Unix文件系统的权限控制。Zookeeper定义了如下5种权限：
+
+* CREATE: 创建子节点的权限
+
+* READ： 获取节点数据和子节点列表的权限
+
+* WRITE: 更新节点数据的权限
+
+* DELETE: 删除子节点的权限
+
+* ADMIN: 设置节点ACL的权限
+
+其中尤其需要注意的是，CREATE和DELETE这两种权限都是针对子节点的权限控制。
 
 
 <br />
