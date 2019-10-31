@@ -1,0 +1,118 @@
+---
+layout: post
+title: Zookeeper之ZAB协议
+tags:
+- paxos
+categories: paxos
+description: Zookeeper之ZAB协议
+---
+
+本文我们将对Zookeeper所使用的ZAB协议做一个较为深入的研究。涉及到的相关论文有：
+
+* 《A simple totally ordered broadcast protocol》
+
+* 《Zab: High-performance broadcast for primary-backup systems》
+
+>注： 这两篇论文网上似乎都要付费下载，因此这里我们主要参考《从Paxos到ZooKeeper》
+
+<!-- more -->
+
+## 1. ZAB协议
+在深入了解Zookeeper之前，相信很多读者都会认为ZooKeeper就是Paxos算法的一个实现。但事实上，ZooKeeper并没有完全采用Paxos算法，而是使用了一种称为Zookeeper Atomic Broadcast(ZAB, ZooKeeper原子消息广播协议）的协议作为数据一致性的核心算法。
+
+ZAB协议是为分布式协调服务Zookeeper专门设计的一种支持崩溃恢复的原子广播协议。ZAB协议的开发设计人员在协议设计之初并没有要求其具有很好的扩展性，最初只是为雅虎公司内部那些高吞吐量、低延迟、健壮、简单的分布式系统场景设计的。在ZooKeeper的官方文档中也指出，ZAB协议并不像Paxos算法那样，是一种通用的分布式一致性算法，它是一种特别为ZooKeeper设计的崩溃可恢复的原子消息广播算法。
+
+在ZooKeeper中，主要依赖ZAB协议来实现分布式数据一致性，基于该协议，ZooKeeper实现了一种主备模式的系统架构来保持集群中各副本之间数据的一致性。具体的，ZooKeeper使用一个单一的主进程来接收并处理客户端的所有事务请求，并采用ZAB的原子广播协议，将服务器数据的状态变更以事务Proposal的形式广播到所有的副本进程上去。ZAB协议的这个主备模型架构保证了同一时刻集群中只能够有一个主进程来广播服务器的状态变更，因此能够很好的处理客户端大量的并发请求。另一方面，考虑到在分布式环境中，顺序执行的一些状态变更其前后会存在一定的依赖关系，有些状态变更必须依赖于比它早生成的那些状态变更，例如变更C需要依赖变更A和变更B。这样的依赖关系也对ZAB协议提出了一个要求： ZAB协议必须能够保证一个全局的变更序列被顺序应用，也就是说，ZAB协议需要保证如果一个状态已经被处理了，那么所有其依赖的状态变更都应该已经被提前处理掉了。最后，考虑到主进程在任何时候都有可能出现崩溃或重启现象，因此，ZAB协议还需要做到在当前主进程出现上述异常情况的时候，依旧能够正常工作。
+
+ZAB协议的核心是定义了对于那些会改变ZooKeeper服务器数据状态的事务请求的处理方式，即：
+
+>所有事务请求必须由一个全局唯一的服务器来协调处理，这样的服务器被称为Leader服务器，而余下的其他服务器则成为Follower服务器。Leader服务器负责将一个客户端事务请求转换成一个事务Proposal(提议），并将该Proposal分发给集群中所有的Follower服务器。之后，Leader服务器需要等待所有Follower服务器的反馈，一旦超过半数的Follower服务器进行了正确的反馈后，那么Leader就会再次向所有的Follower服务器分发Commit消息，要求其将前一个Proposal进行提交。
+
+## 2. ZAB协议介绍
+从上面的介绍中，我们已经了解了ZAB协议的核心，现在我们就来详细地讲解下ZAB协议的具体内容。ZAB协议包括两种基本的模式，分别是崩溃恢复和消息广播。当整个服务框架在启动过程中，或者是当Leader服务器出现网络中断、崩溃退出与重启等异常情况时，ZAB协议就会进入恢复模式并选举产生新的Leader服务器。当选举产生了新的Leader服务器，同时集群中已经有过半的机器与该Leader服务器完成了状态同步之后，ZAB协议就会退出恢复模式。其中，所谓的状态同步是指数据同步，用来保证集群中存在过半的机器能够和Leader服务器的数据状态保持一致。
+
+当集群中已经有过半的Follower服务器完成了和Leader服务器的状态同步，那么整个服务框架就可以进入消息广播了。当一台同样遵守ZAB协议的服务器启动后加入到集群中时，如果此时集群中已经存在一个Leader服务器在负责进行消息广播，那么新加入的服务器就会自觉的进入数据恢复模式： 找到Leader所在的服务器，与其进行数据同步，然后一起参与到消息广播流程中去。正如上文介绍中所说的，Zookeeper设计成只允许唯一的一个Leader服务器来进行事务请求的处理。Leader服务器在接收到客户端的事务请求后，会生成对应的事务提案并发起一轮广播协议； 而如果集群中的其他机器接收到客户端的事务请求，那么这些非Leader服务器会首先将这个事务请求转发给Leader服务器。
+
+当Leader服务器出现崩溃退出或者机器重启，亦或是集群中已经不存在过半的服务器与该Leader服务器保持正常通行时，那么在重新开始新一轮原子广播事务操作之前，所有进程首先会使用崩溃恢复协议来使彼此达到一个一致的状态，于是整个ZAB流程就会从消息广播模式进入到崩溃恢复模式。
+
+一个机器要成为新的Leader，必须获得过半进程的支持，同时由于每个进程都有可能会崩溃，因此，ZAB协议运行过程中，前后会出现多个Leader，并且每个进程也有可能会多次成为Leader。进入崩溃恢复模式后，只要集群中存在过半的服务器能够彼此进行正常通信，那么就可以产生一个新的Leader并再次进入消息广播模式。举个例子来说，一个由3台机器组成的ZAB服务，通常由1个Leader，2个Follower服务器组成。某一个时刻，假如其中一个Follower服务器挂了，整个ZAB集群是不会中断服务的，这是因为Leader服务器依然能够获得过半机器（包括Leader自己）的支持。
+
+接下来我们就重点讲解一下ZAB协议的消息广播和崩溃恢复过程。
+
+### 2.1 消息广播
+ZAB协议的消息广播过程使用的是一个原子广播协议，类似于一个二阶段提交过程。针对客户端的事务请求，Leader服务器会为其生成对应的事务Proposal，并将其发送给集群中其余所有的机器，然后再分别收集各自的选票，最后进行事务提交，下图所示就是```ZAB协议消息广播```流程的示意图：
+
+![zab-message-broadcast](https://ivanzz1001.github.io/records/assets/img/paxos/zab_message_broadcast.jpg)
+
+参看其他的相关文章，我们已经了解了关于二阶段提交协议的内容，而此处ZAB协议中涉及的二阶段提交过程则与其略有不同。在ZAB协议二阶段提交过程中，所有的Follower服务器要么正常反馈Leader提出的事务Proposal，要么就抛弃Leader服务器。同时，ZAB协议将二阶段提交中的中断逻辑移除意味着我们可以在过半的Follower服务器已经反馈ACK之后就开始提交事务Proposal了，而不需要等待集群中所有的Follower服务器都反馈响应。当然，在这种简化了的二阶段提交模型下，是无法处理Leader服务器崩溃退出而带来的数据不一致问题的，因此在ZAB协议中添加了另一个模式，即采用崩溃恢复模式来解决这个问题。另外，整个消息广播协议是基于具有FIFO特性的TCP协议来进行网络通信的，因此能够很容易地保证消息广播过程中消息接收与发送的顺序性。
+
+在整个消息广播过程中，Leader服务器会为每个事务请求生成对应的Proposal来进行广播，并且在广播事务Proposal之前，Leader服务器会首先为这个事务Proposal分配一个全局递增的唯一ID，我们称之为事务ID（即ZXID)。由于ZAB协议需要保证每一个消息严格的因果关系，因此必须将每一个事务Proposal按照其ZXID的先后顺序来进行排序与处理。
+
+具体的，在消息广播过程中，Leader服务器会为每一个Follower服务器都各自分配单独的队列，然后将需要广播的事务Proposal依次放入这些队列中去，并且根据FIFO策略进行消息发送。每一个Follower服务器在接收到这个事务Proposal之后，都会首先将其以事务日志的形式写入到本地磁盘中去，并且在成功写入后反馈给Leader服务器一个ACK响应。当Leader服务器接收到超过半数Follower的Ack响应后，就会广播一个Commit消息给所有的Follower服务器以通知其进行事务提交，同时Leader自身也会完成对事务的提交，而每一个Follower服务器在接收到Commit消息后，也会完成对事务的提交。
+
+### 2.2 崩溃恢复
+上面我们主要讲解了ZAB协议中的消息广播过程。ZAB协议的这个基于原子广播协议的消息广播过程，在正常情况下运行非常良好，但是一旦Leader服务器出现崩溃，或者因为网络原因导致Leader服务器失去了与过半Follower的联系，那么就会进入崩溃恢复模式。在ZAB协议中，为了保证程序的正确运行，整个恢复过程结束后需要选举出一个新的Leader服务器。因此，ZAB协议需要一个高效且可靠的Leader选举算法，从而确保能够快速地选举出新的Leader。同时，Leader选举算法不仅仅需要让Leader自己知道其自身已经被选举为Leader，同时还需要让集群中所有其他机器也能够快速的感知到选举产生的新的Leader服务器。
+
+###### 基本特性
+根据上面的内容，我们了解到，ZAB协议规定了如果一个事务Proposal在一台机器上被处理成功，那么应该在所有的机器上都被处理成功，哪怕机器出现故障崩溃。接下来我们看看在崩溃恢复过程中，可能会出现的两个数据不一致性的隐患及针对这些情况ZAB协议需要保证的特性。
+
+1） ZAB协议需要确保那些已经在Leader服务器上提交的事务最终被所有服务器都提交
+
+假设一个事务在Leader服务器上被提交了，并且已经得到过半Follower服务器的Ack反馈，但是在它将Commit消息发送给所有Follower机器之前，Leader服务器挂了，如下图所示：
+
+![zab-recover-1](https://ivanzz1001.github.io/records/assets/img/paxos/zab_recover_1.jpg)
+
+上图中的消息C2就是一个典型的例子： 在集群正常运行过程中的某一个时刻，Server1是Leader服务器，其先后广播了消息P1、P2、C1、P3和C2，其中当Leader服务器将消息C2(C2是Commit Of Proposal2的缩写，即提交事务Proposal2)发出后就立即崩溃退出了。针对这种情况，ZAB协议就需要确保事务Proposal2最终能够在所有的服务器上都被提交成功，否则将出现不一致。
+
+2） ZAB协议需要确保丢弃那些只在Leader服务器上被提出的事务
+
+相反，如果在崩溃恢复过程中，出现一个需要被丢弃的提案，那么在崩溃恢复结束后需要跳过该事务Proposal，如下图所示：
+
+![zab-recover-2](https://ivanzz1001.github.io/records/assets/img/paxos/zab_recover_2.jpg)
+
+上图所示的集群中，假设初始的Leader服务器Server1在提出了一个事务Proposal3之后就崩溃了，从而导致集群中其他服务器都没有收到这个事务Proposal。于是，当Server1恢复过来再次加入到集群中的时候，ZAB协议需要确保丢弃Proposal3这个事务。
+
+结合上面提到的这两个崩溃恢复过程中需要处理的特殊情况，就决定了ZAB协议必须设计这样一个Leader选举算法：能够确保提交已经被Leader提交的事务Proposal，同时丢弃已经被跳过的事务Proposal。针对这个要求，如果让Leader选举算法能够保证新选举出来的Leader服务器拥有集群中所有机器最高编号(即ZXID最大）的事务Proposal，那么就可以保证这个新选举出来的Leader一定具有所有已经提交的提案。更为重要的是，如果让具有最高编号事务Proposal的机器来称为Leader，就可以省去Leader服务器检查Proposal的提交和丢弃工作这一步操作了。
+
+###### 数据同步
+
+完成Leader选举之后，在正式开始工作（即接收客户端的事务请求，然后提出新的提案）之前，Leader服务器会首先确认事务日志中的所有Proposal是否都已经被集群中过半的机器提交了，即是否完成数据同步。下面我们就来看看ZAB协议的数据同步过程。
+
+所有正常运行的服务器，那么成为Leader，那么成为Follower并和Leader保持同步。Leader服务器需要确保所有的Follower服务器能够接收到每一条事务Proposal,并且能够正确的将所有已经提交了的事务Proposal应用到内存数据库中去。具体的，Leader服务器会为每一个Follower服务器都准备一个队列，并将那些没有被各Follower服务器同步的事务以Proposal消息的形式逐个发送给Follower服务器，并在每一个Proposal消息后面紧接着再发送一个Commit消息，以表示该事务已经被提交。等到Follower服务器将所有其尚未同步的事务Proposal都从Leader服务器上同步过来并成功应用到本地数据库中后，Leader服务器就会将该Follower服务器加入到真正可用的Follower列表中，并开始之后的其他流程。
+
+上面讲到的是正常情况下的数据同步逻辑，下面来看ZAB协议是如何处理那些需要被丢弃的事务Proposal的。在ZAB协议的事务编号ZXID设计中，ZXID是一个64位的数字，其中低32位可以看做是一个简单的单调递增的计数器，针对客户端的每一个事务请求，Leader服务器在产生一个新的事务Proposal的时候，都会对该计数器进行加1操作； 而高32位则代表了Leader周期epoch的编号，每当选举产生一个新的Leader服务器，就会从这个Leader服务器上取出其本地日志中最大事务Proposal的ZXID，并从该ZXID中解析出对应的epoch值，然后再对其进行加1操作，之后就会以此编号作为新的epoch，并将低32位置0来开始生成新的ZXID。ZAB协议中的这一通过epoch编号来区分Leader周期变化的策略，能够有效地避免不同的Leader服务器错误的使用相同的ZXID编号提出不一样的事务Proposal的异常情况，这对于识别在Leader崩溃恢复前后生成的Proposal非常有帮助，大大简化和提升了数据恢复流程。
+
+基于这样的策略，当一个包含了上一个Leader周期中尚未提交过的事务Proposal的服务器启动时，其肯定无法成为Leader，原因很简单，因为当前集群中一定包含一个Quorum集合，该集合中的机器一定包含了更高epoch的事务Proposal，因此这台机器的事务Proposal肯定不是最高，也就无法成为Leader了。当这台机器加入到集群中，以Follower角色连接上Leader服务器之后，Leader服务器就会根据自己服务器上最后被提交的Proposal来和Follower服务器的Proposal进行比对，比对的结果当然是Leader要求Follower进行一个回退操作————回退到一个确实已经被集群中过半机器提交的最新事务Proposal。举个例子来说，在上图```Figure 4```中，当Server1连接上Leader后，Leader会要求Server1取出P3。
+
+## 3. ZAB与Paxos算法的联系与区别
+
+ZAB协议并不是Paxos算法的一个典型实现，在讲解ZAB和Paxos之间的区别之前，我们首先来看一下两者的联系：
+
+* 两者都存在一个类似于Leader进程的角色，由其负责协调多个Follower进程的运行；
+
+* Leader进程都会等到超过半数的Follower做成正确的反馈后，才会将一个提案进行提交；
+
+* 在ZAB协议中，每个Proposal中都包含了一个epoch值，用来代表当前的Leader周期；在Paxos算法中，同样存在这样一个标识，只是名字变成了Ballot。
+
+在Paxos算法中，一个新选举产生的主进程会进行两个阶段的工作。第一阶段被称为读阶段，在这个阶段中，这个新的主进程会通过和所有其他进程进行通信的方式来收集上一个主进程提出的提案，并将它们提交。第二阶段被称为写阶段，在这个阶段当前主进程开始提出它自己的提案。在Paxos算法设计的基础上，ZAB协议额外增加了一个同步阶段。在同步阶段之前，ZAB协议也存在一个和Paxos算法中的读阶段非常类似的过程，称为发现（Discovery）阶段。在同步阶段中，新的Leader会确保存在过半的Follower已经提交了之前Leader周期中的所有事务Proposal。这一同步阶段的引入，能够有效的保证Leader在新的周期中提出事务Proposal之前，所有的进程都已经完成了对之前所有事务Proposal的提交。一旦完成同步阶段后，那么ZAB就会执行和Paxos算法类似的写阶段。
+
+总的来讲，ZAB协议和Paxos算法的本质区别在于，两者设计目标不太一样。ZAB协议主要用于构建一个高可用的分布式数据主备系统，例如Zookeeper，而Paxos算法则是用于构建一个分布式的一致性状态机系统。
+
+
+<br />
+<br />
+**参看：**
+
+1. [Zookeeper和 Google Chubby对比分析](https://www.cnblogs.com/grefr/p/6088115.html)
+
+2. [The Chubby lock service for loosely coupled distributed systems](https://github.com/lwhile/The-Chubby-lock-service-for-loosely-coupled-distributed-systems-zh_cn)
+
+3. [zookeeper官网](https://zookeeper.apache.org/)
+
+4. [zookeeper官网关于Zab的介绍](https://cwiki.apache.org/confluence/display/ZOOKEEPER/Zab)
+
+<br />
+<br />
+<br />
+
+
