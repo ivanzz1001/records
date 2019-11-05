@@ -90,7 +90,71 @@ osdmap eNNN pg {raw-pg-num} ({pg-num}) -> up [0,1,2] acting [0,1,2]
 同时OSD也会向monitor主动报告其自身的状态。
 
 ## 4. 监控PG状态
+假如你执行```ceph health```或者```ceph -s```或者```ceph -w```命令，你可能会发现ceph集群并不总是处于HEALTH OK状态。在你检查完OSD是否正处于运行状态之后，你也应该再检查一下PG的状态。在PG处于peering相关场景下，集群的状态可能就不是```HEALTH OK```了:
 
+* 刚刚创建完一个pool，pg还为peer完成
+
+* PG当前正处于recovering状态
+
+* 刚刚向集群中添加一个OSD或者从集群中移除一个OSD
+
+* 刚刚修改完crush map，PG正处于迁移过程
+
+* 在PG中不同副本之间的数据出现了不一致
+
+* 一个PG的副本之间正处于scrubbing状态
+
+* ceph没有足够的空间来完成backfilling操作
+
+假设出现上面的情况之一，整个集群将会处于```HEALTH WARN```状态。在大部分情况下，整个ceph集群都可以完成自我修复。但在有一些情况下，可能就需要人工介入来进行处理。监控PG运行情况的另一个方面就是确保在ceph集群处于up+running状态时，所有的PG处于active+clean状态。如果要查询所有PG的状态，请执行：
+<pre>
+# ceph pg stat
+v61459532: x pgs: y active+clean, z active+clean+scrubbing+deep; 63243 GB data, 187 TB used, 450 TB / 638 TB avail; 21507 kB/s rd, 2751 kB/s wr, 362 op/s
+</pre>
+上面的结果告诉我们当前总的PG个数为x，其中有y个PG处于active+clean状态，z个PG处于active+clean+scrubbing+deep状态
+
+>注： 大部分情况下，ceph集群中的PG状态都可能会有多种
+
+另外，通过上面的命令在查询PG状态时也会打印出当前数据的使用容量，剩余容量以及总容量。这些数据在某一些场景下很有用：
+
+* ceph集群快达要到near full ratio或者full ratio
+
+* 由于CRUSH的配置错误使得数据并没有均衡的分布到整个集群
+
+1） **PG ID**
+
+PG ID由三个部分组成： 存储池ID(pool number)、period(.)、pg ID(十六进制数表示)：
+{% highlight string %}
+{pool-num}.{pg-id}
+{% endhighlight %}
+
+你可以通过执行*ceph osd lspools*命令来查看存储池ID以及它们的名称。比如ceph集群创建的第一个pool，其pool id为1，因此该存储池中的PG ID就类似于```1.1f```。
+
+
+2） **PG查询相关命令**
+
+如果要获取整个PG列表，请执行如下命令：
+<pre>
+# ceph pg dump
+<pre>
+
+如果想格式化输出(json格式)到一个指定文件，则可以执行如下命令：
+<pre>
+# ceph pg dump -o {filename} --format=json
+</pre>
+
+如果要查询某一个特定PG，可以执行如下的命令：
+<pre>
+# ceph pg {poolnum}.{pg-id} query
+</pre>
+上面命令执行之后将会以json格式打印出该PG的详细信息。
+
+
+### 4.1 PG状态
+
+如下我们将详细地介绍PG的常见状态。
+
+1） **CREATING**
 
 
 
