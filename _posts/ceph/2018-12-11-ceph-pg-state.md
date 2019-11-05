@@ -136,7 +136,7 @@ PG ID由三个部分组成： 存储池ID(pool number)、period(.)、pg ID(十�
 如果要获取整个PG列表，请执行如下命令：
 <pre>
 # ceph pg dump
-<pre>
+</pre>
 
 如果想格式化输出(json格式)到一个指定文件，则可以执行如下命令：
 <pre>
@@ -156,6 +156,9 @@ PG ID由三个部分组成： 存储池ID(pool number)、period(.)、pg ID(十�
 
 1） **CREATING**
 
+当创建存储池(pool)时，将会一并创建所指定个数的PG。在PG正处于创建过程中时，该PG的状态为```creating```。一旦PG创建完成，该PG Acting Set中的OSD将会开始执行peer操作。peer完成后，pg的状态变为active+clean，此时就表明ceph客户端可以开始向该PG写入数据了：
+
+![ceph-pg-create](https://ivanzz1001.github.io/records/assets/img/ceph/ceph-pg-create.png)
 
 
 <br />
