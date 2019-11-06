@@ -154,11 +154,60 @@ PG ID由三个部分组成： 存储池ID(pool number)、period(.)、pg ID(十�
 
 如下我们将详细地介绍PG的常见状态。
 
-1） **CREATING**
+###### 1） CREATING
 
 当创建存储池(pool)时，将会一并创建所指定个数的PG。在PG正处于创建过程中时，该PG的状态为```creating```。一旦PG创建完成，该PG Acting Set中的OSD将会开始执行peer操作。peer完成后，pg的状态变为active+clean，此时就表明ceph客户端可以开始向该PG写入数据了：
 
 ![ceph-pg-create](https://ivanzz1001.github.io/records/assets/img/ceph/ceph-pg-create.png)
+
+
+###### 2） PEERING
+
+当ceph正在对一个PG进行peering时，将尝试使PG中各数据副本达成一致的状态。当PG完成peering之后，这就意味着该PG中OSD之间针对当前PG的状态达成了一致。然而，peering完成之后并不意味着当前PG中各个副本都拥有当前最新的数据。
+
+>**权威历史(Authoritative History)**
+>
+>在客户端进行写操作时，必须要等到PG acting set中的所有OSD都写成功之后才会向客户端返回ACK响应。这就保证了自上次peering操作完成后，acting set中至少有一个成员拥有每一次*成功写操作*(acknowledged write operation)的完整历史记录。
+>
+>对每一个acknowledged write operation都有精确的记录，这就使得ceph可以构建出该PG的一个完整且有序的操作历史，然后就可以将该PG的所有OSD副本都更新到最新的一致状态。
+
+###### 3） ACTIVE
+一旦ceph完成Peering操作之后，pg就会变为active状态。active状态意味着PG中的数据是可以执行读写操作的。
+
+###### 4) CLEAN
+当一个PG处于clean状态时，说明PG的主OSD与副本OSD已经完成了peer，并且主副本OSD上的数据也已经是一致的了。ceph会对PG中的所有数据都复制到正确的副本数。
+
+###### 5) DEGRADED
+当一个客户端向主OSD写入一个对象时，主OSD负责将该对象也写入到副本OSD。在主OSD将对象写入到硬盘之后，PG将会处于*degraded*状态，直到主OSD收到了所有副本OSD的ack应答为止。
+
+一个PG处于active+degraded状态的原因是： 某一个OSD虽然处于active状态，但该OSD当前却并不含有全部的对象。假如某一个OSD进入down状态，ceph将会把与该OSD相关联的PG都置位*degraded*状态。之后如果该OSD重新上线，则相关的PG必须重新peer。然而，即使某一个pg处于*degraded*状态，只要该PG仍是active的，那么仍可以向该PG写入新的数据。
+
+假如某一个OSD处于down状态，并且PG处于*degraded*状态一直持续的话，ceph就可能将该down状态的OSD移出集群，标记为out状态。
+
+假如某一个OSD下线(处于down状态)，那么相关的PG会处于*degraded*状态，在该状态持续一段时间之后（通常是300s），ceph就有可能将该down状态的OSD标记为out状态，指示该OSD已经移出集群， 然后开始将该down OSD上面的数据remap到另一个OSD。一个OSD从down状态变为out状态的时间由*mon osd down out interval*来控制，默认值为600s。
+
+此外，如果ceph在某一个PG中找不到对应的object的话，ceph也可能会将该pg标记为*degraded*状态。对于unfound的对象，将不能够进行读写，但是你仍然可以访问处于*degraded*状态下PG中的其他对象。
+
+###### 6） RECOVERING
+ceph具有高容错性，能够应对运行过程中出现的软件或硬件相关的问题。当一个osd下线(down)之后，该OSD上的数据就有可能会落后于其他副本。之后该OSD重新上线，相关的PG就必须进行更新以反应当前的最新状态。在这一过程中，OSD可能就会显示为*recovering*状态。
+
+Recovery发生的概率还是很高的，因为硬件的错误会导致多个OSD都失效，之后肯定就需要对数据进行恢复。例如，某个rack的路由器出现了故障，这就可能导致多台主机上的OSD落后于当前的集群状态。之后当故障解决之后，相关的OSD就必须进行恢复。
+
+ceph提供了许多的配置参数来平衡相应的资源，使得在数据恢复期间也能够尽量正常的为外部提供服务。*osd recovery delay start*配置参数用于设置在restart、re-peer多长时间之后开始进行recovery操作； *osd recovery thread timeout*用于设置线程的超时时间，因为多个OSD都可能失效，这样最好是错开来进行restart、repeer，以防止消耗太多的资源。*osd recovery max active*配置参数限制了每个OSD能够同时处理的recovery请求个数，以防止因消耗资源过多而不能对外提供服务； *The osd recovery max chunk*配置参数限制了在进行数据恢复时chunk的大小，用以降低网络拥塞。
+
+###### 7） BACKFILLING
+当一个新的OSD加入到集群中之后，CRUSH会对PG进行重新映射，以将一些数据能够存放到新添加的OSD上。强制新添加的OSD马上就接受PG的指派可能会导致该OSD瞬间压力过高。而backfilling操作可以在后台进行，一旦backfilling操作完成，新添加的OSD就能够服务外部的请求。
+
+在backfill操作过程中，你可能会看到多种状态：*backfill_wait*状态表明当前有一个backfill操作被挂起；*backfilling*状态表明backfill操作正在进行中；*backfill_toofull*表明s收到了一个backfill操作请求，但是由于存储容量的限制，使得该backfill操作不能够完成。当一个PG不能够backfilled时，就会显示为*incomplete*状态
+
+*backfill_toofull*状态有可能只是暂时性的，因为当PG中相关的数据有可能会被移除，这样后面就又有可用的存储空间了。*backfill_toofull*状态类似于*backfill_wait*，只要后续相关的条件满足之后backfill就可以成功完成。
+
+ceph提供了一系列的设置用于管理由于PG重新映射(特别是重新映射到一个新的OSD)导致的高负载。默认情况下，*osd_max_backfills*设置一个OSD可以同时进行的backfill数(包括backfill to与backfill from)为1。*backfill full ratio*用于设置一个OSD 在backfill时硬盘容量达到full ratio时就会解决相关的backfill请求，我们可以通过*osd set-backfillfull-ratio*命令来更改相关的值；假如某一个OSD拒绝了一个backfill请求，* osd backfill retry interval*使得一个OSD会在其指定的时间之后再次发起backfill请求。OSD也可以通过设置*osd backfill scan min*以及*osd backfill scan max*来管理扫描周期（默认情况下值分别为64/512）。
+
+
+###### 8) REMAPPED
+
+
 
 
 <br />
