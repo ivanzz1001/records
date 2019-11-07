@@ -332,7 +332,45 @@ osdmap e537 pool 'data' (1) object 'test-object-1' -> pg 1.d1743484 (1.4) -> up 
 ### 5.1 Degraded
 
 ###### 5.1.1 说明
+降级(degraded): 通常我们知道，每个PG有三个副本，分别保存在不同的OSD中，在非故障情况下，这个PG是active+clean状态，那么如果一个PG的副本挂掉了，这个PG就是降级状态。
 
+
+###### 5.1.2 故障模拟
+a. 停止osd.1
+<pre>
+# systemctl stop ceph-osd@1
+</pre>
+
+b. 查看PG状态
+<pre>
+# ceph pg stat
+20 pgs: 20 active+undersized+degraded; 14512 kB data, 302 GB used, 6388 GB / 6691 GB avail; 12/36 objects degraded (33.333%)
+</pre>
+
+c. 查看集群监控状态
+<pre>
+# ceph health detail
+HEALTH_WARN 1 osds down; Degraded data redundancy: 12/36 objects degraded (33.333%), 20 pgs unclean, 20 pgs degraded; application not enabled on 1 pool(s)
+OSD_DOWN 1 osds down
+    osd.1 (root=default,host=ceph-xx-cc00) is down
+PG_DEGRADED Degraded data redundancy: 12/36 objects degraded (33.333%), 20 pgs unclean, 20 pgs degraded
+    pg 1.0 is active+undersized+degraded, acting [0,2]
+    pg 1.1 is active+undersized+degraded, acting [2,0]
+</pre>
+
+d. 客户端IO操作
+<pre>
+//写入对象
+# bin/rados -p test_pool put myobject ceph.conf
+
+//读取对象到文件
+# rados -p test_pool get myobject.old
+
+//查看文件
+# ll ceph.conf*
+-rw-r--r-- 1 root root 6211 Jun 25 14:01 ceph.conf
+-rw-r--r-- 1 root root 6211 Jul  3 19:57 ceph.conf.old
+</pre>
 
 
 <br />
