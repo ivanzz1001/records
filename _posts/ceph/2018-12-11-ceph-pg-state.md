@@ -180,7 +180,7 @@ PG ID由三个部分组成： 存储池ID(pool number)、period(.)、pg ID(十�
 ###### 5) DEGRADED
 当一个客户端向主OSD写入一个对象时，主OSD负责将该对象也写入到副本OSD。在主OSD将对象写入到硬盘之后，PG将会处于*degraded*状态，直到主OSD收到了所有副本OSD的ack应答为止。
 
-一个PG处于active+degraded状态的原因是： 某一个OSD虽然处于active状态，但该OSD当前却并不含有全部的对象。假如某一个OSD进入down状态，ceph将会把与该OSD相关联的PG都置位*degraded*状态。之后如果该OSD重新上线，则相关的PG必须重新peer。然而，即使某一个pg处于*degraded*状态，只要该PG仍是active的，那么仍可以向该PG写入新的数据。
+一个PG处于active+degraded状态的原因是： 某一个OSD虽然处于active状态，但该OSD当前却并不含有全部的对象。假如某一个OSD进入down状态，ceph将会把与该OSD相关联的PG都置为*degraded*状态。之后如果该OSD重新上线，则相关的PG必须重新peer。然而，即使某一个pg处于*degraded*状态，只要该PG仍是active的，那么仍可以向该PG写入新的数据。
 
 假如某一个OSD处于down状态，并且PG处于*degraded*状态一直持续的话，ceph就可能将该down状态的OSD移出集群，标记为out状态。
 
@@ -214,6 +214,59 @@ ceph会使用heartbeat来检测hosts与daemons的运行状况，*ceph-osd*守护
 
 当启动集群的时候，我们可能会经常看到*stale*状态，直到peering过程完成。在ceph集群运行一段时间之后，如果看到一些PG进入*stale*状态，这通常表明这些PG的主OSD失效(down)或者是主OSD没有向monitor报告相应的状态。
 
+
+<br />
+如下我们对PG相关状态进行一下总结：
+
+* Activating： Peering已经完成，PG正在等待所有PG实例同步并固化Peering的结果(Info、Log等)
+
+* Active： 活跃态。PG可以正常处理来自客户端的读写请求
+
+* Backfilling： 正在后台填充态。 backfill是recovery的一种特殊场景，指peering完成后，如果基于当前权威日志无法对Up Set当中的某些PG实例实施增量同步(例如承载这些PG实例的OSD离线太久，或者是新的OSD加入集群导致的PG实例整体迁移) 则通过完全拷贝当前Primary所有对象的方式进行全量同步
+
+* Backfill-toofull： 某个需要被Backfill的PG实例，其所在的OSD可用空间不足，Backfill流程当前被挂起
+
+* Backfill-wait： 等待Backfill 资源预留
+
+* Clean： 干净态。PG当前不存在待修复的对象， Acting Set和Up Set内容一致，并且大小等于存储池的副本数
+
+* Creating： PG正在被创建
+
+* Deep： PG正在或者即将进行对象一致性扫描清洗
+
+* Degraded： 降级状态。Peering完成后，PG检测到任意一个PG实例存在不一致(需要被同步/修复)的对象，或者当前ActingSet 小于存储池副本数
+
+* Down： Peering过程中，PG检测到某个不能被跳过的Interval中(例如该Interval期间，PG完成了Peering，并且成功切换至Active状态，从而有可能正常处理了来自客户端的读写请求),当前剩余在线的OSD不足以完成数据修复
+
+* Incomplete： Peering过程中， 由于 a. 无非选出权威日志 b. 通过choose_acting选出的Acting Set后续不足以完成数据修复，导致Peering无非正常完成
+
+* Inconsistent	不一致态。集群清理和深度清理后检测到PG中的对象在副本存在不一致，例如对象的文件大小不一致或Recovery结束后一个对象的副本丢失
+
+* Peered： Peering已经完成，但是PG当前ActingSet规模小于存储池规定的最小副本数(min_size)
+
+* Peering： 正在同步态。PG正在执行同步处理
+
+* Recovering： 正在恢复态。集群正在执行迁移或同步对象和他们的副本
+
+* Recovering-wait： 等待Recovery资源预留
+
+* Remapped： 重新映射态。PG活动集任何的一个改变，数据发生从老活动集到新活动集的迁移。在迁移期间还是用老的活动集中的主OSD处理客户端请求，一旦迁移完成新活动集中的主OSD开始处理
+
+* Repair： PG在执行Scrub过程中，如果发现存在不一致的对象，并且能够修复，则自动进行修复状态
+
+* Scrubbing： PG正在或者即将进行对象一致性扫描
+
+* Unactive： 非活跃态。PG不能处理读写请求
+
+* Unclean： 非干净态。PG不能从上一个失败中恢复
+
+* Stale： 未刷新态。PG状态没有被任何OSD更新，这说明所有存储这个PG的OSD可能挂掉, 或者Mon没有检测到Primary统计信息(网络抖动)
+Undersized	PG当前Acting Set小于存储池副本数
+
+
+
+
+
 ### 4.2 identifying troubled PGS
 如上文提到的，一个PG如果其状态不是active+clean的话，并不一定意味着出现了问题。通常情况下，当一个PG进入stuck状态之后，ceph很可能不能够完成自我修复。stuck状态包括如下：
 
@@ -226,7 +279,7 @@ ceph会使用heartbeat来检测hosts与daemons的运行状况，*ceph-osd*守护
 如果要找出处于stuck状态的PG，可以执行如下的命令：
 <pre>
 # ceph pg dump_stuck [unclean|inactive|stale|undersized|degraded]
-<pre>
+</pre>
 
 
 ### 4.3 finding an object location
@@ -273,6 +326,12 @@ osdmap e537 pool 'data' (1) object 'test-object-1' -> pg 1.d1743484 (1.4) -> up 
 </pre>
 随着集群的不断运行，对象的location可能也会动态的发生改变。ceph动态平衡的一个好处就是可以不用人工进行干预。
 
+
+## 5. PG状态详解及故障模拟
+
+### 5.1 Degraded
+
+###### 5.1.1 说明
 
 
 
