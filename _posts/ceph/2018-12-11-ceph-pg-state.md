@@ -207,6 +207,72 @@ ceph提供了一系列的设置用于管理由于PG重新映射(特别是重新�
 
 ###### 8) REMAPPED
 
+当一个PG的Acting Set发生了改变之后，PG中的数据就会从老的acting set迁移到新的acting set。在这一迁移过程中，新的primary OSD可能会有一段时间不能正常的提供服务，因此还是需要请求原来到的primary OSD，直到PG中相关的数据迁移完成。一旦数据迁移完成，会使用新acting set中的primary OSD来提供服务。
+
+###### 9) STALE
+ceph会使用heartbeat来检测hosts与daemons的运行状况，*ceph-osd*守护进程本身也可能会进入*stuck*状态，此时其就不能周期性的报告相关的运行数据(例如：临时性的网络故障)。默认情况下，OSD守护进程会隔0.5s就报告一次PG、up through、boot以及failure数据，这个报告频率是高于heartbeat的阈值的。假如一个PG的主OSD不能向monitor报告相关的运行数据，或者是PG中的其他OSD向monitor报告主OSD已经失效(down)，则monitor将会把该PG的状态标记为stale。
+
+当启动集群的时候，我们可能会经常看到*stale*状态，直到peering过程完成。在ceph集群运行一段时间之后，如果看到一些PG进入*stale*状态，这通常表明这些PG的主OSD失效(down)或者是主OSD没有向monitor报告相应的状态。
+
+### 4.2 identifying troubled PGS
+如上文提到的，一个PG如果其状态不是active+clean的话，并不一定意味着出现了问题。通常情况下，当一个PG进入stuck状态之后，ceph很可能不能够完成自我修复。stuck状态包括如下：
+
+* unclean： PG所包含的对象的副本数与所期望的不一致，需要对这些对象进行恢复
+
+* inactive： 由于拥有最新数据的OSD还没有运行(up)，导致对应的PG不能进行读写操作
+
+* stale: PG当前处于unknown state，这是由于容纳该这些PG的OSD已经有一段时间没有向Monitor报告相关的状态了（由*mon osd report timeout*进行配置)
+
+如果要找出处于stuck状态的PG，可以执行如下的命令：
+<pre>
+# ceph pg dump_stuck [unclean|inactive|stale|undersized|degraded]
+<pre>
+
+
+### 4.3 finding an object location
+要向ceph对象存储中存放一个对象，ceph客户端必须：
+
+* 指定对象名称(object name)
+
+* 指定一个pool
+
+ceph客户端接收到最新的cluster map之后，使用CRUSH算法计算出对象到PG的映射，然后再动态的计算出PG到OSD的映射。要查找一个对象的存储位置，只需要```object name```与```pool name```两个参数。例如：
+<pre>
+# ceph osd map {poolname} {object-name} [namespace]
+</pre>
+
+###### 示例： 定位一个object
+如下我们给出一个示例，讲解如何定位一个object。首先我们需要创建一个object，需要指定如下三个参数：
+
+* 对象名称
+
+* 文件路径，即从本地某个路径来读取内容作为我们要上传的对象的内容
+
+* 所要上传到的存储池
+
+例如：
+<pre>
+# rados put {object-name} {file-path} --pool=data
+# rados put test-object-1 testfile.txt --pool=data
+</pre>
+
+之后我们可以执行如下命令来列出存储池中的所有对象：
+<pre>
+# rados -p data ls
+</pre>
+之后，我们可以通过如下命令打印出一个对象的location，例如：
+{% highlight string %}
+# ceph osd map {pool-name} {object-name}
+# ceph osd map data test-object-1
+osdmap e537 pool 'data' (1) object 'test-object-1' -> pg 1.d1743484 (1.4) -> up ([0,1], p0) acting ([0,1], p0)
+{% endhighlight %}
+
+最后，作为示例，我们可以通过执行删除命令，删除我们刚上传的对象：
+<pre>
+# rados rm test-object-1 --pool=data
+</pre>
+随着集群的不断运行，对象的location可能也会动态的发生改变。ceph动态平衡的一个好处就是可以不用人工进行干预。
+
 
 
 
