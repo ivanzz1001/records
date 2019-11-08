@@ -99,6 +99,214 @@ Zookeeper采用ACL(Access Control Lists)策略来进行权限控制，类似于U
 其中尤其需要注意的是，CREATE和DELETE这两种权限都是针对子节点的权限控制。
 
 
+## 2. ZooKeeper环境的搭建
+Zookeeper有两种运行模式： 单机模式和集群模式。这里我们分别简要的讲解一下。由于Zookeeper的运行需要依赖java环境，因此首先需要搭建Java运行环境，请参看相关文档:
+<pre>
+# javac -version
+javac 1.8.0_131
+</pre>
+
+当前zookeeper最新的稳定版本是```v3.5.6```，当前的操作系统环境为：
+# cat /etc/centos-release
+CentOS Linux release 7.3.1611 (Core) 
+# uname -a
+Linux oss-uat-06 3.10.0-514.el7.x86_64 #1 SMP Tue Nov 22 16:42:41 UTC 2016 x86_64 x86_64 x86_64 GNU/Linux
+</pre>
+
+### 2.1 单机模式
+
+当前最新版本(v3.5.6)支持源代码安装、bin解压安装两种方式：
+<pre>
+[   ] apache-zookeeper-3.5.6-bin.tar.gz 2019-10-16 08:35  8.8M  
+[   ] apache-zookeeper-3.5.6.tar.gz     2019-10-16 08:35  3.0M  
+</pre>
+如果我们要采用源代码安装，请下载*apache-zookeeper-[version].tar.gz*文件（需要Java 1.8 u211版本以上）。如果不想自己编译就直接下载*apache-zookeeper-[version]-bin.tar.gz*即可。 
+
+1） 下载Zookeeper
+
+到Apache zookeeper官网http://zookeeper.apache.org/下载3.5.6版本的zookeeper（这里我们采用bin安装):
+<pre>
+# wget https://mirrors.tuna.tsinghua.edu.cn/apache/zookeeper/stable/apache-zookeeper-3.5.6-bin.tar.gz
+</pre>
+
+2) 解压并安装
+
+直接解压即可，不需要进行额外的安装操作:
+<pre>
+# tar -zxvf apache-zookeeper-3.5.6-bin.tar.gz
+# cd apache-zookeeper-3.5.6-bin
+# ls
+bin  conf  docs  lib  LICENSE.txt  NOTICE.txt  README.md  README_packaging.txt
+</pre>
+在conf目录下有一个示例配置文件zoo_sample.cfg，我们来看一下：
+<pre>
+# cat conf/zoo_sample.cfg | grep -v ^#
+tickTime=2000
+initLimit=10
+syncLimit=5
+dataDir=/tmp/zookeeper
+clientPort=2181
+</pre>
+这里我们简要介绍一下里面相关字段的含义：
+
+* tickTime: zookeeper所使用的基本时间单元（单位： ms)。其会被用于作为heartbeat的时间间隔，最低的session过期时间为tickTime的两倍。
+
+* dataDir: 用于指定存放内存数据库快照的位置。对数据库进行更新的事务日志也会存放在该目录（除非另行指定）
+
+* clientPort: 用于监听客户端连接的端口
+
+* initLimit: 在```初始```同步阶段，follower连接到leader并进行同步的时间限制(单位：tickTime)。如果Zookeeper所管理的数据较大时，可以适当调大本值
+
+* syncLimit: 当followers与leader进行同步时的时间限制(单位: tickTime)
+
+这里我们将```zoo_sample.cfg```重命名为```zoo.cfg```:
+<pre>
+# cp conf/zoo_sample.cfg conf/zoo.cfg
+</pre>
+
+3) 启动zookeeper
+
+执行如下命令启动zookeeper server:
+<pre>
+# bin/zkServer.sh start
+ZooKeeper JMX enabled by default
+Using config: /root/zookeeper-inst/apache-zookeeper-3.5.6-bin/bin/../conf/zoo.cfg
+Starting zookeeper ... STARTED
+
+# netstat -nlp | grep 2181
+tcp6       0      0 :::2181                 :::*                    LISTEN      88510/java 
+</pre>
+可以查看zookeeper server的相关日志确认已经启动成功：
+<pre>
+# cat logs/zookeeper-root-server-localhost.localdomain.out 
+2019-11-08 18:52:39,581 [myid:] - INFO  [main:QuorumPeerConfig@133] - Reading configuration from: /root/zookeeper-inst/apache-zookeeper-3.5.6-bin/bin/../conf/zoo.cfg
+2019-11-08 18:52:39,609 [myid:] - INFO  [main:QuorumPeerConfig@385] - clientPortAddress is 0.0.0.0/0.0.0.0:2181
+2019-11-08 18:52:39,609 [myid:] - INFO  [main:QuorumPeerConfig@389] - secureClientPort is not set
+2019-11-08 18:52:39,611 [myid:] - INFO  [main:DatadirCleanupManager@78] - autopurge.snapRetainCount set to 3
+2019-11-08 18:52:39,611 [myid:] - INFO  [main:DatadirCleanupManager@79] - autopurge.purgeInterval set to 0
+2019-11-08 18:52:39,612 [myid:] - INFO  [main:DatadirCleanupManager@101] - Purge task is not scheduled.
+2019-11-08 18:52:39,612 [myid:] - WARN  [main:QuorumPeerMain@125] - Either no config or no quorum defined in config, running  in standalone mode
+2019-11-08 18:52:39,620 [myid:] - INFO  [main:ManagedUtil@46] - Log4j found with jmx enabled.
+2019-11-08 18:52:39,653 [myid:] - INFO  [main:QuorumPeerConfig@133] - Reading configuration from: /root/zookeeper-inst/apache-zookeeper-3.5.6-bin/bin/../conf/zoo.cfg
+2019-11-08 18:52:39,653 [myid:] - INFO  [main:QuorumPeerConfig@385] - clientPortAddress is 0.0.0.0/0.0.0.0:2181
+2019-11-08 18:52:39,653 [myid:] - INFO  [main:QuorumPeerConfig@389] - secureClientPort is not set
+2019-11-08 18:52:39,654 [myid:] - INFO  [main:ZooKeeperServerMain@117] - Starting server
+</pre>
+
+###### 2.1.1 zookeeper的测试
+首先我们执行如下命令连接到zookeeper:
+<pre>
+#  bin/zkCli.sh -server 127.0.0.1:2181
+Connecting to 127.0.0.1:2181
+2019-11-08 18:57:31,115 [myid:] - INFO  [main:Environment@109] - Client environment:zookeeper.version=3.5.6-c11b7e26bc554b8523dc929761dd28808913f091, built on 10/08/2019 20:18 GMT
+...
+...
+WATCHER::
+
+WatchedEvent state:SyncConnected type:None path:null
+[zk: 127.0.0.1:2181(CONNECTED) 0] 
+</pre>
+之后我们执行```help```命令，查看相关帮助信息：
+<pre>
+[zk: 127.0.0.1:2181(CONNECTED) 0] help
+ZooKeeper -server host:port cmd args
+        addauth scheme auth
+        close 
+        config [-c] [-w] [-s]
+        connect host:port
+        create [-s] [-e] [-c] [-t ttl] path [data] [acl]
+        delete [-v version] path
+        deleteall path
+        delquota [-n|-b] path
+        get [-s] [-w] path
+        getAcl [-s] path
+        history 
+        listquota path
+        ls [-s] [-w] [-R] path
+        ls2 path [watch]
+        printwatches on|off
+        quit 
+        reconfig [-s] [-v version] [[-file path] | [-members serverID=host:port1:port2;port3[,...]*]] | [-add serverId=host:port1:port2;port3[,...]]* [-remove serverId[,...]*]
+        redo cmdno
+        removewatches path [-c|-d|-a] [-l]
+        rmr path
+        set [-s] [-v version] path data
+        setAcl [-s] [-v version] [-R] path acl
+        setquota -n|-b val path
+        stat [-w] path
+        sync path
+Command not found: Command not found help
+[zk: 127.0.0.1:2181(CONNECTED) 1] 
+</pre>
+
+这里可以先尝试执行一些简单的命令。首先执行```ls```命令：
+<pre>
+[zk: 127.0.0.1:2181(CONNECTED) 2] ls /
+[zookeeper]
+</pre>
+
+接下来我们通过运行*create /zk_test my_data*命令来新创建一个znode。该命令会创建一个新的znode，并将该znode与字符串```my_data```相关联：
+<pre>
+[zk: 127.0.0.1:2181(CONNECTED) 3] create /zk_test my_data
+Created /zk_test
+</pre>
+>注： znode节点必须一级一级创建
+
+然后我们再执行```ls```命令，可以看到：
+<pre>
+[zkshell: 11] ls /
+[zookeeper, zk_test]
+</pre>
+上面我们注意到已经创建了```zk_test```目录。
+
+接下来，我们通过执行```get```命令来检查```zk_test```这个znode是否和我们的数据进行了关联：
+<pre>
+[zk: 127.0.0.1:2181(CONNECTED) 8] get -s -w /zk_test
+my_data
+cZxid = 0x2
+ctime = Fri Nov 08 19:04:58 CST 2019
+mZxid = 0x2
+mtime = Fri Nov 08 19:04:58 CST 2019
+pZxid = 0x2
+cversion = 0
+dataVersion = 0
+aclVersion = 0
+ephemeralOwner = 0x0
+dataLength = 7
+numChildren = 0
+</pre>
+我们也可以更改```zk_test```这个znode所关联的数据：
+<pre>
+[zk: 127.0.0.1:2181(CONNECTED) 9] set /zk_test junk
+
+WATCHER::
+
+WatchedEvent state:SyncConnected type:NodeDataChanged path:/zk_test
+[zk: 127.0.0.1:2181(CONNECTED) 10] get -s -w /zk_test
+junk
+cZxid = 0x2
+ctime = Fri Nov 08 19:04:58 CST 2019
+mZxid = 0x7
+mtime = Fri Nov 08 19:12:36 CST 2019
+pZxid = 0x2
+cversion = 0
+dataVersion = 1
+aclVersion = 0
+ephemeralOwner = 0x0
+dataLength = 4
+numChildren = 0
+</pre>
+
+我们看到确实已经完成了修改。最后我们可以删除该节点：
+<pre>
+[zk: 127.0.0.1:2181(CONNECTED) 12] delete /zk_test
+
+WATCHER::
+
+WatchedEvent state:SyncConnected type:NodeDeleted path:/zk_test
+</pre>
+
+
 <br />
 <br />
 **参看：**
@@ -108,6 +316,10 @@ Zookeeper采用ACL(Access Control Lists)策略来进行权限控制，类似于U
 2. [The Chubby lock service for loosely coupled distributed systems](https://github.com/lwhile/The-Chubby-lock-service-for-loosely-coupled-distributed-systems-zh_cn)
 
 3. [zookeeper官网](https://zookeeper.apache.org/)
+
+4. [ZooKeeper Getting Started Guide](https://zookeeper.apache.org/doc/r3.5.6/zookeeperStarted.html)
+
+5. [ZooKeeper Administrator's Guide](https://zookeeper.apache.org/doc/r3.5.6/zookeeperAdmin.html)
 
 <br />
 <br />
