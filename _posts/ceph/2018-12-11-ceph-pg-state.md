@@ -464,6 +464,178 @@ f. 客户端IO操作
 
 ### 5.3 Remapped
 ###### 5.3.1 说明
+peering完成，PG当前Acting Set与Up Set不一致就会出现Remapped状态
+
+###### 5.3.2 故障模拟
+a. 停止osd.x
+<pre>
+# systemctl stop ceph-osd@x
+</pre>
+
+b. 间隔5分钟，启动osd.x
+<pre>
+# systemctl start ceph-osd@x
+</pre>
+
+c. 查看PG状态
+<pre>
+# ceph pg stat
+1416 pgs: 6 active+clean+remapped, 1288 active+clean, 3 stale+active+clean, 119 active+undersized+degraded; 74940 MB data, 250 GB used, 185 TB / 185 TB avail; 1292/48152 objects degraded (2.683%)
+
+# ceph pg dump | grep remapped
+dumped all
+13.cd         0                  0        0         0       0         0    2        2      active+clean+remapped 2018-07-03 20:26:14.478665       9453'2   20716:11343    [10,23]         10 [10,23,14]             10       9453'2 2018-07-03 20:26:14.478597          9453'2 2018-07-01 13:11:43.262605
+3.1a         44                  0        0         0       0 373293056 1500     1500      active+clean+remapped 2018-07-03 20:25:47.885366  20272'79063  20716:109173     [9,23]          9  [9,23,12]              9  20272'79063 2018-07-03 03:14:23.960537     20272'79063 2018-07-03 03:14:23.960537
+5.f           0                  0        0         0       0         0    0        0      active+clean+remapped 2018-07-03 20:25:47.888430          0'0   20716:15530     [23,8]         23  [23,8,22]             23          0'0 2018-07-03 06:44:05.232179             0'0 2018-06-30 22:27:16.778466
+3.4a         45                  0        0         0       0 390070272 1500     1500      active+clean+remapped 2018-07-03 20:25:47.886669  20272'78385  20716:108086     [7,23]          7  [7,23,17]              7  20272'78385 2018-07-03 13:49:08.190133      7998'78363 2018-06-28 10:30:38.201993
+13.102        0                  0        0         0       0         0    5        5      active+clean+remapped 2018-07-03 20:25:47.884983       9453'5   20716:11334     [1,23]          1  [1,23,14]              1       9453'5 2018-07-02 21:10:42.028288          9453'5 2018-07-02 21:10:42.028288
+13.11d        1                  0        0         0       0   4194304 1539     1539      active+clean+remapped 2018-07-03 20:25:47.886535  20343'22439   20716:86294     [4,23]          4  [4,23,15]              4  20343'22439 2018-07-03 17:21:18.567771     20343'22439 2018-07-03 17:21:18.567771
+
+//2分钟之后查询
+# ceph pg stat
+1416 pgs: 2 active+undersized+degraded+remapped+backfilling, 10 active+undersized+degraded+remapped+backfill_wait, 1401 active+clean, 3 stale+active+clean; 74940 MB data, 247 GB used, 179 TB / 179 TB avail; 260/48152 objects degraded (0.540%); 49665 kB/s, 9 objects/s recovering
+
+# ceph pg dump | grep remapped
+dumped all
+13.1e8 2 0 2 0 0 8388608 1527 1527 active+undersized+degraded+remapped+backfill_wait 2018-07-03 20:30:13.999637 9493'38727 20754:165663 [18,33,10] 18 [18,10] 18 9493'38727 2018-07-03 19:53:43.462188 0'0 2018-06-28 20:09:36.303126
+</pre>
+d. 客户端IO操作
+<pre>
+//rados读写正常
+# rados -p test_pool put myobject /tmp/test.log
+</pre>
+
+###### 5.3.3 总结
+* 在OSD挂掉或者扩容的时候，PG上的OSD会按照CRUSH算法重新分配PG所属的OSD编号，并且会把PG remap到别的OSD上去
+
+* remapped状态时，PG当前acting set与up set不一致
+
+* 客户端IO可以正常读写
+
+### 5.4 Recovery
+###### 5.4.1 说明
+指PG通过PGLog日志针对数据不一致的对象进行同步和修复的过程
+
+###### 5.4.2 故障模拟
+a. 停止osd.x
+<pre>
+# systemctl stop ceph-osd@x
+</pre>
+b. 间隔1分钟启动osd.x
+<pre>
+# systemctl start ceph-osd@x
+</pre>
+
+c. 查看集群监控状态
+<pre>
+# ceph health detail
+HEALTH_WARN Degraded data redundancy: 183/57960 objects degraded (0.316%), 17 pgs unclean, 17 pgs degraded
+PG_DEGRADED Degraded data redundancy: 183/57960 objects degraded (0.316%), 17 pgs unclean, 17 pgs degraded
+    pg 1.19 is active+recovery_wait+degraded, acting [29,9,17]
+</pre>
+###### 5.4.3 总结
+
+* Recovery是通过记录的PGLog进行恢复数据的
+
+* 记录的PGLog在osd_max_pg_log_entries=10000条以内，这个时候通过PGLog就能增量恢复数据
+
+### 5.5 Backfill
+###### 5.5.1 说明
+当PG的副本无法通过PGLog来恢复数据，这个时候就需要进行全量同步，通过完全拷贝当前Primary所有对象的方式进行全量同步。
+
+###### 5.5.2 故障模拟
+
+a. 停止osd.x
+<pre>
+# systemctl stop ceph-osd@x
+</pre>
+
+b. 间隔10分钟启动osd.x
+<pre>
+# systemctl start ceph-osd@x
+</pre>
+c. 查看集群健康状态
+<pre>
+# ceph health detail
+HEALTH_WARN Degraded data redundancy: 6/57927 objects degraded (0.010%), 1 pg unclean, 1 pg degraded
+PG_DEGRADED Degraded data redundancy: 6/57927 objects degraded (0.010%), 1 pg unclean, 1 pg degraded
+    pg 3.7f is active+undersized+degraded+remapped+backfilling, acting [21,29] 
+</pre>
+
+###### 5.5.3 总结
+* 无法根据记录的PGLog进行恢复数据时，就需要执行Backfill过程全量恢复数据
+
+* 如果超过osd_max_pg_log_entries=10000条， 这个时候需要全量恢复数据
+
+### 5.6 Stale
+###### 5.6.1 说明
+* mon检测到当前PG的Primary所在的OSD宕机
+
+* Primary超时未向mon上报pg相关的信息(例如网络阻塞）
+
+* PG内三个副本都挂掉的情况
+
+###### 5.6.2 故障模拟
+a. 分别停止PG中的三个副本osd，首先停止osd.23
+<pre>
+# systemctl stop ceph-osd@23
+</pre>
+
+b. 然后停止osd.24
+<pre>
+# systemctl stop ceph-osd@24
+</pre>
+
+c. 查看停止两个副本后，PG 1.45的状态(undersized+degraded+peered)
+<pre>
+# ceph health detail
+HEALTH_WARN 2 osds down; Reduced data availability: 9 pgs inactive; Degraded data redundancy: 3041/47574 objects degraded (6.392%), 149 pgs unclean, 149 pgs degraded, 149 pgs undersized
+OSD_DOWN 2 osds down
+    osd.23 (root=default,host=ceph-xx-osd02) is down
+    osd.24 (root=default,host=ceph-xx-osd03) is down
+PG_AVAILABILITY Reduced data availability: 9 pgs inactive
+    pg 1.45 is stuck inactive for 281.355588, current state undersized+degraded+peered, last acting [10]
+</pre>
+
+d. 再停止PG 1.45中第三个副本osd.10
+<pre>
+# systemctl stop ceph-osd@10
+</pre>
+
+e. 查看停止三个副本PG 1.45的状态(stale + undersized + degraded + peered)
+<pre>
+# ceph health detail
+HEALTH_WARN 3 osds down; Reduced data availability: 26 pgs inactive, 2 pgs stale; Degraded data redundancy: 4770/47574 objects degraded (10.026%), 222 pgs unclean, 222 pgs degraded, 222 pgs undersized
+OSD_DOWN 3 osds down
+    osd.10 (root=default,host=ceph-xx-osd01) is down
+    osd.23 (root=default,host=ceph-xx-osd02) is down
+    osd.24 (root=default,host=ceph-xx-osd03) is down
+PG_AVAILABILITY Reduced data availability: 26 pgs inactive, 2 pgs stale
+    pg 1.9 is stuck inactive for 171.200290, current state undersized+degraded+peered, last acting [13]
+    pg 1.45 is stuck stale for 171.206909, current state stale+undersized+degraded+peered, last acting [10]
+    pg 1.89 is stuck inactive for 435.573694, current state undersized+degraded+peered, last acting [32]
+    pg 1.119 is stuck inactive for 435.574626, current state undersized+degraded+peered, last acting [28]
+</pre>
+
+f. 客户端IO操作
+<pre>
+//#读写挂载磁盘IO 夯住
+# rados -p test_pool put myobject /tmp/test.log
+# ll /mnt/
+</pre>
+
+**故障总结**:
+
+先停止同一个PG内两个副本，状态是 undersized+degraded+peered
+然后停止同一个PG内三个副本，状态是stale+undersized+degraded+peered
+
+###### 5.6.3 总结
+* 当出现一个PG内三个副本都挂掉的情况，就会出现stale状态
+
+* 此时，该PG不能提供客户端读写，IO挂起夯住
+
+* Primary超时未向mon上报PG相关的信息（例如网络阻塞），也会出现stale状态
+
 
 
 
