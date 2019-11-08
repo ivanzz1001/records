@@ -636,7 +636,251 @@ f. 客户端IO操作
 
 * Primary超时未向mon上报PG相关的信息（例如网络阻塞），也会出现stale状态
 
+### 5.7 Inconsistent
+###### 5.7.1 说明
+PG通过scrub检测到某个或者某些对象在PG实例间出现了不一致。
 
+###### 5.7.2 故障模拟
+a. 删除PG 3.0中副本osd.34头文件
+<pre>
+# rm -rf /var/lib/ceph/osd/ceph-34/current/3.0_head/DIR_0/1000000697c.0000122c__head_19785300__3
+</pre>
+
+b. 手动执行PG 3.0进行数据清理
+<pre>
+# ceph pg scrub 3.0
+instructing pg 3.0 on osd.34 to scrub
+</pre>
+
+c. 检查集群监控状态
+<pre>
+# ceph health detail
+HEALTH_ERR 1 scrub errors; Possible data damage: 1 pg inconsistent
+OSD_SCRUB_ERRORS 1 scrub errors
+PG_DAMAGED Possible data damage: 1 pg inconsistent
+    pg 3.0 is active+clean+inconsistent, acting [34,23,1]
+</pre>
+
+d. 修复PG 3.0
+<pre>
+# ceph pg repair 3.0
+instructing pg 3.0 on osd.34 to repair
+
+//查看集群监控状态
+# ceph health detail
+HEALTH_ERR 1 scrub errors; Possible data damage: 1 pg inconsistent, 1 pg repair
+OSD_SCRUB_ERRORS 1 scrub errors
+PG_DAMAGED Possible data damage: 1 pg inconsistent, 1 pg repair
+    pg 3.0 is active+clean+scrubbing+deep+inconsistent+repair, acting [34,23,1]
+
+//集群监控状态已恢复正常
+# ceph health detail
+HEALTH_OK
+</pre>
+
+**故障总结**：
+
+当PG内部三个副本有数据不一致的情况，想要修复不一致的数据文件，只需要执行ceph pg repair修复指令，ceph就会从其他的副本中将丢失的文件拷贝过来进行数据修复。
+
+###### 5.7.3 总结
+* 当OSD短暂挂掉的时候，因为集群内黑存在着两个副本，是可以正常写入的，但是osd.34内的数据并没有得到更新，过了一会osd.34上线了，这个时候osd.34的数据是陈旧的，就通过其他的OSD向osd.34进行数据的恢复，使其数据为最新的，而在这个恢复过程中，PG的状态会从inconsistent->recover->clean，最终恢复正常
+
+* 这是集群自愈的一种场景 
+
+### 5.8 Down
+###### 5.8.1 说明
+
+Peering过程中，PG检测到某个不能跳过的Interval中（例如该Interval期间，PG完成了peering，并且成功切换至active状态，从而有可能正常处理了来自客户端的读写请求），当前剩余在线的OSD不足以完成数据修复
+
+###### 5.8.2 故障模拟
+a. 查看PG 3.7f内的副本数
+<pre>
+# ceph pg dump | grep ^3.7f
+dumped all
+3.7f         43                  0        0         0       0 494927872 1569     1569               active+clean 2018-07-05 02:52:51.512598  21315'80115  21356:111666  [5,21,29]          5  [5,21,29]              5  21315'80115 2018-07-05 02:52:51.512568      6206'80083 2018-06-29 22:51:05.831219
+</pre>
+b. 停止PG 3.7f副本osd.21
+<pre>
+# systemctl stop ceph-osd@21
+</pre>
+c. 查看PG 3.7状态
+<pre>
+# ceph pg dump | grep ^3.7f
+dumped all
+3.7f         66                  0       89         0       0 591396864 1615     1615 active+undersized+degraded 2018-07-05 15:29:15.741318  21361'80161  21365:128307     [5,29]          5     [5,29]              5  21315'80115 2018-07-05 02:52:51.512568      6206'80083 2018-06-29 22:51:05.831219
+</pre>
+
+d. 客户端写入数据，一定要确保数据写入到PG 3.7的副本中[5,29]
+<pre>
+# fio -filename=/mnt/xxxsssss -direct=1 -iodepth 1 -thread -rw=read -ioengine=libaio -bs=4M -size=2G -numjobs=30 -runtime=200 -group_reporting -name=read-libaio
+read-libaio: (g=0): rw=read, bs=4M-4M/4M-4M/4M-4M, ioengine=libaio, iodepth=1
+...
+fio-2.2.8
+Starting 30 threads
+read-libaio: Laying out IO file(s) (1 file(s) / 2048MB)
+Jobs: 5 (f=5): [_(5),R(1),_(5),R(1),_(3),R(1),_(2),R(1),_(1),R(1),_(9)] [96.5% done] [1052MB/0KB/0KB /s] [263/0/0 iops] [eta 00m:02s]                                                            s]
+read-libaio: (groupid=0, jobs=30): err= 0: pid=32966: Thu Jul  5 15:35:16 2018
+  read : io=61440MB, bw=1112.2MB/s, iops=278, runt= 55203msec
+    slat (msec): min=18, max=418, avg=103.77, stdev=46.19
+    clat (usec): min=0, max=33, avg= 2.51, stdev= 1.45
+     lat (msec): min=18, max=418, avg=103.77, stdev=46.19
+    clat percentiles (usec):
+     |  1.00th=[    1],  5.00th=[    1], 10.00th=[    1], 20.00th=[    2],
+     | 30.00th=[    2], 40.00th=[    2], 50.00th=[    2], 60.00th=[    2],
+     | 70.00th=[    3], 80.00th=[    3], 90.00th=[    4], 95.00th=[    5],
+     | 99.00th=[    7], 99.50th=[    8], 99.90th=[   10], 99.95th=[   14],
+     | 99.99th=[   32]
+    bw (KB  /s): min=15058, max=185448, per=3.48%, avg=39647.57, stdev=12643.04
+    lat (usec) : 2=19.59%, 4=64.52%, 10=15.78%, 20=0.08%, 50=0.03%
+  cpu          : usr=0.01%, sys=0.37%, ctx=491792, majf=0, minf=15492
+  IO depths    : 1=100.0%, 2=0.0%, 4=0.0%, 8=0.0%, 16=0.0%, 32=0.0%, >=64=0.0%
+     submit    : 0=0.0%, 4=100.0%, 8=0.0%, 16=0.0%, 32=0.0%, 64=0.0%, >=64=0.0%
+     complete  : 0=0.0%, 4=100.0%, 8=0.0%, 16=0.0%, 32=0.0%, 64=0.0%, >=64=0.0%
+     issued    : total=r=15360/w=0/d=0, short=r=0/w=0/d=0, drop=r=0/w=0/d=0
+     latency   : target=0, window=0, percentile=100.00%, depth=1
+Run status group 0 (all jobs):
+   READ: io=61440MB, aggrb=1112.2MB/s, minb=1112.2MB/s, maxb=1112.2MB/s, mint=55203msec, maxt=55203msec
+</pre>
+e. 停止PG 3.7f中副本osd.29，并且查看PG 3.7f状态(undersized+degraded+peered)
+<pre>
+//停止该PG副本osd.29
+# systemctl stop ceph-osd@29
+ 
+//查看该PG 3.7f状态为undersized+degraded+peered
+# ceph pg dump | grep ^3.7f
+dumped all
+3.7f         70                  0      140         0       0 608174080 1623     1623 undersized+degraded+peered 2018-07-05 15:35:51.629636  21365'80169  21367:132165        [5]          5        [5]              5  21315'80115 2018-07-05 02:52:51.512568      6206'80083 2018-06-29 22:51:05.831219
+</pre>
+
+f. 停止PG 3.7f中副本osd.5，并且查看PG 3.7f状态(undersized+degraded+peered)
+<pre>
+//停止该PG副本osd.5
+# systemctl stop ceph-osd@5
+ 
+//查看该PG状态undersized+degraded+peered
+# ceph pg dump | grep ^3.7f
+dumped all
+3.7f         70                  0      140         0       0 608174080 1623     1623 stale+undersized+degraded+peered 2018-07-05 15:35:51.629636  21365'80169  21367:132165        [5]          5        [5]              5  21315'80115 2018-07-05 02:52:51.512568      6206'80083 2018-06-29 22:51:05.831219
+</pre>
+
+g. 拉起PG 3.7f 中副本osd.21(此时的osd.21数据比较陈旧），查看PG状态(down)
+<pre>
+//拉起该PG的osd.21
+# systemctl start ceph-osd@21
+ 
+//查看该PG的状态down
+# ceph pg dump | grep ^3.7f
+dumped all
+3.7f         66                  0        0         0       0 591396864 1548     1548                          down 2018-07-05 15:36:38.365500  21361'80161  21370:111729       [21]         21       [21]             21  21315'80115 2018-07-05 02:52:51.512568      6206'80083 2018-06-29 22:51:05.831219
+</pre>
+
+h. 客户端IO操作
+<pre>
+//此时客户端IO都会夯住
+# ll /mnt/
+</pre>
+
+**故障总结：**
+
+首先有一个PG 3.7f，有三个副本[5,21,29]，当停掉一个osd.21之后，写入数据到osd.5、osd.29。这个时候停掉osd.29、osd.5，最后拉起osd.21。这个时候osd.21的数据比较陈旧，就会出现PG为down的情况，这个时候客户端IO会夯住，只能拉起挂掉的osd才能修复问题。
+
+###### 5.8.3 PG为Down的OSD丢失或者无法拉起
+修复方式（生产环境已验证）
+{% highlight string %}
+a. 删除无法拉起的OSD
+b. 创建对应编号的OSD
+c. PG的Down状态就会消失
+d. 对于unfound 的PG ，可以选择delete或者revert 
+ ceph pg {pg-id} mark_unfound_lost revert|delete
+{% endhighlight %}
+
+###### 5.8.4 结论
+* 典型场景: A(主)、B、C
+<pre>
+a. 首先kill B 
+b. 新写入数据到 A、C 
+c. kill A和C
+d. 拉起B    
+</pre>
+* 出现PG为down的场景是由于osd节点数据太旧，并且其他在线的OSD不足以完成数据修复
+
+* 这个时候该PG不能提供客户端IO读写，IO会挂起夯住
+
+### 5.9 Incomplete
+Peering过程中，由于a) 无法选出权威日志 b)通过choose_acting选出的acting set后续不足以完成数据修复，导致Peering无法完成
+
+常见于ceph集群在peering状态下，来回重启服务器，或者掉电。
+
+###### 5.9.1 总结
+
+* 修复方式[wanted: command to clear 'incomplete' PGs](https://tracker.ceph.com/issues/10098)
+
+比如: PG 1.1是incomplete，先对比PG 1.1的主副本之间PG里面的对象数，哪个对象数多，就把哪个PG export出来。然后import到对象数少的PG里面，然后再```mark complete```(注：一定要先export PG备份)
+
+**简单方式，数据可能又丢的情况**
+<pre>
+a. stop the osd that is primary for the incomplete PG;
+b. run: ceph-objectstore-tool --data-path ... --journal-path ... --pgid $PGID --op mark-complete
+c. start the osd. 
+</pre>
+
+**保证数据完整性**
+<pre>
+//1. 查看pg 1.1主副本里面的对象数，假设主本对象数多，则到主本所在osd节点执行
+# ceph-objectstore-tool --data-path /var/lib/ceph/osd/ceph-0/ --journal-path /var/lib/ceph/osd/ceph-0/journal --pgid 1.1 --op export --file /home/pg1.1
+
+//2. 然后将/home/pg1.1 scp到副本所在节点（有多个副本，每个副本都要这么操作），然后到副本所在节点执行
+# ceph-objectstore-tool --data-path /var/lib/ceph/osd/ceph-1/ --journal-path /var/lib/ceph/osd/ceph-1/journal --pgid 1.1 --op import --file /home/pg1.1
+
+//3. 然后再makr complete
+# ceph-objectstore-tool --data-path /var/lib/ceph/osd/ceph-1/ --journal-path /var/lib/ceph/osd/ceph-1/journal --pgid 1.1 --op mark-complete
+
+//4. 最后启动osd
+# start osd
+</pre>
+
+**验证方案**
+{% highlight string %}
+//1. 把状态incomplete的pg，标记为complete。建议操作前，先在测试环境验证，并熟悉ceph-objectstore-tool工具的使用。
+PS：使用ceph-objectstore-tool之前需要停止当前操作的osd，否则会报错。
+
+//2. 查询pg 7.123的详细信息，在线使用查询
+# ceph pg 7.123 query > /export/pg-7.123-query.txt
+
+//3. 每个osd副本节点进行查询
+# ceph-objectstore-tool --data-path /var/lib/ceph/osd/ceph-641/ --type bluestore --pgid 7.123 --op info > /export/pg-7.123-info-osd641.txt
+如
+pg 7.123 OSD 1 存在1,2,3,4,5 object
+pg 7.123 OSD 2 存在1,2,3,6   object
+pg 7.123 OSD 2 存在1,2,3,7   object
+
+//4. 查询对比数据
+//4.1 导出pg的object清单
+# ceph-objectstore-tool --data-path /var/lib/ceph/osd/ceph-641/ --type bluestore --pgid 7.123 --op list > /export/pg-7.123-object-list-osd-641.txt
+
+//4.2 查询pg的object数量
+# ceph-objectstore-tool --data-path /var/lib/ceph/osd/ceph-641/ --type bluestore --pgid 7.123 --op list|wc -l
+
+//4.3 对比所有副本的object是否一致。
+# diff -u /export/pg-7.123-object-list-osd-1.txt /export/pg-7.123-object-list-osd-2.txt
+比如：pg 7.123是incomplete，对比7.123的所有副本之间pg里面的object数量。
+ - 如上述情况，diff对比后，每个副本（主从所有副本）的object list是否一致。避免有数据不一致。使用数量最多，并且diff对比后，数量最多的包含所有object的备份。
+ - 如上述情况，diff对比后，数量是不一致，最多的不包含所有的object，则需要考虑不覆盖导入，再导出。最终使用完整的所有的object进行导入。注：import是需要提前remove pg后进行导入，等于覆盖导入。
+ - 如上述情况，diff对比后，数据是一致，则使用object数量最多的备份，然后import到object数量少的pg里面 然后在所有副本mark complete，一定要先在所有副本的osd节点export pg备份，避免异常后可恢复pg。
+
+//5. 导出备份
+查看pg 7.123所有副本里面的object数量，参考上述情况，假设osd-641的object数量多，数据diff对比一致后，则到object数量最多，object list一致的副本osd节点执行（最好是每个副本都进行导出备份,为0也需要导出备份）
+# ceph-objectstore-tool --data-path /var/lib/ceph/osd/ceph-641/ --type bluestore --pgid 7.123 --op export --file /export/pg1.414-osd-1.obj
+
+//6. 导入备份
+然后将/export/pg1.414-osd-1.obj scp到副本所在节点，在对象少的副本osd节点执行导入。（最好是每个副本都进行导出备份,为0也需要导出备份）
+将指定的pg元数据导入到当前pg,导入前需要先删除当前pg（remove之前请先export备份一下pg数据）。需要remove当前pg,否则无法导入，提示已存在。
+# ceph-objectstore-tool --data-path /var/lib/ceph/osd/ceph-57/ --type bluestore --pgid 7.123 --op remove 需要加–force才可以删除。
+# ceph-objectstore-tool --data-path /var/lib/ceph/osd/ceph-57/ --type bluestore --pgid 7.123 --op import --file /export/pg1.414-osd-1.obj
+
+//7. 标记pg状态，makr complete（主从所有副本执行）
+# ceph-objectstore-tool --data-path /var/lib/ceph/osd/ceph-57/ --type bluestore --pgid 7.123 --op mark-complete
+{% endhighlight %}
 
 
 
