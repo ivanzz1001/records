@@ -263,8 +263,7 @@ ceph会使用heartbeat来检测hosts与daemons的运行状况，*ceph-osd*守护
 * Stale： 未刷新态。PG状态没有被任何OSD更新，这说明所有存储这个PG的OSD可能挂掉, 或者Mon没有检测到Primary统计信息(网络抖动)
 Undersized	PG当前Acting Set小于存储池副本数
 
-
-
+* Undersized: PG当前Acting Set小于存储池副本数
 
 
 ### 4.2 identifying troubled PGS
@@ -361,7 +360,7 @@ PG_DEGRADED Degraded data redundancy: 12/36 objects degraded (33.333%), 20 pgs u
 d. 客户端IO操作
 <pre>
 //写入对象
-# bin/rados -p test_pool put myobject ceph.conf
+# rados -p test_pool put myobject ceph.conf
 
 //读取对象到文件
 # rados -p test_pool get myobject.old
@@ -371,6 +370,103 @@ d. 客户端IO操作
 -rw-r--r-- 1 root root 6211 Jun 25 14:01 ceph.conf
 -rw-r--r-- 1 root root 6211 Jul  3 19:57 ceph.conf.old
 </pre>
+
+**故障总结：**
+
+为了模拟故障(size=3, min_size=2)，我们手动停止了osd.1，然后查看PG状态，可见，它此刻的状态是active+undersized+degraded。当一个PG所在的OSD挂掉之后，这个PG就会进入undersized+degraded状态，而后面的[0,2]的意义就是还有两个副本存活在osd.0和osd.2上，并且这个时候客户端可以正常读写IO。
+
+###### 5.1.3 总结
+* 降级就是在发生了一些故障比如OSD挂掉之后，Ceph将这个OSD上的所有PG标记为Degraded
+
+* 降级的集群可以正常读写数据，降级的PG只是相当于小毛病而已，并不是严重的问题
+
+* undersized的意思就是当前存活的PG副本数为2，小于副本数3，将其做此标记，表示存货副本数不足，也不是严重问题
+
+### 5.2 Peered
+###### 5.2.1 说明
+peering已经完成，但是PG当前Acting Set规模小于存储池规定的最小副本数(min_size).
+
+###### 5.2.2 故障模拟
+
+a. 停掉两个副本osd.1、osd.0
+<pre>
+# systemctl stop ceph-osd@1
+# systemctl stop ceph-osd@0
+</pre>
+b. 查看集群健康状况
+<pre>
+# ceph health detail
+HEALTH_WARN 1 osds down; Reduced data availability: 4 pgs inactive; Degraded data redundancy: 26/39 objects degraded (66.667%), 20 pgs unclean, 20 pgs degraded; application not enabled on 1 pool(s)
+OSD_DOWN 1 osds down
+    osd.0 (root=default,host=ceph-xx-cc00) is down
+PG_AVAILABILITY Reduced data availability: 4 pgs inactive
+    pg 1.6 is stuck inactive for 516.741081, current state undersized+degraded+peered, last acting [2]
+    pg 1.10 is stuck inactive for 516.737888, current state undersized+degraded+peered, last acting [2]
+    pg 1.11 is stuck inactive for 516.737408, current state undersized+degraded+peered, last acting [2]
+    pg 1.12 is stuck inactive for 516.736955, current state undersized+degraded+peered, last acting [2]
+PG_DEGRADED Degraded data redundancy: 26/39 objects degraded (66.667%), 20 pgs unclean, 20 pgs degraded
+    pg 1.0 is undersized+degraded+peered, acting [2]
+    pg 1.1 is undersized+degraded+peered, acting [2]
+</pre>
+
+c. 客户端IO操作（夯住)
+<pre>
+//读取对象到文件，夯住IO
+# rados -p test_pool get myobject  ceph.conf.old
+</pre>
+
+**故障总结**：
+
+* 现在PG只剩下osd.2上存活，并且PG还多了一个状态```peered```，英文的意思是仔细看，这里我们可以理解成协商、搜索。
+
+* 这时候读取文件，会发现指令会卡在那个地方一直不动，为什么就不能读取内容了？ 因为我们设置min_size=2，如果存活数小于2，比如这里的1，那么就不会响应外部的IO请求
+
+d. 调整min_size可以解决IO夯住问题
+<pre>
+//设置min_size = 1
+# ceph osd pool set test_pool min_size 1
+set pool 1 min_size to 1
+</pre>
+
+e. 查看集群监控状态
+<pre>
+# ceph health detail
+HEALTH_WARN 1 osds down; Degraded data redundancy: 26/39 objects degraded (66.667%), 20 pgs unclean, 20 pgs degraded, 20 pgs undersized; application not enabled on 1 pool(s)
+OSD_DOWN 1 osds down
+    osd.0 (root=default,host=ceph-xx-cc00) is down
+PG_DEGRADED Degraded data redundancy: 26/39 objects degraded (66.667%), 20 pgs unclean, 20 pgs degraded, 20 pgs undersized
+    pg 1.0 is stuck undersized for 65.958983, current state active+undersized+degraded, last acting [2]
+    pg 1.1 is stuck undersized for 65.960092, current state active+undersized+degraded, last acting [2]
+    pg 1.2 is stuck undersized for 65.960974, current state active+undersized+degraded, last acting [2]
+</pre>
+
+f. 客户端IO操作
+<pre>
+//读取对象到文件中
+# ll -lh ceph.conf*
+-rw-r--r-- 1 root root 6.1K Jun 25 14:01 ceph.conf
+-rw-r--r-- 1 root root 6.1K Jul  3 20:11 ceph.conf.old
+-rw-r--r-- 1 root root 6.1K Jul  3 20:11 ceph.conf.old.1
+</pre>
+
+**故障总结**：
+
+* 可以看到，PG状态peered没有了，并且客户端文件IO可以正常读写了
+
+* 当min_size=1时，只要集群里面有一份副本活着，就可以响应外部的IO请求
+
+###### 5.2.3 总结
+* Peered状态我们这里可以将它理解成它在等待其他副本上线
+
+* 当min_size=2时，也就是必须保证有两个副本存活的时候就可以去除Peered状态
+
+* 处于Peered状态的PG是不能响应外部的请求，并且IO被挂起
+
+### 5.3 Remapped
+###### 5.3.1 说明
+
+
+
 
 
 <br />
