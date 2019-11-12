@@ -217,33 +217,82 @@ Leader选举流程比较复杂，在正式进入选举流程之前，需要先�
 ###### 3.3.3 流程详述
 流程比较复杂(QuorumPeer::run())，接下来对流程图中标有数字的地方详细介绍。
 
-1） 自增logicalclock
+1） **自增logicalclock**
 
 logicalclock就是Notification中的electionEpoch。选举的第一个操作是logicalclock自增，接着更新提议，其实第一次总是提议自己作为Leader。
 
 如果和现实中总统选举做一个类比的话，每次总统选举时都要明确这是第几届选举，logicalclock对应的就是```第几届```(即表示这是该服务器发起的第多少轮投票）。整个选举必须保证处于同一届选举中方有效。
 
-2） 发送选票信息 
+2） **发送选票信息**
 
 这是一个异步操作（由sendNotifications封装），将提议信息放到FastLeaderElection#sendqueue队列中，然后异步的发送给所有其他的zookeeper server(这里值得是所有参与投票的服务器，不会发送给Observer类型的服务器）。
 
-3） 从选票队列中取选票信息
+3） **从选票队列中取选票信息**
 
 当前server收到其他服务器的选举回复信息以后，将选票信息放在FastLeaderElection#recvqueue。当服务器循环从此队列中取选票信息时，如果队列中有选票信息就立即返回，如果没有则等待。这里有一个超时时间，如果超过此时间依然没有选票信息，则返回null，这么做可以防止死等。
 
-4） 判断消息是否发送出去
+4） **判断消息是否发送出去**
 
 当从recvqueue没有取得选票信息时，会检查是否已经将提议的leader发送给其他server了，如果queueSendMap(待发送队列）为空，说明已经全部发送出去了； 否则认为没有发送出去，此时会重连其他zookeeper server，以保证链路畅通。
 
-5）重连其他zookeeper server
+5）**重连其他zookeeper server**
 
 如果链路出现异常，可能会导致提议信息无法发送成功，所以如果queueSendMap中的信息没有全部发送出去，此时会重连其他zookeeper server，以保证zookeeper集群的链路畅通。
 
-6） LOOKING状态时，electionEpoch比较
+6） **LOOKING状态时，electionEpoch比较**
 
-如果收到的选票信息状态为LOOKING，说明对方也在选举中。
+如果收到的选票信息状态为LOOKING，说明对方也在选举中。然后按如下步骤进行处理：
+{% highlight string %}
+a) electionEpoch比较
+进行electionEpoch比较的目的是统一当前是第几届选举。
+
+如果收到选票的electionEpoch更大，那么使用收到的选票的electionEpoch作为“届”，然后清空收到的选票信息，更新提议信息（这里有一个判定过程），重新发送更新后的提议；
+
+如果收到选票的electionEpoch更小，直接忽略此选票；
+
+如果收到选票的electionEpoch和当前相同，那么认为是合法的选票，接着判断是否更新选票。若要更新，则进行更新并重新发送出去，否则则不需要重发（因为没有更新)
+
+b) 接受选票的提议
+当且仅当以下三个条件满足其一时，将接受选票的提议，并重新发送选票信息:
+n.peerEpoch > self.proposedEpoch
+n.peerEpoch == self.proposedEpoch&& n.zxid > self.proposedZxid
+n.peerEpoch == self.proposedEpoch&& n.zxid = self.proposedZxid && n.leader > self.proposedLeader
+
+上面n指的是收到的选票，self指的是当前服务器自身的提议。由此可知： peerEpoch、zxid、leader越大。
+
+注： proposedLeader开始的时候一定是当前server的id，但随着选举的进行，会变成上一次提议的leader。
+{% endhighlight %}
 
 
+7） **Leader是否有效**
+
+(接着步骤6，即LOOKING状态下）如果某一个server已经得到半数以上的选票，那么进入Leader是否有效的验证逻辑，具体如下：
+
+无限循环的从recvqueue中取选票，满足一下条件之一时退出循环：
+
+* recvqueue没有选举票（超时时间内一直没有获取到选票）     ----情形1
+
+* 取到一个更新的选票信息（满足“接受选票提议”的条件，则说明提议更新）；   ----情形2
+
+这里其实是一个Leader有效性的校验。依次从recvqueue中取出所有的选票，校验发现所有的选票均满足“接受选票提议”时，说明没有服务器的选票能够推翻之前的结论，所以此时可以认为Leader是有效的。
+
+针对上面```情形1```，即等了一段时间一直没有获取到新的有效选票，那么我们认为当前集群节点已经达成共识了，此时可以直接将本主机设置为LEADING状态或者是FOLLOWING/OBSERVING状态（根据收到的选票来判断，如果选的是自己则设置为LEADING）；针对```情形2```，说明还有一些人在进行投票，此时重复回到步骤6)，继续尽可能多的获得更多选票信息，以期获得更大的共识。
+
+8) **FOLLOWING、LEADING状态时，electionEpoch比较**
+
+a) 选票集合
+
+为了将此部分解释清楚，需要先能清楚选举过程中用到的两个集合：
+
+* recvset: 用来记录选票信息，以方便后续统计
+{% highlight string %}
+HashMap<Long, Vote> recvset = new HashMap<Long, Vote>();
+{% endhighlight %}
+
+* outofelection: 用来记录选举逻辑之外的选票，例如当一个服务器加入zookeeper集群时，因为集群已经存在，不用重新选举，只需要在满足一定条件下加入集群即可。
+{% highlight string %}
+HashMap<Long, Vote> outofelection = new HashMap<Long, Vote>();
+{% endhighlight %}
 
 
 
@@ -263,7 +312,7 @@ logicalclock就是Notification中的electionEpoch。选举的第一个操作是l
 
 4. [zookeeper官网](https://zookeeper.apache.org/)
 
-5. [](https://yq.aliyun.com/articles/298075)
+5. [ZAB协议恢复模式-leader选举](https://yq.aliyun.com/articles/298075)
 
 <br />
 <br />
