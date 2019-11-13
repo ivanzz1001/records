@@ -233,7 +233,7 @@ namespace std{
 
 * 虚函数和纯虚函数都可以在子类(subclass)中被重载，以多态的形式被调用
 
-* 虚函数和纯虚函数通常存在于存在于抽象基类(abstract base class)之中，被继承的子类重载，目的是提供一个统一的接口
+* 虚函数和纯虚函数通常存在于抽象基类(abstract base class)之中，被继承的子类重载，目的是提供一个统一的接口
 
 * 虚函数的定义形式为virtual {method body}, 而纯虚函数的定义形式为virtual {} = 0。在虚函数与纯虚函数中不能有static标识符，原因很简单，被static修饰的函数在编译时要求前期bind，然而虚函数却是动态绑定(runtime bind)，而且被两者修饰的函数生命周期(life cycle)也不一样。
 
