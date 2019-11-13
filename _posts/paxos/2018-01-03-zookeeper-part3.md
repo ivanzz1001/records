@@ -136,7 +136,7 @@ static public class Notification {
 
 * zxid: 事务ID，事务请求的唯一标记，由Leader服务器负责进行分配。高32位是peerEpoch，低32位是请求的计数，从0开始。
 
-* peerEpoch: 每次Leader选举完成之后，都会选出一个新的peerEpoch，用来标记事务请求所属轮次。
+* peerEpoch: 每次Leader选举完成之后，都会选出一个新的peerEpoch，用来标记事务请求所属轮次
 
 * electionEpoch： 每次Leader选举，electionEpoch就会自增1，统计选票信息时，首先保证electionEpoch相同
 
@@ -294,10 +294,219 @@ HashMap<Long, Vote> recvset = new HashMap<Long, Vote>();
 HashMap<Long, Vote> outofelection = new HashMap<Long, Vote>();
 {% endhighlight %}
 
+b) electionEpoch比较
+
+如果收到的选票显示处于FOLLOWING、LEADING状态，说明集群目前有Leader，只需要确保当前服务器和Leader能够正常通信，并收到集群半数以上服务器推荐此Leader时，就直接加入到集群中去。
+
+因为Leader已经存在，所有所有的选票都会加入到outofelection中。如果outofelection有一条选票是来自Leader的，那么就可以认为自己和Leader正常通信；如果outofelection中统计出有超过半数的服务器都推荐了这个Leader，那么毫无疑问，此选票推荐的就是我们的Leader。
+
+c) 源码逻辑
+
+如果logicalclock与n.electionEpoch相同，那么将此选票加入到选票列表中，如果此张选票通过“选票有效性验证”，那么将此选票推举的候选人作为Leader；
+
+因为Leader已经存在，将所有选票放在outofelection中，进行一次“选票有效性验证”，如果通过就可以将此选票推举的候选人作为Leader。
+
+>以上两步的差别是在进行有效性校验时，一个用的是recvset，一个用的是outofelection。从代码上看，zookeeper认为只要electionEpoch相同就认为这是在选举，所以判断选票数目的时候使用的是recvset。
+>
+>以上两步逻辑比较绕，如果理解起来比较困难，可以参考一下源码。
+
+d) 源码
+{% highlight string %}
+case FOLLOWING:
+case LEADING:
+if (n.electionEpoch == logicalclock) {
+   //如果Notification的electionEpoch和当前的electionEpoch相同，那么说明在同一轮的选举中，
+   recvset.put(n.sid, new Vote(n.leader, n.zxid, n.electionEpoch, n.peerEpoch));
+ 
+   //判定选举是否结束
+    if (ooePredicate(recvset,outofelection, n)){
+       // 选举结束，设置状态
+       self.setPeerState((n.leader == self.getId()) ? ServerState.LEADING : learningState());
+ 
+       Vote endVote = new Vote(n.leader, n.zxid, n.electionEpoch, n.peerEpoch);
+       leaveInstance(endVote);
+       return endVote;
+    }
+}
+ 
+outofelection.put(n.sid,
+       new Vote(n.version, n.leader, n.zxid, n.electionEpoch, n.peerEpoch, n.state));
+// 判定选举是否结束
+if(ooePredicate(outofelection, outofelection, n)) {
+   synchronized (this) {
+       logicalclock = n.electionEpoch;
+       self.setPeerState((n.leader == self.getId()) ? ServerState.LEADING : learningState());
+    }
+   Vote endVote = new Vote(n.leader, n.zxid, n.electionEpoch, n.peerEpoch);
+   leaveInstance(endVote);
+   return endVote;
+}
+break;
+{% endhighlight %}
+
+e) 选票有效性验证
+
+leader候选人获得超过半数的选票，通过Leader有效性校验。
+{% highlight string %}
+protected boolean termPredicate(Map<Long, Vote> votes, Vote vote) {
+    SyncedLearnerTracker voteSet = new SyncedLearnerTracker();
+    voteSet.addQuorumVerifier(self.getQuorumVerifier());
+    if (self.getLastSeenQuorumVerifier() != null
+            && self.getLastSeenQuorumVerifier().getVersion() > self
+                    .getQuorumVerifier().getVersion()) {
+        voteSet.addQuorumVerifier(self.getLastSeenQuorumVerifier());
+    }
+
+    /*
+     * First make the views consistent. Sometimes peers will have different
+     * zxids for a server depending on timing.
+     */
+    for (Map.Entry<Long, Vote> entry : votes.entrySet()) {
+        if (vote.equals(entry.getValue())) {
+            voteSet.addAck(entry.getKey());
+        }
+    }
+
+    return voteSet.hasAllQuorums();
+}
+{% endhighlight %}
+
+f) Leader有效性验证
+
+如果自己不是Leader，那么一定收要到过Leader的信息，即收到Leader信息，并且Leader的回复信息中宣称自己的状态是ServerState.LEADING; 如果自己是Leader，那么当前logicalclock一定要等于选票信息中的electionEpoch。
 
 
+###### 3.3.4 核心类
+以下为选举过程中使用到的核心类:
+
+1) QuorumPeer: 控制整个Leader选举过程
 
 
+2) FastLeaderElection: 默认的选举算法。此类中还有几个重要的内部类，如下
+<pre>
+a) FastLeaderElection::Messenger::WorkerReceiver
+从QuorumCnxManager::recvQueue中获取网络包，并将其发到FastLeaderElection::recvqueue中
+
+b)  FastLeaderElection::Messenger::WorkerSender
+从FastLeaderElection::sendqueue中获取网络包，并将其放到QuorumCnxManager::queueSendMap中，并发送到网络上
+</pre>
+
+3) QuorumCnxManager: 实际发生网络交互的地方。QuorumCnxManager保证与每一个zookeeper服务器之间只有一个链接。主要数据结构如下
+{% highlight string %}
+a) queueSendMap
+sid（key） -> buffer queue（value），为每个参与投票的server都保留一个队列。
+
+b) recvQueue
+message queue，所有收到的消息都放到recvQueue。
+
+c) listener
+server主线程，收发消息时和上面两个队列交互。
+{% endhighlight %}
+
+
+###### 3.3.5 投票流程总结
+
+1） **自增选举轮次**
+
+Zookeeper规定所有有效的投票都必须在同一轮次中。每个服务器在开始新一轮投票时，会先对自己维护的logicalclock进行自增操作。
+
+2) **初始化选票**
+
+每个服务器在广播自己的选票前，会将自己的投票箱清空。该投票箱记录了所收到的选票。例：服务器2投票给服务器3，服务器3投票给服务器1，则服务器1的投票箱为(2, 3), (3, 1), (1, 1)。票箱中只会记录每一投票者的最后一票，如投票者更新自己的选票，则其它服务器收到该新选票后会在自己票箱中更新该服务器的选票。
+
+3) **发送初始化选票**
+
+每个服务器最开始都是通过广播把票投给自己。
+{% highlight string %}
+synchronized(this){
+    logicalclock.incrementAndGet();
+    updateProposal(getInitId(), getInitLastLoggedZxid(), getPeerEpoch());
+}
+
+LOG.info("New election. My id =  " + self.getId() +
+        ", proposed zxid=0x" + Long.toHexString(proposedZxid));
+sendNotifications();
+{% endhighlight %}
+
+4) **接收外部投票**
+
+服务器会尝试从其它服务器获取投票，并记入自己的投票箱内。如果无法获取任何外部投票，则会确认自己是否与集群中其它服务器保持着有效连接。如果是，则再次发送自己的投票；如果否，则马上与之建立连接。
+
+5) **判断选举轮次**
+
+收到外部投票后，首先会根据投票信息中所包含的logicalclock来进行不同处理:
+
+* 外部投票的logicalclock大于自己的logicalclock，说明该服务器的选举轮次落后于其他服务器的选举轮次，立即清空自己的投票箱并将自己的logicalclock更新为收到的logicalclock，然后再对比自己之前的投票与收到的投票以确定是否需要变更自己的投票，最后再次将自己的投票广播出去。
+
+* 外部投票的logicalclock小于自己的logicalclock，则当前服务器直接忽略该投票，继续处理下一个投票
+
+* 外部投票的logicalclock与自己的logical相等，则进行选票PK（参见如下）
+
+6) **选票PK**
+
+选票PK是基于(self_id, self_zxid)与(vote_id, vote_zxid)的对比:
+
+* 外部投票的logicalclock大于自己的logicalclock，则将自己的logicClock及自己的选票的logicClock变更为收到的logicalclock
+
+* 若logicalclock一致，则对比二者的vote_zxid，若外部投票的vote_zxid比较大（假设收到的选票为n)，则将自己的票中的(vote_myid, vote_zxid)更新为(n.vote_myid, n.vote_zxid)并广播出去。此外还将本次收到的选票```n```及自己更新后的票放入自己的票箱。
+
+* 若二者vote_zxid一致，则比较二者的vote_myid，若外部投票的vote_myid比较大，则将自己的票中的vote_myid更新为收到的票中的vote_myid并广播出去，另外将收到的票及自己更新后的票放入自己的票箱
+
+7) **统计选票**
+
+如果已经确定有过半服务器认可了自己的投票（可能是更新后的投票）则终止投票。否则继续接收其它服务器的投票。
+
+8） **更新服务器状态**
+
+投票终止后，服务器开始更新自身状态。若过半的票投给了自己，则将自己的服务器状态更新为LEADING，否则将自己的状态更新为FOLLOWING
+
+## 4. 几种Leader选举场景
+
+### 4.1 集群启动Leader选举
+>注： 图中三元组(logicalclock,proposedLeader, zxid)
+
+1) **初始投票给自己**
+
+集群刚启动时，所有服务器的logicalclock都为1，zxid都为0。各服务器初始化之后，都投票给自己，并将自己的一票存入自己的票箱。如下图所示：
+
+![election](https://ivanzz1001.github.io/records/assets/img/paxos/start_election_1.png)
+
+在上图中，(1, 1, 0)第一位数代表投出该选票的服务器的logicalclock，第二位数代表被推荐的服务器的proposedLeader，第三位代表被推荐的服务器的最大的zxid。由于该步骤中所有选票都投给自己，所以第二位的proposedLeader即是自己的服务器ID(s_id)，第三位的zxid即是自己的zxid。
+
+此时各自的票箱中只有自己投给自己的一票。
+
+2) **更新选票**
+
+服务器收到外部投票后，进行选票PK，相应更新自己的选票并广播出去，并将合适的选票存入自己的票箱，如下图所示。
+
+![election](https://ivanzz1001.github.io/records/assets/img/paxos/start_election_2.png)
+```服务器1```收到服务器2的选票（1, 2, 0）和服务器3的选票（1, 3, 0）后，由于所有的logicalclock都相等，所有的zxid都相等，因此根据myid判断应该将自己的选票按照服务器3的选票更新为（1, 3, 0），并将自己的票箱全部清空，再将服务器3的选票与自己的选票存入自己的票箱，接着将自己更新后的选票广播出去。此时服务器1票箱内的选票为(1, 3, 0)，(3, 3, 0)。
+
+同理，服务器2收到服务器3的选票后也将自己的选票更新为（1, 3, 0）并存入票箱然后广播。此时服务器2票箱内的选票为(2, 3, 0)，(3, 3,0)。
+
+服务器3根据上述规则，无须更新选票，自身的票箱内选票仍为（3, 3, 0）。
+
+服务器1与服务器2更新后的选票广播出去后，由于三个服务器最新选票都相同，最后三者的票箱内都包含三张投给服务器3的选票。
+
+3) **根据选票确定角色**
+
+![election](https://ivanzz1001.github.io/records/assets/img/paxos/start_election_3.png)
+
+根据上述选票，三个服务器一致认为此时服务器3应该是Leader。因此服务器1和2都进入FOLLOWING状态，而服务器3进入LEADING状态。之后Leader发起并维护与Follower间的心跳。
+
+### 4.2 Follower重启
+1) **Follower重启投票给自己**
+
+Follower重启，或者发生网络分区后找不到Leader，会进入LOOKING状态并发起新的一轮投票。
+
+![follower-restart](https://ivanzz1001.github.io/records/assets/img/paxos/follower_restart_election_1.png)
+
+2) **发现已有Leader后成为Follower**
+
+服务器3收到服务器1的投票后，将自己的状态LEADING以及选票返回给服务器1。服务器2收到服务器1的投票后，将自己的状态FOLLOWING及选票返回给服务器1。此时服务器1知道服务器3是Leader，并且通过服务器2与服务器3的选票可以确定服务器3确实得到了超过半数的选票。因此服务器1进入FOLLOWING状态。
+
+![follower-restart](https://ivanzz1001.github.io/records/assets/img/paxos/follower_restart_election_2.png)
+### 4.3 Leader重启
 
 
 <br />
