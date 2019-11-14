@@ -508,6 +508,27 @@ Follower重启，或者发生网络分区后找不到Leader，会进入LOOKING�
 ![follower-restart](https://ivanzz1001.github.io/records/assets/img/paxos/follower_restart_election_2.png)
 ### 4.3 Leader重启
 
+1） **FOLLOWER发起新投票**
+
+Leader(服务器3）宕机后，Follower(服务器1和2）发现Leader不工作了，因此进入LOOKING状态并发起新的一轮投票，并且都将票投给自己。
+
+![leader-restart](https://ivanzz1001.github.io/records/assets/img/paxos/leader_restart_election_1.png)
+
+
+2) **广播更新选票**
+
+```服务器1```和```服务器2```根据外部投票确定是否需要更新自身的选票。这里有两种情况：
+
+* 服务器1和服务器2的```zxid```相同（例如，在服务器3宕机前，服务器1和服务器2完全与之同步），此时选票的更新主要取决于myid的大小
+
+* 服务器1和服务器2的```zxid```不同。在旧Leader宕机前，其所主导的写操作只需过半服务器确认即可，而不需要所有服务器确认。换句话说，服务器1和服务器2可能一个与旧的Leader同步(即zxid与之相同），另一个不同步（即zxid比之小）。此时选票的更新主要取决于谁的zxid较大
+
+
+
+
+
+
+
 
 <br />
 <br />
