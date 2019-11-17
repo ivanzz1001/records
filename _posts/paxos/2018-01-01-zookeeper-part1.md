@@ -306,6 +306,38 @@ WATCHER::
 WatchedEvent state:SyncConnected type:NodeDeleted path:/zk_test
 </pre>
 
+### 2.2 集群模式的搭建
+如果要提供一个可靠的Zookeeper服务，我们应该部署一个zookeeper集群。只要集群的大部分节点处于```up```状态，zookeeper服务就是可用的。因为Zookeeper需要一个```多数派```(majority)，因此整个集群的节点个数最好是奇数个。
+
+
+>说明： 正如上面所提到的，在建立zookeeper集群时至少需要3个节点，以达到最基本的容错性。
+>
+>而在实际生产环境中，三个节点往往是不够的。我们为了维持zookeeper在维护期间的最大的可用性，我们可能需要5个zookeeper节点。假如在一个节点失效，并且我们在对另一个节点进行维护的过程中，zookeeper仍能正常的提供服务。
+>
+>我们在对集群进行冗余考虑时，应该包含各个方面。假如我们的Zookeeper集群有3个节点，但是它们都连到同一台交换机上，如果这台交换机出现了故障，则会导致整个集群不可用。
+
+如下我们列出如何搭建zookeeper集群的相关步骤（这些步骤在每一台机器上都应该执行一遍）：
+
+* 安装[JDK](https://www.oracle.com/technetwork/java/javase/downloads/index.html)
+
+* 设置Java虚拟机的heap大小。这一点是相当重要的，可以避免不必要的内存交换，否则可能会严重影响Zookeeper的性能。为了确定一个合适的值，请使用负载测试方法。如果不想测试的话，对于4G内存的主机，建议将Java虚拟机heap大小设置为3GB。
+
+* 安装Zookeeper server
+
+* 创建配置文件(文件名称可以随意)
+<pre>
+tickTime=2000
+dataDir=/var/lib/zookeeper/
+clientPort=2181
+initLimit=5
+syncLimit=2
+server.1=zoo1:2888:3888
+server.2=zoo2:2888:3888
+server.3=zoo3:2888:3888
+</pre>
+
+
+
 
 <br />
 <br />
