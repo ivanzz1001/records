@@ -523,12 +523,91 @@ Leader(服务器3）宕机后，Follower(服务器1和2）发现Leader不工作�
 
 * 服务器1和服务器2的```zxid```不同。在旧Leader宕机前，其所主导的写操作只需过半服务器确认即可，而不需要所有服务器确认。换句话说，服务器1和服务器2可能一个与旧的Leader同步(即zxid与之相同），另一个不同步（即zxid比之小）。此时选票的更新主要取决于谁的zxid较大
 
-在上图中，
+在上图中，服务器1的zxid为11，而服务器2的zxid为10，因此服务器2将自身选票更新为(3,1,11)，如下图所示：
+
+![leader-restart](https://ivanzz1001.github.io/records/assets/img/paxos/leader_restart_election_2.png)
+
+
+3） **选出新的Leader**
+
+经过上一步选票更新后，服务器1和服务器2均将选票投给服务器1，因此服务器2成为Follower，而服务器1成为新的Leader并维护与服务器2的心跳。
+
+![leader-restart](https://ivanzz1001.github.io/records/assets/img/paxos/leader_restart_election_3.png)
+
+4） **旧Leader恢复后发起选举**
+
+旧的Leader恢复后，进入LOOKING状态并发起新一轮领导选举，并将选票投给自己。此时服务器1会将自己的LEADING状态及选票(3,1,11)返回给服务器3，而服务器2将自己的FOLLOWING状态及选票(3,1,11)返回给服务器3。如下图所示：
+
+![leader-restart](https://ivanzz1001.github.io/records/assets/img/paxos/leader_restart_election_4.png)
+
+5） **旧Leader成为Follower**
+
+服务器3了解到Leader为服务器1，且根据选票了解到服务器1确实得到过半服务器的选票，因此自己进入FOLLOWING状态：
+
+![leader-restart](https://ivanzz1001.github.io/records/assets/img/paxos/leader_restart_election_5.png)
+
+## 5. 一致性保证
+ZAB协议保证了在Leader选举的过程中，已经被commit的数据不会丢失，未被commit的数据对客户端不可见。
+
+### 5.1 Commit过的数据不丢失
+
+1) **FailOver前状态**
+
+为了更好地演示Leader Failover过程，本列中共使用了5个Zookeeper服务器。A作为Leader，共收到P1、P2、P3三条消息，并且commit了1和2，且总体顺序为P1、P2、C1、P3、C2。根据顺序性原则，其他Follower收到的消息的顺序肯定与之相同。其中B与A完全同步，C收到P1、P2、C1，D收到P1、P2，E收到P1，如下图所示：
+
+![recovery](https://ivanzz1001.github.io/records/assets/img/paxos/recovery_1.png)
+
+这里要注意：
+
+* 由于A没有C3，意味着收到P3的服务器的总个数不会超过一半，也即包含A在内最多只有两台服务器收到P3。在这里A和B收到P3，其它服务器均未收到P3
+
+* 由于A已写入C1、C2，说明它已经Commit了P1、P2，因此整个集群有超过一半的服务器，即最少三个服务器收到P1、P2。在这里所有服务器都收到了P1，除E外其它服务器也都收到了P2
+
+2） **选出新的Leader**
+
+旧Leader也即A宕机后，其它服务器根据上述FastLeaderElection算法选出B作为新的Leader。C、D和E成为Follower且以B为Leader后，会主动将自己最大的zxid发送给B，B会将Follower的zxid与自身zxid间的所有被Commit过的消息同步给Follower，如下图所示。
+
+![recovery](https://ivanzz1001.github.io/records/assets/img/paxos/recovery_2.png)
+
+在上图中:
+
+* P1和P2都被A Commit，因此B会通过同步保证P1、P2、C1与C2都存在于C、D和E中
+
+* P3由于未被A Commit，同时幸存的所有服务器中P3未存在于大多数据服务器中，因此它不会被同步到其它Follower
+
+3) **通知Follower可对外服务**
+
+同步完数据后，B会向D、C和E发送NEWLEADER命令并等待大多数服务器的ACK（下图中D和E已返回ACK，加上B自身，已经占集群的大多数），然后向所有服务器广播UPTODATE命令。收到该命令后的服务器即可对外提供服务。
+
+![recovery](https://ivanzz1001.github.io/records/assets/img/paxos/recovery_3.png)
+
+### 5.2 未Commit过的消息对客户端不可见
+在上例中，P3未被A Commit过，同时因为没有过半的服务器收到P3，因此B也未Commit P3（如果有过半服务器收到P3，即使A未Commit P3，B会主动Commit P3，即C3），所以它不会将P3广播出去。
+
+具体做法是，B在成为Leader后，先判断自身未Commit的消息（本例中即P3）是否存在于大多数服务器中从而决定是否要将其Commit。然后B可得出自身所包含的被Commit过的消息中的最小zxid（记为min_zxid）与最大zxid（记为max_zxid）。C、D和E向B发送自身Commit过的最大消息zxid（记为max_zxid）以及未被Commit过的所有消息（记为zxid_set）。B根据这些信息作出如下操作:
+
+* 如果Follower的max_zxid与Leader的max_zxid相等，说明该Follower与Leader完全同步，无须同步任何数据
+
+* 如果Follower的max_zxid在Leader的(min_zxid，max_zxid)范围内，Leader会通过TRUNC命令通知Follower将其zxid_set中大于Follower的max_zxid（如果有）的所有消息全部删除
 
 
 
+上述操作保证了未被Commit过的消息不会被Commit从而对外不可见。
+
+上述例子中Follower上并不存在未被Commit的消息。但可考虑这种情况，如果将上述例子中的服务器数量从五增加到七，服务器F包含P1、P2、C1、P3，服务器G包含P1、P2。此时服务器F、A和B都包含P3，但是因为票数未过半，因此B作为Leader不会Commit P3，而会通过TRUNC命令通知F删除P3。如下图所示。
 
 
+![recovery](https://ivanzz1001.github.io/records/assets/img/paxos/recovery_4.png)
+
+## 6. 总结
+
+* 由于使用主从复制模式，所有的写操作都要由Leader主导完成，而读操作可通过任意节点完成，因此Zookeeper读性能远好于写性能，更适合读多写少的场景
+
+* 虽然使用主从复制模式，同一时间只有一个Leader，但是Failover机制保证了集群不存在单点失败（SPOF）的问题
+
+* ZAB协议保证了Failover过程中的数据一致性
+
+*服务器收到数据后先写本地文件再进行处理，保证了数据的持久性
 
 <br />
 <br />
