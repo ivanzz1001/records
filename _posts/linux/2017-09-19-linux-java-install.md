@@ -85,7 +85,7 @@ drwxr-xr-x 4 root root   28 Jul 31 23:28 jre
 # ls -al /usr/bin/javac
 lrwxrwxrwx 1 root root 23 May 12 09:55 /usr/bin/javac -> /etc/alternatives/javac
 # ls -al /etc/alternatives/javac 
-lrwxrwxrwx 1 root root 70 May 12 09:55 /etc/alternatives/javac -> /usr/lib/jvm/ava-1.8.0-openjdk-1.8.0.141-1.b16.el7_3.x86_64/bin/javac
+lrwxrwxrwx 1 root root 70 May 12 09:55 /etc/alternatives/javac -> /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.141-1.b16.el7_3.x86_64/bin/javac
 # ls -lrt /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.141-1.b16.el7_3.x86_64/bin/
 total 420
 -rwxr-xr-x 1 root root   2806 Jan 18 00:38 java-rmi.cgi
