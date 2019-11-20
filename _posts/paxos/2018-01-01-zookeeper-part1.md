@@ -335,7 +335,48 @@ server.1=zoo1:2888:3888
 server.2=zoo2:2888:3888
 server.3=zoo3:2888:3888
 </pre>
+你可以在[Configuration Parameter](https://zookeeper.apache.org/doc/r3.5.6/zookeeperAdmin.html#sc_configuration)相关章节找到这些配置参数的含义。在这里我们只需要知道： Zookeeper集群中的每一个节点之间都需要互相能够连通。你可以通过在配置文件中使用*server.id=host:port:port*这样的形式来实现。其中```host```是该机器的主机名；第一个Port用于在Leader选举成功后，Follower用该端口来连接Leader； 第二个Port用于Leader选举。集群中的每一个节点会在对应的数据目录下创建一个myid文件，用于唯一的标识自己。
 
+* myid文件只有一行，就是存放我们为该机器指定的id。因此对于上面```server.1```主机上的myid文件，其内容为```1```。id在整个zookeeper集群中必须唯一，且范围是[1,255]。（注： 如果你启用了zookeeper的一些扩展特性，如TTL节点话，则对应的id范围则必须为[1,254]）。本步骤我们需要通过手动方式来创建myid文件，例如在```zoo1```这台主机上，我们执行命令：
+<pre>
+# echo "1" > /var/lib/zookeeper/myid
+# cat /var/lib/zookeeper/myid
+</pre>
+
+* 假如配置文件建立好之后，可以通过如下方式启动Zookeeper Server
+<pre>
+# ls
+bin  conf  docs  lib  LICENSE.txt  NOTICE.txt  README.md  README_packaging.txt
+# bin/zkServer.sh start 
+</pre>
+
+* 查看集群的运行情况
+
+我们可以查看对应目录下的日志：
+<pre>
+# tail -f logs/zookeeper-root-server-localhost.localdomain.out 
+        at org.apache.zookeeper.server.quorum.Learner.sockConnect(Learner.java:233)
+        at org.apache.zookeeper.server.quorum.Learner.connectToLeader(Learner.java:262)
+        at org.apache.zookeeper.server.quorum.Follower.followLeader(Follower.java:77)
+        at org.apache.zookeeper.server.quorum.QuorumPeer.run(QuorumPeer.java:1271)
+2019-11-19 23:59:12,552 [myid:1] - INFO  [QuorumPeer[myid=1](plain=/0:0:0:0:0:0:0:0:2181)(secure=disabled):Learner@391] - Getting a diff from the leader 0x0
+2019-11-19 23:59:12,557 [myid:1] - INFO  [QuorumPeer[myid=1](plain=/0:0:0:0:0:0:0:0:2181)(secure=disabled):Learner@546] - Learner received NEWLEADER message
+2019-11-19 23:59:12,626 [myid:1] - INFO  [QuorumPeer[myid=1](plain=/0:0:0:0:0:0:0:0:2181)(secure=disabled):Learner@529] - Learner received UPTODATE message
+2019-11-19 23:59:12,631 [myid:1] - INFO  [QuorumPeer[myid=1](plain=/0:0:0:0:0:0:0:0:2181)(secure=disabled):CommitProcessor@256] - Configuring CommitProcessor with 4 worker threads.
+2019-11-19 23:59:17,007 [myid:1] - INFO  [/192.168.79.128:3888:QuorumCnxManager$Listener@918] - Received connection request 192.168.79.131:36560
+2019-11-19 23:59:17,013 [myid:1] - INFO  [WorkerReceiver[myid=1]:FastLeaderElection@679] - Notification: 2 (message format version), 3 (n.leader), 0x0 (n.zxid), 0x1 (n.round), LOOKING (n.state), 3 (n.sid), 0x0 (n.peerEPoch), FOLLOWING (my state)0 (n.config version)
+</pre>
+
+
+我们也可以通过如下方式查看集群：
+<pre>
+# bin/zkServer.sh status
+/usr/bin/java
+ZooKeeper JMX enabled by default
+Using config: /app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../conf/zoo.cfg
+Client port found: 2181. Client address: localhost.
+Mode: follower
+</pre>
 
 
 
@@ -352,6 +393,8 @@ server.3=zoo3:2888:3888
 4. [ZooKeeper Getting Started Guide](https://zookeeper.apache.org/doc/r3.5.6/zookeeperStarted.html)
 
 5. [ZooKeeper Administrator's Guide](https://zookeeper.apache.org/doc/r3.5.6/zookeeperAdmin.html)
+
+6. [zookeeper3.5.6安装](https://blog.csdn.net/qinqinde123/article/details/102854529)
 
 <br />
 <br />
