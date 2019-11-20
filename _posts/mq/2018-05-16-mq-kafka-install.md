@@ -274,82 +274,94 @@ This is another message
 test:0:31
 </pre>
 
-**5) 删除topic**
 
-这里删除kafka topic分成几个步骤：
+## 4. kafka如何彻底删除topic及数据
 
-* ```删除kafka存储目录```
+删除kafka topic及其数据，严格来说并不是很难的操作。但是，往往给kafka使用者带来诸多问题。项目组之前接触过多个开发者，发现都会偶然出现无法彻底删除kafka的情况。本文总结多个删除kafka topic的应用场景，总结一套删除kafka topic的标准操作方法。
 
-通过kafka配置文件server.properties的log.dirs配置项，找到相关topic的数据存储目录(默认为/tmp/kafka-logs)，然后进行删除：
-<pre>
-# rm -rf /opt/oss_kafka/dataDir/kafka/logs/test-0/
-</pre>
+1） **停止对应topic的produce和consume操作**
+
+如果需要被删除的topic此时正在被程序produce和consume，则这些生产和消费程序需要停止。因为如果有程序正在生产或者消费该topic，则该topic的offset信息一直会在broker更新。调用kafka delete命令则无法删除该topic。同时，需要设置*auto.create.topics.enable = false*(注：默认设置为true)。如果设置为true，则produce或者fetch不存在的topic也会自动创建这个topic，这样会给删除topic带来很多意想不到的问题。
+
+所以，这一步很重要，必须设置*auto.create.topics.enable = false*，并认真把生产和消费程序彻底全部停止。
 
 
-* ```删除kafka topic```
+2） **更改相关配置**
 
-首先如果kafka启动时加载的配置文件中server.properties没有配置```delete.topic.enable=true```，那么此时的删除并不是真正的删除，而是把topic标记为```marked for deletion```。此时可以先修改配置，然后执行如下命令重启kafka:
-<pre>
+如果kafka配置文件server.properties中没有配置*delete.topic.enable=true*，则调用kafka的delete命令无法真正将topic删除，而是把topic标记为```marked for deletion```。
+
+因此我们需要首先修改配置文件，添加*delete.topic.enable=true*，然后执行如下命令进行重启：
+{% highlight string %}
 # bin/kafka-server-stop.sh
 # ps -ef 
 # nohup bin/kafka-server-start.sh config/server.properties >/dev/null 2>&1 &
-</pre>
+{% endhighlight %}
 
-然后执行如下命令删除topic:
+3) **调用命令删除topic**
+
+执行命令删除指定的topic，命令格式如下：
+{% highlight string %}
+# ./bin/kafka-topics --delete --zookeeper <zookeeper server:port> --topic <topic name>
+{% endhighlight %}
+例如我们这里要删除test这个topic，则：
 <pre>
 # ./bin/kafka-topics.sh --delete --zookeeper localhost:2181 --topic test
-Topic test is marked for deletion.
-Note: This will have no impact if delete.topic.enable is not set to true.
-
 # ./bin/kafka-topics.sh --zookeeper localhost:2181 --list 
-__consumer_offsets
-test - marked for deletion
 </pre>
-可以看到现在将对应的topic标记为	deletion了, 后续要想彻底删除还需要到zookeeper中删除数据。
 
 
-* ```删除zookeeper中相关topic数据```
+4) **删除kafka存储目录**
 
-首先登录zookeeper客户端：
+删除kafka存储目录（server.properties文件log.dirs配置，默认为"/data/kafka-logs"）相关topic的数据目录。
+
+注意：如果kafka有多个broker，且每个broker配置了多个数据盘（比如*/data/kafka-logs,/data1/kafka-logs ...*），且topic也有多个分区和replica，则需要对所有broker的所有数据盘进行扫描，删除该topic的所有分区数据。
+
+
+一般而言，经过上面4步就可以正常删除掉topic和topic的数据。但是，如果经过上面四步，还是无法正常删除topic，则需要对kafka在zookeeer的存储信息进行删除。具体操作如下：
+
+（注意：以下步骤里面，kafka在zk里面的节点信息是采用默认值，如果你的系统修改过kafka在zk里面的节点信息，则需要根据系统的实际情况找到准确位置进行操作）
+
+5) **删除zookeeper中的topic相关信息**
+
+首先找一台部署了zookeeper的服务器，使用如下命令登录zookeeper server:
 <pre>
 # bin/zkCli.sh -server localhost:2181
 #  
 </pre>
-然后执行如下的命令找到相关topic目录：
+
+登录到zk shell之后，找到topic所在目录，执行*ls /brokers/topics*，找到要删除的topic后，然后执行删除命令
 <pre>
 [zk: localhost:2181(CONNECTED) 0] ls /brokers/topics
 [test, __consumer_offsets]
+[zk: localhost:2181(CONNECTED) 1] rmr /brokers/topics/test 
+</pre>
+此时，topic彻底被删除了。
 
-//被标记为marked for deletion的topic，可以通过如下命令查看
-[zk: localhost:2181(CONNECTED) 1] ls /admin/delete_topics 
+如果某个topic是被标记为*marked for deletion*，可以通过如下命令查看：
+<pre>
+[zk: localhost:2181(CONNECTED) 2] ls /admin/delete_topics 
 [test]
 </pre>
-
-再接着删除zookeeper中相关topic数据, 此时topic被彻底删除:
+此种情况下，我们需要执行如下命令来进行删除：
 <pre>
-[zk: localhost:2181(CONNECTED) 2] rmr /brokers/topics test 
-[zk: localhost:2181(CONNECTED) 3] ls /brokers/topics       
-Node does not exist: /brokers/topics
+[zk: localhost:2181(CONNECTED) 3] rmr /admin/delete_topics/test
 </pre>
 
-此后再通过如下命令则看不到相关topic的数据了：
+```备注:``` 网络上很多其它文章还说明，需要删除topic在zk上面的消费节点记录、配置节点记录，比如
+{% highlight string %}
+# rmr /consumers/<consumer-group>
+
+# rmr /config/topics/<topic name>
+{% endhighlight %}
+其实正常情况是不需要进行这两个操作的，如果需要，那都是由于操作不当导致的。比如```步骤1```停止生产和消费程序没有做，```步骤2```没有正确配置。也就是说，正常情况下严格按照```步骤1~5```的步骤，是一定能够正常删除topic的。
+
+6) **重新查看topic相关信息进行验证**
+
+执行完上述步骤后，我们可以执行如下的命令查看topic相关信息：
 <pre>
 # bin/kafka-topics.sh --zookeeper localhost:2181 --list
 </pre>
-
-
-* ```总结```
- 
-如下我们针对彻底删除topic做一个总结：
-{% highlight string %}
-彻底删除topic：
-
-1： 删除kafka存储目录（server.properties文件log.dirs配置，默认为"/tmp/kafka-logs"）相关topic目录
-
-2： 如果配置了delete.topic.enable=true直接通过命令删除，如果命令删除不掉，直接通过zookeeper-client 删除掉broker下的topic即可。
-{% endhighlight %}
-
-
+查看现在kafka的topic信息。正常情况下删除的topic就不会再显示。但是，如果还能够查询到删除的topic，则重启zk和kafka即可。
 
 
 
@@ -371,9 +383,9 @@ Node does not exist: /brokers/topics
 
 6. [ZooKeeper Getting Started Guide](http://zookeeper.apache.org/doc/current/zookeeperStarted.html)
 
-7. [彻底删除Kafka中的topic](https://blog.csdn.net/fengzheku/article/details/50585972)
+7. [kafka如何彻底删除topic及数据](https://blog.csdn.net/belalds/article/details/80575751)
 
-
+8. [kafka系列之指定了一个offset,怎么查找到对应的消息？](https://www.jianshu.com/p/b32ac197aacb)
 <br />
 <br />
 <br />
