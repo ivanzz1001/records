@@ -380,6 +380,54 @@ Client port found: 2181. Client address: localhost.
 Mode: follower
 </pre>
 
+执行```ps -ef```命令可以查看zookeeper的实际启动参数(输出格式已做整理)：
+{% highlight string %}
+# ps -ef | grep zookeeper
+root      14176      1  2 22:32 pts/0    00:00:03 java -Dzookeeper.log.dir=/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../logs 
+-Dzookeeper.log.file=zookeeper-root-server-localhost.localdomain.log 
+-Dzookeeper.root.logger=INFO,CONSOLE 
+-XX:+HeapDumpOnOutOfMemoryError 
+-XX:OnOutOfMemoryError=kill -9 %p 
+-cp /app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../zookeeper-server/target/classes:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../build/classes:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../zookeeper-server/target/lib/*.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../build/lib/*.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/zookeeper-jute-3.5.6.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/zookeeper-3.5.6.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/slf4j-log4j12-1.7.25.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/slf4j-api-1.7.25.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/netty-transport-native-unix-common-4.1.42.Final.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/netty-transport-native-epoll-4.1.42.Final.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/netty-transport-4.1.42.Final.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/netty-resolver-4.1.42.Final.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/netty-handler-4.1.42.Final.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/netty-common-4.1.42.Final.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/netty-codec-4.1.42.Final.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/netty-buffer-4.1.42.Final.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/log4j-1.2.17.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/json-simple-1.1.1.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/jline-2.11.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/jetty-util-9.4.17.v20190418.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/jetty-servlet-9.4.17.v20190418.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/jetty-server-9.4.17.v20190418.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/jetty-security-9.4.17.v20190418.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/jetty-io-9.4.17.v20190418.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/jetty-http-9.4.17.v20190418.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/javax.servlet-api-3.1.0.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/jackson-databind-2.9.10.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/jackson-core-2.9.10.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/jackson-annotations-2.9.10.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/commons-cli-1.2.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../lib/audience-annotations-0.5.0.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../zookeeper-*.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../zookeeper-server/src/main/resources/lib/*.jar:\
+/app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../conf:
+-Xmx1000m 
+-Dcom.sun.management.jmxremote
+-Dcom.sun.management.jmxremote.local.only=false 
+org.apache.zookeeper.server.quorum.QuorumPeerMain /app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../conf/zoo.cfg
+{% endhighlight %}
+
 
 
 <br />
