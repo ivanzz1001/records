@@ -107,6 +107,7 @@ javac 1.8.0_131
 </pre>
 
 当前zookeeper最新的稳定版本是```v3.5.6```，当前的操作系统环境为：
+<pre>
 # cat /etc/centos-release
 CentOS Linux release 7.3.1611 (Core) 
 # uname -a
@@ -327,7 +328,7 @@ WatchedEvent state:SyncConnected type:NodeDeleted path:/zk_test
 * 创建配置文件(文件名称可以随意)
 <pre>
 tickTime=2000
-dataDir=/var/lib/zookeeper/
+dataDir=/opt/zookeeper/
 clientPort=2181
 initLimit=5
 syncLimit=2
@@ -339,7 +340,8 @@ server.3=zoo3:2888:3888
 
 * myid文件只有一行，就是存放我们为该机器指定的id。因此对于上面```server.1```主机上的myid文件，其内容为```1```。id在整个zookeeper集群中必须唯一，且范围是[1,255]。（注： 如果你启用了zookeeper的一些扩展特性，如TTL节点话，则对应的id范围则必须为[1,254]）。本步骤我们需要通过手动方式来创建myid文件，例如在```zoo1```这台主机上，我们执行命令：
 <pre>
-# echo "1" > /var/lib/zookeeper/myid
+# mkdir -p /opt/zookeeper/
+# echo "1" > /opt/zookeeper/myid
 # cat /var/lib/zookeeper/myid
 </pre>
 
