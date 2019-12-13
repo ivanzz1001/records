@@ -28,7 +28,7 @@ description: kafka工作原理介绍
 
 1. [kafka工作原理介绍](https://blog.csdn.net/qq_29186199/article/details/80827085)
 
-
+2. [kafka官网](https://kafka.apache.org/)
 
 <br />
 <br />
