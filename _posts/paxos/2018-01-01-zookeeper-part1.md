@@ -342,7 +342,7 @@ server.3=zoo3:2888:3888
 <pre>
 # mkdir -p /opt/zookeeper/
 # echo "1" > /opt/zookeeper/myid
-# cat /var/lib/zookeeper/myid
+# cat /opt/zookeeper/myid
 </pre>
 
 * 假如配置文件建立好之后，可以通过如下方式启动Zookeeper Server
