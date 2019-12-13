@@ -428,6 +428,44 @@ root      14176      1  2 22:32 pts/0    00:00:03 java -Dzookeeper.log.dir=/app/
 org.apache.zookeeper.server.quorum.QuorumPeerMain /app/zookeeper/apache-zookeeper-3.5.6-bin/bin/../conf/zoo.cfg
 {% endhighlight %}
 
+#### 2.2.1 集群模式的测试
+通过查看日志或者执行```bin/zkServer.sh status```命令，我们发现目前zookeeper集群的主从情况如下：
+
+* 192.168.79.128(Follower)
+
+* 192.168.79.129(Follower)
+
+* 192.168.79.131(Leader)
+
+1) Follower上操作
+
+接着我们使用zookeeper客户端登录*192.168.79.128*这个zookeeper服务器（在192.168.79.128主机上操作)：
+{% highlight string %}
+# bin/zkCli.sh -server 127.0.0.1:2181
+[zk: 127.0.0.1:2181(CONNECTED) 2] ls /
+[zookeeper]
+{% endhighlight %}
+执行命令*create /zk_test my_data*尝试创建一个节点:
+{% highlight string %}
+[zk: 127.0.0.1:2181(CONNECTED) 3] create /zk_kafka_topic topics
+Created /zk_kafka_topic
+[zk: 127.0.0.1:2181(CONNECTED) 4] ls /
+[zk_kafka_topic, zookeeper]
+{% endhighlight %}
+可以看到节点创建成功了。同时在执行上面这条命令时，我们在192.168.79.128主机上使用tcpdump进行抓包：
+<pre>
+# tcpdump -i ens33 tcp and port 2888 -w follower.pcap
+</pre>
+之后使用wireshark进行分析，我们看到有如下流程：
+{% highlight string %}
+No     Time       Source         Destination     Protocol    Length      Info
+----------------------------------------------------------------------------------------------------------
+193  31.941347  192.168.79.128  192.168.79.131     tcp        181        52762->2888 [PSH,ACK] Seq=2051940045 Ack=293419740 Win=246 Len=115 TSval=2088146587 TSecr=2088127400
+194  31.942296  192.168.79.131  192.168.79.128     tcp        66         2888->52762 [ACK] Seq=293419740 Ack=2051940160 Win=227 Len=0 TSval=2088128309 TSecr=2088146587
+195  31.943332  192.168.79.131  192.168.79.128     tcp        179        2888->52762 [PSH,ACK] Seq=293419740 Ack=2051940160 Win=227 Len=113 TSval=2088128310 TSecr=2088146587
+196  31.943931  192.168.79.131  192.168.79.129     tcp        179        2888->43924 [PSH,ACK] Seq=2728426865 Ack=2309074595 Win=227 Len=113 TSval=2088128310 TSecr=2088115286
+{% endhighlight %}
+从这里我们看到，follower首先是将写请求发送到Leader，之后再由Leader向各个Follower执行写操作。
 
 
 <br />
