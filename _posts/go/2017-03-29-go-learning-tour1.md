@@ -469,28 +469,46 @@ import (
 	"sync"
 )
 
-type TaskQueue struct{
+type MessageQueue struct{
 	buffer *list.List
 	lock    sync.Mutex
 	popable *sync.Cond
+	running bool
 }
 
 
-func CreateTaskQueue() *TaskQueue{
-	taskQueue := &TaskQueue{
+func CreateMsgQueue() *MessageQueue{
+	msgQueue := &MessageQueue{
 		buffer: list.New(),
+		running: true,
 	}
-	taskQueue.popable = sync.NewCond(&taskQueue.lock)
-
-	return taskQueue
+	msgQueue.popable = sync.NewCond(&msgQueue.lock)
+	return msgQueue
 }
 
-func (queue *TaskQueue)Pop()(* interface{}, int){
+func (queue *MessageQueue)Close(){
+	queue.lock.Lock()
+	queue.running = false
+	queue.popable.Broadcast()
+	queue.lock.Unlock()
+}
+
+func (queue *MessageQueue)IsRunning() bool{
+	return queue.running
+}
+
+func (queue *MessageQueue)Pop()(*interface{}, int){
 	length := 0
 
 	queue.lock.Lock()
 	for queue.buffer.Len() == 0{
-		queue.popable.Wait()
+		if queue.running{
+			queue.popable.Wait()
+		}else{
+			queue.lock.Unlock()
+			return nil, 0
+		}
+
 	}
 	element := queue.buffer.Front()
 
@@ -502,6 +520,7 @@ func (queue *TaskQueue)Pop()(* interface{}, int){
 
 	return &task, length
 }
+
 
 func (queue *TaskQueue)TryPop()(interface{}, bool){
 	queue.lock.Lock()
@@ -557,6 +576,8 @@ package queue
 import(
 	"testing"
 	"fmt"
+	"strconv"
+	"time"
 )
 
 func TestTaskQueuev1(t *testing.T){
@@ -600,8 +621,404 @@ func TestTaskQueuev1(t *testing.T){
 		fmt.Printf("name: %s content: %s\n", outRealWork2.name, outRealWork2.content)
 	}
 }
+
+func TestMessageQueue(t *testing.T){
+	type internalMessage struct {
+		msgID int64
+		msgContent string
+	}
+
+	//wg := sync.WaitGroup{}
+	msgQueue := CreateMsgQueue()
+
+	//wg.Add(1)
+	go func(){
+		for i:=0;i<5000;i++{
+			internalMsg := internalMessage{
+				msgID: int64(i+1),
+				msgContent: "this is message #" + strconv.Itoa(i+1),
+			}
+
+			msgQueue.Push(internalMsg)
+			if (i + 1) % 100 == 0{
+				time.Sleep(time.Millisecond * 300)
+			}
+		}
+
+		msgQueue.Close()
+		//wg.Done()
+	}()
+
+	for{
+		msg, _:= msgQueue.Pop()
+		if msg != nil{
+			internalMsg, ok:= (*msg).(internalMessage)
+			if !ok{
+				fmt.Printf("[TestMessageQueue] unexpected message type\n")
+				continue
+			}
+			fmt.Printf("msgID: %d msgContent: %s\n", internalMsg.msgID, internalMsg.msgContent)
+		}else if msgQueue.IsRunning() == false{
+			fmt.Printf("[TestMessageQueue] message queue is not running now, exit the loop\n")
+			break
+		}
+	}
+
+	fmt.Printf("[TestMessageQueue] exit message queue test\n")
+}
 {% endhighlight %}
 
+### 6.2 带限速功能的队列
+{% highlight string %}
+package service
+
+import (
+	"container/list"
+	"sync"
+	"time"
+	"common/logging"
+)
+
+/*
+ * Description: Here we realize a throttle queue, which will limit the pop rate in a period(4s)
+ */
+const(
+	MAX_THROTTLE_CNT = 15
+)
+
+type ThrottleLimit func()int64
+
+type ThrottleQueue struct{
+	buffer *list.List
+	lock    sync.Mutex
+	popable *sync.Cond
+	running bool
+
+	tick int64
+	throttle [MAX_THROTTLE_CNT]int64
+	exitC chan struct{}
+	wg sync.WaitGroup
+
+	limitCallback ThrottleLimit
+}
+
+
+func CreateThrottleQueue(tlimit ThrottleLimit) *ThrottleQueue{
+	queue := &ThrottleQueue{
+		buffer: list.New(),
+		running: true,
+		tick: 0x0,
+		exitC: make(chan struct{}),
+		limitCallback: tlimit,
+	}
+	queue.popable = sync.NewCond(&queue.lock)
+	go queue.throttlePump()
+
+	return queue
+}
+
+func (queue *ThrottleQueue)Close(){
+	queue.lock.Lock()
+	queue.running = false
+	queue.popable.Broadcast()
+	queue.lock.Unlock()
+	queue.exitC <- struct{}{}
+
+	queue.wg.Wait()
+}
+
+func (queue *ThrottleQueue)throttlePump(){
+	queue.wg.Add(1)
+
+	ticker := time.NewTicker(time.Second * 4)
+	defer func(){
+		ticker.Stop()
+		queue.wg.Done()
+	}()
+
+	limit := queue.limitCallback()
+	queue.throttle[0] = limit
+
+	Loop:
+		for{
+			select{
+			case <-ticker.C:
+				limit = queue.limitCallback()
+				if limit <= 0{
+					logging.Warning("[throttlePump] current limit throttle is %d", limit)
+				}
+				queue.lock.Lock()
+				lastTick := queue.tick
+				queue.tick++
+				queue.throttle[queue.tick % MAX_THROTTLE_CNT] = limit
+				if queue.buffer.Len() > 0 && queue.throttle[lastTick % MAX_THROTTLE_CNT] <= 0{
+					//queue.popable.Signal()
+					queue.popable.Broadcast()     //most probably we should wakeup all
+				}
+				queue.lock.Unlock()
+			case <-queue.exitC:
+				break Loop
+			}
+		}
+}
+func (queue *ThrottleQueue)IsRunning() bool{
+	return queue.running
+}
+
+func (queue *ThrottleQueue)Pop()(*interface{}, int){
+	length := 0
+
+	queue.lock.Lock()
+	for queue.buffer.Len() == 0 || queue.throttle[queue.tick % MAX_THROTTLE_CNT] <= 0{
+		if queue.running{
+			queue.popable.Wait()
+		}else{
+			queue.lock.Unlock()
+			return nil, 0
+		}
+
+	}
+	queue.throttle[queue.tick % MAX_THROTTLE_CNT]--
+
+	element := queue.buffer.Front()
+	task := element.Value
+	queue.buffer.Remove(element)
+	length = queue.buffer.Len()
+
+	queue.lock.Unlock()
+
+	return &task, length
+}
+
+
+func (queue *ThrottleQueue)TryPop()(* interface{}, bool){
+	queue.lock.Lock()
+
+	if queue.buffer.Len() > 0 && queue.throttle[queue.tick % MAX_THROTTLE_CNT] > 0{
+		queue.throttle[queue.tick % MAX_THROTTLE_CNT]--
+
+		element := queue.buffer.Front()
+		task := element.Value
+		queue.buffer.Remove(element)
+
+		queue.lock.Unlock()
+		return &task, true
+	}
+
+	queue.lock.Unlock()
+	return nil, false
+}
+
+/*
+ * returns current message count
+ */
+func (queue *ThrottleQueue)Push(task interface{})int{
+	length := 0
+
+	queue.lock.Lock()
+	if queue.buffer.Len() == 0 && queue.throttle[queue.tick % MAX_THROTTLE_CNT] > 0{
+		queue.buffer.PushBack(task)
+		queue.popable.Signal()
+	}else{
+		queue.buffer.PushBack(task)
+	}
+	length = queue.buffer.Len()
+	queue.lock.Unlock()
+
+	return length
+}
+
+
+
+func (queue *ThrottleQueue)PeakAll()([] *interface{}){
+	result := []*interface{}{}
+
+	queue.lock.Lock()
+
+	for e := queue.buffer.Front(); e != nil; e = e.Next(){
+		task := &e.Value
+		result = append(result, task)
+	}
+	queue.lock.Unlock()
+	return result
+}
+
+func (queue *ThrottleQueue)Length()int{
+	length := 0
+
+	queue.lock.Lock()
+	length = queue.buffer.Len()
+	queue.lock.Unlock()
+
+	return length
+}
+{% endhighlight %}
+
+测试示例：
+{% highlight string %}
+package service
+
+import (
+	"testing"
+	"strconv"
+	"time"
+	"fmt"
+	"sync"
+)
+
+type testInternalMessage struct{
+	msgID int64
+	msgContent string
+}
+
+func TestThrottleQueue(t *testing.T){
+	throttleQueue := CreateThrottleQueue(func()int64{
+		h := time.Now().Hour()
+		return 0x0
+		if h > 20 || h < 8{
+			return 8
+		}else{
+			return 4
+		}
+	})
+
+
+	for i:=0;i<5000;i++{
+		internalMsg := testInternalMessage{
+			msgID: int64(i+1),
+			msgContent: "this is message #" + strconv.Itoa(i+1),
+		}
+
+		throttleQueue.Push(internalMsg)
+		if (i + 1) % 100 == 0{
+			time.Sleep(time.Millisecond * 100)
+		}
+	}
+
+	consumeMsgCnt := 0
+	for{
+		msg, _:= throttleQueue.Pop()
+		consumeMsgCnt++
+		if msg != nil{
+			internalMsg, ok:= (*msg).(testInternalMessage)
+			if !ok{
+				fmt.Printf("[TestMessageQueue] unexpected message type\n")
+			}else{
+				fmt.Printf("msgID: %d msgContent: %s\n", internalMsg.msgID, internalMsg.msgContent)
+			}
+		}else if throttleQueue.IsRunning() == false{
+			fmt.Printf("[TestMessageQueue] message queue is not running now, exit the loop\n")
+			break
+		}
+
+		if consumeMsgCnt == 5000{
+			fmt.Printf("popped out all the message, exit\n")
+			break
+		}
+	}
+
+	throttleQueue.Close()
+}
+func produceMsg(throttleQueue *ThrottleQueue, exitC chan <- struct{}){
+	for i:=0;i<5000;i++{
+		internalMsg := testInternalMessage{
+			msgID: int64(i+1),
+			msgContent: "this is message #" + strconv.Itoa(i+1),
+		}
+
+		throttleQueue.Push(internalMsg)
+		if (i + 1) % 100 == 0{
+			time.Sleep(time.Millisecond * 800)
+		}
+	}
+
+	exitC <- struct{}{}
+
+}
+func consumeMsg(throttleQueue *ThrottleQueue, wg *sync.WaitGroup){
+	wg.Add(1)
+	defer wg.Done()
+
+	for{
+		msg, _:= throttleQueue.Pop()
+		if msg != nil{
+			internalMsg, ok:= (*msg).(testInternalMessage)
+			if !ok{
+				fmt.Printf("[consumeMsg] unexpected message type\n")
+			}else{
+				fmt.Printf("msgID: %d msgContent: %s\n", internalMsg.msgID, internalMsg.msgContent)
+			}
+		}else if throttleQueue.IsRunning() == false{
+			fmt.Printf("[consumeMsg] message queue is not running now, exit the loop\n")
+			break
+		}
+	}
+}
+func TestThrottleQueue2(t *testing.T){
+	throttleQueue := CreateThrottleQueue(func()int64{
+		h := time.Now().Hour()
+		if h > 20 || h < 8{
+			return 8
+		}else{
+			return 4
+		}
+	})
+
+	wg := sync.WaitGroup{}
+	produceFinC := make(chan struct{})
+
+	go produceMsg(throttleQueue, produceFinC)
+	for i:=0; i<5;i++{
+		go consumeMsg(throttleQueue, &wg)
+	}
+
+	select{
+		case <-produceFinC:
+			fmt.Printf("produce message finished\n")
+	}
+
+	throttleQueue.Close()
+	wg.Wait()
+	fmt.Printf("exit the test function\n")
+}
+
+func TestThrottleQueue_Exit(t *testing.T){
+	throttleQueue := CreateThrottleQueue(func()int64{
+		h := time.Now().Hour()
+		if h > 20 || h < 8{
+			return 8
+		}else{
+			return 4
+		}
+	})
+
+	wg := sync.WaitGroup{}
+	go func(){
+		wg.Add(1)
+		defer wg.Done()
+		for{
+			msg, _:= throttleQueue.Pop()
+			if msg != nil{
+				internalMsg, ok:= (*msg).(testInternalMessage)
+				if !ok{
+					fmt.Printf("[consumeMsg] unexpected message type\n")
+				}else{
+					fmt.Printf("msgID: %d msgContent: %s\n", internalMsg.msgID, internalMsg.msgContent)
+				}
+			}else if throttleQueue.IsRunning() == false{
+				fmt.Printf("[consumeMsg] message queue is not running now, exit the loop\n")
+				break
+			}
+		}
+	}()
+
+	time.Sleep(time.Second * 10)
+	throttleQueue.Close()
+
+	wg.Wait()
+	fmt.Printf("success exit the throttle queue\n")
+}
+{% endhighlight %}
 
 <br />
 <br />
