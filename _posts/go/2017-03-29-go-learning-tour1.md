@@ -712,6 +712,8 @@ func CreateThrottleQueue(tlimit ThrottleLimit) *ThrottleQueue{
 		limitCallback: tlimit,
 	}
 	queue.popable = sync.NewCond(&queue.lock)
+
+	queue.throttle[queue.tick % MAX_THROTTLE_CNT] = queue.limitCallback()
 	go queue.throttlePump()
 
 	return queue
@@ -736,14 +738,11 @@ func (queue *ThrottleQueue)throttlePump(){
 		queue.wg.Done()
 	}()
 
-	limit := queue.limitCallback()
-	queue.throttle[0] = limit
-
 	Loop:
 		for{
 			select{
 			case <-ticker.C:
-				limit = queue.limitCallback()
+				limit := queue.limitCallback()
 				if limit <= 0{
 					logging.Warning("[throttlePump] current limit throttle is %d", limit)
 				}
