@@ -120,6 +120,23 @@ M个处理线程，包含在线程池KafkaRequestHandlerPool内部，从RequestC
 
 其为Kafka服务端的请求通道，该数据结构中包含了一个全局的请求队列requestQueue和多个与Processor处理器相对应的响应队列responseQueue，提供给Processor与请求处理线程KafkaRequestHandler、Processor与KafkaApis交换数据的地方。
 
+5） **NetworkClient**
+
+其底层是对Java NIO进行相应的封装，位于kafka的网络接口层。Kafka消息生产者对象KafkaProducer的send()方法主要调用NetworkClient完成消息发送。
+
+6） **SocketServer**
+
+其是一个NIO的服务，它同时启动一个Acceptor接收线程和多个Processor处理线程。提供了一种典型的reactor多线程模式，将接收客户端请求和处理请求相分离。
+
+7） **KafkaServer**
+
+代表了一个Kafka Broker实例。其startup方法为实例启动的入口。
+
+8） **KafkaApis**
+
+Kafka的业务逻辑处理API，负责处理不同类型的请求。比如，“发送消息”、“获取消息偏移量offset”和“处理心跳请求”等。
+
+
 
 
 <br />
