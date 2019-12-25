@@ -139,6 +139,242 @@ Kafka的业务逻辑处理API，负责处理不同类型的请求。比如，“
 
 ## 2. kafka集群环境的搭建
 
+这里我们介绍一下kafka集群环境的搭建。
+
+### 2.1 前提条件
+
+1） 部署kafka集群搭建```一般```需要至少3台服务器，并且通常为奇数台
+
+2） kafka的安装需要java环境（JDK1.8)
+
+3） zookeeper集群环境的搭建
+
+4） kafka集群环境的搭建。这里我们会在如下3台机器上分别部署kafka
+<pre>
+   kafka服务器名                   IP地址                       域名
+--------------------------------------------------------------------------------------
+    kafka0                      192.168.79.128               (未设置)
+    kafka1                      192.168.79.129               (未设置)
+    kafka2                      192.168.79.131               (未设置)
+</pre>
+
+5) hosts配置(可选)
+
+如果我们要采用域名的话，我们可以修改```/etc/hosts```文件，在其中加入类似如下：
+<pre>
+# cat /etc/hosts
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+192.168.79.128    kafka0.cn
+192.168.79.129    kafka1.cn
+192.168.79.131    kafka2.cn
+</pre>
+注： 这里我们暂未采用域名
+
+### 2.2 详细步骤
+
+###### java环境搭建
+
+关于Linux下java环境的搭建，这里我们不做介绍。这里我们安装的JDK版本是:
+<pre>
+# javac -version
+javac 1.8.0_231
+</pre>
+
+###### zookeeper集群环境的搭建
+
+关于zookeeper集群环境的搭建及验证，在其他章节我们已经有相关详细说明，这里不再赘述。这里我们安装的zookeeper版本是：
+<pre>
+# ls
+apache-zookeeper-3.5.6-bin  apache-zookeeper-3.5.6-bin.tar.gz
+</pre>
+
+
+###### kafka集群安装
+
+1) 下载kafka安装包
+
+这里我们下载当前最新版本的kafka二进制安装包：kafka_2.13-2.4.0
+<pre>
+# mkdir /app/kafka
+# cd /app/kafka
+# wget http://mirror.bit.edu.cn/apache/kafka/2.4.0/kafka_2.13-2.4.0.tgz
+# ls
+kafka_2.13-2.4.0.tgz
+</pre>
+下载完成之后，我们解压:
+<pre>
+# tar -zxvf kafka_2.13-2.4.0.tgz 
+# cd kafka_2.13-2.4.0/
+# ls
+bin  config  libs  LICENSE  NOTICE  site-docs
+# ls bin/
+connect-distributed.sh        kafka-console-producer.sh    kafka-log-dirs.sh                    kafka-server-start.sh               windows
+connect-mirror-maker.sh       kafka-consumer-groups.sh     kafka-mirror-maker.sh                kafka-server-stop.sh                zookeeper-security-migration.sh
+connect-standalone.sh         kafka-consumer-perf-test.sh  kafka-preferred-replica-election.sh  kafka-streams-application-reset.sh  zookeeper-server-start.sh
+kafka-acls.sh                 kafka-delegation-tokens.sh   kafka-producer-perf-test.sh          kafka-topics.sh                     zookeeper-server-stop.sh
+kafka-broker-api-versions.sh  kafka-delete-records.sh      kafka-reassign-partitions.sh         kafka-verifiable-consumer.sh        zookeeper-shell.sh
+kafka-configs.sh              kafka-dump-log.sh            kafka-replica-verification.sh        kafka-verifiable-producer.sh
+kafka-console-consumer.sh     kafka-leader-election.sh     kafka-run-class.sh                   trogdor.sh
+# ls config/
+connect-console-sink.properties    connect-file-sink.properties    connect-mirror-maker.properties  log4j.properties     tools-log4j.properties
+connect-console-source.properties  connect-file-source.properties  connect-standalone.properties    producer.properties  trogdor.conf
+connect-distributed.properties     connect-log4j.properties        consumer.properties              server.properties    zookeeper.properties
+</pre>
+
+
+2) 创建kafka日志目录
+
+kafka日志目录用于存放kafka的topic数据、日志数据等：
+<pre>
+# mkdir -p /opt/kafka/logs
+# ls /opt/kafka
+</pre>
+
+3) 修改kafka配置文件
+
+我们修改*config/server.properties*配置文件，主要是修改如下几项：
+
+* broker.id: 集群中每一个broker的ID都必须唯一
+
+* listeners： broker所监听的地址
+
+* log.dirs: kafka数据存储位置
+
+* zookeeper.connect: zookeeper集群的地址
+
+* auto.create.topics.enable： 是否允许自动创建topic
+
+其他暂时都可以采用默认值。注： 默认配置中*num.partitions=1*，说明默认的分区数是1，通常我们并不需要进行修改，因为一般我们在创建topic时都会自行指定```分区数```和```副本数```。
+
+如下是各节点kafka的配置：
+
+* kafka0
+<pre>
+broker.id=0
+listeners=PLAINTEXT://192.168.79.128:9092
+log.dirs=/opt/kafka
+zookeeper.connect=192.168.79.128:2181,192.168.79.129,192.168.79.131
+</pre>
+修改完成后类似于如下：
+{% highlight string %}
+# cat config/server.properties | grep -v ^# | grep -v ^$
+broker.id=0
+listeners=PLAINTEXT://192.168.79.128:9092
+num.network.threads=3
+num.io.threads=8
+socket.send.buffer.bytes=102400
+socket.receive.buffer.bytes=102400
+socket.request.max.bytes=104857600
+log.dirs=/opt/kafka
+num.partitions=1
+num.recovery.threads.per.data.dir=1
+offsets.topic.replication.factor=1
+transaction.state.log.replication.factor=1
+transaction.state.log.min.isr=1
+log.retention.hours=168
+log.segment.bytes=1073741824
+log.retention.check.interval.ms=300000
+zookeeper.connect=192.168.79.128:2181,192.168.79.129:2181,192.168.79.131:2181
+zookeeper.connection.timeout.ms=6000
+group.initial.rebalance.delay.ms=0
+{% endhighlight %}
+
+* kafka1
+<pre>
+broker.id=0
+listeners=PLAINTEXT://192.168.79.128:9092
+log.dirs=/opt/kafka/logs
+zookeeper.connect=192.168.79.128:2181,192.168.79.129,192.168.79.131
+</pre>
+
+* kafka2
+<pre>
+broker.id=2
+listeners=PLAINTEXT://192.168.79.128:9092
+log.dirs=/opt/kafka/logs
+zookeeper.connect=192.168.79.128:2181,192.168.79.129,192.168.79.131
+</pre>
+
+4) 启动kafka
+
+* 以前台方式启动
+<pre>
+# bin/kafka-server-start.sh config/server.properties
+[2013-04-22 15:01:47,028] INFO Verifying properties (kafka.utils.VerifiableProperties)
+[2013-04-22 15:01:47,051] INFO Property socket.send.buffer.bytes is overridden to 1048576 (kafka.utils.VerifiableProperties)
+</pre>
+
+* 以后台方式启动
+<pre>
+# nohup bin/kafka-server-start.sh config/server.properties >/dev/null 2>&1 &
+</pre>
+
+启动后，我们看到在*$KAFKA_HOME/logs*目录下会有很多日志：
+<pre>
+# ls logs/
+controller.log  kafka-authorizer.log  kafka-request.log  kafkaServer-gc.log.0.current  log-cleaner.log  server.log  state-change.log
+</pre>
+要查看kafka server的启动运行信息可以看```server.log```日志。
+
+同时在kafka数据存储目录*/opt/kafka/logs*下会有如下文件：
+<pre>
+# ls -al /opt/kafka/logs
+total 4
+drwxr-xr-x 2 root root 187 Dec 25 00:11 .
+drwxr-xr-x 3 root root  18 Dec 25 00:11 ..
+-rw-r--r-- 1 root root   0 Dec 25 00:11 cleaner-offset-checkpoint
+-rw-r--r-- 1 root root   0 Dec 25 00:11 .lock
+-rw-r--r-- 1 root root   0 Dec 25 00:11 log-start-offset-checkpoint
+-rw-r--r-- 1 root root  88 Dec 25 00:11 meta.properties
+-rw-r--r-- 1 root root   0 Dec 25 00:11 recovery-point-offset-checkpoint
+-rw-r--r-- 1 root root   0 Dec 25 00:11 replication-offset-checkpoint
+</pre>
+
+
+
+5) 停止kafka
+
+执行如下命令停止kafka:
+<pre>
+# bin/kafka-server-stop.sh
+</pre>
+
+### 2.3 kafka的测试
+
+
+
+
+## 3. 补充： kafka的版本号
+
+在kafka的下载页面我们看到如下：
+
+![kafka-download](https://ivanzz1001.github.io/records/assets/img/mq/kafka_download.jpg)
+
+当前Apache Kafka的最新版本是2.4.0。但是当我们看到上图中*Scala 2.11  - kafka_2.11-2.4.0.tgz*时，我们可能会有些疑惑，难道kafka的版本号不是```2.11```吗？其实不然，前面的版本号是编译kafka源代码的**Scala**编译器的版本。
+
+>注：kafka服务器端的代码完全由Scala语言编写，Scala同时支持面向对象编程和函数式编程，用Scala写的源代码编译之后也是普通```.class```文件，因此我们说Scala是JVM系的语言，它的很多设计思想都是为人称道的。
+
+上面*Scala 2.11  - kafka_2.11-2.4.0.tgz*中```2.4.0```才是真正的kafka版本号。那么这个```2.4.0```又表示什么呢？最前面的2表示大版本号，即major version；中间的4表示表示的是小版本号或者次版本号，即minor version；最后的0表示修订版本号，也就是patch号。kafka社区在发布```1.0.0```版本后特意写过一篇文章，宣布kafka版本命名规则正式从4位演进到3位，比如```0.11.0.0```版本就是4位版本号
+
+### 3.1 kafka版本演进
+
+kafka目前总共演进了7个大版本，分别是0.7、0.8、0.9、0.10、0.11、1.0和2.0，其中的小版本和patch版本很多。哪些版本引入了哪些重大的功能改进？建议你最好做到如数家珍，因为这样不仅令你在和别人交谈时显得很酷，而且如果你要向架构师转型或者已然是架构师，那么这些都是能够帮助你进行技术选型、架构评估的重要依据。
+
+我们先从0.7版本说起，实际上也没有太多可说的，这是最早开源时的上古版本了。这个版本只提供了最基础的消息队列功能，甚至连副本机制都没有，我实在想不出来有什么理由你要使用这个版本，因此如果有人要向你推荐这个版本，果断走开好了。
+
+kafka从0.7时代演进到0.8之后正式引入了副本机制，至此kafka成为了一个真正意义上完备的分布式、高可靠消息队列解决方案。有了副本备份机制，kafka就能够比较好地做到消息无丢失。那时候生产和消费消息使用的还是老版本客户端的api，所谓```老版本```是指当你使用它们的api开发生产者和消费者应用时，你需要指定zookeeper的地址而非broker的地址。
+
+如果你现在尚不能理解这两者的区别也没关系，我会在后续继续介绍它们。老版本的客户端有很多的问题，特别是生产者api，它默认使用同步方式发送消息，可以想到其吞吐量一定不会太高。虽然它也支持异步的方式，但实际场景中消息有可能丢失，因此0.8.2.0版本社区引入了新版本producer api，即需要指定broker地址的producer。
+
+>据我所知，国内依然有少部分用户在使用0.8.1.1、0.8.2版本。我的建议是尽量使用比较新的版本，如果你不能升级大版本，我也建议你至少要升级到0.8.2.2这个版本，因为该版本中老版本消费者的api是比较稳定的。另外即使升级到了0.8.2.2，也不要使用新版本producer api，此时它的bug还非常的多。
+
+
+
+
+
+
 
 <br />
 <br />
@@ -157,6 +393,14 @@ Kafka的业务逻辑处理API，负责处理不同类型的请求。比如，“
 5. [Zookeeper+Kafka集群部署](https://www.cnblogs.com/saneri/p/8762168.html)
 
 6. [Kafka集群部署](https://blog.csdn.net/xuesp/article/details/88094326)
+
+7. [kafka quick start](https://kafka.apache.org/quickstart)
+
+8. [Kafka集群部署指南](https://cloud.tencent.com/developer/article/1459941)
+
+9. [kafka集群参数配置](https://blog.csdn.net/yujianping_123/article/details/96874189)
+
+10. [聊聊Kafka的版本号](https://www.cnblogs.com/yuhan-Hanny/p/11685626.html)
 
 <br />
 <br />
