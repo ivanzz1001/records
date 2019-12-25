@@ -347,6 +347,24 @@ drwxr-xr-x 3 root root  18 Dec 25 00:11 ..
 
 ### 2.3 kafka的测试
 
+1) **创建topic**
+
+如下我们在kafka0上创建测试topic: test-ken-io，这里我们指定3个副本，1个分区：
+<pre>
+# bin/kafka-topics.sh --create --bootstrap-server 192.168.79.128:9092 --replication-factor 3 --partitions 1 --topic test-ken-io
+</pre>
+创建完毕之后，通过执行如下命令查看是否创建成功：
+<pre>
+#  bin/kafka-topics.sh --describe --bootstrap-server 192.168.79.128:9092
+Topic: test2-ken-io     PartitionCount: 1       ReplicationFactor: 1    Configs: segment.bytes=1073741824
+        Topic: test2-ken-io     Partition: 0    Leader: 0       Replicas: 0     Isr: 0
+Topic: test-ken-io      PartitionCount: 1       ReplicationFactor: 3    Configs: segment.bytes=1073741824
+        Topic: test-ken-io      Partition: 0    Leader: 1       Replicas: 1,2,0 Isr: 1,2,0
+# bin/kafka-topics.sh --list --bootstrap-server 192.168.79.128:9092
+test-ken-io
+</pre>
+
+另外
 
 
 
