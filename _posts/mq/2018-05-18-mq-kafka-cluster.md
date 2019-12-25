@@ -109,7 +109,7 @@ kafka的网络模型基于reactor模型。以下来自:[消息中间件—简谈
 
 2） **Processor**
 
-N个处理线程，其中每个Processor都有自己的selector，它会向Acceptor分配的SocketChannel注册相应的```OP_READ```事件，N的大小由*num.networker.threads*决定；
+N个处理线程，其中每个Processor都有自己的selector，它会向Acceptor分配的SocketChannel注册相应的```OP_READ```事件，N的大小由*num.network.threads*决定；
 
 3） **KafkaRequestHandler**
 
@@ -137,6 +137,7 @@ M个处理线程，包含在线程池KafkaRequestHandlerPool内部，从RequestC
 Kafka的业务逻辑处理API，负责处理不同类型的请求。比如，“发送消息”、“获取消息偏移量offset”和“处理心跳请求”等。
 
 
+## 2. kafka集群环境的搭建
 
 
 <br />
@@ -152,6 +153,10 @@ Kafka的业务逻辑处理API，负责处理不同类型的请求。比如，“
 3. [kafka体系架构](https://segmentfault.com/a/1190000021175583?utm_source=tag-newest)
 
 4. [Consumer的offset保存在哪里](https://blog.csdn.net/chaiyu2002/article/details/86545658)
+
+5. [Zookeeper+Kafka集群部署](https://www.cnblogs.com/saneri/p/8762168.html)
+
+6. [Kafka集群部署](https://blog.csdn.net/xuesp/article/details/88094326)
 
 <br />
 <br />
