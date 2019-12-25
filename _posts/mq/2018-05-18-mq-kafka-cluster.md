@@ -254,6 +254,7 @@ kafka日志目录用于存放kafka的topic数据、日志数据等：
 <pre>
 broker.id=0
 listeners=PLAINTEXT://192.168.79.128:9092
+auto.create.topics.enable=false
 log.dirs=/opt/kafka
 zookeeper.connect=192.168.79.128:2181,192.168.79.129,192.168.79.131
 </pre>
@@ -273,6 +274,7 @@ num.recovery.threads.per.data.dir=1
 offsets.topic.replication.factor=1
 transaction.state.log.replication.factor=1
 transaction.state.log.min.isr=1
+auto.create.topics.enable=false
 log.retention.hours=168
 log.segment.bytes=1073741824
 log.retention.check.interval.ms=300000
@@ -285,6 +287,7 @@ group.initial.rebalance.delay.ms=0
 <pre>
 broker.id=0
 listeners=PLAINTEXT://192.168.79.128:9092
+auto.create.topics.enable=false
 log.dirs=/opt/kafka/logs
 zookeeper.connect=192.168.79.128:2181,192.168.79.129,192.168.79.131
 </pre>
@@ -293,6 +296,7 @@ zookeeper.connect=192.168.79.128:2181,192.168.79.129,192.168.79.131
 <pre>
 broker.id=2
 listeners=PLAINTEXT://192.168.79.128:9092
+auto.create.topics.enable=false
 log.dirs=/opt/kafka/logs
 zookeeper.connect=192.168.79.128:2181,192.168.79.129,192.168.79.131
 </pre>
