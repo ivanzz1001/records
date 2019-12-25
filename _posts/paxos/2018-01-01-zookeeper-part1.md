@@ -307,6 +307,8 @@ WATCHER::
 WatchedEvent state:SyncConnected type:NodeDeleted path:/zk_test
 </pre>
 
+<br />
+
 ### 2.2 集群模式的搭建
 如果要提供一个可靠的Zookeeper服务，我们应该部署一个zookeeper集群。只要集群的大部分节点处于```up```状态，zookeeper服务就是可用的。因为Zookeeper需要一个```多数派```(majority)，因此整个集群的节点个数最好是奇数个。
 
@@ -316,6 +318,18 @@ WatchedEvent state:SyncConnected type:NodeDeleted path:/zk_test
 >而在实际生产环境中，三个节点往往是不够的。我们为了维持zookeeper在维护期间的最大的可用性，我们可能需要5个zookeeper节点。假如在一个节点失效，并且我们在对另一个节点进行维护的过程中，zookeeper仍能正常的提供服务。
 >
 >我们在对集群进行冗余考虑时，应该包含各个方面。假如我们的Zookeeper集群有3个节点，但是它们都连到同一台交换机上，如果这台交换机出现了故障，则会导致整个集群不可用。
+
+
+这里我们假设需要部署的3台zookeeper服务器分别为： zoo1、zoo2、zoo3
+<pre>
+zookeeper服务器名               IP地址                        域名
+-----------------------------------------------------------------------------------------
+   zoo1                      192.168.79.128                (未设置)
+   zoo2                      192.168.79.129                (未设置)
+   zoo3                      192.168.79.131                (未设置)
+</pre>
+
+
 
 如下我们列出如何搭建zookeeper集群的相关步骤（这些步骤在每一台机器上都应该执行一遍）：
 
@@ -332,9 +346,9 @@ dataDir=/opt/zookeeper/
 clientPort=2181
 initLimit=5
 syncLimit=2
-server.1=zoo1:2888:3888
-server.2=zoo2:2888:3888
-server.3=zoo3:2888:3888
+server.1=192.168.79.128:2888:3888
+server.2=192.168.79.129:2888:3888
+server.3=192.168.79.131:2888:3888
 </pre>
 你可以在[Configuration Parameter](https://zookeeper.apache.org/doc/r3.5.6/zookeeperAdmin.html#sc_configuration)相关章节找到这些配置参数的含义。在这里我们只需要知道： Zookeeper集群中的每一个节点之间都需要互相能够连通。你可以通过在配置文件中使用*server.id=host:port:port*这样的形式来实现。其中```host```是该机器的主机名；第一个Port用于在Leader选举成功后，Follower用该端口来连接Leader； 第二个Port用于Leader选举。集群中的每一个节点会在对应的数据目录下创建一个myid文件，用于唯一的标识自己。
 
