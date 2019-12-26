@@ -372,7 +372,7 @@ test-ken-io
 
 * Replicas: 某一个partition的所有副本节点。副本节点有可能当前并不是处于alive状态，因此单纯通过本选项是不知道一个节点是否是存活的。
 
-* Isr： 处于```in-sync```状态的副本集，其是Replicas的一个子集。该集合中的元素是处于alive状态，并且当前保持着与Leader的同步
+* Isr(In-sync Replica)： 处于```in-sync```状态的副本集，其是Replicas的一个子集。该集合中的元素是处于alive状态，并且当前保持着与Leader的同步
 
 另外还可以通过如下来创建topic:
 <pre>
@@ -450,8 +450,19 @@ Note: This will have no impact if delete.topic.enable is not set to true.
 
 
 
+## 3. 设置kafka日志输出路径
+我们知道在kafka配置文件*config/server.properties*中有*log.dirs*这一配置选项，但该选项并不是用来配置kafka日志输出的保存位置，而是用来配置kafka消息存储的位置。
 
-## 3. 补充： kafka的版本号
+默认kafka运行的时候都会通过log4j打印很多日志文件，比如server.log、controller.log、state-change.log等，而且都会将其输出到*$KAFKA_HOME/logs/*目录下，这样很不利于线上运维，因为经常容易出现压爆文件系统的情况，一般kafka安装的盘都比较小，因此需要将日志数据存放到另一个或多个更大空间的分区盘。
+
+具体方法是，打开*$KAFKA_HOME/bin/kafka_run_class.sh*，找到*base_dir=$(dirname $0)/..*这一行，然后在下面加入：
+<pre>
+base_dir=$(dirname $0)/..
+LOG_DIR=/web/kafka/log
+</pre>
+这样就会把日志存放到所指定的位置了。
+
+## 4. 补充： kafka的版本号
 
 在kafka的下载页面我们看到如下：
 
