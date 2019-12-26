@@ -242,11 +242,13 @@ kafka日志目录用于存放kafka的topic数据、日志数据等：
 
 * log.dirs: kafka数据存储位置
 
+* num.partitions： 所创建的topic的默认分区数。默认配置的分区数是1。虽然```一般```我们在创建topic时都会自行指定```分区数```和```副本数```，但这里我们最好还是改成3，因为有一些topic可能并不直接由用户创建（如consumer消费时的offset会存放到一个名叫*__consumer_offsets*的topic中，该topic由kafka自动创建)，为了保证数据的可靠性，我们对默认值进行修改。
+
 * zookeeper.connect: zookeeper集群的地址
 
 * auto.create.topics.enable： 是否允许自动创建topic
 
-其他暂时都可以采用默认值。注： 默认配置中*num.partitions=1*，说明默认的分区数是1，通常我们并不需要进行修改，因为一般我们在创建topic时都会自行指定```分区数```和```副本数```。
+其他暂时都可以采用默认值。注： 默认配置中*num.partitions=1*，说明默认的分区数是1，通常我们并不需要进行修改，因为。
 
 如下是各节点kafka的配置：
 
@@ -256,6 +258,7 @@ broker.id=0
 listeners=PLAINTEXT://192.168.79.128:9092
 auto.create.topics.enable=false
 log.dirs=/opt/kafka
+num.partitions=3
 zookeeper.connect=192.168.79.128:2181,192.168.79.129,192.168.79.131
 </pre>
 修改完成后类似于如下：
@@ -269,7 +272,7 @@ socket.send.buffer.bytes=102400
 socket.receive.buffer.bytes=102400
 socket.request.max.bytes=104857600
 log.dirs=/opt/kafka
-num.partitions=1
+num.partitions=3
 num.recovery.threads.per.data.dir=1
 offsets.topic.replication.factor=1
 transaction.state.log.replication.factor=1
@@ -289,6 +292,7 @@ broker.id=0
 listeners=PLAINTEXT://192.168.79.128:9092
 auto.create.topics.enable=false
 log.dirs=/opt/kafka/logs
+num.partitions=3
 zookeeper.connect=192.168.79.128:2181,192.168.79.129,192.168.79.131
 </pre>
 
@@ -298,6 +302,7 @@ broker.id=2
 listeners=PLAINTEXT://192.168.79.128:9092
 auto.create.topics.enable=false
 log.dirs=/opt/kafka/logs
+num.partitions=3
 zookeeper.connect=192.168.79.128:2181,192.168.79.129,192.168.79.131
 </pre>
 
@@ -355,16 +360,94 @@ drwxr-xr-x 3 root root  18 Dec 25 00:11 ..
 </pre>
 创建完毕之后，通过执行如下命令查看是否创建成功：
 <pre>
-#  bin/kafka-topics.sh --describe --bootstrap-server 192.168.79.128:9092
-Topic: test2-ken-io     PartitionCount: 1       ReplicationFactor: 1    Configs: segment.bytes=1073741824
-        Topic: test2-ken-io     Partition: 0    Leader: 0       Replicas: 0     Isr: 0
+# bin/kafka-topics.sh --describe --bootstrap-server 192.168.79.128:9092
 Topic: test-ken-io      PartitionCount: 1       ReplicationFactor: 3    Configs: segment.bytes=1073741824
         Topic: test-ken-io      Partition: 0    Leader: 1       Replicas: 1,2,0 Isr: 1,2,0
 # bin/kafka-topics.sh --list --bootstrap-server 192.168.79.128:9092
 test-ken-io
 </pre>
+上面我们看到成功创建了```test-ken-io```这个topic，该topic具有3个副本，1个分区，即partition 0分区，该分区的的Leader是broker0。通过Isr: 1,2,0我们知道，partition 0分区的其他两个副本均已同步上Leader。下面对```--describe```选项的输出的一些字段做一个简单的介绍：
 
-另外
+* Leader: 表明该broker节点负责指定分区的所有读写操作。每一个broker节点都有可能会被随机选择为Leader。
+
+* Replicas: 某一个partition的所有副本节点。副本节点有可能当前并不是处于alive状态，因此单纯通过本选项是不知道一个节点是否是存活的。
+
+* Isr： 处于```in-sync```状态的副本集，其是Replicas的一个子集。该集合中的元素是处于alive状态，并且当前保持着与Leader的同步
+
+另外还可以通过如下来创建topic:
+<pre>
+# bin/kafka-topics.sh --create --zookeeper 192.168.79.128:2181,192.168.79.129:2181,192.168.79.131:2181 --replication-factor 3 --partitions 1 --topic test2-ken-io
+Created topic test2-ken-io.
+
+# bin/kafka-topics.sh --describe --zookeeper 192.168.79.128:2181,192.168.79.129:2181,192.168.79.131:2181
+Topic: test-ken-io      PartitionCount: 1       ReplicationFactor: 3    Configs: 
+        Topic: test-ken-io      Partition: 0    Leader: 1       Replicas: 1,2,0 Isr: 0,2,1
+Topic: test2-ken-io     PartitionCount: 1       ReplicationFactor: 3    Configs: 
+        Topic: test2-ken-io     Partition: 0    Leader: 1       Replicas: 1,2,0 Isr: 1,2,0
+
+# bin/kafka-topics.sh --list --zookeeper 192.168.79.128:2181,192.168.79.129:2181,192.168.79.131:2181
+test-ken-io
+test2-ken-io
+</pre>
+上面两种方法之间有一些微妙的区别。从kafka的版本演进历程来看，早期的kafka客户端API都是通过zookeeper地址来访问kafka的，而目前新版本的kafka都是直接通过broker地址来访问的，早已经弃用了通过zookeeper来访问的方法。
+
+2） **创建producer**
+
+我们在broker 0上为```test-ken-io```创建producer，并产生一些message:
+{% highlight string %}
+# bin/kafka-console-producer.sh --broker-list  192.168.79.128:9092  --topic test-ken-io
+>test 0
+>test 1
+>test 2
+>test 3
+>test 4
+{% endhighlight %}
+
+3) **创建consumer**
+
+我们在broker 1上为```test-ken-io```创建consumer:
+<pre>
+# bin/kafka-console-consumer.sh --bootstrap-server 192.168.79.129:9092 --topic test-ken-io --from-beginning
+test 0
+test 1
+test 2
+test 3
+test 4
+</pre>
+注： 上面并未指明consumer group，在不同窗口同时执行会创建不同的匿名消费组，可以同时消费test-ken-io中的消息。
+
+4) **测试容错性**
+
+通过上面我们知道test-ken-io有3个副本，1个分区partition 0，且该分区的Leader是broker 1。这里我们通过如下命令将broker1 kill掉:
+<pre>
+# ps -aux | grep kafka
+root      90523  2.6 19.9 5207444 772552 pts/0  Sl   Dec25  25:54 /usr/java/jdk1.8.0_131//bin/java -Xmx1G ...
+# kill -9 90523
+</pre>
+重新执行如下命令看当前test-ken-io这个topic的partition 0的Leader：
+<pre>
+# bin/kafka-topics.sh --describe --bootstrap-server 192.168.79.128:9092
+Topic: test-ken-io      PartitionCount: 1       ReplicationFactor: 3    Configs: segment.bytes=1073741824
+        Topic: test-ken-io      Partition: 0    Leader: 2       Replicas: 1,2,0 Isr: 2,0
+</pre>
+这里我们看到Leader变成了broker 2，且Isr也变成了2,0。
+
+然后我们再用producer发送消息，用consumer消费消息，可以看到均能够正常运行。
+
+5） **删除topic**
+
+执行如下命令删除topic:
+<pre>
+# bin/kafka-topics.sh --delete --bootstrap-server 192.168.79.128:9092 --topic test2-ken-io
+</pre>
+或通过如下命令：
+<pre>
+# bin/kafka-topics.sh --delete --zookeeper 192.168.79.128:2181,192.168.79.129:2181,192.168.79.131:2181 --topic test2-ken-io
+Topic test2-ken-io is marked for deletion.
+Note: This will have no impact if delete.topic.enable is not set to true.
+</pre>
+注： 通过上面的命令，(随kafka版本不同)```可能```并没有真正彻底的将该topic的相关信息移除。要想彻底删除，请参看相关文章。
+
 
 
 
