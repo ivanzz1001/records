@@ -414,9 +414,63 @@ test 2
 test 3
 test 4
 </pre>
-注： 上面并未指明consumer group，在不同窗口同时执行会创建不同的匿名消费组，可以同时消费test-ken-io中的消息。
+注： 上面并未指明consumer group，在不同窗口同时执行会创建不同的匿名消费组，可以同时消费test-ken-io中的消息。并且这里创建的consumer group是```临时```的，当*bin/kafka-console-consumer.sh*执行退出后，对应的消费组也会在一定时间后被自动删除。
 
-4) **测试容错性**
+如下我们也可以在创建consumer时指定消费组：
+<pre>
+# bin/kafka-console-consumer.sh --bootstrap-server 192.168.79.129:9092 --topic test-ken-io --from-beginning --consumer-property group.id=test-group1
+test 0
+test 1
+test 2
+test 3
+test 4
+</pre>
+注： 此种方式创建的consumer group是永久的(没明确证据！)。
+
+4) **查询consumer消费信息**
+
+我们知道在kafka 0.9版本之后，kafka的consumer group和offset信息就不保存在zookeeper中了。因此我们要查看所有消费组，我们得先区分kafka版本：
+
+* 0.9版本之前kafka查看所有消费组
+<pre>
+# ./kafka-consumer-groups.sh --zookeeper 192.168.79.128:2181 --list
+</pre>
+
+* 0.9及之后版本kakfa查看所有消费组
+<pre>
+
+# kafka-consumer-groups.sh --new-consumer --bootstrap-server 192.168.79.128:9092 --list 
+//说明2.4.0版本已经不支持--new-consumer选项
+# bin/kafka-consumer-groups.sh  --bootstrap-server 192.168.79.128:9092 --list
+console-consumer-54559
+console-consumer-97891
+test-group2
+test-group1
+console-consumer-81258
+</pre>
+
+
+在我们知道```consumer group```之后，我们就可以查询对应group下某个topic的消息消费情况。同样，针对kafka版本的不同，也有不同的查看方式：
+
+* 0.9版本之前kafka查看consumer的消费情况
+<pre>
+# bin/kafka-run-class.sh kafka.tools.ConsumerOffsetChecker --zookeeper 192.168.79.128:2181 --group logstash-new
+</pre>
+
+* 0.9及之后版本kakfa查看consumer消费情况
+<pre>
+# bin/kafka-consumer-groups.sh --new-consumer --bootstrap-server 192.168.79.128:9092 --describe --group console-consumer-99512
+//说明2.4.0版本已经不支持--new-consumer选项
+# bin/kafka-consumer-groups.sh --bootstrap-server 192.168.79.128:9092 --describe --group test-group1
+
+Consumer group 'test-group1' has no active members.
+
+GROUP           TOPIC           PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG             CONSUMER-ID     HOST            CLIENT-ID
+test-group1     test-ken-io     0          10              10              0               -               -               -
+</pre>
+
+
+5) **测试容错性**
 
 通过上面我们知道test-ken-io有3个副本，1个分区partition 0，且该分区的Leader是broker 1。这里我们通过如下命令将broker1 kill掉:
 <pre>
@@ -434,7 +488,7 @@ Topic: test-ken-io      PartitionCount: 1       ReplicationFactor: 3    Configs:
 
 然后我们再用producer发送消息，用consumer消费消息，可以看到均能够正常运行。
 
-5） **删除topic**
+6） **删除topic**
 
 执行如下命令删除topic:
 <pre>

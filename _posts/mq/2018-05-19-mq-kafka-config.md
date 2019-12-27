@@ -77,7 +77,7 @@ listeners=PLAINTEXT://myhost:9092,SSL://:9091 CLIENT://0.0.0.0:9092,REPLICATION:
 
 5) **background.threads**
 
-用于指明有多少个后台线程来处理任务。
+用于指明有多少个线程来处理```后台任务```
 
 6） **broker.id**
 
@@ -103,7 +103,225 @@ Kafka会定期为那些超过磁盘空间阈值的topic进行日志段的删除�
 
 如果将此配置项设置为-1，表示不对日志进行控制。这是从```空间维度```来对日志进行管理的。
 
-10) 
+10) **log.retention.hours**
+
+kafka日志段的最长保留时间。通常结合log.retention.minutes、log.retention.ms一起使用。这是从```时间维度```来对日志进行管理的。
+
+
+11） **log.roll.hours**
+
+基于时间的日志分割。即使文件没有到达log.segment.bytes，只要文件创建时间到达此属性，就会创建新文件。这个设置也可以有topic层面的设置进行覆盖；
+
+12) **log.segment.bytes**
+
+用于指定每个日志段的大小。
+
+13） **message.max.bytes**
+
+kafka批量处理消息时，每一个批量所允许的最大字节数。
+
+14） **unclean.leader.election.enable**
+
+此配置项用于指定是否允许落后太多的replica竞选Leader，如果允许的话可能会发生信息丢失。默认值为```false```。
+
+15） **log.cleanup.policy**
+
+用于指定在达到一个留存窗口(retention window)后，对日志段的留存策略。当前所支持的留存策略有```delete```、```compact```。
+
+16） **num.partitions**
+
+用于指定每一个topic的默认分区数，默认值为1.
+
+17） **replica.lag.time.max.ms**
+
+在一个指定的时间之内，如果follower没有发送任何fetch请求，或者没有同步上Leader，那么leader就会将该follower从ISR中移除。默认值是10秒
+
+
+###### 实践经验
+
+生产上如果有消息丢失的情况，可以先检查一下如下的一些参数是否设置合理：
+
+1） unclean.leader.election.enable = false
+
+2） replication.factor >=3：将消息多冗余几份
+
+3） min.insync.replicas >= 2，消息至少要被写入2个副本才算是```已提交```,1个leader副本，至少1个follower副本
+
+4) retries > 0，producer端参数，防止网络抖动，自动重试消息发送，在网络不稳定的时候可以考虑。acks = all，表示所有副本broker全部接收到消息才算```已提交```。请参看[Producer Configs](https://kafka.apache.org/documentation/#brokerconfigs)相关配置段。
+
+另外，producer.send(msg,callback), callback可以知道消息到底发送成功了没有。
+
+5） enable.auto.commit = false，这是consumer端参数，采用手动提交offset。特别是当consumer端是多线程处理时，offset提交了，但是线程处理出错了。
+
+
+###### 更新Broker Configs
+ 从Kafka 1.1开始，Broker的```有一些```配置我们可以动态的更新，而并不需要重启Broker。我们可以通过```Broker Configs```的*Dynamic Update Mode*这一列来看是否可以动态更新：
+
+* read-only: 说明如果对应的配置进行了更新，需要通过重启broker才能生效
+
+* per-broker: 只在对应的broker上生效，可以动态的更新
+
+* cluster-wide: 对整个集群有效，可以动态的更新
+
+
+要更改当前broker(broker id为0）的配置（比如，修改日志清理线程的数量）：
+<pre>
+# bin/kafka-configs.sh --bootstrap-server localhost:9092 --entity-type brokers --entity-name 0 --alter --add-config log.cleaner.threads=2
+</pre>
+
+要查看broker 0的当前broker configs，可以通过如下命令：
+<pre>
+# bin/kafka-configs.sh --bootstrap-server localhost:9092 --entity-type brokers --entity-name 0 --describe
+</pre>
+
+如果要删除broker 0的动态配置，让其恢复默认值或者静态配置文件的配置的值（例如，恢复日志清理线程的数量)，可以执行如下操作：
+<pre>
+# bin/kafka-configs.sh --bootstrap-server localhost:9092 --entity-type brokers --entity-name 0 --alter --delete-config log.cleaner.threads
+</pre>
+
+有一些configs可以配置为整个集群(cluster-wide)生效，这样就可以使得集群中的所有broker都有一样的值。通过如下的命令可以修改整个集群的配置值（例如，修改所有broker的日志清理线程数量）：
+<pre>
+# bin/kafka-configs.sh --bootstrap-server localhost:9092 --entity-type brokers --entity-default --alter --add-config log.cleaner.threads=2
+</pre>
+
+要查看当前整个集群的默认配置值的话，可以执行如下命令：
+<pre>
+# bin/kafka-configs.sh --bootstrap-server localhost:9092 --entity-type brokers --entity-default --describe
+</pre>
+
+所有可以在cluster级别进行的配置，也可以在per-broker级别进行配置。如果在不同的级别(cluster level/broker level)都进行了配置，则按照如下顺序决定所使用的值：
+
+* 存储在zookeeper中的per-broker配置值
+
+* 存储在zookeeper中的cluster-wide配置值
+
+* server.properties静态配置的broker config
+
+* kafka的默认值
+
+### 1.2 topic级别的配置
+
+与topic相关的配置我们可以在broker server层面进行默认设置，也可以在per-topic层面进行设置，per-topic层面的设置会覆盖broker server层面的设置。我们可以在创建topic时，通过使用```--config```选项来进行相应的参数配置。例如，我们要创建一个名为```my-topic```的topic，并设置我们自己想要的*max message size*以及*flush rate*，那么我们可以通过如下命令
+<pre>
+# bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic my-topic --partitions 1 \
+    --replication-factor 1 --config max.message.bytes=64000 --config flush.messages=1
+</pre>
+
+我们也可以在后续对相应的配置参数进行修改，例如：
+<pre>
+# bin/kafka-configs.sh --zookeeper localhost:2181 --entity-type topics --entity-name my-topic
+    --alter --add-config max.message.bytes=128000
+</pre>
+
+如果要查看当前topic(my-topic)的配置信息，可以执行如下命令：
+<pre>
+# bin/kafka-configs.sh --zookeeper localhost:2181 --entity-type topics --entity-name my-topic --describe
+</pre>
+
+如果要删除对应的参数配置，让其恢复到默认值，我们可以执行如下命令：
+<pre>
+# bin/kafka-configs.sh --zookeeper localhost:2181  --entity-type topics --entity-name my-topic
+    --alter --delete-config max.message.bytes
+</pre>
+
+topic参数和broker参数，就好像是局部和全局变量的关系。如果两者都进行了设置，则以topic参数为准。通常情况下，我们可能会对*message.max.bytes*配置参数，针对具体的topic进行单独设置，而其他配置参数进行单独设置的场景并不多。
+
+设置topic级别的参数有2种方式：创建topic 时设置，另一个是修改参数。kafka有kafka-topics命令来创建topic，结尾处使用--config设置topic参数；另一个用kafka-configs来修改参数。
+
+
+### 1.3 producer configs
+如下是producer的一些配置：
+
+1） **acks**
+
+producer写入数据时，要求leader至少需获得多少ack才认为数据写入成功。这控制着数据的持久化，acks所允许设置的值有：
+
+* acks=0: 假如设置为0，则producer不会等待以获得任何ack。消息记录会直接添加到socket缓冲，并且认为发送成功。在此种情况下，我们并不能确保broker已经成功接受到消息记录，并且我们所配置的```retries```参数也不会起任何作用（因为客户端无从感知是否操作失败，因此也就没有必要进行任何retry操作）。消息发送后反馈回来的offset值也一直是```-1```。
+
+* acks=1: 这意味着leader会将相应的消息记录写到本地日志，之后就马上将响应返回给producer，并不会等待follower的写入响应信息。在这种情况下，假如leader写入成功并向producer返回ack信息之后，leader突然崩溃，导致写入的record信息没来得及复制到其他followers上，这样就有可能会造成消息数据的丢失。
+
+* acks=all: 这意味着在producer写入数据时，Leader会等待所有ISR的ack响应，只有所有ISR成员都写入成功，才会向producer反馈写入成功。这样，就可以保证消息记录不会丢失，因为至少有一个follower保持着与Leader的同步。这是最强的```可用性```保证。*acks=all*等价于*acks=-1*。
+
+2） **bootstrap.servers**
+
+producer会使用此配置项所设置的*host/port*列表来连接kafka集群。值得指出的是，producer只是会用此列表所配置的参数来建立与kafka cluster的初始连接，从而获得完整的集群信息，因此并不会真正影响到后续的消息发送等操作。bootstrap.servers的配置格式为：
+<pre>
+bootstrap.servers=host1:port1,host2:port2,host3:port3...
+</pre>
+
+3) **compression.type**
+
+用于指定producer所生产的消息采用哪种压缩方式。默认情况下，不会对消息进行压缩。本配置选项可选值有： none、gzip、snappy、lz4、zstd。
+
+4） **retries**
+
+如果我们设置一个```大于```0的值，则当遇到一个潜在的瞬时错误而导致消息发送失败时，客户端会对消息记录进行重新发送。值得指出的是，这里并不会区分到底是哪种错误（本地网络错误、服务端反馈回来的错误等）导致的消息重发。假如我们没有将*max.in.flight.requests.per.connection*设置为1的情况下允许```retries```的话，则可能会导致消息记录的乱序。比如，我们现在有两条消息都发送到同一个partition，第一条消息发送失败，然后进行重试，但是此时第二条消息发送成功了，那么此时消息就出现了乱序。
+
+假如在重试次数被耗尽之前，我们所设置的*delivery.timeout.ms*就已经超时了，那么此时也会将该produce请求标记为失败。我们通常并不会更改本参数的值，而是使用*delivery.timeout.ms*来控制重试的行为。
+
+### 1.4 Consumer Configs
+
+1) **group.id**
+
+一个唯一的字符串，用于标识本consumer属于哪一个consumer group。假如consumer使用组管理功能（通过subscribe(topic)方式）或者基于kafka的offset管理策略的话，则必须要提供此参数。本参数的默认值为```null```。
+
+2） **allow.auto.create.topics**
+
+当订阅（subscribe)或指定(assign)一个topic时，如果该topic不存在，用于指定是否允许自动创建该topic。当我们订阅(subscribe)一个topic时，假如broker的*auto.create.topics.enable*配置为true时，且所订阅的topic不存在，则会自动创建该topic。
+
+注： 当我们使用的broker版本低于```0.11.0```时，必须要将此配置项设置为false。
+
+3） **auto.offset.reset** 
+
+当在kafka中没有找到initial offset，或者当前的offset所对应的数据在服务器上已经找不到（例如：数据已经删除）时，我们应该采用何种策略，有如下4中选择：
+
+* earliest: 自动的将offset重置到earliest位置
+
+* latest: 自动将offset重置到latest位置
+
+* none: 假如在consumer group中找不到对应的offset的话，则抛出异常
+
+* anything else: 向consumer抛出异常
+
+本参数的默认值为```latest```。
+
+4) **enable.auto.commit**
+
+假如本参数设置为```true```的话，则consumer所消费的offset会周期性的在后台被提交。默认值为true。
+
+5) **partition.assignment.strategy**
+
+当使用consumer group时，通过本参数所指定的策略来决定partition属于哪一个consumer实例所拥有。这里我们可以按照优先级指定一组class names或者class types，只要求所指定的这些class实现*org.apache.kafka.clients.consumer.ConsumerPartitionAssignor*接口即可。
+
+
+### 1.5 Kafka Connect Configs
+
+暂不介绍
+
+### 1.6 Kafka Streams Configs
+
+暂不介绍
+
+### 1.7 Admin Configs
+
+暂不介绍
+
+### 1.8 补充说明
+我们在使用kafka的过程中，有时候可能需要调整JVM参数，这里简单介绍一下。
+
+* kafka_heap_opts： 指定堆大小，默认是1GB，这可能太小了，最好设置大一点。社区推荐是6GB
+
+* kafka_jvm_performance_opts: 指定GC参数，java8默认是新生代垃圾回收器UseParallelGC，可以调整为G1收集器。
+
+具体做法是先设置这两个环境变量，然后再启动kafka broker:
+<pre>
+# export kafka_heap_opts=--Xms6g  --Xmx6g
+
+# export kafka_jvm_performance_opts= -server -XX:UseG1GC
+
+# kafka-server-start.sh config/server.properties
+</pre>
+
 
 
 
@@ -118,6 +336,8 @@ Kafka会定期为那些超过磁盘空间阈值的topic进行日志段的删除�
 2. [kafka configuration](https://kafka.apache.org/documentation/#configuration)
 
 3. [kafka集群参数配置](https://blog.csdn.net/yujianping_123/article/details/96874189)
+
+4. [kafka log.retention.bytes](https://blog.csdn.net/qq_35440040/article/details/93163775)
 
 <br />
 <br />
