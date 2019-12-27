@@ -425,7 +425,7 @@ test 2
 test 3
 test 4
 </pre>
-注： 此种方式创建的consumer group是永久的(没明确证据！)。
+注： 此种方式创建的consumer group是永久的(```没明确证据！```)。
 
 4) **查询consumer消费信息**
 
@@ -438,9 +438,9 @@ test 4
 
 * 0.9及之后版本kakfa查看所有消费组
 <pre>
-
-# kafka-consumer-groups.sh --new-consumer --bootstrap-server 192.168.79.128:9092 --list 
+//# kafka-consumer-groups.sh --new-consumer --bootstrap-server 192.168.79.128:9092 --list 
 //说明2.4.0版本已经不支持--new-consumer选项
+
 # bin/kafka-consumer-groups.sh  --bootstrap-server 192.168.79.128:9092 --list
 console-consumer-54559
 console-consumer-97891
@@ -459,8 +459,9 @@ console-consumer-81258
 
 * 0.9及之后版本kakfa查看consumer消费情况
 <pre>
-# bin/kafka-consumer-groups.sh --new-consumer --bootstrap-server 192.168.79.128:9092 --describe --group console-consumer-99512
+//# bin/kafka-consumer-groups.sh --new-consumer --bootstrap-server 192.168.79.128:9092 --describe --group console-consumer-99512
 //说明2.4.0版本已经不支持--new-consumer选项
+
 # bin/kafka-consumer-groups.sh --bootstrap-server 192.168.79.128:9092 --describe --group test-group1
 
 Consumer group 'test-group1' has no active members.
