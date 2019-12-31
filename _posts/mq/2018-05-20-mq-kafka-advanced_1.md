@@ -112,6 +112,18 @@ kafka通过批量操作实现了巨大的效率提升，为了实现批量kafka 
 
 
 
+## 4. Consumer
+kafka consumer通过向对应partition的Leader发送fetch请求来消费数据。在每一个请求中，consumer都会制定所要抓取的offset，然后会收到从该偏移位置开始的一簇数据。因此，consumer能够完全的控制所要消费的偏移位置。
+
+### 4.1 Push vs. Pull
+我们考虑的一个首要问题是：消费者主动从broker拉取数据，还是broker推送数据到consumer。在这一方面，kafka遵循大多数消息系统的设计方式，producer将数据push到broker，consumer从broker拉取数据。一些以日志为中心(logging-centric)的系统，比如Scribe和Apache Flume，这些系统是采用push的方式往下游推送数据的。其实，push或pull这两种方式各有优缺点。然而，基于push系统很难满足各式各样的用户需求，因为是由broker来控制数据的传输速率的。我们的目标通常是consumer能够能够达到最大的消费速率，然而不幸的是，在一个push系统中当consumer的消费速率较低时，大量的push数据就很可能会压垮整个系统。基于pull的系统通常就没有这方面的问题，consumer可以落后于broker，并在适当的时候追赶上broker。我们可以采用某种类型的补偿协议，使得consumer可以预测其是否会被压垮，然而要准确的获得consumer的最大消费速度其实比想象中的更为困难，因此在构建kafka时我们还是采用传统消息系统常用的pull模式。
+
+基于pull模式的系统的另一个优点在于consumer自身可以控制是否批量的将数据发送给自己。而基于push的系统，由于其并不知道下游consumer的立即处理能力，则其必须选择是单条数据发送，还是积累更多的数据来进行发送。假如需要低延迟的话，则会导致每次只向下游推送一条数据，但这明显比较浪费带宽。而基于pull的系统设计就可以弥补这一缺点，因为consumer总是会拉取当前offset之后的可用消息，因此其可以进行批量优化而不会引入不必要的延迟。
+
+基于pull模式系统的一个缺点在于，假如broker没有数据的话，则consumer可能会陷入一个
+
+
+
 
 
 
