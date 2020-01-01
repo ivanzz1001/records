@@ -120,7 +120,48 @@ kafka consumer通过向对应partition的Leader发送fetch请求来消费数据�
 
 基于pull模式的系统的另一个优点在于consumer自身可以控制是否批量的将数据发送给自己。而基于push的系统，由于其并不知道下游consumer的立即处理能力，则其必须选择是单条数据发送，还是积累更多的数据来进行发送。假如需要低延迟的话，则会导致每次只向下游推送一条数据，但这明显比较浪费带宽。而基于pull的系统设计就可以弥补这一缺点，因为consumer总是会拉取当前offset之后的可用消息，因此其可以进行批量优化而不会引入不必要的延迟。
 
-基于pull模式系统的一个缺点在于，假如broker没有数据的话，则consumer可能会陷入一个
+基于pull模式系统的一个缺点在于，假如broker没有数据的话，则consumer可能会陷入一个轮询的死循环中，一直处于处于忙等待状态。为了避免这个问题，在pull请求中我们有相应的参数设置，以允许consumer的请求阻塞在长等待(long-poll waiting)状态，直到有新的数据到达。
+
+你也可以设想一下其他端到端(end-to-end)之间只使用pull模式的设计。例如，producer在本地进行写日志操作，然后broker从producer拉取数据，consumer又从broker拉取数据。一种存储转发(store-and-forward)类型的producer就通常是这样实现的。这种设计看起来也还不错，但仔细考虑其实不是很合理，因为在我们的用例中可能会存在成千上万的producer。根据我们大规模运维持久化数据系统的经验，如果一个系统涉及到成千上万的磁盘，则可能会使得整个系统变得十分的脆弱。在实际使用过程中，我们还发现在大规模SLA（service level agreement)应用中，使用pipeline就可以，而不需要producer具有持久化能力。
+
+### 4.2 consumer消费偏移
+跟踪哪些消息已经被消费是消息系统的一个关键性能指标。
+
+大多数消息系统都是在broker上保存哪些消息已经被消费的元数据。即当消息发送给consumer时，broker可能会马上在本地进行记录，或者等待conumser的ack信息。这是一个很直观的选择，并且针对单台服务器来说也确实不太可能将消费偏移保存在其他地方。由于在很多消息系统中，存储所采用的数据结构都没有太好的水平扩展性，因此保存在broker也是一个实用的选择———由于broker知道当前已经消费到什么位置了，因此其就可以删除已消费完的数据，确保不会浪费太多的磁盘空间。
+
+这里有一个隐藏的问题就是，对于消费偏移offset，如何使broker与consumer达成一致呢？假如broker在将消息发送到网络上之后，立马就将该消息标识为```consumed```，则当consumer未能成功处理该消息（例如程序崩溃或超时等）时，则该消息就会被丢失。为了解决这一问题，很多消息系统采用ack机制，这就意味着当broker把消息发送出去时，只是将该消息标记为```sent```，而不是```consumed```状态，然后broker等待consumer对该消息的ack，从而将该消息标志为```consumed```状态。通过这一策略，就避免了消息的丢失，但是却产生了新的问题。首先，假如consumer已经成功的处理了该消息，但是还没来的及ack，consumer程序就崩溃了，那么这条消息就会被消费两次；其次，就是性能方面的问题，现在broker必须要跟踪每一条消息的多个状态（sent状态、consumed状态）。对于一个消息系统，我们必须要处理一些疑难的问题，比如消息已经发送出去，但是没有收到ack。
+
+kafka在处理这一问题时，采用一种不同的方法。在kafka中，topic会被分隔成一个全局有序的partition集合，在任何时间每一个partition都只会被同一个consumer group中的一个consumer所消费。这就意味着在每一个partition中，我们仅仅使用一个整数就可以表示该consumer下一次所消费的位置。这就使得消费状态的表示十分轻巧，每一个partition一个整数即可。我们可以周期性的对该状态进行检查，这就等价于对消息进行ack。
+
+采用此种方法来处理消费偏移还带来了另外一个好处，即consumer可以自由的将offset进行重置，从而重新消费原来的数据。这一点与我们常见的消息队列不一致，但对很多conusmers来说可能确实很有用处。例如，假设consumer的代码存在bug，在消费掉一些消息之后该bug被发现，则在bug修正后可以重新对这些消息进行消费。
+
+### 4.3 离线数据加载
+大规模存储要求能够支持consumers间断性的消费消息，例如某个时刻hadoop批量的将数据加载到某个离线系统。
+
+在这种情况下，Hadoop会并发的来进行数据加载，其可以将加载任务分隔成单独的map tasks，之后每一个task对应一个topic/partition，这样就可以实现完全并发。Hadoop提供了task管理功能，当任务失败时，其只需要重新启动任务并从原位置加载数据即可。
+
+### 4.4 静态成员关系
+静态成员关系(static membership)的目标是为了提高流应用程序的可用性，消费组(consumer groups)以及其他应用程序构建于```组平衡协议```(group reblance protocol)之上的。重平衡协议依赖于组协调器(group cordinator)来为每一个组成员分配一个ID。组协调器所分配的ID只是暂时性的，当组成员重启(restart)并重新加入组时，其ID会发生改变。对基于consumer的应用程序来说，这种动态的成员关系(dynamic membership)，在进行管理操作时（例如重新部署应用程序、更新配置、或者重启），可能会有大批的任务重新指定到一个不同的实例。对于具有大量状态的应用程序来说，这种任务的变动可能需要花费很长的时间来恢复其本地状态，之后才能够正常工作，则就会导致应用程序可能在一段时间内不能向外提供正常服务。正是注意到了此方面的问题，kafka的组管理协议(group management protocol)允许为组成员提供持久化的实体ID(entity ID)。通过基于这些持久化的ID，组成员关系就能够维持不变，这样组不会触发重平衡。
+
+假如你想要使用静态成员关系(static membership):
+
+* 将kafka broker集群及client的版本更新到```2.3```或之后的版本，并确保更新之后的broker所使用的*inter.broker.protocol.version*大于等于```2.3```。
+
+* 对于一个consumer group，将该组内的每一个consumer设置一个唯一的实例ID（通过*ConsumerConfig#GROUP_INSTANCE_ID_CONFIG*配置项来进行设置）
+
+* 对于kafka流应用，最好是针对每一个KafkaStream实例设置一个唯一的ID（通过*ConsumerConfig#GROUP_INSTANCE_ID_CONFIG*配置项来设置）
+
+假如broker的版本低于```2.3```，但是你在client端通过*ConsumerConfig#GROUP_INSTANCE_ID_CONFIG*设置了唯一的ID，则应用程序会侦测到broker的版本，并抛出UnsupportException。另外，假如碰巧两个不同的实例设置了相同的ID，则在broker端会启用相应的规避机制，并通过触发*org.apache.kafka.common.errors.FencedInstanceIdException*来通知客户端马上关闭程序。
+
+## 5. 消息投递机制
+现在我们初步了解了producer与consumer是如何工作的了，现在我们来介绍一下kafka是如何处理producer与consumer之间消息的可靠性？很明显，有多种消息投递策略：
+
+* 至多一次(at most once): 消息可能丢失，绝不重新投递
+
+* 至少一次(at least once): 消息不丢失，但可能会被重新投递
+
+* 投递一次(exactly once): 这是大部分人所期望实现的，每一条消息仅仅只会投递一次
+
 
 
 
