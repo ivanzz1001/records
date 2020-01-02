@@ -190,8 +190,28 @@ kafka会对topic每一个分区的log进行复制。这就使得kafka集群在�
 
 其他消息系统也提供了某些副本(replication-related)特性，但是从我们带有```偏见```的角度来看，这似乎只是一个外加的功能，并不会被经常使用，并且具有很大的副作用： replicas处于inactive状态，严重影响整个系统的吞吐量，并且需要繁杂的人工配置。而kafka默认就是搭配replication一起使用———事实上，将副本因子设置为1的话，也就相当于实现了un-replicated topic。
 
-kafka是以topic partition作为副本复制单元的。在不考虑系统失效的情况下，kafka的每一个分区都有一个leader，以及零个或多个followers。总的副本数（包括leader)就是复制因子(replication factor)。kafka的所有读写操作都是通过leader分区来完成的。通常，分区数会远远超过broker数，因此可以基本保证leader均匀的分布在每一个broker上。处于followers上的log与leader的log保持一致————具有相同的offset，
+kafka是以topic partition作为副本复制单元的。在不考虑系统失效的情况下，kafka的每一个分区都有一个leader，以及零个或多个followers。总的副本数（包括leader)就是复制因子(replication factor)。kafka的所有读写操作都是通过leader分区来完成的。通常，分区数会远远超过broker数，因此可以基本保证leader均匀的分布在每一个broker上。处于followers上的log与leader的log保持一致————具有相同的offset以及消息记录（当然，可能会在一个很短的时间内，leader上的数据未复制到副本）。
 
+Followers会像普通的kafka consumer那样从Leaders消费数据，并且消费的数据写入到它们自身的log里。followers从leader拉取数据，然后可以将这些数据打包在一起，批量的写入到日志。
+
+大部分能够自动处理失败故障的分布式系统都要求能够精确定义一个节点```alive```的状态。对于kafka来说，一个节点处于```存活```(liveness)状态必须要满足如下两个条件：
+
+1） 节点必须要能够和zookeeper之间维持会话（通过zookeeper的heartbeat机制）
+
+2） 假如节点是follower的话，则必须要能够复制leader的写操作，并且不会落后太多
+
+我们把满足则两个条件的节点称为```in sync```节点，而不含糊的称为```alive```或者```failed```。Leader会保持对```in sync```节点的跟踪。假如一个follower死亡(dies)、卡住(stuck)、或者落后太多，则leader会将其从ISR列表中移除。判断副本节点有没有被卡住或者滞后，是通过*replica.lag.time.max.ms*配置项来决定的。
+
+在分布式术语中，我们只会尝试处理这样一种```fail/recover```模型：节点突然失效，然后又恢复工作。kafka并不会处理**拜占庭**故障，即节点产生随机恶意的应答信息。
+
+
+现在我们就可以更精确的定义消息的```committed```状态：消息成功写入到了一个partition中所有ISR节点的日志里。只有被提交的日志才会被consumer所消费，这就意味着consumer不必担心会遇到由于leader失效而导致消息丢失的情况。另一方面，producer可以根据他们的偏好（延迟性/可靠性）来选择是否等待消息被提交的响应。偏好(reference)是由producer的ACK设置来控制的。值的注意的是，但producer获取消息提交的响应时，会根据该topic所设置的最低ISR数来进行检查。假如producer发送的请求并不要求严格ack的话，则即使ISR数低于所设置的最低值时，消息还是可以被提交并且被消费者所消费。
+
+
+在任何时刻，有至少一个副本处于alive状态，那么kafka就能够保证已经被提交的消息不会丢失。
+
+
+在短暂的故障转移期过后，如果节点出现故障，kafka仍将保持可用，但在出现网络分区时将变的不可用。
 
 
 
