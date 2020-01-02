@@ -162,8 +162,35 @@ kafka在处理这一问题时，采用一种不同的方法。在kafka中，topi
 
 * 投递一次(exactly once): 这是大部分人所期望实现的，每一条消息仅仅只会投递一次
 
+值得注意的是，这其实可以分解为两个问题： 消息发布时的可靠性保证，以及消息消费时的可靠性保证
+
+很多系统的设计目标都是提供```exactly once```这样一种消息投递语义，但请仔细阅读相关说明，其实这些目标大部分其实都是误导性的。例如，这些系统不考虑producer或consumer失效情况，也不考虑有多个消费进程的情况，也不考虑写到硬盘上的数据可能会丢失的情况。
+
+kafka所提供的消息投递语义很直接。当publish一条消息时，我们就会认为该消息会被提交(commit)到日志中。一旦消息被提交，并且至少有一个消息副本存活的情况下，消息就不会丢失。我们将在下一节详细介绍```已提交消息```(committed message)、存活的(alive) partition以及该投递机制下能够应对的```失败类型```(failure type)。现在我们假设一种完美的场景，broker不会丢失数据，然后来理解producer与consumer所提供的消息投递保证： 假如一个producer尝试publish一条消息，此时刚好遇到了网络故障，但是并不能确定该故障是发生在消息被commit之前还是之后。
+
+在kafka 0.11.0.0版本之前，假如producer收到消息被提交的响应，则其只能选择对消息进行重发。这相当于提供了```at least once```这样的投递语义，因为在消息重新发送时，有可能这条消息会被重复写入日志。从```kafka 0.11.0.0```版本开始，kafka producer也支持幂等的投递选项，这保证了重复投递的消息不会被重复写入到log中。为了实现此功能，broker为每一个producer都指定了一个ID，并且为每一条发送的消息都加上了序列号，从而避免消息的重复。也是从kafka 0.11.0.0版本开始，producer也支持以```事务语义```（即所有的消息那么全部写入成功，要么全部写入失败）来向多个topic partitions发送消息。
+
+并不是所有的使用场景都需要这种强保证。对于那些对延迟很敏感的应用来说，我们允许producer指定一个特定的可靠性级别。假如producer要等待消息被提交的响应，则这可能需要花费10ms以上。然而，producer也可以被指定为完全异步消息发送，或者只等待leader数据写入成功。
+
+现在我们从consumer的角度来看消息投递的可靠性保证。所有的replicas在相同的offset处都有相同的log，由consumer自己控制其所消费的日志偏移。假如consumer不会崩溃失效，那么其在内存中保存消费偏移即可；但是假如consumer会崩溃失效，并且当失效后我们期望对应的topic partition能够由另一个新的进程来接管，那么新接管的进程则必须选择一个合适的offset来消费数据。kafka consumer读取消息时，我们也有一些选项来处理消息以及更新offset位置：
+
+* consumer可以先读取消息，然后在log中保存消息的偏移位置，之后再开始处理这条消息。在这种情况下，可能会出现consumer刚保存完偏移位置，但还没来的及处理这条消息，系统就出现了崩溃。之后，如果有另外一个进程接管了原崩溃进程的工作，那么其就会从该位置开始处理。在consumer失败的情况下，这对应于```at-most-once```语义，因为其只会对未处理的消息只处理一次。
+
+* consumer可以先读取消息，然后处理消息，之后再保存保存消息的偏移位置。在这种情况下，可能会出现consumer刚处理完消息，但还没来得及保存偏移位置，系统就出现了崩溃。之后，如果有另外的进程接管了原崩溃进程的工作，那么其可能就会对原来某些已处理的过的消息进行重新处理。在consumer失效的情况下，这对应于```at-least-once```语义。在很多情况下，消息都有一个primary key，因此使得相应的更新操作都是幂等的（收到同一条消息两次，仅仅只是用其本身的备份来覆盖自身而已）
+
+那```exactly once```的语义是怎么样呢？当我们从kafka的一个topic消费数据，同时将产生的输出发送到另一个topic，我们可以借用上面提到的kafka 0.11.0.0所引入的事务型producer。consumer的消费offset会存放在一个topic中，因此我们可以在一个事务中进行offset提交、消息publish到output-topic，这锅这样来保证操作的原子性。假如事务被中断，则consumer的消费偏移(offset)也会被撤销还原到旧的值，根据所采用的隔离级别，consumer也看不到新发布到output-topic的数据。在默认的```读未提交```(read-uncommitted)级别中，即使事务部分被中断，consumers也可以看到所有的消息；而```读提交```(read-committed)级别中，consumer只能读取到已提交的消息。
+
+当需要将消息写入到一个外部系统时，主要的限制在于需要协调consumer的消费偏移以及消息的外部存储。经典的做法是在**存储消费偏移**与**存储消费者输出**时引入二段提交，但更简单与通用的做法是让consumer在同一个地方来存储```消费偏移```以及```消费输出```(consume output)。由于consumer所要写入的大部分输出系统可能都不支持二段提交，因此采用后一种方法可能会更好。
 
 
+在kafka streams中，kafka有效的支持了```exactly-once```消息投递。此外如果需要在kafka topic之间传递并处理数据时，也可以采用事务型producer/consumer来实现```exactly-once```。对于输出目标地址是其他系统的话，```exactly-once```投递机制通常需要相应系统的协作。否则，kafka默认提供的投递机制是```at-least-once```，用户也可以在producer端通过禁用重试机制，从而实现```at-most-once```投递机制。
+
+## 6. Replication
+kafka会对topic每一个分区的log进行复制。这就使得kafka集群在出现故障时，可以自动的进行故障转移，从而使得消息仍然保持可用。
+
+其他消息系统也提供了某些副本(replication-related)特性，但是从我们带有```偏见```的角度来看，这似乎只是一个外加的功能，并不会被经常使用，并且具有很大的副作用： replicas处于inactive状态，严重影响整个系统的吞吐量，并且需要繁杂的人工配置。而kafka默认就是搭配replication一起使用———事实上，将副本因子设置为1的话，也就相当于实现了un-replicated topic。
+
+kafka是以topic partition作为副本复制单元的。在不考虑系统失效的情况下，kafka的每一个分区都有一个leader，以及零个或多个followers。总的副本数（包括leader)就是复制因子(replication factor)。kafka的所有读写操作都是通过leader分区来完成的。通常，分区数会远远超过broker数，因此可以基本保证leader均匀的分布在每一个broker上。处于followers上的log与leader的log保持一致————具有相同的offset，
 
 
 
