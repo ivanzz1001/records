@@ -214,6 +214,38 @@ Followers会像普通的kafka consumer那样从Leaders消费数据，并且消�
 在短暂的故障转移期过后，如果节点出现故障，kafka仍将保持可用，但在出现网络分区时将变的不可用。
 
 
+### 6. 副本日志：多数派、ISR和状态机
+kafka分区的核心就是replicated log。在分布式数据系统中，副本日志是最基本的原语，并有许多方法来实现一个副本日志系统。replicated log可以作为实现其他分布式系统的基础，将其作为副本日志的一个状态机(state machine)。
+
+副本日志模型主要用于处理*在一个顺序序列上达成共识*（通常会对log entry进行编码0、1、2...)。有很多方法来实现，但最简单、最快速的方式是通过一个Leader来确定好所有值的顺序。只要leader存活，那么所有followers就只需要从leader拷贝相应的值序列。
+
+当然，在理想情况下，假如leader永远不会失效的话，那么当然可以不需要followers。而当leader死亡，我们就需要从followers中选举出一个新的leader。但是followers自身可能也落后于原来的leader，或者可能也出现了崩溃，因此我们必须要确保能够选举出一个最新的follower。一个日志复制算法(log replication algorithm)核心就是需要保证： 假如向client端反馈消息已经committed，那么即使leader崩溃，新选举出来的leader也必须要保证这条消息不会丢失。这就需要作出一个权衡：假如leader需要等待从更多followers那里获得ack来确定一条消息已经committed，那么为了系统具有更高的吞吐率，则我们可能需要选举出更多的leader（对于kafka，就需要设置更多的分区）。
+
+
+对于副本日志(replicated log)系统，*消息提交所需要获取的ack数量*与*leader选举所需要比较的logs数量*之间需要确保有重叠(注：这就可以保证在每一次leader选举时，都会有一个最权威的broker保存有所有的日记记录，从而确保不会丢失消息记录)，这被称为Quorum。
+
+一种常见的实现方式是使用多数派(majority)投票来决定leader选举，以及消息提交(commit)。尽管目前kafka不是这样做的，但这里我们还是来探讨一下这种实现方式。例如： 当前我们有```2f+1```个replicas。假设leader收到```f+1```个replicas的ack响应才会认为消息提交成功，又假设我们需要从至少```f+1```个replicas里面选举出拥有最新log日志的节点成为新的leader，那么在失效节点数小于等于```f```的情况下，就能够保证leader拥有完整的消息提交日志。因为在任何```f+1```的replicas集中，至少有一个replica拥有完整的消息提交日志，那么这个拥有最完整消息提交日志的replica就会被选举成为新的leader。其实对于每一种日志复制算法(log replication algorithm)，都还有很多需要处理的细节（如怎样更精确保持日志的完备性，在leader失效过程中确保日志数据的一致性，或者更改replica set中的服务器），但这里我们暂时不去探讨。
+
+上面介绍的这种多数派投票实现方式有一个很好的特性： 延迟只取决于最快的服务器。即，假如我们假设副本因子是3，则延迟是取决于较快(faster)的那个follower，而不是较慢的那个。
+
+
+与此相似类型的算法有很多，包括zookeeper的ZAB算法、Raft算法、Viewstamped Replication算法。而与kafka的实际实现最为接近的来自于微软的[PacificA](http://research.microsoft.com/apps/pubs/default.aspx?id=66814)，我们可以查看相应的教学书籍。
+
+
+多数派选举（majority vote)不好的一面在于: 如果有多个replicas失败，那么将可能选举不出新的leader。为了能够处理一个replica的失效，我们需要有三份数据拷贝；如果要应对两个replicas的失效，那么就需要5份数据拷贝。在我们的经验中，对于实际的系统如果只用足够的冗余来应对单个故障是不够的，但是却造成每一个写操作都要执行5次，需要5倍的硬盘存储空间，且只有1/5的吞吐量，因此对于大容量数据系统的话这不切实际。这就是为什么quorum算法主要是应用于```集群配置中心```这样的系统，例如zookeeper，而在主数据存储方面使用较少。例如，HDFS的name节点的高可用性是构建于```majority-vote-based journal```，但是但是数据存储本身却没有使用此昂贵的方法。
+
+
+kafka采用一种略微不同的方式来选择其quorum集。其并没有采用majority vote，而是动态的维持一个ISR集，该集合中的元素保持了与leader的同步。只有此集合中的成员才有资格进行leader选举。往kafka的某个分区写入数据时，需要等到该分区的所有in-sync replicas都写入成功才会被认为消息提交成功。ISR集的每一次更变都会被持久化到zookeeper中。因此，ISR集的任何一个replica都有资格被选为leader。在kafka的使用模型中有很多的partition，这一点对kafka来说是一个很重要的因素，并通过这样来确保leadership的平衡。通过使用ISR模型和```f+1```个replicas，一个kafka topic就可以应对```f```个replicas的失效，并保证提交的数据不会丢失。
+
+对于我们想要处理的大部分使用场景，我们认为此种设计方案是合理的。实际上，为了能够处理```f```个replicas失效，无论是```多数派投票```(majority vote)方法还是ISR方法，在确认一个消息被成功提交前都需要获得相同数量replicas的ack响应（例如， 为了应对一个replica失效，采用多数派投票方法时，至少需要有3个replicas并获得1个ack； 采用ISR方法时，需要2个replicas和1个ack响应）。而```majority vote```方法的优点在于消息的提交不需要依赖于最低速的服务器。然而，我们认为在消息提交时通过client端来选择是否进行阻塞是一种较好的方式，并且在应对由于低速的复制所造成的吞吐量及磁盘使用率低这一方面也是值得的。
+
+
+另一个不同之处在于，kafka并不需要崩溃的节点恢复所有的数据。对于复制算法(replication algorithm)来说，这是很常见的，因为通常的硬盘存储在数据没有招到破坏的情况下并不会丢失。在这种假设下会有两个主要的问题。首先，在我们实际运维的数据存储系统中，硬盘错误是最常见的问题，并且数据的完整性可能会遭到破坏； 其次，即使我们不考虑此问题，我们也不想在每次执行写操作时都调用fsync来确保数据写入到硬盘，因为这可能会造成系统的速度有2到3倍的下降。kafka所使用的协议允许一个replica重新加入ISR，但是在重新加入之前必须完成与leader的重新同步。
+
+### 6.1 Unclean leader election
+值得注意的是，kafka保证数据不会丢失是基于*至少有一个replica处于同步状态*。
+
+
 
 <pre>
 </pre>
