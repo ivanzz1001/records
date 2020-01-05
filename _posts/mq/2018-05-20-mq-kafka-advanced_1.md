@@ -243,7 +243,52 @@ kafka采用一种略微不同的方式来选择其quorum集。其并没有采用
 另一个不同之处在于，kafka并不需要崩溃的节点恢复所有的数据。对于复制算法(replication algorithm)来说，这是很常见的，因为通常的硬盘存储在数据没有招到破坏的情况下并不会丢失。在这种假设下会有两个主要的问题。首先，在我们实际运维的数据存储系统中，硬盘错误是最常见的问题，并且数据的完整性可能会遭到破坏； 其次，即使我们不考虑此问题，我们也不想在每次执行写操作时都调用fsync来确保数据写入到硬盘，因为这可能会造成系统的速度有2到3倍的下降。kafka所使用的协议允许一个replica重新加入ISR，但是在重新加入之前必须完成与leader的重新同步。
 
 ### 6.1 Unclean leader election
-值得注意的是，kafka保证数据不会丢失是基于*至少有一个replica处于同步状态*。
+值得注意的是，kafka保证数据不会丢失是基于*至少有一个replica处于同步状态*。假如一个分区的所有副本都失效了，则这个保证将不复存在，可能会造成数据的丢失。
+
+然而，对于一个实际的系统，当所有的replicas都失效时，我们还是需要做一些事情以应对这种情况。假如真的不幸出现了所有副本都失效(die)，很重要的一点是我们需要考虑会产生什么后果。有两种不同应对策略：
+
+1） 等待ISR中的一个replica复活，并且将其选为leader(幸运的是，该replica保存有所有的数据）
+
+2） 选择第一个复活的replica(不需要一定在ISR中)作为leader
+
+
+上面的两种策略，其实就是在可用性(availability)与一致性(consistency)做一个简单的取舍。假如我们需要等待ISR中的replicas，则当ISR中的replicas都失效时，则会导致系统处于不可用状态。如果这些replicas被销毁，或者数据已经丢失，那么整个系统都将再也恢复不过来。另一方面，假如一个处于```非同步状态```(non-in-sync)的replica复活，并且我们允许将其选为Leader，那么会以该replica的日志作为事实标准，尽管这样可能会丢失一些数据。从```0.11.0.0```版本开始，kafka默认选择第一种策略，然后等待一个一致性的副本复活。我们可以使用配置选项*unclean.leader.election.enable*来改变这种策略，用于支持*数据可用性*高于*数据一致性*的场景。
+
+
+其实并不是kafka会遇到这样的问题，所有```quorum-based```模式的系统都存在。例如在```majority voting```模式的系统中，假如大部分(majority)服务器都永久失效了，则你必须进行选择：100%丢失数据；或者不考虑数据的一致性，而从剩下的服务器中恢复数据。
+
+### 6.2 可用性与可靠性保证
+当在写kafka的时候，producer可以选择是否等待该消息的ack：
+
+* 0： 不等待ack
+
+* 1： 等待leader的ack
+
+* -1: 等待该分区所有in-sync replicas的ack
+
+值的注意的是，*acknowledgement by all replicas*并不保证获得所有收到message的replicas的响应。默认情况下，当设置```ack=all```时，收到所有in-sync replicas的ack即可。例如，一个topic被配置为2副本，则当1个失效时(仍剩余一个处于in-sync状态)，则当指定```ack=all```时，仍可以成功的进行写入。然而，假如剩余的一个replica也失效的话，那么所写的消息数据则可能会丢失。尽管这保证了partition的最大可用性，但是对某些要求具有高可靠性的用户来说，可能并不能接受。因此，我们提供了两个topic级别的配置项，用于支持可靠性(durability)高于可用性(availability)的场景：
+
+1） 禁用*unclean leader election*(通过unclean.leader.election.enable配置项)———假如所有的replicas都不可用，则分区会保持不可用状态，直到重新选出新的可用的leader为止。这降低了可用性，但是可以保证数据不会丢失。关于unclean leader选举，请参看上一节的介绍。
+
+2） 指定最小的ISR值———只有当partition的ISR数大于所指定的最小值时，消息才能够写入成功，这样就确保了消息不会只写入到了单个replica，从而避免在单个replica失效时，造成的数据丢失。但请注意，此设置只有在producer使用```ack=all```时，才会保证消息至少要收到指定数量的*in-sync replicas*响应。此设置使得可以在可用性(availability)与可靠性(durability)之间做一个取舍。我们将最小ISR值设置的越大，就越能够更好的保证数据的一致性，因为消息记录会被写入到越多的replicas中，从而降低数据丢失的可能性。然而，这降低了系统的可用性，因为假如in-sync replicas数量低于所设定的阈值时，相应的partition将变得不可用。
+
+### 6.3 replication管理
+在上面关于副本日志(replicated logs)的讨论中，都只涉及到单个log，例如，一个topic partition。然而，kafka集群很可能管理着成千上万的partitions。在一个Kafka集群中，我们使用流行的round-robin方式来尝试平衡各个分区(partition)，从而避免一些高容量(high-volumn)topic只集中于少数几个节点上。相似的，我们也会尝试平衡各leader，从而使得每个节点(node)都会是某些分区的leader。
+
+同时，优化leader选举过程也是很重要的，因为这是系统不可用的一个关键窗口(window)。一个简单的leader选举算法，在单个节点失效(node)的情况下，很可能会造成与该节点相关的所有分区(partition)都需要进行重新的leader选举。相反，我们选择其中一个broker作为```controller```。该controller负责侦测broker级别的故障，并且在侦测到broker失效时，负责修改所有受影响的分区的leader。这就使得我们可以批量的来处理leadership修改的通知，从而使得大量的partion选举会变得更简单与高效。假如controller失效的话，则会从剩余的broker当中选举出一个新的controller。
+
+## 7. 日志压缩
+关于日志压缩，请参看*kafka日志留存策略*相关文章，这里不做介绍。
+
+## 8. kafka实现细节
+本节会讲述kafka的一些实现细节。
+
+### 8.1 网络层
+
+
+
+
+
 
 
 
