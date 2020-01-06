@@ -285,15 +285,87 @@ kafka采用一种略微不同的方式来选择其quorum集。其并没有采用
 
 ### 8.1 网络层
 
+网络层就是一个直接的NIO服务器，在这里并不会做很详细的介绍。sendfile的实现是通过MessageSet接口的writeTo方法。这允许文件存储的消息集可以使用更加高效的transferTo实现，而不是使用进程间的缓冲写。所采用的线程模型是：单个acceptor线程 + N个处理器线程，每个处理器线程处理一定数量的tcp连接。这种设计模型在其他很多地方都被验证过，其足够的简单和高效。协议的设计也足够简单，以便于未来通过其他编程语言来实现客户端(clients).
 
+### 8.2 Messages
+kafka消息是由如下3部分组成：
 
+1） 可变长度的header
 
+2) 可变长度的key部分
 
+3） 可变长度的value部分
 
+如下图所示：
 
+![kafka-msg-fmt](https://ivanzz1001.github.io/records/assets/img/mq/kafka-msg-fmt.jpg)
 
+关于header，我们会在下一节进行介绍。对于key和value部分，我们设置为对用户透明： 当前有很大部分的处理都是通过序列化库来完成的，我们很难说针对所有的使用场景都选择某一特定的序列化库。尚且有一些使用kafka的特定应用，用户很可能会想要使用某种特定的序列化方法。RecordBatch接口是一个简单的迭代消息的方法，用于批量的读写NIO Channel。
+
+### 8.3 消息格式
+消息记录(messages)总是以批量的方式来进行写操作。这里我们将一批消息称为```record batch```。一个record batch包含一条或多条消息记录。在少数情况下，一个record batch只包含一条消息记录。这里需要指出的是，```record batch```与```record```均各自含有自己的headers。下面我们会进行详细说明。
+
+###### 8.3.1 Record Batch
+如下是RecordBatch存储到硬盘上时的格式：
 <pre>
+baseOffset: int64
+batchLength: int32
+partitionLeaderEpoch: int32
+magic: int8 (current magic value is 2)
+crc: int32
+attributes: int16
+    bit 0~2:
+        0: no compression
+        1: gzip
+        2: snappy
+        3: lz4
+        4: zstd
+    bit 3: timestampType
+    bit 4: isTransactional (0 means not transactional)
+    bit 5: isControlBatch (0 means not a control batch)
+    bit 6~15: unused
+lastOffsetDelta: int32
+firstTimestamp: int64
+maxTimestamp: int64
+producerId: int64
+producerEpoch: int16
+baseSequence: int32
+records: [Record]
 </pre>
+值得指出的是，假如启用了压缩(compression)，则被压缩的消息数据就会直接序列化，放在```消息记录数```(records count)的后面。
+
+crc校验覆盖了从```attributes```到整个record batch结尾字节数据。其是通过```magic```字节来进行隔离的，这就意味着客户端必须要首先解析到magic字段，然后在知道如何解释后面的数据。*partition leader epoch*字段并不会参与到CRC的计算中，这样就可以避免broker每次收到batch数据时都重新计算crc。这里采用```CRC-32C```算法来计算crc。
+
+在进行压缩时，新版本的消息格式与老版本有所不同，在magic v2及以上版本中，当log被清理的时候，baseOffset与baseSequence这两个字段仍然会保留。这在log重新加载以恢复producer的状态时是有必要的。假如我们没有在日志中保存```last sequence number```的话，则会在某些情况下出现故障，例如当某个partition 的leader失效时，producer可能会看到*OutOfSequence*这样的错误。*base sequence number*这一字段必须被保留，以进行重复性检查(broker会检查所进入的producer请求，看是否会有数据重复）。
+
+
+###### 8.3.2 Record
+Record级别的头(header)是从kafka 0.11.0版本引入的，在存入硬盘时其格式如下：
+<pre>
+length: varint
+attributes: int8
+    bit 0~7: unused
+timestampDelta: varint
+offsetDelta: varint
+keyLength: varint
+key: byte[]
+valueLen: varint
+value: byte[]
+Headers => [Header]
+</pre>
+
+1) **Record Header**
+
+record header格式如下：
+<pre>
+headerKeyLength: varint
+headerKey: String
+headerValueLength: varint
+Value: byte[]
+</pre>
+
+### 8.4 Log
+一个具有两个partitions的topic(名称为```my_topic```)是由两个目录所组成（名称分别是*my_topic_0*和*my_topic_1*)，在对应的目录中存放着相应的消息记录。日志文件的格式是一系列的```log entries```，每一个log entry是由一个**4字节的整数**和**N字节的消息**所组成，其中4字节的整数N表示消息的长度。每条消息都由一个64bit的整数*offset*来唯一标识，用于指明这条消息的第一个字节在该partition所收到的所有消息中的偏移。每一条消息存放到硬盘上的格式会在下面给出。每一个日志文件的名称都是以其所存放的第一条消息的第一个字节的偏移来命名的，因此，所创建的第一个文件名为**00000000000**(11个0），每个日志段的大小是```S```，是由相应配置指定的。
 
 
 
