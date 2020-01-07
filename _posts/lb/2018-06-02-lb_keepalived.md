@@ -479,7 +479,7 @@ setenforce: SELinux is disabled
 ! Configuration File for keepalived 
  
 vrrp_instance VI_180{
-    state MASTER             #指定该节点为主节点，备用节点设置为BACKUP
+	state MASTER             #指定该节点为主节点，备用节点设置为BACKUP
 	interface ens33          #绑定虚拟IP的网络接口
 	
 	virtual_router_id 180    #VRRP组名，两个节点设置一样，以指明各个节点同属一VRRP组
@@ -503,7 +503,7 @@ vrrp_instance VI_180{
 
 #虚拟IP服务
 virtual_server 192.168.79.180 80{
-    delay_loop 6             #设定检查间隔
+	delay_loop 6             #设定检查间隔
 	lb_algo rr               #指定LVS算法
 	lb_kind DR               #指定LVS模式
 	persistence_timeout 10   #指定LVS持久连接设置
@@ -531,7 +531,7 @@ virtual_server 192.168.79.180 80{
 ! Configuration File for keepalived 
  
 vrrp_instance VI_180{
-    state BACKUP             #指定该节点为主节点，备用节点设置为BACKUP
+	state BACKUP             #指定该节点为主节点，备用节点设置为BACKUP
 	interface ens33          #绑定虚拟IP的网络接口
 	
 	virtual_router_id 180    #VRRP组名，两个节点设置一样，以指明各个节点同属一VRRP组
@@ -555,7 +555,7 @@ vrrp_instance VI_180{
 
 #虚拟IP服务
 virtual_server 192.168.79.180 80{
-    delay_loop 6             #设定检查间隔
+	delay_loop 6             #设定检查间隔
 	lb_algo rr               #指定LVS算法
 	lb_kind DR               #指定LVS模式
 	persistence_timeout 10   #指定LVS持久连接设置
