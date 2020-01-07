@@ -367,6 +367,19 @@ Value: byte[]
 ### 8.4 Log
 一个具有两个partitions的topic(名称为```my_topic```)是由两个目录所组成（名称分别是*my_topic_0*和*my_topic_1*)，在对应的目录中存放着相应的消息记录。日志文件的格式是一系列的```log entries```，每一个log entry是由一个**4字节的整数**和**N字节的消息**所组成，其中4字节的整数N表示消息的长度。每条消息都由一个64bit的整数*offset*来唯一标识，用于指明这条消息的第一个字节在该partition所收到的所有消息中的偏移。每一条消息存放到硬盘上的格式会在下面给出。每一个日志文件的名称都是以其所存放的第一条消息的第一个字节的偏移来命名的，因此，所创建的第一个文件名为**00000000000**(11个0），每个日志段的大小是```S```，是由相应配置指定的。
 
+消息记录精确的二进制格式是按不同版本来进行维护的，其作为一个标准的接口（协议)，使得record batches可以在producer、broker、以及client之间进行无缝传输，而不需要进行任何的重新拷贝与转换。在上一节我们对records的详细格式做了较为详细的介绍。
+
+
+使用message offset来作为message id的情况并不常见。我们原来的想法是使用producer所产生的GUID，然后在每个broker上维持一个GUID到message offset的映射。然而，由于consumer必须为每个broker服务器都维持一个ID，因此就没有必要全局唯一了（只需要保证单个broker唯一就可以）。更为重要的是，要维持一个一个随机的GUID到message offset的映射增加了系统的复杂度，因为这需要一个重量级的索引结构来实现，且该索引结构需要在硬盘之间来进行同步，而这又涉及到对该索引结构进行持久化。因此，为了简化查询结构，我们使用了一个简单的```分区原子计数器```(per-partition atomic count)，通过与partition id和node id一起，从而唯一的标识一条消息； 这就使得整个查询结构变得十分简单。在我们启用```counter```之后，我们就可以直接使用offset了———因为这两个参数(counter和offset)在一个partition内都是单调递增的。由于offset是对consumer API隐藏的，因此具体的实现细节我们不做深入的介绍。
+
+![kafka-log](https://ivanzz1001.github.io/records/assets/img/mq/kafka_log.jpg)
+
+
+
+
+
+
+
 
 
 <br />
