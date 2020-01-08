@@ -445,7 +445,11 @@ kafka consumer会跟踪其所消费的每一个partition 消息的最大偏移�
 {% highlight string %}
 /brokers/ids/[0...N] --> {"jmx_port":...,"timestamp":...,"endpoints":[...],"host":...,"version":...,"port":...} (ephemeral node)
 {% endhighlight %}
-上面是一个broker节点的列表，其中每一个节点都有一个唯一的逻辑ID，用于向consumer来标识自己的身份。
+上面是一个broker节点的列表，其中每一个节点都有一个唯一的逻辑ID，用于向consumer来标识自己的身份。在启动的时候，broker就会在zookeeper的*/brokers/ids*目录下以自身的```broker id```来创建znode。逻辑broker id的主要目的是为了允许将broker移动到另一个物理主机，而不会影响到consumer。如果尝试注册一个已经存在的broker id将会导致错误。
+
+由于broker是采用临时节点(ephemeral nodes)来在zookeeper注册自己的，那么broker被关闭或死亡的情况下，相应的znode节点也会消失。
+
+3) **Broker Topic注册**
 
 
 
