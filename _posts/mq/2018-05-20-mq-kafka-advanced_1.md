@@ -374,11 +374,78 @@ Value: byte[]
 
 ![kafka-log](https://ivanzz1001.github.io/records/assets/img/mq/kafka_log.jpg)
 
+###### 数据写操作
+数据总是会被追加到最后一个日志文件中。当文件达到了一个分片大小时，就会开启一个新的文件来开始写。kafka消息日志的写入主要与两个参数相关： ```M```用于指定每多少条消息强制将数据从操作系统刷入硬盘； ```S```用于指定每多长时间（单位： s)进行一次强制刷新操作。这样就保证了即使在系统崩溃的条件下，最多可能会丢失```M```条消息，或者最多会丢失```S```秒内的消息。
+
+###### 数据读操作
+
+我们可以通过指定一个offset和chunck size来读取kafka消息，其中offset是一个64bit的逻辑偏移，chunk size是每一次读取的最大chunk大小。这会返回一个消息迭代器，存放于```S```字节的buffer空间中。这里```S```至少应该超过单个```message```大小，但是在一个异常大message事件里，我们也可以尝试进行多次读操作，每次将buffer空间扩大一倍，直到成功读取完消息为止。我们通过指定message与buffer size的最大长度，这样我们就可以拒绝处理某些超大的messages，然后给client端一个可读取的消息大小的边界。有时候可能会只读取到消息的一部分，但这可以很容易的通过size来进行侦测。
+
+
+实际从偏移位置读数据时，首先需要定位到日志段文件(数据是存放在一个一个日志段中的），然后再通过全局偏移(global offset)计算出段(segment)内偏移，然后再从该日志段对应的偏移处来读取数据。对数据的查找类似于在内存中做二分查找。
+
+kafka日志提供了获取最新写入消息的功能，这样就使得客户端可以订阅当前的最新消息。这在指定时间内(retention.ms)consumer消费消息失败的情形下是很有用处的。在这种情况下，当客户端尝试消费一个不存在的offset处的消息时，会返回*OutOfRangeException*异常，这样我们就可以对offset进行复位或者直接报告相应的错误。
+
+如下是consumer读取消息时返回数据时的格式：
+<pre>
+MessageSetSend (fetch result)
+ 
+total length     : 4 bytes
+error code       : 2 bytes
+message 1        : x bytes
+...
+message n        : x bytes
 
 
 
+MultiMessageSetSend (multiFetch result)
+ 
+total length       : 4 bytes
+error code         : 2 bytes
+messageSetSend 1
+...
+messageSetSend n
+</pre>
 
 
+###### 数据删除
+在进行日志数据删除时，是以日志段(log segment)为单位来进行删除的。允许向日志管理器添加相应的删除策略，以决定哪些文件可以被合法的删除。当前的删除策略是： *删除N天之前的日志* 或 *保留最近N GB的日志*。为了避免在锁定读取(locking reads)的同时仍然进行日志段文件的删除，而造成修改日志段列表的情况，我们使用了copy-on-write(写时复制）技术，从而实现了在删除的同时仍然可以通过日志段快照来进行二分查找。
+
+###### Guarantees
+
+kafka日志部分提供了相应的配置参数```M```，用于控制最多M个消息就要强制刷新一下硬盘。在日志恢复进程开始运行的时候，其就会遍历(iterates)当前最新日志段的所有消息，并校验每条消息的entry是否有效。假如消息的大小(size)以及offset小于日志文件的长度，并且该消息所保存的CRC32与重新计算出来的CRC32相匹配的话，则说明该消息的entry有效。假如检测到一个entry被破坏，那么则会从该位置直接将文件截断。
+
+
+值得注意的是，有两种类型的崩溃(corruption)必须要进行处理： 
+
+* crash发生时，数据块并未写入，但是inode节点已经更新（可能更新了size信息）
+
+* crash发生时，可能先写入了数据，但是inode节点没有更新
+
+之所以会产生上述说的两种情况，是因为通常操作系统并不能保证*inode节点的更新*与*实际的数据写入*之间的先后关系，因此假如先更新了inode节点，但是数据还没来得及写入，系统就崩溃了，这样就会造成相应的数据错误。我们通过CRC可以侦测到这种错误，然后防止这样的错误造成整个kafka日志段的损坏。
+
+### 8.5 Distribution
+
+###### Consumer Offset跟踪
+kafka consumer会跟踪其所消费的每一个partition 消息的最大偏移，并且向kafka提交(commit)相关的offset报告，这样就可以使得consumer在重启之后仍能从对应的offset处开始进行消费。kafka提供了相应的功能选项: 将consumer group的所有消费偏移存储在与该group对应的broker上，我们将该broker称为group coordinator。例如，一个consumer group中的任何一个消费者实例(instance)都应该向对应的group coordinator报告其消费偏移，并能够从中获取到相应的消费偏移记录。consumer group是基于组名(group name)来指定coordinator的。consumer可以通过使用*FindCoordinatorRequest*来查找其所对应的coordinator，将该请求发到任何一个broker，然后通过读取*FindCoordinatorResponse*响应，从而获取到coordinator的详细信息。之后consumer就可以向该coordinator报告或者获取消费偏移信息。在coordinator发生变动的情况下，consumer需要重新查找coordinator。consumer实例可以自动或手动的提交offset。
+
+当group coordinator收到*OffsetCommitRequest*之后，其会将offset追加到一个名为```__consumer_offsets```的topic中，等到所有副本都写入成功之后，broker就会向consumer发送响应。offsets在如果在指定的时间内没有复制保存到副本上，那么*OffsetCommitRequest*将会失败，consumer可以通过重试机制来进行处理。broker会周期性的对offsets这个topic进行压缩，因为通常其维持每个partition的最新偏移即可。同时coordinator也会在内存中缓存offsets，这样就可以更快的获取到相应的偏移记录。
+
+当coordinator收到offset抓取请求的时候，其会简单的从offsets cache中返回上一次提交的offset记录。在coordinator刚刚启动，或者刚成为一组consumer groups的cooordinator(刚成为```__consumer_offsets```这个topic某一个partition的leader)时，则其可能需要从topic中加载offsets到内存中。在这种情况下，fetch将会失败，并返回*CoordinatorLoadInProgressException*异常，consumer可以通过重新发送*OffsetFetchRequest*来进行处理。
+
+###### Zookeeper Directories
+如下我们会介绍一下zookeeper在consumers与brokers协调方面所采用的结构与算法。
+
+1） **Notation**
+
+当一个路径的某个元素表示为```[xyz]```时，表示该值并未固定，实际上针对每个```xyz```可能都有一个zookeeper znode节点。例如，*/topics/[topic]*表示一个名称为```/topics```的目录下针对每一个topic都有一个子目录。同时也可以表示数值范围，例如```[0...5]```表示子目录0、1、2、3、4。箭头```->```用于表示某一个znode节点的内容，例如，```/hello->world```表示znode节点*/hello*的值为*world*。
+
+2) **Broker节点注册**
+
+{% highlight string %}
+/brokers/ids/[0...N] --> {"jmx_port":...,"timestamp":...,"endpoints":[...],"host":...,"version":...,"port":...} (ephemeral node)
+{% endhighlight %}
+上面是一个broker节点的列表，其中每一个节点都有一个唯一的逻辑ID，用于向consumer来标识自己的身份。
 
 
 
