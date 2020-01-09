@@ -450,6 +450,21 @@ kafka consumer会跟踪其所消费的每一个partition 消息的最大偏移�
 由于broker是采用临时节点(ephemeral nodes)来在zookeeper注册自己的，那么broker被关闭或死亡的情况下，相应的znode节点也会消失。
 
 3) **Broker Topic注册**
+{% highlight string %}
+/brokers/topics/[topic]/partitions/[0...N]/state --> {"controller_epoch":...,"leader":...,"version":...,"leader_epoch":...,"isr":[...]} (ephemeral node)
+{% endhighlight %}
+每一个broker都会在其所维护的topic下面注册自己，并且存储该topic的partition信息。
+
+4) **Cluster Id**
+
+cluster id是为kafka集群所指定的一个不变的、唯一的标识符。cluster id最长可以有22个字符，所允许的字符由正则表达式```[a-zA-Z0-9_\-]+```指定，与URL安全base64编码所采用的字符类似。通常，在集群第一次启动的时候会自动产生。
+
+在实现方面，从broker 0.10.1版本(含0.10.1)开始，在集群第一次启动的时候就会自动产生cluster id。broker在启动的时候会尝试从```/cluster/id```目录下获取cluster id。假如该节点不存在，则broker会产生一个新的cluster id并同时创建对应的znode节点。
+
+5) **Broker node注册**
+
+broker节点通常都是独立的，因此其只向zookeeper发布其自身所拥有的信息。当一个broker加入集群的时候，其会在zookeeper brokers目录下注册自己，并在该节点下写入hostname以及port信息。同时broker也会注册已存在的topics列表和topic对应的逻辑分区信息。当一个新的topic在broker上创建时也会动态的进行注册。
+
 
 
 
