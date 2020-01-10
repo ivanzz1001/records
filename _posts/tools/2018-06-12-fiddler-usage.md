@@ -20,6 +20,11 @@ description: fiddler工具的使用
 
 * Fiddler可以抓取支持http代理的任意程序的数据包，如果要抓取https的话，要先安装证书
 
+如下是fiddle发送请求：
+
+![fiddler-json-req](https://ivanzz1001.github.io/records/assets/img/tools/fiddler_json_req.jpg)
+
+
 ## 2. Fiddler HTTP代理的设置
 Fiddler4.0在启动的时候，默认会监听127.0.0.1:8888端口。网上讲了很多方法，比如手动设置IE/Firefox浏览器代理为```127.0.0.1:8888```， 此种方法虽然可行，但是每个不同浏览器都得设置一下，比较麻烦。我们启动Fiddler之后， 可以发现Fiddler能够自动代理差不多所有的浏览器， 然后再跑到各浏览器代理设置的地方去查看， Fiddler并未在那里帮我们设置。那么Fiddler是怎么帮我们自动做到代理所有浏览器的呢？
 
