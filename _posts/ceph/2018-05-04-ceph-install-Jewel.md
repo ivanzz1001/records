@@ -443,6 +443,51 @@ ntpstat                 #查看当前的同步状态
 {% endhighlight %}
 
 
+11） 其他参数的相关优化
+<pre>
+# cat /etc/sysctl.conf
+# sysctl settings are defined through files in
+# /usr/lib/sysctl.d/, /run/sysctl.d/, and /etc/sysctl.d/.
+#
+# Vendors settings live in /usr/lib/sysctl.d/.
+# To override a whole file, create a new file with the same in
+# /etc/sysctl.d/ and put new settings there. To override
+# only specific settings, add a file with a lexically later
+# name in /etc/sysctl.d/ and put new settings there.
+#
+# For more information, see sysctl.conf(5) and sysctl.d(5).
+
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_tw_recycle = 1
+net.ipv4.tcp_fin_timeout = 30
+
+net.netfilter.nf_conntrack_max=13107200
+net.netfilter.nf_conntrack_tcp_timeout_time_wait=120
+net.netfilter.nf_conntrack_tcp_timeout_fin_wait=120
+net.nf_conntrack_max=13107200
+net.netfilter.nf_conntrack_tcp_timeout_close_wait=60
+net.ipv4.tcp_retries2=7
+
+net.ipv4.tcp_max_tw_buckets = 5000
+
+kernel.pid_max = 4194303
+vm.min_free_kbytes = 3145728
+
+net.ipv4.tcp_syncookies = 1 
+net.ipv4.tcp_tw_reuse = 1 
+net.ipv4.tcp_tw_recycle = 1 
+net.ipv4.tcp_fin_timeout = 30 
+net.ipv4.tcp_keepalive_time = 1800 
+#net.ipv4.ip_local_port_range = 1024 65535 
+net.ipv4.tcp_max_syn_backlog = 81920
+net.ipv4.tcp_max_tw_buckets = 5000
+
+kernel.watchdog_thresh=20
+
+vm.max_map_count=4194303
+</pre>
+
 ## 3. 建立集群
 
 ### 3.1 建立monitor
