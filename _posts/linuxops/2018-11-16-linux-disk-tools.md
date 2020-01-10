@@ -42,7 +42,7 @@ description: Linux下相关硬盘工具的使用
 
 1） **使用fdisk查看分区信息**
 
-我们可以使用```fdisk```命令来显示你的所有磁盘或闪存的信息以及它们的分区信息
+我们可以使用```fdisk```命令来显示你的所有磁盘或闪存的信息以及它们的```分区```信息。
 <pre>
 # fdisk -l /dev/sdj
 WARNING: fdisk GPT support is currently new, and therefore in an experimental phase. Use at your own discretion.
@@ -70,6 +70,96 @@ done
 Pass completed, 0 bad blocks found. (0/0/0 errors)
 </pre>
 
+3) **使用df来查看查看文件系统的磁盘使用情况**
+
+我们可以使用```df```命令来查看文件系统的磁盘使用情况，例如：
+<pre>
+# df
+Filesystem                 1K-blocks       Used  Available Use% Mounted on
+/dev/mapper/test-lv_root   20961280    1941848   19019432  10% /
+devtmpfs                   131917224          0  131917224   0% /dev
+tmpfs                      131928216        212  131928004   1% /dev/shm
+tmpfs                      131928216    1009116  130919100   1% /run
+tmpfs                      131928216          0  131928216   0% /sys/fs/cgroup
+/dev/sdk2                     607980     140004     467976  24% /boot
+/dev/mapper/test-lv_var  7781410816  260187916 7521222900   4% /var
+/dev/sda2                 7801452868 3159489912 4641962956  41% /var/lib/ceph/osd/ceph-16
+/dev/sdb2                 7801452868 3462296992 4339155876  45% /var/lib/ceph/osd/ceph-38
+/dev/sdc2                 7801452868 2856510324 4944942544  37% /var/lib/ceph/osd/ceph-54
+/dev/sdd2                 7801452868 2901124256 4900328612  38% /var/lib/ceph/osd/ceph-59
+/dev/sde2                 7801452868 3588682536 4212770332  47% /var/lib/ceph/osd/ceph-65
+/dev/sdf2                 7801452868 3328774296 4472678572  43% /var/lib/ceph/osd/ceph-70
+tmpfs                       26385644          0   26385644   0% /run/user/0
+/dev/sdg2                 7801452868 3810297232 3991155636  49% /var/lib/ceph/osd/ceph-76
+/dev/sdh2                 7801452868 2681698220 5119754648  35% /var/lib/ceph/osd/ceph-81
+/dev/sdi2                 7801452868 2724485808 5076967060  35% /var/lib/ceph/osd/ceph-89
+/dev/sdl2                  458140932   11186764  446954168   3% /var/lib/ceph/osd/ceph-96
+/dev/sdm2                  458140932    7706308  450434624   2% /var/lib/ceph/osd/ceph-103
+</pre>
+
+4) **使用lvdisplay命令显示逻辑卷**
+
+lvdisplay命令用于显示LVM逻辑卷空间大小、读写状态和快照信息等属性。如果省略```逻辑卷```参数，则vdisplay命令显示所有的逻辑卷属性，否则，仅显示指定的逻辑卷属性：
+<pre>
+# lvdisplay 
+  --- Logical volume ---
+  LV Path                /dev/test/lv_var
+  LV Name                lv_var
+  VG Name                test
+  LV UUID                oXHqWi-VMw9-6xrV-GQSO-VRHx-JA9J-TZVQpq
+  LV Write Access        read/write
+  LV Creation host, time ceph-173.test.net, 2017-10-24 13:38:14 +0800
+  LV Status              available
+  # open                 1
+  LV Size                7.25 TiB
+  Current LE             1900268
+  Segments               1
+  Allocation             inherit
+  Read ahead sectors     auto
+  - currently set to     256
+  Block device           253:1
+   
+  --- Logical volume ---
+  LV Path                /dev/test/lv_root
+  LV Name                lv_root
+  VG Name                test
+  LV UUID                79go9I-8Dqa-eihG-jB9q-vEZV-VwrR-zt04by
+  LV Write Access        read/write
+  LV Creation host, time ceph-173.test.net, 2017-10-24 13:39:33 +0800
+  LV Status              available
+  # open                 1
+  LV Size                20.00 GiB
+  Current LE             5120
+  Segments               1
+  Allocation             inherit
+  Read ahead sectors     auto
+  - currently set to     256
+  Block device           253:0
+   
+# lvdisplay /dev/test/lv_root
+  --- Logical volume ---
+  LV Path                /dev/test/lv_root
+  LV Name                lv_root
+  VG Name                test
+  LV UUID                79go9I-8Dqa-eihG-jB9q-vEZV-VwrR-zt04by
+  LV Write Access        read/write
+  LV Creation host, time ceph-173.test.net, 2017-10-24 13:39:33 +0800
+  LV Status              available
+  # open                 1
+  LV Size                20.00 GiB
+  Current LE             5120
+  Segments               1
+  Allocation             inherit
+  Read ahead sectors     auto
+  - currently set to     256
+  Block device           253:0
+</pre>
+之后，我们再可以通过```mount```命令查看对应的硬盘挂载到了哪个目录，例如：
+<pre>
+# mount | grep "lv_root"
+/dev/mapper/test-lv_root on / type xfs (rw,relatime,attr2,inode64,noquota)
+</pre>
+可以看到挂载到了根目录。
 
 ## 4. parted工具
 
