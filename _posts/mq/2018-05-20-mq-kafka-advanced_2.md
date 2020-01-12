@@ -198,6 +198,14 @@ val allTopicPartitions = ctx.partitionsForTopic.flatMap { case(topic, partitions
 
 ### 4.1 controller运行原理
 
+在kafka集群中，controller是多个broker中的一个（也只有一个controller)。它除了实现了正常的broker功能外，还负责选举分区(partition)的Leader。第一个启动的broker会成为一个controller，它会在zookeeper创建一个临时节点(ephemeral): /controller。其他后启动的broker也尝试去创建这样一个临时节点，但会报错，此时这些broker会在该zookeeper的/controller节点上创建一个监控(watch)，这样当该节点状态发生变化（比如： 被删除）时，这些broker就会得到通知。此时，这些broker就可以在得到通知时，继续创建该节点。保证该集群一直都有一个controller节点。
+
+当controller所在的broker节点宕机或断开和zookeeper的连接，它在zookeeper上创建的临时节点就会被自动删除。其他在该节点上都安装了监控的broker节点都会得到通知，此时，这些broker都会尝试去创建这样一个临时的/controller节点，但它们当中只有一个broker(最先创建的那个)能够创建成功，其他的broker会报错：node already exists，接收到该错误的broker节点会再次在该临时节点上安装一个watch来监控该节点状态的变化。每次当一个broker被选举时，将会赋予一个更大的数字（通过zookeeper的条件递增实现），这样其他节点就知道controller目前的数字。
+
+
+当一个broker宕机而不在当前kafka集群中时，controller将会得到通知（通过监控zookeeper的路径实现），若有些topic的主分区恰好在该broker上，此时controller将重新选择这些主分区。controller将会检查所有没有leader的分区，并决定新的leader是谁（简单的方法是： 选择该分区的下一个副本分区），并给所有的broker发送请求。
+
+每个
 
 
 <br />
