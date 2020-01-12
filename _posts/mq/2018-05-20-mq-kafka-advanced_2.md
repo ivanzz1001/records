@@ -75,12 +75,128 @@ def partition(key: Any, numPartitions: Int): Int = {
 
 2) **key为null时，从缓存中取分区ID或者随机取一个**
 
+如果你没有指定key，那么kafka是如何确定这条消息去往哪个分区的呢？
+{% highlight string %}
+if(key == null) {  
+    val id = sendPartitionPerTopicCache.get(topic)	// 先看看Kafka有没有缓存的现成的分区Id
+    id match {
+      case Some(partitionId) =>  // 如果有的话直接使用这个分区Id就好了
+        partitionId	
+
+      case None => // 如果没有的话，
+        val availablePartitions = topicPartitionList.filter(_.leaderBrokerIdOpt.isDefined)  //找出所有可用分区的leader所在的broker
+        if (availablePartitions.isEmpty)
+          throw new LeaderNotAvailableException("No leader for any partition in topic " + topic)
+        val index = Utils.abs(Random.nextInt) % availablePartitions.size	// 从中随机挑一个
+        val partitionId = availablePartitions(index).partitionId
+        sendPartitionPerTopicCache.put(topic, partitionId)	// 更新缓存以备下一次直接使用
+        partitionId
+    }
+}
+{% endhighlight %}
+
+不指定key时，kafka几乎就是随机找一个分区发送无key的消息，然后把这个分区号加入到缓存中以备后面直接使用。当然了，kafka本身也会清空该缓存（默认每10分钟或者每次请求topic元数据时）。
+
+### 3.3 consumer个数与分区数
+
+topic下的一个分区只能被同一个consumer group下的一个consumer线程来消费，但反之并不成立，即一个consumer线程可以消费多个分区的数据，比如kafka提供的ConsoleConsumer，默认就只是一个线程来消费所有分区的数据。
+
+>即分区数决定了同组消费者个数的上限
+
+![kafka-pc](https://ivanzz1001.github.io/records/assets/img/mq/kafka_partition_consumer.jpg)
+
+所以，如果你的分区数是N，那么最好线程数也保持为N，这样通常能够达到最大的吞吐量。超过N的配置只是浪费系统资源，因为多出的线程不会被分配到任何分区。
+
+###### Consumer消费partition的分配策略
+kafka提供了两种分配策略： range和round robin，由参数*partition.assignment.strategy*指定，默认是range策略。
+
+当以下事件发生时，kafka将会进行一次分区分配：
+
+* 同一个Consumer Group内新增消费者
+
+* 消费者离开当前所属的Consumer Group，包括shutdown 或 crash
+
+* 订阅的主题新增分区
+
+将分区的所有权从一个消费者移动到另一个消费者，称为重新平衡(rebalance)。如何rebalance就涉及到本文提到的分区分配策略。
+
+下文我们将详细介绍kafka内置的两种分区分配策略。本文假设我们有个名为```T1```的topic，其中包含了10个分区，然后我们有两个消费者(C1,C2)来消费这10个分区里面的数据，而且C1的*num.streams=1*， C2的*num.streams=2*。
+
+
+1） **Range strategy**
+
+range策略是对每个topic而言的，首先对同一个topic里面的分区按照序号进行排序，并对消费者按照字母顺序进行排序。在我们的例子里面，排完序的分区将会使0，1，2，3，4，5，6，7，8，9； 消费者线程排完序将会是C1-0，C2-0，C2-1。然后将*partitions的个数*除以*消费者线程的总数*来决定每个消费者线程消费几个分区。如果除不尽，前面几个消费者线程将会多消费一个分区。在我们的例子里面，我们有10个分区，3个消费者线程，10/3=3，而且除不尽，那么消费者线程C1-0将会多消费一个分区，随意最后分区分配的结果看起来是这样的：
+
+* C1-0将消费0,1,2,3分区
+
+* C2-0将消费4,5,6分区
+
+* C2-1将消费7,8,9分区
+
+假如我们有11个分区，那么最后分区分配的结果看起来是这样的：
+
+* C1-0将消费0,1,2,3分区
+
+* C2-0将消费4,5,6,7分区
+
+* C2-1将消费8,9,10分区
+
+假如我们有两个topic(名称分别为T1和T2），分别有10个分区，那么最后分区分配的结果看起来是这样的：
+
+* C1-0将消费T1这个topic的0,1,2,3分区； C1-0将消费T2这个topic的0,1,2,3分区
+
+* C2-0将消费T1这个topic的4,5,6分区； C2-0将消费T2这个topic的4,5,6分区
+
+* C2-1将消费T1这个topic的7,8,9分区； C2-1将消费T2这个topic的7,8,9分区
+
+
+可以看出，C1-0这个消费者线程比其他消费者线程多消费了2个分区，这就是range strategy的一个很明显的弊端。
+
+2) **RoundRobin strategy**
+
+使用roundrobin策略有两个前提条件必须满足：
+
+* 同一个consumer group里面的所有消费者的num.streams必须相等；
+
+* 每个消费者订阅的topic必须相同
+
+所以这里假设前面提到的两个消费者的*num.streams=2*。Roundrobin策略的工作原理：将所有topic的分区组成TopicAndPartion列表，然后对TopicAndPartition列表按照hashCode进行排序，参看如下代码：
+{% highlight string %}
+val allTopicPartitions = ctx.partitionsForTopic.flatMap { case(topic, partitions) =>
+  info("Consumer %s rebalancing the following partitions for topic %s: %s"
+       .format(ctx.consumerId, topic, partitions))
+  partitions.map(partition => {
+    TopicAndPartition(topic, partition)
+  })
+}.toSeq.sortWith((topicPartition1, topicPartition2) => {
+  /*
+   * Randomize the order by taking the hashcode to reduce the likelihood of all partitions of a given topic ending
+   * up on one consumer (if it has a high enough stream count).
+   */
+  topicPartition1.toString.hashCode < topicPartition2.toString.hashCode
+})
+{% endhighlight %}
+最后按照round-robin风格将分区分别分配给不同的消费者线程。
+
+在这个例子里面，假如按照hashCode排完序的topic-partitions组依次为：T1-5、T1-3、T1-0、T1-8、T1-2、T1-1、T1-4、T1-7、T1-6、T1-9，我们的消费者线程排序为C1-0、C1-1、C2-0、C2-1，最后分区分配的结果为：
+
+* C1-0将消费T1-5、T1-2、T1-6分区；
+
+* C1-1将消费T1-3、T1-1、T1-9分区；
+
+* C2-0将消费T1-0、T1-4分区
+
+* C2-1将消费T1-8、T1-7分区
+
+多个topic的分区分配和单个topic类似。遗憾的是，目前我们还不能自定义分区分配策略，只能通过partition.assignment.strategy参数选择range或round-robin。
 
 
 
 ## 4. kafka controller
 
+本节描述一下kafka controller的实现原理，并对其源代码的实现进行讲解。
 
+### 4.1 controller运行原理
 
 
 
@@ -94,6 +210,8 @@ def partition(key: Any, numPartitions: Int): Int = {
 1. [kafka官网](https://kafka.apache.org/)
 
 2. [Kafka的分区数和消费者个数](https://www.jianshu.com/p/dbbca800f607)
+
+3. [kafka源码分析—Controller](https://blog.csdn.net/zg_hover/article/details/81672997)
 
 
 <br />
