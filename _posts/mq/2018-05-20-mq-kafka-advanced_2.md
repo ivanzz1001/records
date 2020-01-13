@@ -21,6 +21,85 @@ description: kafka进阶
 <!-- more -->
 
 ## 1. kafka常用操作
+如下我们列出一些kafka在实际生产系统中的基本用法。
+
+### 1.1 基本操作
+在本节我们列出操作kafka集群的一些常用操作，其中涉及到的所有工具(tools)都可以在kafka的```bin/```目录下找到，我们可以通过直接运行相应的命令（不要携带任何参数）来获得相应的详细信息。
+
+###### 添加topic
+我们可以选择通过手动创建topic，或者在publish消息时对于不存在的topic让其自动创建。如果topics是自动创建的，我们也可以通过```bin/kafka-topics.sh```来调优默认的topic配置参数。
+
+使用如下的命令来添加topic:
+<pre>
+# bin/kafka-topics.sh --bootstrap-server broker_host:port --create --topic my_topic_name \
+      --partitions 20 --replication-factor 3 --config x=y
+</pre>
+副本复制因子用于控制写入的消息会被复制多少份。假如我们将replication factor设置为3，则在最多2副本失效的情况下，仍能对数据进行正常访问。我们建议将replication factor设置为2或者3，这样当相应的服务器出现异常时，不会中断消费数据。
+
+分区总数用于控制一个topic的消息数据会被shard到多少个logs当中。分区数的多少会产生多方面的影响。首先，每一个分区必须匹配一台服务器。因此假如我们有20个分区的话，则最多需要20台服务器来处理（这里不计算replicas)；其次，分区数也会影响到consumer的最大并发能力。
+
+每一个分区的日志文件都有其自己的目录。目录的名字是```topicName-partitionID```（例如，当前topic的名称是mytopic，partitionID为0，那么对一个的目录名称就是```mytopic-0```)。由于folder的名称长度不能超过255个字符，因此这也限制了topic name的长度。我们假设分区总数不会操作100000，那么topic name的长度不能长于255-6=249个字符。
+
+通过命令行选项添加的参数配置会覆盖相应的默认值。针对每一个topic有哪些参数配置，可以参考[这里](https://kafka.apache.org/documentation/#topicconfigs).
+
+###### 修改topics
+我们可以使用```bin/kafka-topics.sh```来修改topic的参数配置或者partition个数。例如，通过如下命令添加partition个数：
+<pre>
+# bin/kafka-topics.sh --bootstrap-server broker_host:port --alter --topic my_topic_name \
+      --partitions 40
+</pre>
+
+partitions的一个使用场景就是对数据进行分区，添加分区数并不会改变已有数据的分区，因此这可能会影响到一些依赖于分区的consumer。因为通常使用*hash(key)%number_of_partitions*算法来决定数据存放到哪个分区，但是kafka并不会尝试对已存在的数据重新做分区映射。
+
+1） **添加configs**
+
+使用如下的命令来添加config:
+<pre>
+# bin/kafka-configs.sh --bootstrap-server broker_host:port --entity-type topics --entity-name my_topic_name --alter --add-config x=y
+</pre>
+
+2) **移除config**
+
+使用如下的命令来移除一个config:
+<pre>
+# bin/kafka-configs.sh --bootstrap-server broker_host:port --entity-type topics --entity-name my_topic_name --alter --delete-config x
+</pre>
+
+3) **删除topic**
+
+可以通过下面的命令来移除一个topic:
+<pre>
+# bin/kafka-topics.sh --bootstrap-server broker_host:port --delete --topic my_topic_name
+</pre>
+
+当前kafka并不支持减少topic的分区数。对于修改topic的副本复制因子，请参看[这里](https://kafka.apache.org/documentation/#basic_ops_increase_replication_factor)
+
+###### 优雅的关闭
+kafka集群会自动的侦测任何broker的关闭或者是失效，然后为相应的分区重新选举出新的leader。这在broker因故障失效，或者人为的主动关闭(如进行系统维护），或者配置修改均会触发相应的Leader选举动作。对于后面的一些场景（系统维护、配置修改），kafka支持一种更加优雅的机制来进行关闭，而不是直接将其kill掉。当kafka是被优雅的关闭时，其主要是做了如下两方面的优化：
+
+* 主动的将日志数据同步到硬盘，以避免在进行重启时需要进行日志恢复（校验日志文件尾部的若干消息的checksum)，从而可以提高系统的启动速度
+
+* 在broker关闭之前，会迁移Leader是该broker的分区。这可以加快后续相应分区Leader的选举的速度，并降低相应分区处于不可用状态的时间。
+
+无论broker是被优雅的关闭，还是直接kill，都会触发日志的同步。但是受控的Leadership迁移需要如下特殊设置：
+<pre>
+controlled.shutdown.enable=true
+</pre>
+值得注意的是，受控的关闭只在该broker有replicas(即副本数大于等于1，并且至少要有一个副本处于alive状态)的情况下才有效。
+
+###### 平衡leadership
+无论什么时候一个broker关闭或者崩溃，如果某些partitions的leadership在该broker上，那么将会进行leadship转移。这就意味着在默认情况下，当broker重启，该broker只会成为相应分区的follower，从而不会在该broker上进行任何的读写操作。
+
+为了避免这样导致的不平衡，kafka有一个首选副本的概念。假如某一个分区的副本列表是1、5、9，则node1会更被倾向于成为leader，因为node1排在整个副本列表的首位。你可以运行如下命令，尝试让kafka集群恢复leadership到原来的broker上：
+<pre>
+# bin/kafka-preferred-replica-election.sh --zookeeper zk_host:port/chroot
+</pre>
+
+由于每次运行此命名可能会十分繁琐，因此我们可以通过如下配置来让kafka自动的来完成：
+<pre>
+auto.leader.rebalance.enable=true
+</pre>
+
 
 ## 2. kafka日志数据
 
