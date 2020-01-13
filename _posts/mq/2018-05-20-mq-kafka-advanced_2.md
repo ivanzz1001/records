@@ -205,7 +205,105 @@ val allTopicPartitions = ctx.partitionsForTopic.flatMap { case(topic, partitions
 
 当一个broker宕机而不在当前kafka集群中时，controller将会得到通知（通过监控zookeeper的路径实现），若有些topic的主分区恰好在该broker上，此时controller将重新选择这些主分区。controller将会检查所有没有leader的分区，并决定新的leader是谁（简单的方法是： 选择该分区的下一个副本分区），并给所有的broker发送请求。
 
-每个
+每个分区的新的Leader知道，它将接收来自客户端的生产者和消费者的请求。同时follower也知道，应该从这个新的leader开始复制消息。当一个新的broker节点加入集群时，controller将会检查，在该broker上是否存在分区副本。若存在，controller通知新的和存在的broker这个变化，该broker开始从leader处复制消息。
+
+
+总的来说，kafka会通过在zookeeper上创建临时节点的方式来选举一个controller，当kafka集群中有节点加入或退出时，该controller将会得到通知。Controller还负责在多个分区中选择主分区，负责当有节点加入集群时进行副本的复制。Controller通过递增数字(epoch number)来防止脑裂(split brain)问题。
+
+>脑裂是指： 多个节点都选自己为controller
+
+### 4.2 实现分析
+Controller是通过事件处理机制来实现的。把broker的节点的变化、分区的变化，都封装成事件，事件发生时把事件放入到事件队列中。此时，阻塞在事件队列的处理者即可开始处理这些事件。这些事件类，都必须实现同一个接口。
+
+###### 启动
+类KafkaServer中的startup()函数中启动Controller，代码如下：
+{% highlight string %}
+def startup() {
+    ...
+    /* start kafka controller */
+    kafkaController = new KafkaController(config, zkClient, time, metrics, brokerInfo, tokenManager, threadNamePrefix)
+
+    // 启动kafka server的控制模块
+    kafkaController.startup()
+    ...
+}
+{% endhighlight %}
+
+###### 初始化工作
+kafka服务节点启动时，Controller模块就会启动。但当Controller启动时，并不会假设自己是controller，而是先注册会话超时的监听者(listener)，然后开始controller的leader选举过程。
+
+启动时，会把Startup事件控制实体，放入到事件队列中。在eventManager线程启动时，会在队列取出ControllerEvent类型的事件，并进行处理。此时取出的当然是刚刚放入的Startup事件，所以，开始执行Startup类的process函数。代码实现如下：
+{% highlight string %}
+def startup() = {
+    ... ...
+    eventManager.put(Startup)
+    eventManager.start()
+ }
+{% endhighlight %}
+
+* Startup事件控制实体
+
+在Controller模块启动时，该事件就被放入到事件队列中，所以最开始处理该事件。执行的处理函数是下面定义的process()。代码实现如下：
+{% highlight string %}
+case object Startup extends ControllerEvent {
+    def state = ControllerState.ControllerChange
+    override def process(): Unit = {
+      zkClient.registerZNodeChangeHandlerAndCheckExistence(controllerChangeHandler)
+      elect()
+    }
+
+}
+{% endhighlight %}
+
+###### Startup事件处理
+{% highlight string %}
+private def elect(): Unit = {
+    val timestamp = time.milliseconds
+    activeControllerId = zkClient.getControllerId.getOrElse(-1)
+
+    // 这里要判断一下controller是否已经选出来了，若是选出来了，就不需要再继续选举
+    if (activeControllerId != -1) {
+      debug(s"Broker $activeControllerId has been elected as the controller, so stopping the election process.")
+      return
+    }
+
+    // 若controller还没有选出来，则进行选举
+    try {
+         // 若成功的选举成controller，继续进行后面的注册，否则抛出异常
+         zkClient.checkedEphemeralCreate(ControllerZNode.path, ControllerZNode.encode(config.brokerId, timestamp))
+         info(s"${config.brokerId} successfully elected as the controller")
+
+        // 自己被选举成controller，进入onControllerFailover函数
+        activeControllerId = config.brokerId
+        onControllerFailover()
+    } catch {
+      case _: NodeExistsException =>
+        // If someone else has written the path, then
+        activeControllerId = zkClient.getControllerId.getOrElse(-1)
+
+        ... ...
+    }
+}
+{% endhighlight %}
+
+
+###### 被选举成controller之后
+当broker被选举成为controller之后，继续执行后面的代码，此时进入onControllerFailover()函数。该函数主要完成以下几件事：
+
+* 注册constroller epoch(controller id)变化的监听器
+
+* 增加controller的id
+
+* 初始化controller的context，该context保存了每个topic的信息，和所有分区的leader信息
+
+* 开启controller的channel管理模块
+
+* 开启副本状态机
+
+* 开启分区状态机
+
+* 当该broker发生任何异常，会重新选择controller，这样其他的broker节点也有可能成为controller
+
 
 
 <br />
