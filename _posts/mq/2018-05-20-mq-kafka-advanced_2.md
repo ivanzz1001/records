@@ -101,6 +101,22 @@ auto.leader.rebalance.enable=true
 </pre>
 
 
+###### 跨rack平衡replicas
+kafka的rack感知特性(rack awareness feature)分区的副本放到不同的rack上。此扩展保证了kafka能够应对因rack故障导致的broker失效问题，从而降低了数据丢失的风险。
+
+你可以通过broker的配置参数指定broker是属于哪一个特定的rack：
+<pre>
+broker.rack=my-rack-id
+</pre>
+
+当创建、修改topic，或者replicas redistributed时，此rack参数的限制就会起作用，确保副本之间尽量分布到不同的rack上面。
+
+kafka中为broker分配replicas的算法会确保每个broker的leader都会是一个常量，而不管broker的跨rack情况如何。这从整体上保证了集群的平衡。
+
+然而，假如rack之间brokers数量是不相等的，则副本的指定将会是不平衡的。那些brokers数量更少的rack会有更多的replicas，这就意味着
+
+
+
 ## 2. kafka日志数据
 
 ## 3. 如何确定kafka分区数
