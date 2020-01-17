@@ -113,7 +113,76 @@ broker.rack=my-rack-id
 
 kafka中为broker分配replicas的算法会确保每个broker的leader都会是一个常量，而不管broker的跨rack情况如何。这从整体上保证了集群的平衡。
 
-然而，假如rack之间brokers数量是不相等的，则副本的指定将会是不平衡的。那些brokers数量更少的rack会有更多的replicas，这就意味着
+然而，假如rack之间brokers数量是不相等的，则副本的指定将会是不平衡的。那些brokers数量更少的rack会有更多的replicas，这就意味着会在这些brokers上面存储更多的数据。因此，我们最好保证每个rack上都有相等的broker数量。
+
+###### 集群之间镜像(mirror)数据
+为区分单个kafka集群broker节点之间的数据复制，这里我们将集群之间复制(replicate)数据的过程称为```mirroring```。kafka提供了一个相应的工具来在集群之间进行数据镜像，该工具会从source cluster消费数据，然后发布到destination cluster。这种数据镜像(mirror)的常见使用场景是：在其他的数据中保存一个副本。
+
+我们可以运行多个镜像(mirror)进程来增加吞吐率和容错性（假如一个进程失效，则其他的进程将会接管相应的负载）。
+
+```kafka-mirror-maker.sh```会从source cluster相应的topic中读取数据，然后将其写到destination cluster相同名称的topic中。实际上mirror maker相当于把consumer以及producer相应功能组合到了一起。
+
+source及destination cluster是两个完全独立的entry: 两个集群可以有不同的partitions数量，offsets也会不同。 由于这样的原因，镜像(mirror)一个cluster其实并不能作为一个很好的容错机制，我们还是建议采用使用单个集群内的副本复制。mirror maker进程会使用相同的message key来映射分区，因此消息之间的整体排列还是不会被打乱。
+
+如下我们给出一个示例展示如何mirror一个topic:
+<pre>
+#  bin/kafka-mirror-maker.sh
+      --consumer.config consumer.properties
+      --producer.config producer.properties --whitelist my-topic
+</pre>
+上面我们注意到使用了```--whitelist```选项来指定topic列表，该选项允许使用任何[java风格](http://docs.oracle.com/javase/7/docs/api/java/util/regex/Pattern.html)的正则表达式。因此你可以使用```--whitelist 'A|B'```来mirror topic A以及topic B。或者你也可以使用```--whitelist '*'```来mirror所有的topic。请使用单引号(```''```)把正则表达式括起来，以免shell将其解释为文件路径。此外，为了使用方便我们允许使用```,'```来代替```|```用于指定多个topic。之后再配合使用*auto.create.topics.enable=true*，使得在Mirror数据时自动的进行topic数据创建.
+
+###### 检查consumer的消费偏移
+
+有时候我们需要查看consumer的消费偏移信息。kafka提供了相应的工具来查看一个consumer group中所有consumers的消费信息。如下我们展示了如何查看查看```my-group```这个消费组中消费者的消费偏移：
+<pre>
+# bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group my-group
+ 
+TOPIC                          PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG        CONSUMER-ID                                       HOST                           CLIENT-ID
+my-topic                       0          2               4               2          consumer-1-029af89c-873c-4751-a720-cefd41a669d6   /127.0.0.1                     consumer-1
+my-topic                       1          2               3               1          consumer-1-029af89c-873c-4751-a720-cefd41a669d6   /127.0.0.1                     consumer-1
+my-topic                       2          2               3               1          consumer-2-42c1abd4-e3b2-425d-a8bb-e1ea49b29bb2   /127.0.0.1                     consumer-2
+</pre>
+这里我们简单介绍一下如下几项：
+
+* *CURRENT-OFFSET*: consumer在一个分区的当前消费偏移
+
+* *LOG-END-OFFSET*: 一个分区的日志结束的偏移量
+
+* *LAG*: consumer消费消息时落后的偏移量(可以理解为未消费的记录条数）
+
+如果想控制当前offset，需要注意的是这里面的消息消费过后可能超出了kafka日志留存策略，所以你只能控制到近期仍保留的日志偏移。可以执行如下命令：
+<pre>
+# bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --group your_consumer_group_name --topic your_topic_name --execute --reset-offsets --to-offset 80
+# bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group your_consumper_group_name
+</pre>
+
+
+###### 管理consumer group
+通过使用consumer group命令行工具，我们可以list、describe或者delete消费组。consumer group可以手工删除，或者是根据日志留存策略在过期后被自动删除。如果我们要手动删除，那就必须要保证该group当前已经没有活跃的成员(active members)了。通过如下命令，我们可以列出所有topic的消费组：
+<pre>
+# bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --list
+ 
+test-consumer-group
+</pre>
+
+如果要查看消费偏移，我们可以```describe```消费组：
+<pre>
+# bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group my-group
+ 
+TOPIC           PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG             CONSUMER-ID                                    HOST            CLIENT-ID
+topic3          0          241019          395308          154289          consumer2-e76ea8c3-5d30-4299-9005-47eb41f3d3c4 /127.0.0.1      consumer2
+topic2          1          520678          803288          282610          consumer2-e76ea8c3-5d30-4299-9005-47eb41f3d3c4 /127.0.0.1      consumer2
+topic3          1          241018          398817          157799          consumer2-e76ea8c3-5d30-4299-9005-47eb41f3d3c4 /127.0.0.1      consumer2
+topic1          0          854144          855809          1665            consumer1-3fc8d6f1-581a-4472-bdf3-3515b4aee8c1 /127.0.0.1      consumer1
+topic2          0          460537          803290          342753          consumer1-3fc8d6f1-581a-4472-bdf3-3515b4aee8c1 /127.0.0.1      consumer1
+topic3          2          243655          398812          155157          consumer4-117fe4d3-c6c1-4178-8ee9-eb4a3954bee0 /127.0.0.1      consumer4
+</pre>
+此外，针对```describe```还有其他一些额外的选项，可用于获得一个consumer group更为详细的信息：
+
+1) ```--members```选项
+
+本选项用于获取一个consumer group中所有的active members
 
 
 
