@@ -182,7 +182,94 @@ topic3          2          243655          398812          155157          consu
 
 1) ```--members```选项
 
-本选项用于获取一个consumer group中所有的active members
+本选项用于获取一个consumer group中所有的active members。例如：
+<pre>
+# bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group my-group --members
+ 
+CONSUMER-ID                                    HOST            CLIENT-ID       #PARTITIONS
+consumer1-3fc8d6f1-581a-4472-bdf3-3515b4aee8c1 /127.0.0.1      consumer1       2
+consumer4-117fe4d3-c6c1-4178-8ee9-eb4a3954bee0 /127.0.0.1      consumer4       1
+consumer2-e76ea8c3-5d30-4299-9005-47eb41f3d3c4 /127.0.0.1      consumer2       3
+consumer3-ecea43e4-1f01-479f-8349-f9130b75d8ee /127.0.0.1      consumer3       0
+</pre>
+上面显示consumer1当前正在消费两个分区，consumer4正在消费1个分区。
+
+2) ```--members --verbose```选项
+
+在```--members```选项的基础上，本选项用于列出consumer正在消费哪些分区，例如：
+<pre>
+# bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group my-group --members --verbose
+ 
+CONSUMER-ID                                    HOST            CLIENT-ID       #PARTITIONS     ASSIGNMENT
+consumer1-3fc8d6f1-581a-4472-bdf3-3515b4aee8c1 /127.0.0.1      consumer1       2               topic1(0), topic2(0)
+consumer4-117fe4d3-c6c1-4178-8ee9-eb4a3954bee0 /127.0.0.1      consumer4       1               topic3(2)
+consumer2-e76ea8c3-5d30-4299-9005-47eb41f3d3c4 /127.0.0.1      consumer2       3               topic2(1), topic3(0,1)
+consumer3-ecea43e4-1f01-479f-8349-f9130b75d8ee /127.0.0.1      consumer3       0               -
+</pre>
+
+3) ```--offsets```选项
+
+这是默认的describe选项，提供的输出与```--describe```相同。
+
+4) ```--state```选项
+
+本选项会提供一些有用的group级别的信息。例如：
+<pre>
+# bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group my-group --state
+ 
+COORDINATOR (ID)          ASSIGNMENT-STRATEGY       STATE                #MEMBERS
+localhost:9092 (0)        range                     Stable               4
+</pre>
+
+5) ```--delete```选项
+
+要手动的删除一个或多个consumer group(s)，我们可以使用```--delete```选项。例如：
+<pre>
+# bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --delete --group my-group --group my-other-group
+ 
+Deletion of requested consumer groups ('my-group', 'my-other-group') was successful.
+</pre>
+
+<br />
+此外，如果想要重置一个consumer group的offsets，我们可以使用```--reset-offsets```选项。本选项只支持一次重置一个consumer group，在重置offsets时还需要指定作用域： ```--all-topics```或```--topic```。另外，还需要确保在重置是consumer处于Inactive状态。
+
+执行offsets重置时，有3个执行选项：
+
+* (default): 显示哪些offsets会被重置
+
+* ```--execute```: 用于执行``` --reset-offsets```进程
+
+* ```--export```: 将结果导出为CSV格式
+
+*--reset-offsets*可以通过如下方式来指定要重置到哪个位置：
+{% highlight string %}
+--to-datetime <String: datetime>: 将offsets重置指定的日期。日期格式为'YYYY-MM-DDTHH:mm:SS.sss'
+
+--to-earliest : 重置offsets到earliest
+
+--to-latest: 重置offsets到latest
+
+--shift-by <Long: number-of-offsets>: 将offsets重置为当前值+'n'，这里'n'可以可以是正数也可以是负数
+
+--from-file : 将offsets重置到CSV文件中指定的位置
+
+--to-current: 将offsets重置到当前位置
+
+--to-offset: 将offsets重置到一个指定的偏移值
+{% endhighlight %}
+需要注意的是，如果要重置的offsets已经超出了当前可用的offset，那么就只会被重置为当前可用offset的结尾处。例如，假如offset end是10，我们使用offset shift请求来设置偏移到15，那么最后offset仍只能被重置为10。
+
+如下我们给出一个示例，将一个consumer group的offsets重置为latest:
+<pre>
+# bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --reset-offsets --group consumergroup1 --topic topic1 --to-latest
+ 
+TOPIC                          PARTITION  NEW-OFFSET
+topic1                         0          0
+</pre>
+假如你使用的是较老版本的kafka，那么consumer的消费偏移信息可能存放在zookeeper中，此时你可以传递```--zookeeper```参数而不是```--bootstrap-server```参数：
+<pre>
+# bin/kafka-consumer-groups.sh --zookeeper localhost:2181 --list
+</pre>
 
 
 
