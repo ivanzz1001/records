@@ -73,9 +73,102 @@ Additionally, most devices that support Wi-Fi or Ethernet can be configured to s
 
 这里我们清除电脑上的与Fiddler相关的根证书： ```WIN+R```快捷键，输入```certmgr.msc```，然后回车进入证书管理界面。参看如下图示，查找所有fiddler证书，然后删除。
 
+![fiddler-mgr](https://ivanzz1001.github.io/records/assets/img/tools/fiddler_certmgr.png)
+
+3) 清除浏览器中与fiddler相关的根证书
+
+清除浏览器上的证书文件，此处需要仔细查找带有```FiddlerRoot```的字样，并删除。以Google浏览器为例说明，在浏览器上输入： chrome://settings/
+
+![fiddler-certclr](https://ivanzz1001.github.io/records/assets/img/tools/fiddler_certclr.png)
 
 
+4) 重置所有的certificates
 
+打开fiddler，点击工具栏中的**Tools->Options**，点击**Actions**，选择最后一项**Reset All certifications**，然后关闭。如下图所示：
+
+![fiddler-certrst](https://ivanzz1001.github.io/records/assets/img/tools/fiddler_certrst.png)
+
+### 2.2 fiddler抓取https包
+
+1) 下载最新版fiddler，强烈建议在官网下载（官网地址: https://www.telerik.com/download/fiddler)
+
+2) 正常傻瓜式安装，下一步，下一步，安装完毕后，先不用急于打开软件。
+
+3) 下载并安装Fiddler证书生成器： http://www.telerik.com/docs/default-source/fiddler/addons/fiddlercertmaker.exe?sfvrsn=2
+
+>注： fiddler安装后默认的根证书FiddlerRoot通常有些问题(其“证书预期目的”经常不是“所有”），导致可能在抓取https包时出现故障.
+
+4） 打开Fiddler，点击工具栏中的Tools->Options
+
+![fiddler-tools](https://ivanzz1001.github.io/records/assets/img/tools/fiddler_tools.png)
+
+5) 点击https设置选项，勾选选择项
+
+![fiddler-https-set](https://ivanzz1001.github.io/records/assets/img/tools/fiddler_https_set.png)
+
+6) 设置FiddlerRoot证书
+
+点击```Actions```按钮，如下所示
+
+![fiddler-actions](https://ivanzz1001.github.io/records/assets/img/tools/fiddler_actions.jpg)
+
+可以看到这里有多个选项。通过这我们有两种方法来在系统中设置FiddlerRoot证书，下面我们分别介绍
+
+* 自动设置
+
+我们可以选择*Trust Root Certificate*，然后让Fiddler自动的帮我们设置FiddlerRoot根证书到系统，如下所示：
+
+![fiddler-trust](https://ivanzz1001.github.io/records/assets/img/tools/fiddler_trust_cert.jpg)
+
+通过此方法，fiddler通常会把FiddlerRoot证书帮我们导入到“受信任的根证书”目录。但有时，可能也会遇到问题，此时我们可以采用下面介绍的```手动设置```方法来进行操作。
+
+* 手动设置
+
+我们可以选择*Export Root Certificate to Desktop*将FiddlerRoot证书导出到桌面。之后，将该根证书导入到浏览器中。以Google浏览器为例，在浏览器输入：chrome://settings/，然后进入高级设置，点击管理证书，将证书导入到“受信任的根证书颁发机构”，如下图所示：
+
+![fiddler-root](https://ivanzz1001.github.io/records/assets/img/tools/fiddler_root.jpg)
+
+
+7) 关闭fiddler，再重新打开，抓取https数据包
+
+如下图所示，这里我们抓取*https://www.baidu.com*:
+
+![fiddler-baidu](https://ivanzz1001.github.io/records/assets/img/tools/fiddler_baidu.jpg)
+
+## 3. 火狐浏览器抓包
+经过上面的设置之后我们可以通过Fiddler抓到IE和chrome等浏览器的http和https请求了，但如果我们使用的是火狐浏览器，则有可能会抓取不到任何请求数据，我们需要手动设置一些信息才行。
+
+1) 查看当前fiddler监听端口
+
+通过Options->Connections查看Fiddler的监听端口，如下所示：
+
+![fiddler-proxy](https://ivanzz1001.github.io/records/assets/img/tools/fiddler_proxy.jpg)
+
+2) 设置火狐浏览器代理
+
+打开火狐浏览器，选择```选项```，如下图所示：
+
+![fiddler-firefox](https://ivanzz1001.github.io/records/assets/img/tools/fiddler_firefox.png)
+
+打开之后，搜索代理：
+
+![fiddler-firefox-proxy](https://ivanzz1001.github.io/records/assets/img/tools/fiddler_firefox_proxy.png)
+
+之后，再手动设置代理(这里将代理接口设置为8888)：
+
+![fiddler-firefox-set](https://ivanzz1001.github.io/records/assets/img/tools/fiddler_firefox_set.png)
+
+3） 添加证书
+
+这里我们将证书导入到火狐浏览器。打开火狐浏览器，进入设置选项搜索证书：
+
+![fiddler-firefox-cert](https://ivanzz1001.github.io/records/assets/img/tools/fiddler_firefox_cert.png)
+
+之后将FiddlerRoot.cer导入火狐浏览器即可：
+
+![fiddler-firefox-import](https://ivanzz1001.github.io/records/assets/img/tools/fiddler_firefox_import.png)
+
+导入成功之后，重启火狐浏览器就可以进行抓包了。
 
 <br />
 <br />
