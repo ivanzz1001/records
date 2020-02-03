@@ -344,7 +344,37 @@ void tranverse_inorder(root r)
 ![ds-23tree-insertes](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_insertes.jpg)
 
 
+## 8. 数据结构定义
+此外，我们也可以按照如下方式来定义数据结构:
+{% highlight string %}
+struct TTNode;
 
+struct TwoNode{
+	int key;
+	struct TTNode *left;
+	struct TTNode *right;
+	struct TTNode *parent;
+};
+
+struct ThreeNode{
+	int lkey;
+	int rkey;
+
+	struct TTNode *left;
+	struct TTNode *middle;
+	struct TTNode *right;
+	struct TTNode *parent;
+};
+
+typedef enum{TWO_NODE, THREE_NODE}NodeType;
+struct TTNode{
+	NodeType type;
+	union{
+		TwoNode twNode;
+		ThreeNode thNode;
+	};
+};
+{% endhighlight %}
 
 
 <br />
