@@ -206,9 +206,12 @@ lmdb-env-path /tmp/acceptor
 </pre>
 
 
+<br />
+<br />
 
-<br />
-<br />
-<br />
+**参看：**
+
+1. [优酷教育(paxos)](https://edu.youku.com/)
+
 
 
