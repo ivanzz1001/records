@@ -112,13 +112,13 @@ p = private (copy on write)
 
 通常是内存区域所映射到的文件。对于ELF文件，你可以很容易的找出相应段的偏移（通过*readelf -l*命令)；另外也有一些其他的pseudo-paths:
 
-* [stack]: 初始进程(即主线程）的栈区
+* ```[stack]```: 初始进程(即主线程）的栈区
 
-* [stack:<tid>]: 线程<tid>的栈区，其对应于/proc/[pid]/task/[tid]/路径中相关信息。（since Linux 3.4)
+* ```[stack:<tid>]```: 线程<tid>的栈区，其对应于/proc/[pid]/task/[tid]/路径中相关信息。（since Linux 3.4)
 
-* [vdso]: 虚拟动态链接对象
+* ```[vdso]```: 虚拟动态链接对象
 
-* [heap]: 进程的堆区
+* ```[heap]```: 进程的堆区
 
 假如```pathname```列为空的话，则是通过mmap()函数所创建的匿名映射。
 
