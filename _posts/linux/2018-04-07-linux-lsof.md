@@ -59,6 +59,90 @@ lsof打开的文件可以是：
 
 * ```-v``` 显示版本信息
 
+### 1.2 使用实例
+
+###### 实例1： 无任何参数
+<pre>
+# lsof| more
+COMMAND     PID      USER   FD      TYPE             DEVICE SIZE/OFF       NODE NAME
+init          1      root  cwd       DIR              253,0     4096          2 /
+init          1      root  rtd       DIR              253,0     4096          2 /
+init          1      root  txt       REG              253,0   150352    1310795 /sbin/init
+init          1      root  mem       REG              253,0    65928    5505054 /lib64/libnss_files-2.12.so
+init          1      root  mem       REG              253,0  1918016    5521405 /lib64/libc-2.12.so
+init          1      root  mem       REG              253,0    93224    5521440 /lib64/libgcc_s-4.4.6-20120305.so.1
+init          1      root  mem       REG              253,0    47064    5521407 /lib64/librt-2.12.so
+init          1      root  mem       REG              253,0   145720    5521406 /lib64/libpthread-2.12.so
+...
+</pre>
+说明： lsof输出各列信息的含义如下
+
+* COMMAND: 进程的名称
+
+* PID: 进程标识符
+
+* USER: 进程所有者
+
+* FD: 文件描述符，应用程序通过文件描述符识别该文件。如cwd、txt等
+{% highlight string %}
+（1）cwd: 表示current work dirctory，即应用程序的当前工作目录，这是该应用程序启动的目录，除非它本身对这个目录进行更改
+（2）txt: 该类型的文件是程序代码，如应用程序二进制文件本身或共享库，如上列表中显示的 /sbin/init 程序
+（3）lnn: library references (AIX);
+（4）er: FD information error (see NAME column);
+（5）jld: jail directory (FreeBSD);
+（6）ltx: shared library text (code and data);
+（7）mxx: hex memory-mapped type number xx.
+（8）m86: DOS Merge mapped file;
+（9）mem: 直接映射到内存的文件;
+（10）mmap: memory-mapped device;
+（11）pd: parent directory;
+（12）rtd: 用户的根目录
+（13）tr: kernel trace file (OpenBSD);
+（14）v86: VP/ix mapped file;
+（15）0: 表示标准输入
+（16）1: 表示标准输出
+（17）2: 表示标准错误
+
+
+有的fd是以 '数字+文件状态模式' 来表示的，其中 '数字' 是文件描述符的具体数值，文件状态模式有： r、w、u等：
+(1) u: 表示该文件被打开并处于读取/写入模式
+(2) r: 表示该文件被打开并处于只读模式
+(3) w: 表示该文件被打开并处于写模式
+(4) 空格: 表示该文件的状态模式为unknow，且没有锁定
+(5) -: 表示该文件的状态模式为unknow, 且被锁定
+
+同时在文件状态模式后面，还跟着相关的锁：
+（1）N：for a Solaris NFS lock of unknown type;
+（2）r：for read lock on part of the file;         //文件的部分读锁
+（3）R：for a read lock on the entire file;        //整个文件的读锁
+（4）w：for a write lock on part of the file;      //文件的部分写锁
+（5）W：for a write lock on the entire file;       //整个文件的写锁
+（6）u：for a read and write lock of any length;   //任何长度的读写锁
+（7）U：for a lock of unknown type;              
+（8）x：for an SCO OpenServer Xenix lock on part of the file;
+（9）X：for an SCO OpenServer Xenix lock on the entire file;
+（10）space：if there is no lock.
+{% endhighlight %}
+
+* TYPE: 文件类型，如DIR、REG等，常见的文件类型有
+{% highlight string %}
+(1) DIR: 表示目录
+(2) CHR: 表示字符设备类型
+(3) BLK: 表示块设备类型
+(4) UNIX: 表示unix域套接字
+(5) FIFO: 先进先出(fifo)队列
+(6) IPv4: 网际协议(IP)套接字
+{% endhighlight %}
+
+* DEVICE: 文件所属设备。对于字符设备和块设备，其表示方法是主设备号，次设备号。更多其他类型的设备编码，请参看[Linux官方设备](http://www.kernel.org/pub/linux/docs/lanana/device-list/devices-2.6.txt)。对于FIFO类型的文件，比如管道和socket，该字段将显示一个内核引用目标文件的地址，或者是其i节点号
+
+* SIZE/OFF: 文件大小或者偏移值。如果该字段显示为0t*或者0x*,就表示这是一个偏移值，否则就表示这是一个文件大小。对于字符设备或者FIFO类型的文件，定义文件大小是没有意义的，所以该字段将显示一个偏移值
+
+* NODE: 文件的i节点号。对于socket，则显示为协议类型，如TCP
+
+* NAME: 文件的名称
+
+
 
 
 
