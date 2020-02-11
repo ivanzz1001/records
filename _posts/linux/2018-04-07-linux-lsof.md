@@ -142,7 +142,83 @@ init          1      root  mem       REG              253,0   145720    5521406 
 
 * NAME: 文件的名称
 
+###### 实例2： 查找某个文件相关的进程
+<pre>
+# lsof /bin/bash
+COMMAND     PID USER  FD   TYPE DEVICE SIZE/OFF    NODE NAME
+mysqld_sa  2169 root txt    REG  253,0   938736 4587562 /bin/bash
+ksmtuned   2334 root txt    REG  253,0   938736 4587562 /bin/bash
+bash      20121 root txt    REG  253,0   938736 4587562 /bin/bash
+</pre>
 
+###### 实例3： 列出某个用户打开的文件信息
+<pre>
+# lsof -u username
+</pre>
+```-u```选项，u是user的缩写。
+
+###### 实例4： 列出某个程序进程所打开的文件信息
+<pre>
+# lsof -c mysql
+</pre>
+```-c```选项将会列出所有以mysql这个名称开头的程序所打开的文件。其实你也可以写成```lsof | grep mysql```，但是第一种方法明显要比第二种方法少打几个字符。
+
+###### 实例5： 列出某个用户以及某个进程所打开的文件信息
+<pre>
+# lsof -u test -c mysql
+</pre>
+
+###### 实例6： 通过某个进程号显示该进程所打开的文件
+<pre>
+# lsof -p 11968
+</pre>
+
+
+###### 实例7： 列出所有的网络连接
+<pre>
+# lsof -i
+</pre>
+
+###### 实例8： 列出所有tcp网络连接信息
+<pre>
+# lsof -i tcp
+
+# lsof -n -i tcp
+COMMAND     PID  USER   FD   TYPE  DEVICE SIZE/OFF NODE NAME
+svnserve  11552 weber    3u  IPv4 3799399      0t0  TCP *:svn (LISTEN)
+redis-ser 25501 weber    4u  IPv4  113150      0t0  TCP 127.0.0.1:6379 (LISTEN)
+</pre>
+
+###### 实例9： 列出谁在使用某个端口
+<pre>
+# lsof -i :3306
+</pre>
+
+###### 实例10： 列出某个用户的所有活跃的网络端口
+<pre>
+# lsof -a -u test -i
+</pre>
+
+###### 实例11： 根据文件描述符列出对应的文件信息
+{% highlight string %}
+# lsof -d <fd>
+{% endhighlight %}
+例如，下面我们查看文件描述符```3```被哪些程序所打开：
+<pre>
+# lsof -d 3 | grep PARSER1
+tail      6499 tde    3r   REG    253,3   4514722     417798 /opt/applog/open/log/HOSTPARSER1_ERROR_141217.log.001
+</pre>
+说明： 0表示标准输入，1表示标准输出，2表示标准错误。从而可知，大多数应用程序所打开的文件的FD都是从3开始。
+
+###### 实例12： 列出进程1234所打开的所有IPv4网络文件
+<pre>
+# lsof -a -i 4 -p 1234
+</pre>
+
+###### 实例13： 列出连接主机```nf5260i5-td```上端口为20、21、80相关的所有文件信息，且每隔3秒重复执行
+<pre>
+# lsof -i@nf5260-td:20,21,80 -r 3
+</pre>
 
 
 
