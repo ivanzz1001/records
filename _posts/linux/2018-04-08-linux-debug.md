@@ -98,7 +98,16 @@ Thread 10 (Thread 0x7fa92f5fe700 (LWP 22970)):
 #8  0x00007fa96f380aa1 in start_thread () from /lib64/libpthread.so.0
 #9  0x00007fa96f0cdaad in clone () from /lib64/libc.so.6
 {% endhighlight %}
+上面的操作基本定位到了具体线程和大概的函数。如果想查看具体的原因，如现场的函数中变量的数值等，就要使用GDB的实时调试功能。
 
+### 1.3 使用GDB实时调试进程
+{% highlight string %}
+>gdb attach 22688
+:thread 10
+:bt
+:frame x
+:p xxx
+{% endhighlight %}
 
 
 
