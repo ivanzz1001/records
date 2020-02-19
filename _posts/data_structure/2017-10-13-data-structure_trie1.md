@@ -73,7 +73,6 @@ struct TrieNode{
 
 其他操作类似处理。下面给出一个C语言版本的实现：
 {% highlight string %}
-#define MAX 26//字符集大小
 #define MAX 26			//字符集大小
 
 typedef struct TrieNode
@@ -106,7 +105,8 @@ TrieNode* CreateTrieNode()
 	{
 		p->next[i]=NULL;
 	}
-    return p;
+
+	return p;
 }
  
 /*插入*/
