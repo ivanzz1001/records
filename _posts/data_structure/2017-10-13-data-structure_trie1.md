@@ -185,7 +185,7 @@ Radix Tree又称为基数树。基数树与字典树的区别在于基数树将�
 ![ds-rtree](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_rtree_sample.png)
 
 ### 2.3 Suffix Tree
-Suffix Tree又称为后缀树。单词 "BANANA" 的后缀树. 每个后缀以```$```结尾。所有的后缀为```A$```, ```NA$```, ```ANA$```,```NANA$```, ```ANANA$``` and ```BANANA$```. 叶子节点表示后缀的起始坐标. 世界上后缀树就是一个单词的所有后缀组成的字典树, 并且把字典树单词进行了压缩。
+Suffix Tree又称为后缀树。单词 "BANANA" 的后缀树. 每个后缀以``` $ ```结尾。所有的后缀为``` A$ ```, ``` NA$ ```, ``` ANA$ ```,``` NANA$ ```, ``` ANANA$ ``` and ``` BANANA$ ```. 叶子节点表示后缀的起始坐标. 世界上后缀树就是一个单词的所有后缀组成的字典树, 并且把字典树单词进行了压缩。
 
 ![ds-suffix-tree](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_suffix_tree.jpg)
 
