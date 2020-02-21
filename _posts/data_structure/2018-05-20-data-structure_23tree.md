@@ -189,6 +189,9 @@ description: 数据结构之2-3树
 
  d) 如果兄弟节点是2-节点， 父节点是2-节点， 则将父节点的key与兄弟节点中的key合并，形成一个3-节点， 将当前节点作为该合并节点
     的一棵子树  ， 此时树高减1， 即h = h -1。将当前节点设置为该合并节点，接着继续执行a) b) c) d)步骤
+
+
+注： 上面的h可以理解为P所指向的树的高度相对于整个树的高度之差。另上面关于高度h的变化有些地方可能表述不准确
 </pre>
 
 ![ds-23tree-delnode-71](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_delnode_71.jpg)
