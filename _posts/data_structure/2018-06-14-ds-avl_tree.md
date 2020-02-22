@@ -242,7 +242,7 @@ int insert_node(AVLTree *root, int data)
 {
 	if(!*root)
 	{
-	    *root = (AVLNode *)malloc(sizeof(AVLNode));
+		*root = (AVLNode *)malloc(sizeof(AVLNode));
 		if(!*root)
 			return -1;
 		(*root)->data = data;
