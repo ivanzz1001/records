@@ -14,7 +14,7 @@ description: 数据结构之2-3树
 
 ## 1. 定义
 
-一棵```2-3查找树```或为一棵空树，活由以下节点组成：
+一棵```2-3查找树```或为一棵空树，或由以下节点组成：
 
 * **2-节点**: 含有一个键（及其对应的值）和两条链接， 左链接指向的```2-3树```中的键都小于该节点，右链接指向的```2-3树```中的键都大于该节点；
 
@@ -180,7 +180,8 @@ description: 数据结构之2-3树
  a) 如果当前节点并没有兄弟节点， 则说明已经到了根节点， 退出
 
  b) 如果当前节点兄弟节点不是2-节点，则父节点中的key下移到该节点，兄弟节点中的一个key上移。接着分解该兄弟节点， 此时树高增加1， 
-    即h = h+1。 如果h值为0，说明整颗树已经达到平衡， 退出； 否则， 将当前节点设置为该兄弟节点， 继续执行a) b) c) d步骤；
+    即h = h+1。 如果h值为0，说明整颗树已经达到平衡， 退出； 否则， 将当前节点设置为该兄弟节点(这里指兄弟节点key上移后的节
+    点）， 继续执行a) b) c) d)步骤；
 
  c) 如果兄弟节点是2-节点，父节点为3-节点，将父节点中的key与兄弟节点合并，再将“当前节点”作为该合并后节点的一棵子树， 此时树高增加1，
     即h = h+1。 如果h值为0， 说明整颗树已经达到平衡， 退出； 否则， 将当前节点设置为该合并后的兄弟节点， 继续执行a) b) c) d)步骤；
@@ -188,6 +189,9 @@ description: 数据结构之2-3树
 
  d) 如果兄弟节点是2-节点， 父节点是2-节点， 则将父节点的key与兄弟节点中的key合并，形成一个3-节点， 将当前节点作为该合并节点
     的一棵子树  ， 此时树高减1， 即h = h -1。将当前节点设置为该合并节点，接着继续执行a) b) c) d)步骤
+
+
+注： 上面的h可以理解为P所指向的树的高度相对于整个树的高度之差。另上面关于高度h的变化有些地方可能表述不准确
 </pre>
 
 ![ds-23tree-delnode-71](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_delnode_71.jpg)
@@ -344,7 +348,37 @@ void tranverse_inorder(root r)
 ![ds-23tree-insertes](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_23tree_insertes.jpg)
 
 
+## 8. 数据结构定义
+此外，我们也可以按照如下方式来定义数据结构:
+{% highlight string %}
+struct TTNode;
 
+struct TwoNode{
+	int key;
+	struct TTNode *left;
+	struct TTNode *right;
+	struct TTNode *parent;
+};
+
+struct ThreeNode{
+	int lkey;
+	int rkey;
+
+	struct TTNode *left;
+	struct TTNode *middle;
+	struct TTNode *right;
+	struct TTNode *parent;
+};
+
+typedef enum{TWO_NODE, THREE_NODE}NodeType;
+struct TTNode{
+	NodeType type;
+	union{
+		TwoNode twNode;
+		ThreeNode thNode;
+	};
+};
+{% endhighlight %}
 
 
 <br />

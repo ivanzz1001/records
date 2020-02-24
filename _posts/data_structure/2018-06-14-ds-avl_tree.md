@@ -28,6 +28,7 @@ description: AVL树原理及实现
 
 
 ![ds-avl-tree](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_avl_tree.png)
+
 上图就是一棵AVL树，从根节点到叶子节点的最短距离是5，最长距离是9.
 
 **2) AVL树的特点**
@@ -241,7 +242,7 @@ int insert_node(AVLTree *root, int data)
 {
 	if(!*root)
 	{
-	    *root = (AVLNode *)malloc(sizeof(AVLNode));
+		*root = (AVLNode *)malloc(sizeof(AVLNode));
 		if(!*root)
 			return -1;
 		(*root)->data = data;
