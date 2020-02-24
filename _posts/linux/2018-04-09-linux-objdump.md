@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 
+title: Linux中objdump的使用
 tags:
 - LinuxOps
 categories: linux
@@ -224,9 +224,9 @@ objdump [-a|--archive-headers]
 </pre>
 
 ### 1.2 常用符号表字段
-* ```**.text**``` 已编译程序的机器代码
+* **```.text```** 已编译程序的机器代码
 
-* ```**.rodata**``` 只读数据，比如printf语句中的格式串和开关(switch)语句的跳转表
+* **```.rodata```** 只读数据，比如printf语句中的格式串和开关(switch)语句的跳转表
 
 * ```**.data**``` 已初始化的全局C变量。局部C变量在运行时被保存在栈中，既不出现在.data中，也不出现在.bss中
 
