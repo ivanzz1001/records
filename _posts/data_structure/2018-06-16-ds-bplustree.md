@@ -174,6 +174,7 @@ m阶```B+树```的插入操作在叶子节点上进行，假设要插入关键�
 
 ![ds-bplus-tree-index2](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_bplus_tree_index2.jpg)
 
+注： ISAM，即Indexed Sequential Access Method（索引顺序访问方法）
 
 ### 7.2 InnoDB
 ```InnoDB```索引和```MyISAM```的最大区别是它只有一个数据文件。在InnoDB存储引擎中，表数据文件本身就是按```B+树```组织的一个索引结构，这棵树的叶节点数据保存了完整的数据记录，所以我们把它的主索引叫做聚集索引。而它的辅助索引和```MyISAM```也会有所不同，它的辅助索引都是将主键作为数据域，所以这样当我们查找的时候通过辅助索引先找到主键，然后通过主索引找到对应的主键，从而得到相应的数据信息。
