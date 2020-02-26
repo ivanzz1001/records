@@ -63,6 +63,9 @@ description: 红黑树的原理及实现
 
 ![ds-rb-23-tree](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_rb_23_tree.jpg)
 
+>注： 其实上面只是将红黑树中的红色左链接进行了画平，如果将红色右链接也进行画平，得到的是一颗2-3-4树
+
+
 ## 2. 旋转的定义
 
 因为很多书中对旋转的定义不一致，所以我们有必要在这里说明一下。假设```红黑树```节点数据结构如下：
