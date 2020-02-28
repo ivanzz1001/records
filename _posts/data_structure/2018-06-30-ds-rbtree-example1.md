@@ -115,13 +115,13 @@ static rb_node_t *rb_rotate_left(rb_tree_t *root, rb_node_t *node)
 
 int rb_insert_fixup(rb_tree_t *root, rb_node_t *node)
 {
-    rb_node_t *parent;
+	rb_node_t *parent;
 	rb_node_t *grand_parent;
 
-    //If parent exist, and the color of parent is RED
+	//If parent exist, and the color of parent is RED
 	while((parent = node->parent) && parent->color == COLOR_RED)
 	{
-         grand_parent = parent->parent;
+		grand_parent = parent->parent;
 
 		 //parent node is grand_parent node's left child(grand_parent should not be NULL, because parent->color==COLOR_RED)
 		 if(grand_parent->left == parent)
@@ -274,8 +274,8 @@ static int rbtree_delete_fixup(rb_tree_t *root, rb_node_t *node, rb_node_t *pare
 				   //3) Case 3: x's brother is COLOR_BLACK, and brother left child is COLOR_RED, 
 				   // right child is COLOR_BLACK
 
-
-                   brother->left->color = COLOR_BLACK;
+	
+				   brother->left->color = COLOR_BLACK;
 				   brother->color = COLOR_RED;
 				   rb_rotate_right(root,brother);
 				   brother = parent->right;
@@ -323,7 +323,7 @@ static int rbtree_delete_fixup(rb_tree_t *root, rb_node_t *node, rb_node_t *pare
 				   // left child is COLOR_BLACK
 
 
-                   brother->right->color = COLOR_BLACK;
+				   brother->right->color = COLOR_BLACK;
 				   brother->color = COLOR_RED;
 				   rb_rotate_left(root,brother);
 				   brother = parent->left;
@@ -371,22 +371,22 @@ int delete_rbtree(rb_tree_t *root, int key)
 
     if(p->left && p->right)
     {
-         //get Successor node
-         rb_node_t *successor = p->right;
+		//get Successor node
+		rb_node_t *successor = p->right;
 
-		 while(successor->left)
-		 	successor = successor->left;
+		while(successor->left)
+			successor = successor->left;
 
-		 if(p->parent)
-		 {
-		      if(p->parent->left == p)
-			      p->parent->left = successor;
-			  else
-			  	  p->parent->right = successor;
-		 }
-		 else{
-		 	  *root = successor;
-		 }
+		if(p->parent)
+		{
+			if(p->parent->left == p)
+				p->parent->left = successor;
+			else
+				p->parent->right = successor;
+		}
+		else{
+			  *root = successor;
+		}
 
 		 rb_node_t *successor_child = successor->right;
 		 rb_node_t *successor_parent = successor->parent;
