@@ -357,11 +357,11 @@ int delete_rbtree(rb_tree_t *root, int key)
 	//find the node
 	while(p)
 	{
-	     if(p->key == key)
+		if(p->key == key)
 		 	break;
-		 else if(p->key > key)
+		else if(p->key > key)
 		 	p = p->left;
-		 else
+		else
 		 	p = p->right;
 	}
 
@@ -448,7 +448,7 @@ int delete_rbtree(rb_tree_t *root, int key)
 	}
 
 
-    if(color == COLOR_BLACK)
+	if(color == COLOR_BLACK)
 		rbtree_delete_fixup(root, child, parent);
 
 	free(p);
