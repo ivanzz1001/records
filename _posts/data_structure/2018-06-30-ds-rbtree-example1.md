@@ -220,7 +220,7 @@ int insert_rbtree(rb_tree_t *root, rb_node_t *node)
 
 	if(q != NULL)
 	{
-	    if(node->key < q->key)
+		if(node->key < q->key)
 			q->left = node;
 		else
 			q->right = node;
