@@ -352,9 +352,9 @@ static int rbtree_delete_fixup(rb_tree_t *root, rb_node_t *node, rb_node_t *pare
 
 int delete_rbtree(rb_tree_t *root, int key)
 {
-    rb_node_t *p = *root;
+	rb_node_t *p = *root;
 
-    //find the node
+	//find the node
 	while(p)
 	{
 	     if(p->key == key)
@@ -369,8 +369,8 @@ int delete_rbtree(rb_tree_t *root, int key)
 		return -1;
 
 
-    if(p->left && p->right)
-    {
+	if(p->left && p->right)
+	{
 		//get Successor node
 		rb_node_t *successor = p->right;
 
@@ -420,7 +420,7 @@ int delete_rbtree(rb_tree_t *root, int key)
     }
 
 
-    rb_node_t *child = NULL;
+	rb_node_t *child = NULL;
 	rb_node_t *parent = NULL;
 	int color;
 
@@ -451,10 +451,9 @@ int delete_rbtree(rb_tree_t *root, int key)
     if(color == COLOR_BLACK)
 		rbtree_delete_fixup(root, child, parent);
 
-    free(p);
+	free(p);
 
 	return 0x0;
-
 }
 
 
