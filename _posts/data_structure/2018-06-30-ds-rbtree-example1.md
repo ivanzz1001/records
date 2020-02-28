@@ -460,7 +460,7 @@ int delete_rbtree(rb_tree_t *root, int key)
 
 void inorder_rbtree(rb_tree_t root)
 {
-    if(!root)
+	if(!root)
 		return;
 
 	inorder_rbtree(root->left);
