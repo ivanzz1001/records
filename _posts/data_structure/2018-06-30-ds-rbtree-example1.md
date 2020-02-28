@@ -126,12 +126,12 @@ int rb_insert_fixup(rb_tree_t *root, rb_node_t *node)
 		 //parent node is grand_parent node's left child(grand_parent should not be NULL, because parent->color==COLOR_RED)
 		 if(grand_parent->left == parent)
 		 {
-		     rb_node_t *uncle = grand_parent->right;
+			 rb_node_t *uncle = grand_parent->right;
 
 			 //Case 1: uncle is RED
 			 if(uncle && uncle->color == COLOR_RED)
 			 {
-			     parent->color = COLOR_BLACK;
+				 parent->color = COLOR_BLACK;
 				 uncle->color = COLOR_BLACK;
 				 grand_parent->color = COLOR_RED;
 
@@ -142,7 +142,7 @@ int rb_insert_fixup(rb_tree_t *root, rb_node_t *node)
 			 //Case 2: uncle is BLACK, and node is parent's right child
 			 if(parent->right == node)
 			 {
-			     rb_rotate_left(root, parent);
+				 rb_rotate_left(root, parent);
 
 				 // reset parent and node pointer
 				 rb_node_t *tmp;
@@ -176,7 +176,7 @@ int rb_insert_fixup(rb_tree_t *root, rb_node_t *node)
 			//Case 2: uncle is BLACK, and node is parent's left child
 			if(parent->left == node)
 			{
-			     rb_rotate_right(root,parent);
+				 rb_rotate_right(root,parent);
 
 				 //reset parent and node pointer
 				 rb_node_t *tmp;
