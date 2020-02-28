@@ -417,7 +417,7 @@ int delete_rbtree(rb_tree_t *root, int key)
 		 free(p);
 		 return 0x0;
 
-    }
+	}
 
 
 	rb_node_t *child = NULL;
