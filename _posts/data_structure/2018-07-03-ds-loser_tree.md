@@ -23,292 +23,213 @@ description: 败者树
 
 
 ## 2. 败者树实现
-
-### 2.1 败者树头文件
-
-头文件```loser_tree.h```:
-{% highlight string %}
-#ifndef __LOSER_TREE_H_
-#define __LOSER_TREE_H_
-
-
-typedef int ElemType;
-
-struct Elements{
-	ElemType *elems;
-	int count;
-};
-
-
-struct LoserTree{
-	int k;
-	int *losers;
-
-	struct Elements *base;
-
-	ElemType ** current_merges;
-	int *offsets;
-
-};
-
-
-#define DEFINITELY_MINIMUM		(ElemType *)0
-
-#define DEFINITELY_MAXIMUM		(ElemType *)-1
-
-
-
-struct LoserTree *create_losertree(struct Elements *merge_ways, int waycnt);
-
-void print_losertree(struct LoserTree *loserTree);
-
-void multiways_merge(struct LoserTree *loserTree);
-
-
-#endif
-{% endhighlight %}
-
-### 2.2 败者树源文件
-
-源文件```loser_tree.c```:
 {% highlight string %}
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "loser_tree.h"
+#include <iostream>
+#include <vector>
+
+typedef int ElemType;
+
+typedef struct MSegment{
+	ElemType *base;
+	int size;
+	
+	int offset;
+}m_segment_t;
+
+typedef struct LoserTree{
+	int k;
+	
+	int *losers;               //losers[i]为-1，表示绝对最小值; losers[i]为-2，表示绝对最大值 
+	m_segment_t *segments;
+}loser_tree_t;
 
 
-static ElemType *read_element(struct Elements *vector, int offset)
-{
-	if(offset >= vector->count)
+loser_tree_t * create_loser_tree(int k){
+	if(k <= 1)
 		return NULL;
-
-	return vector->elems + offset;
-}
-
-static int elem_compare(ElemType *a, ElemType *b)
-{
-	if(a == DEFINITELY_MAXIMUM || b == DEFINITELY_MINIMUM)
-		return 1;
-	else if(a == DEFINITELY_MINIMUM || b == DEFINITELY_MAXIMUM)
-		return -1;
-	else
-		return (*a - *b);
-}
-static void adjust(struct LoserTree *loserTree, int s)
-{
-	int t;
-	int tmp;
-
-	//adjust the loser-tree from the leafs to the root
-	t = (s + loserTree->k) >> 1;			//ls[t] is the parent of loserTree->currents[s]
-
-	while(t > 0)
-	{
-		if(elem_compare(loserTree->current_merges[s], loserTree->current_merges[loserTree->losers[t]]) > 0)
-		{
-			tmp = loserTree->losers[t];
-			loserTree->losers[t] = s;
-			s = tmp;
+		
+	loser_tree_t *root = (loser_tree_t *)malloc(sizeof(loser_tree_t));
+	if(root){
+		root->k = k;
+		
+		root->losers = (int *)malloc(sizeof(int) * k);
+		root->segments = (m_segment_t *)malloc(sizeof(m_segment_t) * k);
+		
+		if(!root->losers || !root->segments){
+			free(root->losers);
+			free(root->segments);
+			free(root);
+			return NULL;
 		}
+		
+		memset(root->losers, 0x0, sizeof(int)*k);
+		memset(root->segments, 0x0, sizeof(m_segment_t)*k);
+		
+		return root;
+	}
+	
+	
+	return root;
+		
+}
 
+void print_loser_tree(loser_tree_t *root){
+	
+	for(int i= 0;i<root->k;i++){
+		printf("第%d个归并段：", i);
+		
+		for(int j=0;j<root->segments[i].size;j++)
+			printf("%d ", root->segments[i].base[j]);
+		printf("\n");
+		
+	}
+	
+}
+
+void adjust(loser_tree_t *root, int s){
+	
+	//adjust the loser-tree from the leafs to the root
+	int t = ((root->k -1) + (s + 1)) >> 1;   //losers[t] is the parent of s
+	
+	
+	int nexts = s;
+	
+	if(root->segments[s].offset >= root->segments[s].size)
+		nexts = -2;
+	
+	while(t > 0){
+		
+		if(root->losers[t] == -1){
+			root->losers[t] = nexts;
+			nexts = -1;
+		}
+		else if(nexts == -2){
+			
+			nexts = root->losers[t];
+			root->losers[t] = -2;
+		}
+		else if(root->losers[t] == -2 || nexts == -1)
+		{
+			//do nothing
+		}
+		else{
+			ElemType e = *(root->segments[nexts].base + root->segments[nexts].offset);
+			ElemType f = *(root->segments[root->losers[t]].base + root->segments[root->losers[t]].offset);
+		
+			if(e > f){
+				int curLoser = nexts;
+				nexts = root->losers[t];
+				root->losers[t] = curLoser;
+			}
+		}
+		
 		t = t>>1;
 	}
-
-	loserTree->losers[0] = s;
+	
+	root->losers[t] = nexts;
 }
 
 
-struct LoserTree *create_losertree(struct Elements *merge_ways, int waycnt)
-{
-	struct LoserTree *loserTree = NULL;
-	int i;
-
-	if((loserTree = (struct LoserTree *)malloc(sizeof(struct LoserTree))) == NULL)
-		return NULL;
-
-
-	memset(loserTree, 0x0, sizeof(struct LoserTree));
-	loserTree->k = waycnt;
-	loserTree->base = merge_ways;
-
-	loserTree->losers = (int *)malloc(sizeof(int)*waycnt);
-	loserTree->current_merges = (ElemType **)malloc(sizeof(ElemType *) * (waycnt + 1));
-	loserTree->offsets = (int *)malloc(sizeof(int)*waycnt);
-
-	if(!loserTree->losers || !loserTree->current_merges || !loserTree->offsets)
-		goto FAILURE;
-
-	loserTree->current_merges[waycnt] = DEFINITELY_MINIMUM;
-	for(i = 0;i<waycnt; i++)
-	{
-		loserTree->losers[i] = waycnt;
-		loserTree->offsets[i] = 0;
-	}
-
-	for(i = 0;i<waycnt;i++)
-	{
-		ElemType *elem = read_element(&loserTree->base[i], loserTree->offsets[i]);
-		if(!elem)
-		{
-			loserTree->current_merges[i] = DEFINITELY_MAXIMUM;
+int init_loser_tree(loser_tree_t *root){
+	
+	for(int i = 0;i<root->k;i++)
+		root->losers[i] = -1;
+	
+	printf("将创建%d个归并段，每个归并段中以从小到大顺序输入若干元素(元素与元素之间以空格分割)\n", root->k);
+	for(int i=0;i<root->k;i++){
+		
+		char buf[2048] = {0};
+		char *p = buf;
+		char *end;
+		std::vector<long> vec;
+		long num;
+		
+		printf("请输入第 %d 个归并段元素(元素之间以空格分割): ", i);
+		fgets(p, 2048, stdin);
+		
+		while(num = strtol(p, &end, 10)){
+			vec.push_back(num);
+			p = end+1;
 		}
-		else{
-			loserTree->current_merges[i] = elem;
-			loserTree->offsets[i]++;
+		
+		if(vec.size() > 0){
+				root->segments[i].size = vec.size();
+				root->segments[i].base = (ElemType *)malloc(sizeof(ElemType) * vec.size());
+				if(!root->segments[i].base){
+					printf("初始化归并段 %d 失败\n", i);
+					return -1;
+				}
+				
+				for(int j= 0;j<vec.size();j++)
+					root->segments[i].base[j] = (int)vec[j];
 		}
+		
 	}
-
-	for(i = waycnt-1;i>=0;i--)
-	{
-		adjust(loserTree, i);
+	
+	printf("\n");
+	printf("=====输出我们创建的归并段=====\n");
+	print_loser_tree(root);
+	printf("\n");
+	
+	for(int i = root->k-1;i>=0;i--){
+		adjust(root, i);
 	}
-
-	return loserTree;
-
-
-FAILURE:
-	free(loserTree->losers);
-	free(loserTree->current_merges);
-	free(loserTree->offsets);
-	free(loserTree);
-
-	return NULL;
+	
+	
+	return 0x0;
 }
 
-
-void print_losertree(struct LoserTree *loserTree)
-{
-	int i;
-
-	printf("%d-ways loser tree:\n", loserTree->k);
-
-	for(i = loserTree->k-1;i>=0;i--)
-	{
-		ElemType *elem = loserTree->current_merges[loserTree->losers[i]];
-		if(elem == DEFINITELY_MINIMUM)
-		{
-			printf("losers[%d]:%d  --> %s\n", i, loserTree->losers[i], "definitely-min");
+void multiways_merge(loser_tree_t *root){
+	
+	while(root->losers[0] != -2){
+		int s = root->losers[0];
+		if(s == -1){
+			printf("skip definitly minimum\n");
+			continue;
 		}
-		else if(elem == DEFINITELY_MAXIMUM)
-		{
-			printf("losers[%d]:%d  --> %s\n", i, loserTree->losers[i], "definitely-max");
-		}
-		else{
-			printf("losers[%d]:%d  --> %d\n", i, loserTree->losers[i], *elem);
-		}
-
+		
+		printf("%d ", *(root->segments[s].base + root->segments[s].offset));
+		root->segments[s].offset++;
+		
+		adjust(root, s);
 	}
+	printf("\n");
 }
 
-
-void multiways_merge(struct LoserTree *loserTree)
-{
-	ElemType *elem;
-	int q;
-
-	while(loserTree->current_merges[loserTree->losers[0]] != DEFINITELY_MAXIMUM)
-	{
-		q = loserTree->losers[0];
-		elem = loserTree->current_merges[q];
-
-		if(elem == DEFINITELY_MINIMUM)
-		{
-			printf("definitely-min ");
-		}
-		else if(elem == DEFINITELY_MAXIMUM)
-		{
-			printf("definitely-max ");
-		}
-		else{
-			printf("%d ", *elem);
-		}
-
-		//Input next merge data
-		elem = read_element(&loserTree->base[q], loserTree->offsets[q]);
-		if(!elem)
-		{
-			loserTree->current_merges[q] = DEFINITELY_MAXIMUM;
-		}
-		else{
-			loserTree->current_merges[q] = elem;
-			loserTree->offsets[q]++;
-		}
-
-		//adjust the loser tree
-		adjust(loserTree, q);
-	}
-}
-{% endhighlight %}
-
-### 2.3 测试
-
-如下是测试文件```main.c```:
-{% highlight string %}
-#include <stdio.h>
-#include <stdlib.h>
-#include "loser_tree.h"
-
-int main(int argc, char *argv[])
-{
-	int i;
-	int b0[] = {10, 15, 16};
-	int b1[] = {9, 18, 20};
-	int b2[] = {20, 22, 40};
-	int b3[] = {6, 15, 25};
-	int b4[] = {12, 37, 48};
-
-	struct Elements merge_ways[] = {
-			{b0, 3},
-			{b1, 3},
-			{b2, 3},
-			{b3, 3},
-			{b4,3}
-		};
-
-
-	struct LoserTree *loserTree = create_losertree(merge_ways,5);
-	if(!loserTree)
-	{
-		printf("create loser tree failure\n");
-		return -1;
-	}
-	print_losertree(loserTree);
-
-	printf("\nbegin %d-ways merge:\n", loserTree->k);
-	multiways_merge(loserTree);
-	printf("\n\n");
-
-	print_losertree(loserTree);
+int main(int argc, char *argv[]){
+	loser_tree_t *root = NULL;
+	
+	root = create_loser_tree(5);
+	init_loser_tree(root);
+	
+	multiways_merge(root);
+	
 	return 0x0;
 }
 {% endhighlight %}
 编译运行：
 {% highlight string %}
-# gcc -o loser_tree *.c
+# gcc -o loser_tree loser_tree.cpp -lstdc++
 # ./loser_tree 
-5-ways loser tree:
-losers[4]:4  --> 12
-losers[3]:2  --> 20
-losers[2]:0  --> 10
-losers[1]:1  --> 9
-losers[0]:3  --> 6
+将创建5个归并段，每个归并段中以从小到大顺序输入若干元素(元素与元素之间以空格分割)
+请输入第 0 个归并段元素(元素之间以空格分割): 
+请输入第 1 个归并段元素(元素之间以空格分割): 3 20
+请输入第 2 个归并段元素(元素之间以空格分割): 4 
+请输入第 3 个归并段元素(元素之间以空格分割): 50
+请输入第 4 个归并段元素(元素之间以空格分割): 201
 
-begin 5-ways merge:
-6 9 10 12 15 15 16 18 20 20 22 25 37 40 48 
+=====输出我们创建的归并段=====
+第0个归并段：
+第1个归并段：3 20 
+第2个归并段：4 
+第3个归并段：50 
+第4个归并段：201 
 
-5-ways loser tree:
-losers[4]:4  --> definitely-max
-losers[3]:2  --> definitely-max
-losers[2]:3  --> definitely-max
-losers[1]:0  --> definitely-max
-losers[0]:1  --> definitely-max
+3 4 20 50 201
 {% endhighlight %}
-
-下面给出败者树初始化后的示意图：
-
-![ds-loser-tree](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_losertree_init.jpg)
-
 
 
 <br />
