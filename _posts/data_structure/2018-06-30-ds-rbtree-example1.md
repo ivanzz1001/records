@@ -254,7 +254,7 @@ static int rbtree_delete_fixup(rb_tree_t *root, rb_node_t *node, rb_node_t *pare
 			{
 			    //1) Case 1: x's brother is COLOR_RED
 				brother->color = COLOR_BLACK;
-			    parent->color = COLOR_RED;
+				parent->color = COLOR_RED;
 				rb_rotate_left(root,node);
 				brother = parent->right;
 			}
@@ -303,7 +303,7 @@ static int rbtree_delete_fixup(rb_tree_t *root, rb_node_t *node, rb_node_t *pare
 			{
 			    //1) Case 1: x's brother is COLOR_RED
 				brother->color = COLOR_BLACK;
-			    parent->color = COLOR_RED;
+				parent->color = COLOR_RED;
 				rb_rotate_right(root,parent);
 				brother = parent->left;
 			}
