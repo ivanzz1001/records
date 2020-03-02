@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 数据结构之: 图的连通性问题
+title: 数据结构图的连通性问题
 tags:
 - data-structure
 categories: data-structure
