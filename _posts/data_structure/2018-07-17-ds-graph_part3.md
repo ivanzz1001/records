@@ -28,6 +28,7 @@ A L M J B F C        D E       G K H I
 
 这3个顶点集分别加上所有依附于这些顶点的边，边构成了非连通图G3的3个连通分量，见如下图：
 
+![ds-graph-partial](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_graph_partial.jpg)
 
 
 
