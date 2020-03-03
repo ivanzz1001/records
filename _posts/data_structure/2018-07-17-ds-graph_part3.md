@@ -104,7 +104,9 @@ void DFSTree(Graph G, int v, CSTree &T){
 ![ds-graph-forest-store](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_graph_forest_store.jpg)
 
 
+## 2. 有向图的强连通分量
 
+深度优先搜索是求有向图的强连通分量的一个新的有效方法。假设以十字链表作有向图的存储结构，则求强连通分量的步骤如下：
 
 
 
