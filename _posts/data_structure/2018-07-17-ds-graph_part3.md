@@ -154,6 +154,56 @@ void DFS(Graph G, int v)
 }
 {% endhighlight %}
 
+2) 在有向图G上，从最后完成搜索的顶点（即finished[vexnum -1])中的顶点）出发，沿着以该顶点为头的弧作逆向的深度优先搜索遍历，若此次遍历不能访问到有向图中所有顶点，则从余下的顶点中最后完成搜索的那个顶点出发，继续作逆向的深度优先搜索遍历，依次类推，直至有向图中所有顶点都被访问到为止。此时调用DFSTraverse时主要作如下修改：函数中第二个循环语句的边界条件应改为```v```从finished[vexnum-1]至finished[0]。
+
+进行修改后的函数如下所示：
+{% highlight string %}
+Boolean visited[MAX];             //访问标志数组
+Status (*VisitFunc)(int v);       //函数变量
+int count;
+int finished[MAX];
+
+
+//对图G作深度优先遍历
+void DFSTraverse(Graph G, Status (*Visit)(int v))
+{
+     VisitFunc = Visit;         //使用全局变量VisitFunc，使DFS不必设函数指针参数
+
+     //访问标志数组初始化
+     for(v = 0; v < G.vexnum; v++)
+         visited[v] = FALSE;
+
+	for(i = G.vexnum -1; i >= 0;i--)
+	{
+		v = finished[i];
+		if(!visited[v])
+			DFS(G, v);			//对尚未访问的顶点调用DFS
+	}
+}
+
+//从第v个顶点出发递归地深度优先遍历图G
+void DFS(Graph G, int v)
+{
+    visited[v] = TRUE;
+    VisitFunc(v);         //访问第v个顶点
+
+    for(w = FirstAdjVex(G, v); v >= 0; w = NextAdjVex(G, v, w))
+    {
+        if(!visited[w])
+            DFS(G, w);          //对v的尚未访问的邻接顶点w递归调用DFS
+    }
+}
+{% endhighlight %}
+由此，每一次调用DFS作逆向深度优先遍历所访问到的顶点集便是有向图G中一个强连通分量的顶点集。
+
+
+例如，图7.11(即下图）所示的有向图，假设从顶点```V1```出发作深度优先搜索遍历，得到finished数组中的顶点号为{1，3，2，0}；则再从顶点```V1```出发作逆向的深度优先搜索遍历，得到两个顶点集{V1, V3, V4}和{V2}，这就是该有向图的两个强连通分量的顶点集。
+
+![ds-graph-dpart](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_graph_dpart.jpg)
+
+上述求强连通分量的第二步，其实质为： 1） 构造一个有向图Gr，设G=(V, {A})，则Gr=(V,{Ar})，对于所有```<vi,vj>∈A```，必有```<vj,vi>∈Ar```。即Gr中拥有和G方向相反的弧；2） 在有向图Gr上，从顶点finished[vexnum-1]出发作深度优先搜索遍历。可以证明，在Gr上所得深度优先生成森林中每一颗树的顶点集即为G的强连通分量的顶点集。
+
+显然，利用遍历求强连通分量的时间复杂度亦和遍历相同。
 
 <br />
 <br />
