@@ -46,6 +46,8 @@ Additionally, most devices that support Wi-Fi or Ethernet can be configured to s
  Android, Windows Phone and Windows RT devices.
 </pre>
 
+因此，要想使用fiddler，我们就要启用WinINet的HTTP代理功能。参看文章：[fiddler抓包代理设置问题](https://blog.csdn.net/tsj11514oo/article/details/51794330)
+
 ### 1.1 fiddler解密https原理
 其实fiddler就是中间人攻击，依次经过如下过程：
 

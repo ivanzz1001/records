@@ -108,6 +108,51 @@ void DFSTree(Graph G, int v, CSTree &T){
 
 深度优先搜索是求有向图的强连通分量的一个新的有效方法。假设以十字链表作有向图的存储结构，则求强连通分量的步骤如下：
 
+1） 在有向图G上，从某个顶点出发沿以该顶点为尾的弧进行深度优先搜索遍历，并按其所有邻接点的搜索都完成（即退出DFS函数）的顺序将顶点排列起来。此时需对```7.3.1```中的算法(即深度优先搜索算法)做如下两点修改：
+
+* 在进入DFSTraverse函数时，首先进行计数变量的初始化，即在入口处加上count=0的语句；
+
+* 在退出DFS函数之前将完成搜索的顶点号记录在另一个辅助数组finished[vexnum]中，即在DFS函数结束之前加上finished[++count]=v的语句
+
+进行修改后的函数如下所示：
+{% highlight string %}
+Boolean visited[MAX];             //访问标志数组
+Status (*VisitFunc)(int v);       //函数变量
+int count;
+int finished[MAX];
+
+
+//对图G作深度优先遍历
+void DFSTraverse(Graph G, Status (*Visit)(int v))
+{
+     VisitFunc = Visit;         //使用全局变量VisitFunc，使DFS不必设函数指针参数
+	 count = 0;                 //将当前完成搜索的技术置为0
+
+     //访问标志数组初始化
+     for(v = 0; v < G.vexnum; v++)
+         visited[v] = FALSE;
+
+     for(v = 0; v < G.vexnum; v++)
+     {
+          if(!visited[v])
+               DFS(G, v);       //对尚未访问的顶点调用DFS 
+     }
+}
+
+//从第v个顶点出发递归地深度优先遍历图G
+void DFS(Graph G, int v)
+{
+    visited[v] = TRUE;
+    VisitFunc(v);         //访问第v个顶点
+
+    for(w = FirstAdjVex(G, v); v >= 0; w = NextAdjVex(G, v, w))
+    {
+        if(!visited[w])
+            DFS(G, w);          //对v的尚未访问的邻接顶点w递归调用DFS
+    }
+	finished[count++] = v;      //按逆序记录当前已经搜索完的顶点（注： 这里应该是count++, 而不是++count) 
+}
+{% endhighlight %}
 
 
 <br />
