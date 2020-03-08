@@ -346,6 +346,83 @@ void MiniSpanTree_KRUSKAL(MGraph G){
 
 ![ds-graph-biconn](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_graph_biconn.jpg)
 
+上图(图7.20)所示为从顶点A出发深度优先搜索遍历图```G5```所得深度优先生成树，图中实线表示树边，虚线表示回边（即不在生成树上的边）。对树中任一顶点v而言，其孩子节点为在它之后搜索到的邻接点，而其双亲节点和由回边联结的祖先节点是在它之前搜索到的邻接点。由深度优先生成树可得出两类关节点的特性：
+
+1） 若生成树的根有两棵或两棵以上的子树，则此根顶点必为关节点。因为图中不存在联结不同子树中顶点的边，因此，若删去根节点，生成树便变成生成森林。如图7.20中的顶点A
+
+2） 若生成树中某个非叶子顶点v，其某棵子树的根和子树中的其他节点均没有指向v的祖先的回边，则v为关节点。因为，若删去v，则其子树和图的其他部分被分割开来。如图7.20中的顶点B、D和G。
+
+若对图Graph=(V, {E})重新定义遍历时的访问函数visited，并引入一个新的函数low，则由一次深度优先搜索遍历便可求得连通图中存在的所有关节点。
+
+定义visited[v]为深度优先搜索遍历连通图时访问顶点v的次序号；定义：
+
+>注： low[v]的含义可理解为顶点v可获得的最低访问顺序
+
+若对于某个顶点v，存在孩子节点w且low[w]>=visited[v]，则该顶点v必为关节点。因为w是v的孩子节点时，low[w]>=visited[v]，表明w及其子孙均无指向v的祖先的回边。
+
+由定义可知，visited[v]即为v在深度优先生成树的前序序列中的序号，只需将DFS函数中头两个语句改为visited[v0]=++count(在DFSTraverse中设置初值count=1)即可；low[v]可由后序遍历深度优先生成树求得，而v在后序序列中的次序和遍历时遍历时退出DFS函数的次序相同，由此修改深度优先搜索遍历的算法便可得到求关节点的算法（见算法7.10和算法7.11)。
+
+**```算法7.10```**
+{% highlight string %}
+void FindArticul(ALGraph G)
+{
+	//连通图G以邻接表作存储结构，查找并输出G上全部关节点。全局量count
+	//对访问计数
+	count = 1; visited[0] = 1;    //设定邻接表上0号顶点为生成树的根
+	
+	for(i = 1; i<G.vexnum;i++)
+		visited[i] = 0;           //其余顶点尚未访问
+		
+	p = G.vertices[0].firstarc; v=p->adjvex;
+	DFSArticul(G, v);             //从第v顶点出发深度优先查找关节点
+	
+	if(count < G.vexnum){
+		printf(0, G.vertices[0].data);    //根是关节点，输出
+		
+		while(p->nextarc){
+			p = p->nextarc;
+			v = p->adjvex;
+			
+			if(visited[v] == 0)
+				DFSArticul(G, v);
+		}
+	}
+	
+}
+{% endhighlight %}
+
+**算法7.11**
+{% highlight string %}
+void DFSArticul(ALGraph G, int v0){
+	//从第v0个顶点出发深度优先遍历图G，查找并输出关节点
+	
+	visited[v0] = min = ++count;    //v0是第count个访问的顶点
+	
+	for(p = G.vertices[v0].firstarc, p; p = p->nextarc){  //对v0的每个邻接顶点进行检查
+		w = p->adjvex;              //w为v0的邻接顶点
+		
+		if(visited[w] == 0){        //w未曾访问，是v0的孩子
+			DFSArticul(G, w);       //返回前求得low[w]
+			
+			if(low[w] < min)   
+				min = low[w];
+				
+			if(low[w] >= visited[v0])
+				printf(v0, G.vertices[v0].data);    //关节点
+		
+		}
+		else if(visited[w] < min){    //w已访问，w是v0在生成树上的祖先
+			min = visited[w];
+		}
+		
+	}
+	
+	low[v0] = min;
+}
+{% endhighlight %}
+
+
+
 
 <br />
 <br />
