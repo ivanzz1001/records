@@ -60,18 +60,18 @@ D[i] = arcs[LocateVex(G,v)][i]    vi ∈ V
 D[j] = Min{D[i] | vi ∈ V-S}
 </pre>
 vj就是当前求得的一条从v出发的最短路径的终点。令
-{% highlight string %}
+<pre>
 S = S U {j}
-{% endhighlight %}
+</pre>
 
 3) 修改从v出发到集合V-S上任一顶点vk可达的最短路径长度。如果
 {% highlight string %}
 D[j] + arcs[j][k] < D[k]
 {% endhighlight %}
 则修改D[k]为
-{% highlight string %}
+<pre>
 D[k] = D[j] + arcs[j][k]
-{% endhighlight %}
+</pre>
 
 4) 重复操作2)、3)共n-1次，由此求得从v到图上其余各顶点的最短路径是依路径长度递增的序列。
 
@@ -154,8 +154,62 @@ void ShortestPath_DIJ(MGraph G, int v0, PathMartix &P, ShortPathTable &D)
 
 假设求从顶点```vi```到```vj```的最短路径。如果从vi到vj有弧，则从vi到vj存在一条长度为arcs[i][j]的路径，该路径不一定是最短路径，尚需进行n次试探。首先考虑路径(vi,v0,vj)是否存在（即判别弧(vi,v0)和(v0,vj)是否存在）。如果存在，则比较(vi,vj)和(vi,v0,vj)的路径长度，取长度较短者为从vi到vj的中间顶点的序号不大于0的最短路径。假如在路径上再增加一个顶点v1，也就是说如果(vi, ..., v1)和(v1, ..., vj)分别是当前找到的中间顶点的序号不大于0的最短路径，那么(vi,..., v1, ..., vj)就可能是从vi到vj的中间顶点的序号不大于1的最短路径。将它和已经得到的从vi到vj中间顶点序号不大于0的最短路径相比较，从中选出中间顶点的序号不大于1的最短路径之后，再增加一个顶点v2，继续进行试探。依次类推。在一般情况下，若（vi, ..., vk)和(vk, ..., vj)分别是从vi到vk和从vk到vj的中间顶点的序号不大于k-1的最短路径，则将(vi, ..., vk, ..., vj)和已经得到的从vi到vj且中间顶点序号不大于k-1的最短路径相比较，其长度较短者便是从vi到vj的中间顶点的序号不大于k的最短路径。这样，在经过n次比较后，最后求得的必是从vi到vj的最短路径。按此方法，可以同时求得各对顶点间的最短路径。
 
+![ds-graph-floyd](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_graph_floyd.jpg)
 
+由此，可得```算法7.16```:
+{% highlight string %}
+void ShortestPath_FLOYD(MGraph G, PathMatrix &P[], DistanceMatrix &D)
+{
+	//用Floyd算法求有向网G中各对顶点v和w之间的最短路径P[v][w]及其带权长度D[v][w]。
+	//若P[v][w][u]为TRUE，则u是从v到w当前求得最短路径上的顶点。
+	
+	for(v = 0; v < G.vexnum; ++v){        //各对节点之间初始已知路径及距离
+	
+		for(w = 0; w < G.vexnum; ++w){
+		
+			D[v][w] = G.arcs[v][w];
+			
+			for(u = 0; u < G.vexnum; ++u){
+				P[v][w][u] = FALSE;
+			}
+			
+			if(D[v][w] < INFINITY){        //从v到w有直接路径
+			
+				P[v][w][v] = TRUE;
+				P[v][w][w] = TRUE;
+			}
+		}
+	}
+	
+	
+	for(u = 0; u < G.vexnum; ++u){        //在路径上插入顶点u时
+		
+		for(v = 0; v < G.vexnum; ++v){
+		
+			for(w = 0; w < G.vexnum; ++w){
+			
+				if(D[v][u] + D[u][w] < D[v][w]){       //从v经u到w的一条路径更短
+					
+					D[v][w] = D[v][u] + D[u][w];
+					
+					for(i = 0; i < G.vexnum; ++i)
+						P[v][w][i] = P[v][u][i] || P[u][w][i];
+				}
+			
+			}
+		
+		}
+	
+	}
+	
+}
+{% endhighlight %}
 
+![ds-graph-floyd2](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_graph_floyd2.jpg)
+
+例如，利用上述算法，可求得```图7.36```所示带权有向图G7的每一对顶点之间的最短路径及其路径长度如图```7.37```所示。
+
+![ds-graph-floyd3](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_graph_floyd3.jpg)
 
 
 
