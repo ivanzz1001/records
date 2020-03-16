@@ -332,7 +332,10 @@ void postorder_tranverse(struct BSTNode *root)
 {% endhighlight %}
 
 ### 6.1 二叉树的非递归遍历
-下面我们给出二叉树```中序遍历```的非递归形式：
+仿照递归算法执行过程中递归工作栈的状态变化状况，可直接写出相应的非递归算法。例如，从中序遍历递归算法执行过程中递归工作栈的状态可见：（1）工作记录中包含两项，其一是递归调用的语句编号，其二是指向根节点的指针，则当栈顶记录中的指针非空时，应遍历左子树，即指向左子树根的指针进栈；（2） 若栈顶记录中的指针值为空，则应退至上一层，若是从左子树返回，则应访问当前层即栈顶记录中指针所指的根节点；（3）若是从右子树返回，则表明当前层的遍历结束，应继续退栈。从另一个角度看，这意味着遍历右子树时，不再需要保存当前层的根指针，可直接修改栈顶记录中的指针即可。由此可得两个中序遍历二叉树的非递归算法如```算法6.2```和```算法6.3```所示，供读者分析比较，以加深理解。
+
+
+**```算法6.2```**:
 {% highlight string %}
 void inorder_tranverse(struct BSTNode *root)
 {
@@ -358,8 +361,10 @@ void inorder_tranverse(struct BSTNode *root)
 		
 	}
 }
+{% endhighlight %}
 
-//方式2
+**```算法6.3```**
+{% highlight string %}
 void inorder_tranverse(struct BSTNode *root)
 {
 	InitStack(S);
