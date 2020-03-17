@@ -36,12 +36,15 @@ typedef struct{             //树结构
 {% endhighlight %}
 例如，图```6.13```展示一棵树及其双亲表示的存储结构。
 
+![ds-tree-parent](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_tree_parent.jpg)
+
 
 这种存储结构利用了每个节点（除根以外）只有唯一的双亲性质。PARENT(T,x)操作可以在常量时间内实现。反复调用PARENT操作，直到遇到无双亲的节点时，便找到了树的根，这就是ROOT(x)操作的过程。但是在这种表示方法中，求节点的孩子时需要遍历整个结构。
 
 ### 1.2 孩子表示法
 由于树中每个节点可能有多棵子树，则可用多重链表，即每个节点有多个指针域，其中每个指针指向一棵子树的根节点，此时链表中的结点可以有如下两种结点格式：
 
+![ds-tree-child](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_graph_child.jpg)
 
 
 
