@@ -138,12 +138,81 @@ Status merge_mfset(MFSet &S, int i, int j)
 }
 {% endhighlight %}
 
+算法6.8和算法6.9的时间复杂度分别为O(d)和O(1)，其中d是树的深度。从前面的讨论可知，这种表示集合的树的深度和树形成的过程有关。试看一个极端的例子。假设有n个子集S1，S2，...，Sn，每个子集只有一个成员Si={i}(i=1,2,...,n)，可用n棵只有一个根结点的的树表示，如图6.19(a)表示。现作n-1次“并”操作，并假设每次都是含成员多的根节点指向含成员少的根节点，则最后得到的集合树的深度为n，如图6.19(b)所示。如果再加上在每次“并”操作之后都要进行查找成员“1”所在子集的操作，则全部操作的时间便是O(n^2)了。
+
+![ds-tree-union2](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_tree_union2.jpg)
+
+改进的办法是在作“并”操作之前先判别子集中所含成员的数目，然后令含成员少的子集树根结点指向含成员多的子集的根。为此，需相应地修改存储结构： 令根节点的parent域存储子集中所含成员数目的负值。修改后的“并”操作算法如算法6.10所示：
+
+```算法6.10```:
+{% highlight string %}
+void mix_mfset(MFSet &S, int i, int j)
+{
+	//S.nodes[i]和S.nodes[j]分别为S的互不相交的两个子集Si和Sj的根节点。
+	//求并集Si∪Sj
+	
+	if(i < 1 || i > S.n || j < 1 || j > S.n)
+		return ERROR;
+		
+	if(S.nodes[i].parent > S.nodes[j].parent){
+		//Si所含成员数比Sj少
+		S.nodes[j].parent += S.nodes[i].parent;
+		S.nodes[i].parent = j;
+	}else{
+		S.nodes[i].parent += S.nodes[j].parent;
+		S.nodes[j].parent = i;
+	}
+
+	return OK;
+}
+{% endhighlight %}
+
+可以证明，按算法6.10进行“并”操作得到的集合树，其深度不超过```⌊log2^n⌋+1```，其中n为集合S中所有子集所含成员数的总和。
+
+由此，利用算法find_mfset和mix_mfset解等价问题的时间复杂度为O(nlog2^n)(当集合中有n个元素时，至多进行n-1次mix操作）。
+
+
+**例 6-1：** 假设集合S={x|1≤x≤n 是正整数}，R是S上的一个等价关系。R={(1,2),(3,4),(5,6),(7,8),(1,3),(5,7),(1,5),...}，现求S的等价类。
+
+以MFSet类型的变量S表示集合S，S中的成员个数为S.n。开始时，由于每个成员自成一个等价类，则S.nodes[i].parent的值均为-1。之后，每处理一个等价偶对(i,j)，首先必须确定i和j各自所属集合，若这两个集合相同，则说明此等价关系是多余的，无需作处理；否则就合并这两个集合。图6.20展示了处理R中前7个等价关系时S的变化状况（图中省去了节点的数据域），图6.21(a)所示为和最后一个S状态相应的树的形态。显然，随着子集逐对合并，树的深度也越来越大，为了进一步减少确定元素所在集合的时间，我们还可进一步将算法6.8改进为算法6.11。当所查元素i不在树的第二层时，在算法中增加一个“压缩路径”的功能，即将所有从根到元素i路径上的元素都变成树根的孩子。
+
+![ds-tree-mfset3](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_tree_mfset3.jpg)
+
+```算法6.11```
+{% highlight string %}
+int fix_mfset(MFSet &S, int i)
+{
+	//确定i所在子集，并将从i至根路径上所有结点都变成根的孩子节点
+	
+	if(i < 1 || i > S.n)
+		return -1;          //i不是S中任一子集的成员
+		
+	for(j = i; S.nodes[j].parent > 0; j = S.nodes[j].parent);
+
+	for(k = i; k != j; k = t){
+		
+		t = S.nodes[k].parent;
+		S.nodes[k].parent = j;
+	}
+	
+	return j;
+}
+{% endhighlight %}
+假设```例6-1```中R的第8个等价偶对为(8,9)，则在执行fix(S,8)的操作之后图6.21(a)的树就变成6.21(b)的树。
+
+已经证明，利用算法fix_mfset和mix_mfset划分大小为n的集合为等价类的时间复杂度为O(nα(n))。其中α(n)是一个增长极其缓慢的函数，若定义单变量的阿克曼函数为A(x) = A(x,x)，则函数α(n)定义为A(x)的拟逆，即α(n)的值是使A(x)≥n成立的最小x。所以，对于通常所见到的正整数n而言，α(n)≤4。
+
+
+
+
+
 <br />
 <br />
 **[参看]:**
 
 1. [等价关系与等价类](https://wenku.baidu.com/view/9fd14eb8a417866fb94a8ecc.html)
 
+2. [回溯法8皇后问题](https://blog.csdn.net/qq_42552533/article/details/86684045)
 
 <br />
 <br />
