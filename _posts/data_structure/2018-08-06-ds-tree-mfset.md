@@ -212,7 +212,7 @@ int fix_mfset(MFSet &S, int i)
 
 1. [等价关系与等价类](https://wenku.baidu.com/view/9fd14eb8a417866fb94a8ecc.html)
 
-2. [回溯法8皇后问题](https://blog.csdn.net/qq_42552533/article/details/86684045)
+
 
 <br />
 <br />
