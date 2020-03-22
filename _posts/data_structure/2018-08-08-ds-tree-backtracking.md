@@ -87,7 +87,7 @@ void GetPowerSet(int i, List A, List &B)
 {% highlight string %}
 void Trial(int i, int n)
 {
-	//进入本函数时，在nxn棋盘前n-1行已放置了互不攻击的i-1个棋子
+	//进入本函数时，在nxn棋盘前i-1行已放置了互不攻击的i-1个棋子
 	//现从第i行起继续为后续棋子选择合适的位置
 	
 	//当i>n时，求得一个合法布局，则输出之
@@ -107,7 +107,114 @@ void Trial(int i, int n)
 {% endhighlight %}
 算法6.16可进一步求精，在此从略。算法6.16可作为回溯法求解的一般模式，类似问题有骑士游历、迷宫问题、选最优解问题等等。
 
+下面我们给出一个完整的8皇后问题的算法：
+{% highlight string %}
+#include <stdio.h>
 
+#define N 8
+int chess[N][N] = {0};
+int count = 0;
+
+
+/*
+ * Description: 当前棋盘处于安全状态，假设现在要在(r,c)位置放入一颗棋子，
+ *              放入后是否仍处于安全状态
+ *
+ * Return: 0 ---- Dangerous   1--- safe
+ */
+int notDanger(int row, int col)
+{
+	int i,j;
+	
+	//1) 判断r行上是否已经有棋子
+	for(i = 0; i < N; ++i){
+		if(chess[row][i])
+			return 0;
+	}
+	
+	//2) 判断c列上是否已经有棋子
+	for(i = 0; i < row; ++i){
+		if(chess[i][col])
+			return 0;
+	}
+	
+	//3) 判断左上对角是否有棋子
+	for(i = row -1, j = col-1; i>=0,j>=0; --i,--j){
+		if(chess[i][j])
+			return 0;
+	}
+	
+	//4) 判断右上对角是否有棋子
+	for(i = row-1, j = col+1; i>=0,j<N; --i,++j){
+		if(chess[i][j])
+			return 0x0;
+	}
+
+}
+
+/*
+ * Description: 打印结果
+ */
+void Print()          
+{
+	int row,col;
+	printf("第 %d 种\n", count+1);
+	
+	for(row = 0; row < N; row++){
+		for(col = 0; col < N; col++){
+			if(chess[row][col]==1)       //皇后用'0'表示
+				printf("0 ");
+			
+			else
+				printf("# ");
+		}
+		printf("\n");
+		
+	}
+	
+	printf("\n");
+}
+
+/*
+ *Description: 进入本函数时，在nxn棋盘前i-1行已放置了互不攻击的i-1个棋子
+ *             现从第i行起继续为后续棋子选择合适的位置
+ */
+void EightQueue(int i, int n)
+{
+	int col;
+	
+	//如果遍历完n行都找到放置皇后的位置则打印
+	if(i > n-1){
+		
+		//打印n皇后的解
+		Print();
+		count++;
+		
+		return;
+	}
+	
+	for(col = 0; col < n; col++){
+		if(notDanger(i, col)){      //判断是否危险
+			chess[i][col] = 1;
+			
+			EightQueue(i+1, n);
+			
+			chess[i][col] = 0;     //清零, 以免回溯时出现脏数据
+		
+		}
+	
+	}
+}
+
+
+int main(int argc, char *argv[]){
+	EightQueue(0, 8);
+	
+	printf("总共有%d种解决方法！\n\n", count);
+	
+	return 0x0;
+}
+{% endhighlight %}
 
 <br />
 <br />
