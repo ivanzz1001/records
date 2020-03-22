@@ -179,12 +179,12 @@ void Print()
  *Description: 进入本函数时，在nxn棋盘前i-1行已放置了互不攻击的i-1个棋子
  *             现从第i行起继续为后续棋子选择合适的位置
  */
-void EightQueue(int i, int n)
+void NQueue(int i)
 {
 	int col;
 	
-	//如果遍历完n行都找到放置皇后的位置则打印
-	if(i > n-1){
+	//如果遍历完N行都找到放置皇后的位置则打印
+	if(i > N-1){
 		
 		//打印n皇后的解
 		Print();
@@ -193,11 +193,11 @@ void EightQueue(int i, int n)
 		return;
 	}
 	
-	for(col = 0; col < n; col++){
+	for(col = 0; col < N; col++){
 		if(notDanger(i, col)){      //判断是否危险
 			chess[i][col] = 1;
 			
-			EightQueue(i+1, n);
+			EightQueue(i+1);
 			
 			chess[i][col] = 0;     //清零, 以免回溯时出现脏数据
 		
@@ -208,7 +208,7 @@ void EightQueue(int i, int n)
 
 
 int main(int argc, char *argv[]){
-	EightQueue(0, 8);
+	NQueue(0);
 	
 	printf("总共有%d种解决方法！\n\n", count);
 	
