@@ -36,7 +36,7 @@ access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
 -F 尝试跟踪vfork调用.在-f时,vfork不被跟踪.
 -h 输出简要的帮助信息.
 -i 输出系统调用的入口指针.
--q 禁止输出关于脱离的消息.
+-q 禁止输出关于attach/detach消息.
 -r 打印出相对时间关于,,每一个系统调用.
 -t 在输出中的每一行前加上时间信息.
 -tt 在输出中的每一行前加上时间信息,微秒级.
@@ -54,15 +54,16 @@ access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
 -e expr
 指定一个表达式,用来控制如何跟踪.格式如下:
 [qualifier=][!]value1[,value2]...
-qualifier只能是 trace,abbrev,verbose,raw,signal,read,write其中之一。value是用来限定的符号或数字.默认的 qualifier是 trace.感叹号是否定符号.例如:
--eopen等价于 -e trace=open,表示只跟踪open调用。而-etrace!=open表示跟踪除了open以外的其他调用。有两个特殊的符号 all 和 none.
+qualifier只能是 trace,abbrev,verbose,raw,signal,read,write其中之一。value是用来限定的符号或数字.默认的 qualifier是 trace.感叹号是否定符号。例如:
+-eopen等价于 -e trace=open,表示只跟踪open调用。而-etrace!=open表示跟踪除了open以外的其他调用。有两个特殊的value符号 all 和 none.
 （注意有些shell使用!来执行历史记录里的命令,所以要使用\\.)
 
 -e trace=set
 只跟踪指定的系统 调用.例如:-e trace=open,close,rean,write表示只跟踪这四个系统调用.默认的为set=all.
 
 -e trace=file
-只跟踪有关文件操作的系统调用.
+只跟踪有关文件操作的系统调用。我们可以将此命令看成是-e strace=open,stat,chmod,unlink...等操作的简写形式，这有助于我们找出相应进程当前正在
+引用(reference)哪些文件。
 
 -e trace=process
 只跟踪有关进程控制的系统调用.
@@ -76,21 +77,28 @@ qualifier只能是 trace,abbrev,verbose,raw,signal,read,write其中之一。valu
 -e trace=ipc
 跟踪所有与进程通讯有关的系统调用
 
+-e trace=desc
+跟踪所有与文件描述符相关的系统调用。
+
+-e trace=memory
+跟踪所有与memory mapping相关的系统调用
+
 -e abbrev=set
-设定 strace输出的系统调用的结果集。-v 等于 abbrev=none.默认为abbrev=all.
+设定 strace输出的系统调用的结果集，指定哪些系统调用中的大型数组或结构体内容缩减显示，如strace -e abbrev=execve ./test仅显示execve调用
+中argv[]和envp[]的部分内容。默认为abbrev=all， abbrev=none等价于-v选项。
 
 -e raw=set
-将指 定的系统调用的参数以十六进制显示.
+指定哪些系统调用中的参数以原始未解码的形式(即16进制)显示。当用户不信任strace解码或需要了解参数实际数值时有用
 
 -e signal=set
 指定跟踪的系统信号.默认为all.如 signal=!SIGIO(或者signal=!io),表示不跟踪SIGIO信号.
 
 -e read=set
-输出从指定文件中读出的数据.例如:
--e read=3,5
+以16进制和ASCII码对照形式显示从指定文件描述符中读出的所有数据，如-e read=3,5可观察文件描述符3和5上的输入动作。该选项独立于系统调用read的
+常规跟踪(由-e trace=read选项控制)
 
 -e write=set
-输出写入到指定文件中的数据.
+以16进制和ASCII码对照形式显示写入指定文件描述符的所有数据
 
 
 -o filename
@@ -127,6 +135,8 @@ qualifier只能是 trace,abbrev,verbose,raw,signal,read,write其中之一。valu
 **[参看]:**
 
 1. [linux tools](https://linuxtools-rst.readthedocs.io/zh_CN/latest/tool/readelf.html)
+
+2. [strace工具使用手册](https://blog.csdn.net/Huangxiang6/article/details/81295752)
 
 <br />
 <br />
