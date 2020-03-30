@@ -25,13 +25,47 @@ KStore和Memstore两种存储引擎比较简单，这里就不介绍了（会在
 
 <!-- more -->
 
+## 1. 基本概念介绍
+RADOS本地对象存储系统(也称为对象存储引擎）基于本地文件系统实现，目前默认的文件系统为XFS。一个对象包含```数据```和```元数据```两种数据。对应本地文件系统里，一个对象就是一个固定大小（默认4MB)的文件，其元数据保存在文件的扩展属性或者本地独立的KV存储系统中。
+
+### 1.1 对象的元数据
+对象的元数据就是用于对象描述信息的数据，它以简单的key-value(键值对）形式存在，在RADOS存储系统中有两种实现：xattrs和omap:
+
+* xattrs保存在对象对应文件的扩展属性中，这要求支持对象存储的本地文件系统支持扩展属性。
+
+* omap就是object map的简称，是一些键值对，保存在本地文件系统之外的独立的key-value存储系统中，例如leveldb、rockdb等。
+
+有些文件系统可能不支持扩展属性，有些虽然也支持扩展属性但对key或者value占用空间的大小有限制，或者扩展属性占的总的空间大小有限制。对于leveldb等本地键值存储系统基本没有这样的限制，但是它的写性能优于读性能。所以一般情况下，xattrs保存一些比较小而经常访问的信息。omap保存一些大而不是经常访问的数据。
+
+
+### 1.2 事务和日志的基本概念
+假设磁盘正在执行一个操作，此时由于发生磁盘错误，或者系统宕机，或者断电等其他原因，导致只有部分数据写入成功。这种情况就会出现磁盘上的数据有一部分是旧数据，部分是新写入的数据，使得磁盘数据不一致。
+
+当一个操作要么全部成功，要么全部失败，不允许只有部分操作成功，就称这个操作具有原子性。引入事务和日志，就是为了实现操作的原子性，解决数据的不一致性问题。
+
+引入日志后，数据写入变为两步： 1） 先把要写入的数据全部封装成一个事务，其整体作为一条日志，先写入日志文件并持久化到磁盘，这个过程称为日志提交(journal submit)。2）然后再把数据写入对象文件中，这称为日志的应用（journal apply)。
+
+当系统在日志提交的过程中出错，系统重启后，直接丢弃不完整的日志条目即可，该条日志对应的实际对象数据并没有修改，数据可以保持一致。当在日志应用的过程中出错，由于数据已经写入并回刷到日志盘中，系统重启后，重放(replay)日志，就可以保证新数据重新完整写入，保证了数据的一致性。
+
+这个机制需要确保所有的更新操作都是幂等操作。所谓幂等操作，就是数据的更新可以多次写入，不会产生任何副作用。对象存储的操作一般都具有幂等性。
+
+在事务的提交过程中，一条日志记录可以对应一个事务。为了提高日志提交的性能，一般都允许多条事务并发提交，一条日志记录可以对应多个事务，批量提交。所以事务的提交过程，一般和日志的提交过程是一个概念。
+
+日志有三个处理阶段，对应过程分别为：
+
+* 日志提交(journal submit): 日志写入日志磁盘
+
+* 日志的应用(journal apply)： 日志对应的修改更新到对象的磁盘文件中。这个修改不一定写入磁盘，可能缓存在本地文件系统的页缓存(page cache)中
+
+* 日志的同步(Journal sync或者journal commit): 当确定日志对应的修改操作已经刷回到磁盘中，就可以把相应的日志记录删除，释放所占用的日志空间。
+
+
+### 1.3 事务的封装
+ObjectStore的内部类Transaction用来实现相关的事务。
 
 
 
-
-
-
-
+## 2. ObjectStore对象存储接口
 
 ## 8. 附录--ceph存储object的attr和omap操作
 
@@ -166,7 +200,7 @@ user.ceph._description="just for test"
 通过上面我们可以直观的看到刚才我们所设置的扩展属性信息。
 
 
-###### 8.2 对象存储元数据管理
+###### 8.2 对象存储元数据管理（xattr)
 
 1) 上传文件到benchmark存储池
 <pre>
@@ -236,6 +270,34 @@ user.ceph._creator="ivanzz1001"
 </pre>
 
 
+###### 8.3 对象存储元数据管理(omap)
+1） 设置omap
+
+对上面所创建的benchmark这个pool中的```hello.txt```这个对象设置omap:
+<pre>
+# rados -p benchmark setomapval hello.txt hcreator 'ivanzz1001'
+# rados -p benchmark setomapval hello.txt hdescription 'just for test'
+# rados -p benchmark listomapkeys hello.txt
+hcreator
+hdescription
+</pre>
+
+2) 查看omap
+
+使用如下命令查看omap值：
+<pre>
+# rados -p benchmark getomapval hello.txt hcreator
+value (10 bytes) :
+00000000  69 76 61 6e 7a 7a 31 30  30 31                    |ivanzz1001|
+0000000a
+
+# rados -p benchmark getomapval hello.txt hdescription
+value (13 bytes) :
+00000000  6a 75 73 74 20 66 6f 72  20 74 65 73 74           |just for test|
+0000000d
+</pre>
+目前对于omap具体存放在哪个文件还未知晓，猜测是在对应OSD的```omap```文件夹下。例如：/var/lib/ceph/osd/ceph-7/current/omap
+
 
 
 
@@ -250,6 +312,8 @@ user.ceph._creator="ivanzz1001"
 2. [Ceph Pool操作总结](https://blog.csdn.net/hxpjava1/article/details/80167792)
 
 3. [linux下文件文件夹扩展属性操作](https://blog.csdn.net/liuhong1123/article/details/7247744)
+
+4. [Ceph leveldb及KV存储](/var/lib/ceph/osd/ceph-7/current/omap)
 
 <br />
 <br />
