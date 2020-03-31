@@ -61,7 +61,13 @@ RADOS本地对象存储系统(也称为对象存储引擎）基于本地文件�
 
 
 ### 1.3 事务的封装
-ObjectStore的内部类Transaction用来实现相关的事务。
+ObjectStore的内部类Transaction用来实现相关的事务。它有两种封装形式，一种是```use_tbl```(transaction bufferlist)，事务把操作的元数据和数据都封装在bufferlist类型的tbl中：
+{% highlight string %}
+bool use_tbl {false};   //use_tbl for encode/decode
+bufferlist tbl;
+{% endhighlight %}
+
+另一种是不使用tbl，
 
 
 

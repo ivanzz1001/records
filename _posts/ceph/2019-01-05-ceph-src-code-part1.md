@@ -17,6 +17,26 @@ buffer是一个命名空间，在这个命名空间下定义了Buffer相关的�
 
 >相关代码位置： src/include/buffer.h src/common/buffer.cc
 
+buffer中定义的相关数据类型在外部引用时，通常都会以如下形式出现：
+{% highlight string %}
+#ifndef BUFFER_FWD_H
+#define BUFFER_FWD_H
+
+namespace ceph {
+  namespace buffer {
+    class ptr;
+    class list;
+    class hash;
+  }
+
+  using bufferptr = buffer::ptr;
+  using bufferlist = buffer::list;
+  using bufferhash = buffer::hash;
+}
+
+#endif
+{% endhighlight %}
+
 ### 2.1 buffer::raw
 类buffer::raw是一个原始的数据Buffer，在其基础之上添加了长度、引用计数和额外的crc校验信息，结构如下(src/common/buffer.cc)：
 {% highlight string %}
@@ -146,6 +166,75 @@ void buffer::list::append(char c)
 * 把数据写入文件或从文件读取数据的功能
 
 * 计算数据的crc32校验
+
+
+## 3. encode/decode
+在ceph中，很多地方涉及到需要将某一种类型的数据编码到bufferlist中，这里简单的进行一下说明(编码的主要实现位于src/include/encoding.h中）：
+{% highlight string %}
+template<class T>
+inline void encode_raw(const T& t, bufferlist& bl)
+{
+  bl.append((char*)&t, sizeof(t));
+}
+template<class T>
+inline void decode_raw(T& t, bufferlist::iterator &p)
+{
+  p.copy(sizeof(t), (char*)&t);
+}
+
+#define WRITE_RAW_ENCODER(type)						\
+  inline void encode(const type &v, bufferlist& bl, uint64_t features=0) { encode_raw(v, bl); } \
+  inline void decode(type &v, bufferlist::iterator& p) { __ASSERT_FUNCTION decode_raw(v, p); }
+
+WRITE_RAW_ENCODER(__u8)
+#ifndef _CHAR_IS_SIGNED
+WRITE_RAW_ENCODER(__s8)
+#endif
+WRITE_RAW_ENCODER(char)
+WRITE_RAW_ENCODER(ceph_le64)
+WRITE_RAW_ENCODER(ceph_le32)
+WRITE_RAW_ENCODER(ceph_le16)
+
+// FIXME: we need to choose some portable floating point encoding here
+WRITE_RAW_ENCODER(float)
+WRITE_RAW_ENCODER(double)
+
+inline void encode(const bool &v, bufferlist& bl) {
+  __u8 vv = v;
+  encode_raw(vv, bl);
+}
+inline void decode(bool &v, bufferlist::iterator& p) {
+  __u8 vv;
+  decode_raw(vv, p);
+  v = vv;
+}
+
+
+// -----------------------------------
+// int types
+
+#define WRITE_INTTYPE_ENCODER(type, etype)				\
+  inline void encode(type v, bufferlist& bl, uint64_t features=0) {	\
+    ceph_##etype e;					                \
+    e = v;                                                              \
+    encode_raw(e, bl);							\
+  }									\
+  inline void decode(type &v, bufferlist::iterator& p) {		\
+    ceph_##etype e;							\
+    decode_raw(e, p);							\
+    v = e;								\
+  }
+
+WRITE_INTTYPE_ENCODER(uint64_t, le64)
+WRITE_INTTYPE_ENCODER(int64_t, le64)
+WRITE_INTTYPE_ENCODER(uint32_t, le32)
+WRITE_INTTYPE_ENCODER(int32_t, le32)
+WRITE_INTTYPE_ENCODER(uint16_t, le16)
+WRITE_INTTYPE_ENCODER(int16_t, le16)
+{% endhighlight %}
+从上面可以看出，对基本数据类型的编码还是比较简单，不考虑大小端。
+
+
 
 
 <br />
