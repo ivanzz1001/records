@@ -67,7 +67,57 @@ bool use_tbl {false};   //use_tbl for encode/decode
 bufferlist tbl;
 {% endhighlight %}
 
-另一种是不使用tbl，
+另一种是不使用tbl，把元数据操作以struct Op的结构体，封装在op_bl中，把操作相关的数据封装在data_bl中：
+{% highlight string %}
+struct Op {
+      __le32 op;
+      __le32 cid;
+      __le32 oid;
+      __le64 off;
+      __le64 len;
+      __le32 dest_cid;
+      __le32 dest_oid;                  //OP_CLONE, OP_CLONERANGE
+      __le64 dest_off;                  //OP_CLONERANGE
+      __le32 hint_type;                 //OP_COLL_HINT
+      __le64 expected_object_size;      //OP_SETALLOCHINT
+      __le64 expected_write_size;       //OP_SETALLOCHINT
+      __le32 split_bits;                //OP_SPLIT_COLLECTION2
+      __le32 split_rem;                 //OP_SPLIT_COLLECTION2
+} __attribute__ ((packed)) ;
+
+
+bufferlist data_bl;
+bufferlist op_bl;
+bufferptr op_ptr;     //临时操作指针
+{% endhighlight %}
+由于struct Op里保存的是coll_id和object_id，所以需要保存coll_t到coll_id的映射关系，以及ghobject_t与object_id的映射关系。从这种存储方式就可以看出，这种方式和前一种的区别，是在数据封装上实现了一种压缩。当事务中多个操作有相同的对象时，只保存一次ghobject_t结构体，其他情况只保存index来索引。
+{% highlight string %}
+map<coll_t, __le32> coll_index;                                        //coll_t -> coll_id的映射关系
+map<ghobject_t, __le32, ghobject_t::BitwiseComparator> object_index;   //ghobject_t -> object_id的映射关系
+
+__le32 coll_id {0};                                                   //当前分配的coll_id的最大值
+__le32 object_id {0};                                                 //当前分配的object_id的最大值
+{% endhighlight %}
+
+数据结构TransactionData记录了一个事务中有关操作的统计信息：
+{% highlight string %}
+struct TransactionData {
+      __le64 ops;                          //本事务中操作数目
+      __le32 largest_data_len;             //最大的数据长度
+      __le32 largest_data_off;             //在对象中的偏移
+      __le32 largest_data_off_in_tbl;      //在tbl中的偏移
+      __le32 fadvise_flags;                //一些标志
+};
+{% endhighlight %}
+
+一个事务中，对应如下三类回调函数，分别在事务不同的处理阶段调用。当事务完成相应阶段工作后，就调用相应的回调函数来通知事件完成。注意每一类都可以注册多个回调函数：
+{% highlight string %}
+list<Context *> on_applied;
+list<Context *> on_commit;
+list<Context *> on_applied_sync;
+{% endhighlight %}
+on_commit是事务提交完成之后调用的回调函数；on_applied_sync和on_applied都是事务应用完成之后的回调函数。前者是被同步调用执行，后者是在Finisher线程里异步调用执行。
+
 
 
 
