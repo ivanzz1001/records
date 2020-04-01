@@ -123,6 +123,44 @@ on_commit是事务提交完成之后调用的回调函数；on_applied_sync和on
 
 ## 2. ObjectStore对象存储接口
 
+下面我们先对ObjectStore中的一些概念及术语做一个简单的介绍：
+
+**1) ObjectStore中Object的内容及语义**
+
+ObjectStore所存储的每一个object都是由处于collection(coll_t)中ghobject_t或hobject_t所标识（注： 这里我们可以将collection理解为一个PG，一个object对应一个PG，但是一个PG可以对应多个object，一个coll_t中的objects可以认为都属于同一个PG）。ObjectStore支持在一个collection内创建(creation)、修改(mutation)、删除(deletion)、枚举(enumeration)对象的操作。这里枚举对象时，是按hash后的对象名的字典序进行输出的。object名称在全局是唯一的。
+
+每一个object都有4个不同的部分： byte data、xattrs、omap_header以及omap entries。
+
+* data： 从概念上来讲，一个object的data部分就相当于文件系统上的一个文件。能够支持对data数据的随机读写操作。对一个object的data部分的轻量级的实现有助于降低系统的工作负载。在系统层面上，我们通常会限制每个对象的最大大小为100MB。
+
+* xattrs: 等价于文件系统的扩展属性。Xattrs是一系列的键值对，支持对xattrs进行枚举操作。在实现层面，xattr并不属于ceph，而是依赖于所采用的文件系统，因此所支持的xattrs通常小于64KB。通常来说，ceph假设在访问对象时一并访问该对象相应的xattr是很方便的，并不会付出过高的代价。
+
+* omap_header: 是一个单独的数据块，可以作为一个整体来进行读写操作
+
+* omap entries: 从概念上来讲，omap entries类似于xattrs，但保存于不同的位置。换句话说，在xattrs中所保存的key/value，在omap entries中可以有相同的key/value。在枚举xattrs时，并不会包括omap entries，反之亦然。通常xattrs最多只能有64KB，而omap entries大小可以达到MB级别，另外两者之间的访问方式也有很大的不同。ceph必须要提供高效
+
+2） **Collections**
+
+一个collection就是一个简单的对象分组。collections具有名称(coll_t)，并且可以被枚举。与一个单独的object类似，一个collection也有一系列的xattrs。
+
+3） **transaction**
+
+一个Transaction代表一系列的原子修改操作。在transaction的生命周期中会产生3个事件回调，每个回调可以包含任意数量的callback上下文(Context)。3个事件回调分别为：
+
+* on_applied_sync
+
+* on_applied
+
+* on_commit
+
+当Transaction所对应的修改请求对ObjectStore的其他子操作已经可见(比如数据已经可读)，就会回调on_applied_sync或on_applied。on_applied_sync与on_applied之间的唯一区别就是回调线程、调用环境的不同。对于on_applied_sync是直接由ObjectStore执行线程所回调，通常回调可以快速完成，且在回调时并不需要执行获取environment锁的操作；相反，对于on_applied则会通过一个单独的Finisher线程来完成，这就意味着其可能需要竞争environment锁。
+
+>注： on_applied有时候也会被称为on_readable，on_applied_sync有时候会被称为on_readable_sync
+
+on_commit回调也是通过Finisher线程来进行，表明所有的修改操作都已经被提交，并完成了持久化操作。
+
+在实现层面，
+
 
 
 
