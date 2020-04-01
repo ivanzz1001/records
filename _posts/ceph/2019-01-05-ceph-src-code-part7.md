@@ -123,6 +123,9 @@ on_commit是事务提交完成之后调用的回调函数；on_applied_sync和on
 
 ## 2. ObjectStore对象存储接口
 
+
+
+
 ## 8. 附录--ceph存储object的attr和omap操作
 
 在ceph中，所有的存储不管是块存储、对象存储、还是文件存储最后都转化成了底层的对象object，这个object包含3个元素data、xattr、omap。data是保存对象的数据。xattr是保存对象的扩展属性，每个对象文件都可以设置文件的属性，这个属性是一个key/value对，但是受到文件系统的限制，key/value对的个数和每个value的大小都进行了限制。如果要设置的对象的key/value不能存储在文件的扩展属性中，还存在另外一种方式保存:omap，omap实际上是保存到了key/value对的数据库levelDB中，在这里value的值限制要比xattr中好的多。

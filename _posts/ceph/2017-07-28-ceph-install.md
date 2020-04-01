@@ -291,11 +291,43 @@ no such option: --use-wheel
 </pre>
 执行make install命令安装到本地，这一步也可以通过手动移动二进制文件和配置文件到相应目录。其中，二进制文件放到/usr/bin，库文件放到/usr/lib,配置文件存入/etc/ceph。
 
+* 1.5 关于ceph的makefile文件
+
+这里我们模拟ceph的Makefile文件，给一个简单的示例：
+{% highlight string %}
+am__recursive_targets = all-recursive
+
+
+all: all-recursive
+
+
+
+$(am__recursive_targets):
+        @fail=;\
+        echo "run here 1...";\
+        echo "run here 2...";\
+        echo "run here 3..."
+{% endhighlight %}
+如下我们执行上面这个Makefile：
+{% highlight string %}
+# make -n
+fail=;\
+echo "run here 1...";\
+echo "run here 2...";\
+echo "run here 3..."
+
+# make 
+run here 1...
+run here 2...
+run here 3...
+{% endhighlight %}
 
 
 ###### 方式2
 
 略，暂时不做介绍。
+
+
 
 
 
