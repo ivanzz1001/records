@@ -116,58 +116,56 @@ void BWInsertSort(SqList *L, SqList *D)
 {
 	int first, last, i;
 	first = last = 1;
-
-	int CAPACITY = L->capacity;
-	D.r[1] = L.r[1];
 	
-	for(i = 1;i<=L->length;i++)
-	{
-		if(L.r[i] < D.r[1])
-		{
+	//由于L->r[0]未使用，因此这里我们需要将[first, last]中的数据映射到[1, D->length]位置上
+	//假设当前下标偏移为n，则映射到[1,D->length]位置的方法为: (n-1 + D->length) % D->length + 1
+	
+	len = L->length;
+	D->r[1] = L->r[1];
+	
+	for(i = 1; i <= L->length; i++){
+		if(L->r[i] < D->r[1]){
 			low = first;
 			high = 1;
-			while(low <= high)
-			{
-				middle = (low + high) >> 1;
+			
+			while(low <= high){
+				middle = (low + high) /2;
 				
-				if(GE[L->r[i].key, D->r[(middle +  CAPACITY) % CAPACITY].key))
-				{
-					low = middle + 1;
+				if(D->r[(middle -1 + len) % len + 1] <= L->r[i]){
+					low++;
+				}else{
+					high--;
 				}
-				else
-					high = middle -1;
 			}
-
-			for(j=first;j<=low-1;j++)
-			{
-				D->r[(first -1 + CAPACITY) % CAPACITY] = D->r[(first + CAPACITY) % CAPACITY];
-			}
-			D->r[(low - 1 + CAPACITY) % CAPACITY] = L.r[i];
+			
+			for(j = first; j <= high + 1; j++)
+				D->r[((j-1) - 1 + len) % len + 1] = D->r[(j -1 + len) % len + 1];
+				
+			D->r[((high + 1) -1 + len) % len + 1] = L->r[i];	
+			
 			first--;
-		}
-		else{
+		}else{
 			low = 1;
 			high = last;
-		
-			while(low <= high)
-			{
-				middle = (low + high)>>1;
-				if(LT(L->r[i].key, D->r[middle].key))
-				{
-					high = middle-1;
+			
+			while(low <= high){
+				middle = (low + high) >> 1;
+				if(D->r[(middle -1 + len) % len + 1] <= L->r[i])
+					low++;
+				else{
+					high--;
 				}
-				else
-					low = middle + 1;
+				
+				for(j = last; j>=high+1; j--){
+					D->r[((j+1)-1 + len) % len + 1] = D->r[(j -1 + len) % len +1];
+				}
+				
+				D->r[((high+1)-1 + len) % len + 1] = L->r[i];
+				
+				last++;
 			}
-			
-			for(j = last; j>=high+1;j--)
-				D->r[j+1] = D->r[j];
-			
-			D->r[hight+1] = L->r[i];
-			last++;
 		}
 	}
-	
 }
 {% endhighlight %}
 
