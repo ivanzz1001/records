@@ -159,7 +159,88 @@ ObjectStore所存储的每一个object都是由处于collection(coll_t)中ghobje
 
 on_commit回调也是通过Finisher线程来进行，表明所有的修改操作都已经被提交，并完成了持久化操作。
 
-在实现层面，
+在实现层面，每一个修改原语(也包括其所关联的数据）都可以被序列化到一个单独的buffer中。在序列化时，并不会拷贝任何的数据，而是通过bufferlist直接引用原始的缓冲块。这就意味着在提交过程中，必须保持整个buffer数据的稳定，直到on_commit回调完成。实际上，bufferlist会帮你完成这个过程，只有在你通过buffer::raw_static来引用一块已存在的内存时才需要自己注意在提交期间保证buffer的数据不会被修改。
+
+有一些ObjectStore的实现会选择根据Transaction的序列化格式来实现自己的日志(journaling)形式。这就要求相应的encode/decode逻辑能够正确的识别version信息，并且在Transaction的编码格式改变时也能够正确的进行升级。这种情况其实已经发生了，Transaction object也包含一些辅助的变量来协助进行解码：
+<pre>
+对于bobtail版本之前的ceph， 可通过sobject_encoding来识别older/simpler类型的oid； 可以通过use_pool_override来侦测pool oid被覆盖的场景。
+</pre>
+
+4) **事务的隔离**
+
+除非另行说明，否则事务的隔离都是由调用者来负责的。换句话说，假如任何存储元素(即上文说的object的4个部分)在事务中被修改，那么在事务处于pending期间(从一个事务产生，到收到on_applied_sync回调这一时间段都处于pending状态)，调用者都不应该尝试去读取该元素。ObjectStore并不会侦测隔离性是否被破坏，也没有相应的机制来报告隔离性遭到了破坏。
+
+如果一个transaction本身包含创建(create)或删除(delete)存储元素的操作，那么执行enumeration操作也有可能会破坏事务的隔离性。在这种情况下如果执行enumeration操作，那么允许ObjectStore自行决定是返回事务元素被破坏前还是破坏后的结果。换句话说，ObjectStore返回的枚举结果集对于是否包含该事务所修改的元素是不确定的。例如，假设一个事务(transaction)含有"Create A"与"delete B"两个修改元素的操作，那么在transaction处于pending期间，如果执行enumeration操作，则ObjectStore可能会返回A/B存在性的4种组合.
+
+下面通过对象存储的接口说明和代码示例，可以了解对象存储的基本功能及如何使用这些功能，从而对对象存储有一个概要了解：
+{% highlight string %}
+class ObjectStore{
+
+/*
+ * 在同一个Sequencer下面的所有transactions都会被顺序的提交执行，而不同Sequencer下面的事务则可能会被并发的提交执行。
+ *
+ * 每个ObjectStore客户端创建并维护他们自己的Sequencer对象。当有一系列的事务需要提交时，由调用者来选择一个特定的
+ * Sequencer。
+ */
+struct Sequencer_impl : public RefCountedObject {};
+
+/*
+ * 获取对象的一个分组信息
+ */
+struct CollectionImpl : public RefCountedObject{};
+
+
+/*
+ * 事务
+ */
+class Transaction{
+
+	/*
+	 * 记录了一个事务中有关操作的统计信息
+	 */
+	struct TransactionData {};
+
+	/*
+	 * 用于解析Transaction的辅助类
+	 */
+	class iterator{
+		//遍历Transaction中的每一个元素，并进行解码
+	};
+
+
+	//1) 对transaction注册on_applied/on_applied_sync/on_commit等相关操作
+	//1) 对transaction中的每一个ghobject_t的相关操作： object attr/object omap/object omap_header/collection attr
+   
+
+};
+
+
+// synchronous wrappers
+unsigned apply_transactions(Sequencer *osr, vector<Transaction>& tls, Context *ondisk=0);
+
+int queue_transactions(....);
+
+//1)  mount/umount操作
+
+//2) mkfs/statfs操作
+
+//3) journal操作
+
+//4) metadata操作
+
+//5) 文件的read/exists/stat等操作
+
+//6) attr相关操作
+
+//7) collections相关操作： 本objectstore所管理的所有分组相关信息
+
+//8) omap/omap_header相关操作
+
+//9) get_fsid/set_fsid相关操作： 获得本objectstore的唯一标识相关的操作
+
+};
+{% endhighlight %}
+由上面可看到，基本上ObjectStore就是对一个文件系统相关功能的一个抽象。
 
 
 
