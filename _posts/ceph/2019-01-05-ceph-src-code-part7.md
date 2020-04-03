@@ -240,9 +240,19 @@ int queue_transactions(....);
 
 };
 {% endhighlight %}
-由上面可看到，基本上ObjectStore就是对一个文件系统相关功能的一个抽象。
+由上面可看到，基本上ObjectStore就是对一个文件系统相关功能的一个抽象。ObjectStore可以将Transaction打包进一个队列，然后由相关线程负责相应事务的提交。
 
+下面我们通过对象存储的接口说明和代码示例，可以了解对象存储的基本功能及如何使用这些功能，从而对对象存储有一个概要了解。
 
+### 2.1 对外接口说明
+类ObjectStore是对象存储系统抽象操作接口。所有的对象存储引擎都有继承并实现它定义的接口。下面列出一些代表性的函数接口：
+
+* objectstore初始化相关的函数
+<pre>
+mkfs   创建objectstore相关的系统信息
+mount  加载objectstore相关的系统信息
+statfs 获取objectstore系统信息
+</pre> 
 
 
 ## 8. 附录--ceph存储object的attr和omap操作
