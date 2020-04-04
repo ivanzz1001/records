@@ -31,7 +31,7 @@ description: C++智能指针
 
 2. [C++中的RAII介绍](https://www.cnblogs.com/jiangbin/p/6986511.html)
 
-3. [](https://blog.csdn.net/qq_34992845/article/details/69218843)
+3. [浅谈shared_ptr及shared_ptr涉及到的循环引用问题](https://blog.csdn.net/qq_34992845/article/details/69218843)
 <br />
 <br />
 <br />

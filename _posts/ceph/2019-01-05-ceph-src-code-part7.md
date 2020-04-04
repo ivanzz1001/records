@@ -254,6 +254,24 @@ mount  加载objectstore相关的系统信息
 statfs 获取objectstore系统信息
 </pre> 
 
+* 获取属性相关信息
+<pre>
+getattr   获取对象的扩展属性xattr
+omap_get  获取对象的omap信息 
+<pre>
+
+* queue_transactions是所有ObjectStore更新操作的接口。更新相关的操作(例如创建一个对象，修改属性，写数据等）都是以事务的方式提交给ObjectStore，该函数被重载成各种不同的接口。其参数为：
+{% highlight string %}
+Sequencer *osr   用于保证在同一个Sequencer的操作是顺序的
+
+vector<Transaction *> &tls   要提交的事务或事务的列表
+
+Context *onreadable 和 Context *onreadable_sync 这两个函数分别对应于事务的on_apply和on_apply_sync。当事务apply完成后，
+修改后的数据就可以被读取了。
+
+Context *ondisk   这个回调函数就是事务进行on_commit后的回调函数
+{% endhighlight %}
+
 
 ## 8. 附录--ceph存储object的attr和omap操作
 
