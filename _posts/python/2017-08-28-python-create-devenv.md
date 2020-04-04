@@ -125,10 +125,21 @@ Python 2.7.5
 
 
 ### 2.4 pip升级
-执行如下命令进行pip升级：
+要使用wheel来安装python包，需要```pip >= 1.4```以及```setuptools >= 0.8```。我们可以执行如下命令来升级pip:
 {% highlight string %}
+# pip -V
+pip 19.3.1 from /usr/lib/python2.7/site-packages/pip (python 3.6)
 # pip install --upgrade pip
 {% endhighlight %}
+查看setuptools版本：
+<pre>
+# ls /usr/lib/python2.7/site-packages/setuptools*
+</pre>
+如果setuptools版本不符合要求，可用如下方式进行卸载，并安装指定版本：
+<pre>
+# pip uninstall setuptools
+# pip install setuptools==39.1.0
+</pre>
 
 
 
@@ -149,9 +160,14 @@ Python 2.7.5
 默认情况下，pip会从https://pypi.python.org/pypi来安装包。根据系统不同，在windows环境下通过pip安装的扩展模块一般位于python目录下Lib\site-packages目录； 而在linux环境下通过pip安装的扩展模块一般位于/usr/local/lib/python/dist-packages/目录。win7下pip下载的安装包缓存位置为：c:\用户\(你的用户名)\AppData\Local\pip\cache\； Linux下pip下载的安装包缓存位置为：~/.cache/pip
 
 
+<br />
+<br />
 
+**参考**
 
+1. [Linux安装python2.7、pip和setuptools](https://www.cnblogs.com/xiaowenshu/p/10239834.html)
 
+2. [将python包发布到PyPI和制作whl文件](https://blog.csdn.net/winycg/article/details/80025432)
 
 <br />
 <br />
