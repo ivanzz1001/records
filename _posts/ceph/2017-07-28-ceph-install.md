@@ -276,9 +276,10 @@ src/test/cli/ceph-authtool/add-key-segv.t: failed
 </pre>
 这里这里需要把pip版本进行一下升级，比如本文编译时升级到了```pip-20.0.2```。执行如下命令：
 <pre>
-# cd  ./src/test/virtualenv/bin
-# ./pip install --upgrade pip
-# ./pip -V
+# ./src/test/virtualenv/bin/pip -V
+pip 9.0.1 from /root/ceph-inst/ceph/src/test/virtualenv/lib/python2.7/site-packages (python 2.7)
+# ./src/test/virtualenv/bin/pip install --upgrade pip
+# ./src/test/virtualenv/bin/pip -V
 pip 20.0.2 from /root/ceph-inst/ceph/src/test/virtualenv/lib/python2.7/site-packages/pip (python 2.7)
 </pre>
 
@@ -298,7 +299,7 @@ no such option: --use-wheel
 这是因为新版本(9.0.1之后)的pip并不支持```--use-wheel```选项，遇到此种情况，我们找到对应的Makefile，将```--use-wheel```选项去掉即可。例如替换*./src/tools/setup-virtualenv.sh*中的```--use-wheel```选项，可以执行如下命令：
 {% highlight string %}
 # grep -rn "use-wheel" ./
-# sed -i 's/--use-wheel//g' ./src/ceph-detect-init/CMakeLists.tx
+# sed -i 's/--use-wheel//g' ./src/ceph-detect-init/CMakeLists.txt
 # sed -i 's/--use-wheel//g' ./src/ceph-detect-init/Makefile.am
 # sed -i 's/--use-wheel//g' ./src/ceph-detect-init/tox.ini
 # sed -i 's/--use-wheel//g' ./src/ceph-disk/CMakeLists.txt
