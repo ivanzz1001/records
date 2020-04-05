@@ -52,6 +52,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 1） **直接克隆指定版本**
 {% highlight string %}
 # git clone https://github.com/ceph/ceph.git -b v10.2.10 --depth 1
+# cd ceph
 # ls -al .
 ./                  .git/               .gitmodule_mirrors  .mailmap            .peoplemap          
 ../                 .gitignore          .gitmodules         .organizationmap    
@@ -203,7 +204,7 @@ v0.20.2
 
 这里注意，需要把pip版本进行一下升级，比如本文编译时升级到了```pip-19.3.1```，否则可能遇到一些编译方面的问题（可以在编译遇到问题时，再考虑升级）。执行如下命令：
 <pre>
-#cd  ./src/test/virtualenv/bin
+# cd  ./src/test/virtualenv/bin
 # ./pip install --upgrade pip
 # ./pip -V
 # ./pip -V
