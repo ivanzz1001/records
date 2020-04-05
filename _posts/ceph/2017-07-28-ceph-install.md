@@ -246,9 +246,17 @@ v0.20.2
 </pre>
 >如果不想要依赖于google-perftools，请使用: ./configure --without-tcmalloc；如果需要调试以及编译测试程序可以加上```--with-debug```选项
 
+此外还可以设置```--prefix=<dir>```来控制编译安装目录。
+
 * 1.3 编译
 
-直接执行make命令即可：
+在编译时我们最好将```src```目录设置到PATH中，以防在编译过程中对```ceph-authtool```等工具找不到：
+<pre>
+# pwd
+/root/ceph-inst/ceph
+# export PATH=$PATH:/root/ceph-inst/ceph/src
+</pre>
+然后直接执行make命令即可：
 <pre>
 # make check
 ============================================================================
@@ -308,6 +316,7 @@ no such option: --use-wheel
 # sed -i 's/--use-wheel//g' ./src/tools/setup-virtualenv.sh
 # sed -i 's/--use-wheel//g' ./src/Makefile.in
 {% endhighlight %}
+
 
 
 
