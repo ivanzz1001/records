@@ -50,14 +50,19 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 这里我们下载ceph-10.2.10版本。我们有如下几种方法：
 
 1） **直接克隆指定版本**
-<pre>
+{% highlight string %}
 # git clone https://github.com/ceph/ceph.git -b v10.2.10 --depth 1
 # ls -al .
 ./                  .git/               .gitmodule_mirrors  .mailmap            .peoplemap          
 ../                 .gitignore          .gitmodules         .organizationmap    
 # git submodule update --force --init --recursive
 # git log -s
-</pre>
+commit 5dc1e4c05cb68dbf62ae6fce3f0700e4654fdbbe
+Author: Jenkins Build Slave User <ceph-release-team@redhat.com>
+Date:   Wed Oct 4 14:17:25 2017 +0000
+
+    10.2.10
+{% endhighlight %}
 
 
 2) **克隆整个ceph工程**
@@ -198,8 +203,16 @@ v0.20.2
 
 这里注意，需要把pip版本进行一下升级，比如本文编译时升级到了```pip-19.3.1```，否则可能遇到一些编译方面的问题（可以在编译遇到问题时，再考虑升级）。执行如下命令：
 <pre>
-# pip install --upgrade pip
+#cd  ./src/test/virtualenv/bin
+# ./pip install --upgrade pip
+# ./pip -V
+# ./pip -V
+pip 20.0.2 from /root/ceph-inst/ceph/src/test/virtualenv/lib/python2.7/site-packages/pip (python 2.7)
 </pre>
+另外，由于新版本(9.0.1之后)的pip不支持```--use-wheel```，这里我们查找所有的文件，去掉里面的```--use-wheel```。
+{% highlight string %}
+# 
+{% endhighlight %}
 
 2) **编译ceph**
 
