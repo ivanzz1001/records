@@ -202,19 +202,6 @@ v0.20.2
 # ./install-deps.sh
 </pre>
 
-这里注意，需要把pip版本进行一下升级，比如本文编译时升级到了```pip-19.3.1```，否则可能遇到一些编译方面的问题（可以在编译遇到问题时，再考虑升级）。执行如下命令：
-<pre>
-# cd  ./src/test/virtualenv/bin
-# ./pip install --upgrade pip
-# ./pip -V
-# ./pip -V
-pip 20.0.2 from /root/ceph-inst/ceph/src/test/virtualenv/lib/python2.7/site-packages/pip (python 2.7)
-</pre>
-另外，由于新版本(9.0.1之后)的pip不支持```--use-wheel```，这里我们查找所有的文件，去掉里面的```--use-wheel```。
-{% highlight string %}
-# 
-{% endhighlight %}
-
 2) **编译ceph**
 
 其实ceph编译有两种方式，一种是运行autogen.sh后接着运行configure，接着运行make编译，编译完成后用make install安装。还有另外一种是直接编译成deb包。下面我们就分别介绍一下这两种方式。
@@ -278,11 +265,25 @@ Testsuite summary for ceph 10.2.10
 
 # make
 </pre>
-上面有少数几个编译make check失败，暂时不去深究。
 
 >注：最后make编译的过程中，如果遇到编译器错误，可以添加-j参数指定处理器数量，make -j2
 
 此外编译过程中可能出现如下错误：
+<pre>
+You are using pip version 9.0.1, however version 20.0.2 is available.
+You should consider upgrading via the 'pip install --upgrade pip' command.
+src/test/cli/ceph-authtool/add-key-segv.t: failed
+</pre>
+这里这里需要把pip版本进行一下升级，比如本文编译时升级到了```pip-20.0.2```。执行如下命令：
+<pre>
+# cd  ./src/test/virtualenv/bin
+# ./pip install --upgrade pip
+# ./pip -V
+pip 20.0.2 from /root/ceph-inst/ceph/src/test/virtualenv/lib/python2.7/site-packages/pip (python 2.7)
+</pre>
+
+
+在升级了pip之后，继续进行编译又遇到如下问题：
 {% highlight string %}
 Usage:   
   pip install [options] <requirement specifier> [package-index-options] ...
@@ -293,11 +294,22 @@ Usage:
 
 no such option: --use-wheel
 {% endhighlight %}
+
 这是因为新版本(9.0.1之后)的pip并不支持```--use-wheel```选项，遇到此种情况，我们找到对应的Makefile，将```--use-wheel```选项去掉即可。例如替换*./src/tools/setup-virtualenv.sh*中的```--use-wheel```选项，可以执行如下命令：
 {% highlight string %}
 # grep -rn "use-wheel" ./
-# sed -i 's/--use-wheel//g' ./src/Makefile
+# sed -i 's/--use-wheel//g' ./src/ceph-detect-init/CMakeLists.tx
+# sed -i 's/--use-wheel//g' ./src/ceph-detect-init/Makefile.am
+# sed -i 's/--use-wheel//g' ./src/ceph-detect-init/tox.ini
+# sed -i 's/--use-wheel//g' ./src/ceph-disk/CMakeLists.txt
+# sed -i 's/--use-wheel//g' ./src/ceph-disk/Makefile.am
+# sed -i 's/--use-wheel//g' ./src/ceph-disk/tox.ini
+# sed -i 's/--use-wheel//g' ./src/tools/setup-virtualenv.sh
+# sed -i 's/--use-wheel//g' ./src/Makefile.in
 {% endhighlight %}
+
+
+
 
 * 1.4 安装
 <pre>
