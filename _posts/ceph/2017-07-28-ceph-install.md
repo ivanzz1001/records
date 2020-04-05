@@ -39,6 +39,13 @@ This is free software; see the source for copying conditions.  There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 </pre>
 
+Ceph的源码可以去Github之上clone下来，或者去Ceph官网下载。这里重点提一下Ceph的版本问题，Ceph在Hammer版本之后，采取了新的版本命名规则：
+
+* x.0.z - 开发版
+
+* x.1.z - 候选版
+
+* x.2.z - 稳定、修正版
 
 
 <!-- more -->
@@ -246,7 +253,10 @@ v0.20.2
 </pre>
 >如果不想要依赖于google-perftools，请使用: ./configure --without-tcmalloc；如果需要调试以及编译测试程序可以加上```--with-debug```选项
 
-此外还可以设置```--prefix=<dir>```来控制编译安装目录。
+此外还可以设置```--prefix=<dir>```来控制编译安装目录，例如：
+<pre>
+--prefix=/usr/local/ceph --sysconfdir=/etc/ceph
+</pre>
 
 * 1.3 编译
 
@@ -317,8 +327,7 @@ no such option: --use-wheel
 # sed -i 's/--use-wheel//g' ./src/Makefile.in
 {% endhighlight %}
 
-
-
+>注：Individual tests run by make check may bind fixed ports or use identical files or subdirectories to store temporary data. They should be cleaned up so that make -j4 check can be used. make check currently needs about 25 minutes on a spinner and 16 minutes on a SSD.
 
 
 * 1.4 安装
@@ -364,7 +373,56 @@ run here 3...
 略，暂时不做介绍。
 
 
+### 1.3 开发环境编译
+对于开发人员，可以按如下方式进行编译：
+<pre>
+# ./install-deps.sh
+# ./run-make-check.sh
+</pre>
 
+注： 我们可以运行```make check```来进行单元测试。
+
+
+### 1.4 测试环境部署
+通常我们在使用*```开发环境编译```*方式编译完成ceph后(正式环境按默认方式编译后，也可以使用此方法来进行测试)，我们可以通过如下的方式来快速搭建一个测试环境。
+
+1) **启动开发集群**
+
+在ceph的src目录下有一个名称为```vstart.sh```的脚本文件，开发人员可以使用该部署脚本快速的部署一个调试环境。一旦编译完成，使用如下的命令来启动ceph部署：
+<pre>
+# cd src
+# ./vstart.sh -d -n -x
+</pre>
+我们也可以指定mon、mds、osd的个数：
+<pre>
+# MON=1 MDS=0 OSD=3  ./vstart.sh -d -n -x
+</pre>
+这里我们针对相关的参数做一个简单的说明：
+{% highlight string %}
+-m  指出monitor节点的ip地址和默认端口6789
+
+-n  指出此次部署为全新部署
+
+-d  指出使用debug模式（便于调试代码）
+
+-r  指出启动radosgw进程
+
+--mon_num  指出部署的monitor个数
+
+--osd_num  指出部署的osd个数
+
+--mds_num  指出部署的mds个数
+
+--blustore  指出ceph后端存储使用最新的bluestore
+{% endhighlight %}
+
+
+3) **停止开发集群**
+
+执行如下命令停止开发集群：
+<pre>
+# ./src/stop.sh 
+</pre>
 
 
 
@@ -544,6 +602,12 @@ get bar
 9. [ceph编译安装教程](https://www.jianshu.com/p/2618036d7ec7)
 
 10. [Developer Guide](https://github.com/ceph/ceph/blob/jewel-next/doc/dev/quick_guide.rst)
+
+11. [Ceph调试开发环境搭建](https://www.jianshu.com/p/844c48d5d45e)
+
+12. [ceph官方调试环境搭建](https://github.com/ceph/ceph/blob/jewel/doc/dev/quick_guide.rst)
+
+13. [Ceph源码编译与打包](http://blog.itpub.net/30088583/viewspace-2136827/)
 <br />
 <br />
 <br />
