@@ -242,6 +242,7 @@ WRITE_INTTYPE_ENCODER(int16_t, le16)
 
 **[参看]**
 
+1. [非常详细的 Ceph 介绍、原理、架构](https://blog.csdn.net/mingongge/article/details/100788388)
 
 
 
