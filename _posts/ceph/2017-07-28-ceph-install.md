@@ -479,6 +479,35 @@ started.  stop.sh to stop.  see out/* (e.g. 'tail -f out/????') for debug output
 export PYTHONPATH=./pybind:./pybind:
 export LD_LIBRARY_PATH=.libs
 
+# ps -ef | grep ceph
+root      85149      1  0 10:55 pts/0    00:03:00 ./ceph-mon -i a -c /root/ceph-inst/ceph/src/ceph.conf
+root      85285      1  0 10:55 ?        00:02:16 ./ceph-osd -i 0 -c /root/ceph-inst/ceph/src/ceph.conf
+root      85471      1  0 10:55 ?        00:02:49 ./ceph-osd -i 1 -c /root/ceph-inst/ceph/src/ceph.conf
+root      85675      1  0 10:55 ?        00:02:23 ./ceph-osd -i 2 -c /root/ceph-inst/ceph/src/ceph.conf
+root      86187      1  0 10:56 ?        00:01:31 /root/ceph-inst/ceph/src/.libs/lt-radosgw -c /root/ceph-inst/ceph/src/ceph.conf --log-file=/root/ceph-inst/ceph/src/out/rgw.log --debug-rgw=20 --debug-ms=1
+
+# netstat -nlp
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 0.0.0.0:111             0.0.0.0:*               LISTEN      1/systemd           
+tcp        0      0 0.0.0.0:6800            0.0.0.0:*               LISTEN      85285/./ceph-osd    
+tcp        0      0 0.0.0.0:6801            0.0.0.0:*               LISTEN      85285/./ceph-osd    
+tcp        0      0 0.0.0.0:6802            0.0.0.0:*               LISTEN      85285/./ceph-osd    
+tcp        0      0 0.0.0.0:6803            0.0.0.0:*               LISTEN      85285/./ceph-osd    
+tcp        0      0 0.0.0.0:6804            0.0.0.0:*               LISTEN      85471/./ceph-osd    
+tcp        0      0 0.0.0.0:6805            0.0.0.0:*               LISTEN      85471/./ceph-osd    
+tcp        0      0 192.168.122.1:53        0.0.0.0:*               LISTEN      2298/dnsmasq        
+tcp        0      0 0.0.0.0:6806            0.0.0.0:*               LISTEN      85471/./ceph-osd    
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      1007/sshd           
+tcp        0      0 0.0.0.0:6807            0.0.0.0:*               LISTEN      85471/./ceph-osd    
+tcp        0      0 127.0.0.1:631           0.0.0.0:*               LISTEN      967/cupsd           
+tcp        0      0 0.0.0.0:6808            0.0.0.0:*               LISTEN      85675/./ceph-osd    
+tcp        0      0 0.0.0.0:6809            0.0.0.0:*               LISTEN      85675/./ceph-osd    
+tcp        0      0 0.0.0.0:6810            0.0.0.0:*               LISTEN      85675/./ceph-osd    
+tcp        0      0 0.0.0.0:6811            0.0.0.0:*               LISTEN      85675/./ceph-osd    
+tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      86187/lt-radosgw    
+tcp        0      0 172.19.0.1:6789         0.0.0.0:*               LISTEN      85149/./ceph-mon 
+
 # ./ceph -s
 *** DEVELOPER MODE: setting PATH, PYTHONPATH and LD_LIBRARY_PATH ***
 2020-04-07 11:00:48.604465 7f9e1306c700 -1 WARNING: the following dangerous and experimental features are enabled: *
