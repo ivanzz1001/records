@@ -258,6 +258,11 @@ v0.20.2
 --prefix=/usr/local/ceph --sysconfdir=/etc/ceph
 </pre>
 
+如果需要调试的话，可以执行如下命令安装调试依赖包：
+<pre>
+# yum install  lttng-tools* lttng-ust* lttng*
+</pre>
+
 * 1.3 编译
 
 在编译时我们最好将```src```目录设置到PATH中，以防在编译过程中对```ceph-authtool```等工具找不到：
