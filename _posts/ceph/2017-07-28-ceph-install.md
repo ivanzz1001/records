@@ -268,6 +268,9 @@ v0.20.2
 </pre>
 然后直接执行make命令即可：
 <pre>
+# make
+
+//执行make check会运行src/tests目录下的单元测试
 # make check
 ============================================================================
 Testsuite summary for ceph 10.2.10
@@ -280,8 +283,6 @@ Testsuite summary for ceph 10.2.10
 # XPASS: 0
 # ERROR: 0
 ============================================================================
-
-# make
 </pre>
 
 >注：最后make编译的过程中，如果遇到编译器错误，可以添加-j参数指定处理器数量，make -j2
@@ -340,18 +341,17 @@ no such option: --use-wheel
 
 这里我们模拟ceph的Makefile文件，给一个简单的示例：
 {% highlight string %}
-am__recursive_targets = all-recursive
-
+am__recursive_targets = all-recursive 
 
 all: all-recursive
 
-
-
 $(am__recursive_targets):
-        @fail=;\
-        echo "run here 1...";\
-        echo "run here 2...";\
-        echo "run here 3..."
+	@fail=;\
+	echo "run here 1...";\
+	echo "run here 2...";\
+	echo "run here 3...";\
+	target=`echo $@ | sed s/-recursive//`;\
+	echo $$target
 {% endhighlight %}
 如下我们执行上面这个Makefile：
 {% highlight string %}
@@ -359,12 +359,15 @@ $(am__recursive_targets):
 fail=;\
 echo "run here 1...";\
 echo "run here 2...";\
-echo "run here 3..."
+echo "run here 3...";\
+target=`echo all-recursive | sed s/-recursive//`;\
+echo $target
 
-# make 
+# make
 run here 1...
 run here 2...
 run here 3...
+all
 {% endhighlight %}
 
 
