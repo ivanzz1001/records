@@ -436,7 +436,45 @@ last_changed 2020-04-07 10:55:43.306120
 created 2020-04-07 10:55:43.306120
 0: 172.19.0.1:6789/0 mon.a
 ./monmaptool: writing epoch 0 to /tmp/ceph_monmap.85091 (1 monitors)
+.....
+.....
+setting up user testid
+2020-04-07 10:55:57.438088 7feb49a459c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 10:55:57.438264 7feb49a459c0  0 lockdep start
+2020-04-07 10:55:57.438596 7feb49a459c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 10:55:57.466235 7feb49a459c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 10:56:10.906012 7feb49a459c0  0 lockdep stop
+setting up s3-test users
+2020-04-07 10:56:10.978801 7f31069a39c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 10:56:10.979357 7f31069a39c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 10:56:11.000158 7f31069a39c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 10:56:11.175270 7f31069a39c0  0 lockdep stop
+2020-04-07 10:56:11.234809 7fb2f27879c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 10:56:11.235285 7fb2f27879c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 10:56:11.258143 7fb2f27879c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 10:56:11.410559 7fb2f27879c0  0 lockdep stop
+setting up user tester
+2020-04-07 10:56:11.469506 7fdb4a6359c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 10:56:11.470049 7fdb4a6359c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 10:56:11.490293 7fdb4a6359c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 10:56:12.926742 7fdb4a6359c0  0 lockdep stop
 
+S3 User Info:
+  access key:  0555b35654ad1656d804
+  secret key:  h7GhxuBLTrlhVUyxSPUKUV8r/2EI4ngqJxD7iBdBYLhwluN30JaT3Q==
+
+Swift User Info:
+  account   : test
+  user      : tester
+  password  : testing
+
+start rgw on http://localhost:8000
+2020-04-07 10:56:14.562873 7fc55bc759c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 10:56:14.562944 7fc55bc759c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+started.  stop.sh to stop.  see out/* (e.g. 'tail -f out/????') for debug output.
+
+export PYTHONPATH=./pybind:./pybind:
+export LD_LIBRARY_PATH=.libs
 
 # ./ceph -s
 *** DEVELOPER MODE: setting PATH, PYTHONPATH and LD_LIBRARY_PATH ***
@@ -589,7 +627,7 @@ objecttwo
 2020-04-07 11:32:19.203814 7f97cea6ea40  0 lockdep stop
 {% endhighlight %}
 
-然后我们在把刚上床的那两个object下载下来看看：
+然后我们在把刚上传的那两个object下载下来看看：
 {% highlight string %}
 # ./rados -p mypool get objectone /opt/download_helloworld.txt
 2020-04-07 11:34:20.877566 7fca88094a40 -1 WARNING: the following dangerous and experimental features are enabled: *
@@ -610,7 +648,171 @@ this file just for test
 {% endhighlight %}
 可以看到当前我们的ceph集群可以正常的进行上传下载操作。
 
-3) **停止开发集群**
+
+3) **通过RGW测试上传下载**
+
+这里我们首先通过如下命令创建一个admin用户，并为其分配权限：
+<pre>
+# ./radosgw-admin user create --uid=admin --display-name="admin"
+# ./radosgw-admin caps add --uid=admin --caps="data=*"
+# ./radosgw-admin caps add --uid=admin --caps="metadata=*"
+# ./radosgw-admin caps add --uid=admin --caps="usage=*"
+# ./radosgw-admin caps add --uid=admin --caps="users=*"
+# ./radosgw-admin caps add --uid=admin --caps="zone=*"
+</pre>
+创建完成后，通过如下命令查看admin用户的相关信息：
+{% highlight string %}
+# ./radosgw-admin user info --uid=admin
+2020-04-07 12:13:12.072043 7fac5b3419c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 12:13:12.072393 7fac5b3419c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 12:13:12.094619 7fac5b3419c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+{
+    "user_id": "admin",
+    "display_name": "admin",
+    "email": "",
+    "suspended": 0,
+    "max_buckets": 1000,
+    "auid": 0,
+    "subusers": [],
+    "keys": [
+        {
+            "user": "admin",
+            "access_key": "9C2DKZUZQ8APDKHW3NFQ",
+            "secret_key": "qcDJoqadbaUek6xZafb6UPHIXMjJkYfvpNbpoHob"
+        }
+    ],
+    "swift_keys": [],
+    "caps": [
+        {
+            "type": "buckets",
+            "perm": "*"
+        },
+        {
+            "type": "metadata",
+            "perm": "*"
+        },
+        {
+            "type": "usage",
+            "perm": "*"
+        },
+        {
+            "type": "users",
+            "perm": "*"
+        },
+        {
+            "type": "zone",
+            "perm": "*"
+        }
+    ],
+    "op_mask": "read, write, delete",
+    "default_placement": "",
+    "placement_tags": [],
+    "bucket_quota": {
+        "enabled": false,
+        "max_size_kb": -1,
+        "max_objects": -1
+    },
+    "user_quota": {
+        "enabled": false,
+        "max_size_kb": -1,
+        "max_objects": -1
+    },
+    "temp_url_keys": []
+}
+
+2020-04-07 12:13:12.241983 7fac5b3419c0  0 lockdep stop
+{% endhighlight %}
+
+之后我们就可以使用S3相关接口创建```S3用户```、```bucket```，并使用S3来上传下载文件了。
+
+如下是我们通过S3接口创建的用户：
+{% highlight string %}
+# ./radosgw-admin user info --uid=oss_dev_test
+2020-04-07 12:39:44.884378 7f6b0f86d9c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 12:39:44.885079 7f6b0f86d9c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 12:39:44.911123 7f6b0f86d9c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+{
+    "user_id": "oss_dev_test",
+    "display_name": "oss_dev_test@1586234316",
+    "email": "",
+    "suspended": 0,
+    "max_buckets": 1,
+    "auid": 0,
+    "subusers": [],
+    "keys": [
+        {
+            "user": "oss_dev_test",
+            "access_key": "AGE9S1IKZILW0948EMWB",
+            "secret_key": "haTvRTiBTN2mfT0SGCWv77G5SPRJenjVIu8XON4i"
+        }
+    ],
+    "swift_keys": [],
+    "caps": [
+        {
+            "type": "buckets",
+            "perm": "read"
+        },
+        {
+            "type": "metadata",
+            "perm": "*"
+        }
+    ],
+    "op_mask": "read, write, delete",
+    "default_placement": "",
+    "placement_tags": [],
+    "bucket_quota": {
+        "enabled": false,
+        "max_size_kb": -1,
+        "max_objects": -1
+    },
+    "user_quota": {
+        "enabled": false,
+        "max_size_kb": -1,
+        "max_objects": -1
+    },
+    "temp_url_keys": []
+}
+{% endhighlight %}
+如下是我们通过S3接口创建的bucket:
+{% highlight string %}
+# ./radosgw-admin bucket list
+2020-04-07 12:41:57.550448 7f52ca0e19c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 12:41:57.551200 7f52ca0e19c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 12:41:57.573576 7f52ca0e19c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+[
+    "oss_dev_test_bucket"
+]
+2020-04-07 12:41:57.709383 7f52ca0e19c0  0 lockdep stop
+{% endhighlight %}
+如下是我们通过S3接口分片上传的一个文件：
+{% highlight string %}
+# ./radosgw-admin bucket list --bucket=oss_dev_test_bucket
+2020-04-07 12:46:03.125303 7f800d4d89c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 12:46:03.125862 7f800d4d89c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 12:46:03.148132 7f800d4d89c0 -1 WARNING: the following dangerous and experimental features are enabled: *
+[
+    {
+        "name": "helloworld_1",
+        "instance": "",
+        "namespace": "",
+        "owner": "oss_dev_test",
+        "owner_display_name": "oss_dev_test@1586234316",
+        "size": 11,
+        "mtime": "2020-04-07 04:45:24.720447Z",
+        "etag": "469e01d115cb913ad709c749df1c5666-1",
+        "content_type": "binary\/octet-stream",
+        "tag": "c6f931df-dc3f-4a06-a92d-138246d413b3.4113.7",
+        "flags": 0,
+        "user_data": ""
+    }
+]
+2020-04-07 12:46:03.288231 7f800d4d89c0  0 lockdep stop
+{% endhighlight %}
+并且通过S3接口也能够正常的下载。
+
+
+
+4) **停止开发集群**
 
 执行如下命令停止开发集群：
 <pre>
