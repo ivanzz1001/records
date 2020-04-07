@@ -232,7 +232,7 @@ v0.20.2
 
 执行如下命令生成编译对应的Makefile文件：
 <pre>
-# ./configure --with-rbd --with-debug --with-rados --with-radosgw
+# ./configure --with-rbd --with-debug --with-rados --with-radosgw --with-cephfs
 </pre>
 在执行configure过程中可能会提示需要安装相应的软件包，执行如下命令安装：
 <pre>
@@ -398,7 +398,7 @@ run here 3...
 # MON=1 MDS=0 OSD=3  ./vstart.sh -d -n -x
 </pre>
 这里我们针对相关的参数做一个简单的说明：
-{% highlight string %}
+<pre>
 -m  指出monitor节点的ip地址和默认端口6789
 
 -n  指出此次部署为全新部署
@@ -414,8 +414,201 @@ run here 3...
 --mds_num  指出部署的mds个数
 
 --blustore  指出ceph后端存储使用最新的bluestore
+</pre>
+
+现在我们通过如下命令来尝试启动ceph集群：
+{% highlight string %}
+# cd src
+# MON=1 MDS=0 OSD=3  ./vstart.sh -d -n -x -r  
+** going verbose **
+./init-ceph: ceph conf ./ceph.conf not found; system is not configured.
+hostname localhost
+ip 172.19.0.1
+ip 172.19.0.1
+port 
+creating /root/ceph-inst/ceph/src/keyring
+./monmaptool --create --clobber --add a 172.19.0.1:6789 --print /tmp/ceph_monmap.85091
+./monmaptool: monmap file /tmp/ceph_monmap.85091
+./monmaptool: generated fsid c4ea0e5a-962d-48a8-b8a5-56d322d25659
+epoch 0
+fsid c4ea0e5a-962d-48a8-b8a5-56d322d25659
+last_changed 2020-04-07 10:55:43.306120
+created 2020-04-07 10:55:43.306120
+0: 172.19.0.1:6789/0 mon.a
+./monmaptool: writing epoch 0 to /tmp/ceph_monmap.85091 (1 monitors)
+
+
+# ./ceph -s
+*** DEVELOPER MODE: setting PATH, PYTHONPATH and LD_LIBRARY_PATH ***
+2020-04-07 11:00:48.604465 7f9e1306c700 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:00:48.631141 7f9e1306c700 -1 WARNING: the following dangerous and experimental features are enabled: *
+    cluster 5f43afcf-46bd-4bbb-b4fc-b6c86a9ed2a4
+     health HEALTH_OK
+     monmap e1: 1 mons at {a=172.19.0.1:6789/0}
+            election epoch 3, quorum 0 a
+     osdmap e23: 3 osds: 3 up, 3 in
+            flags sortbitwise,require_jewel_osds
+      pgmap v180: 80 pgs, 10 pools, 3441 bytes data, 182 objects
+            130 GB used, 95847 MB / 224 GB avail
+                  80 active+clean
+2020-04-07 11:00:48.748806 7f9e1306c700  0 lockdep stop
+{% endhighlight %}
+所采用的ceph配置文件为： ```./src/ceph.conf```
+
+2) **简单测试开发集群**
+
+我们通过上面的命令建立了一个ceph开发集群，系统在启动时创建了一些pools:
+{% highlight string %}
+# ./ceph osd pool stats
+*** DEVELOPER MODE: setting PATH, PYTHONPATH and LD_LIBRARY_PATH ***
+2020-04-07 11:12:26.518390 7f9e1d831700 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:12:26.547846 7f9e1d831700 -1 WARNING: the following dangerous and experimental features are enabled: *
+pool rbd id 0
+  nothing is going on
+
+pool .rgw.root id 1
+  nothing is going on
+
+pool default.rgw.control id 2
+  nothing is going on
+
+pool default.rgw.data.root id 3
+  nothing is going on
+
+pool default.rgw.gc id 4
+  nothing is going on
+
+pool default.rgw.log id 5
+  nothing is going on
+
+pool default.rgw.users.uid id 6
+  nothing is going on
+
+pool default.rgw.users.email id 7
+  nothing is going on
+
+pool default.rgw.users.keys id 8
+  nothing is going on
+
+pool default.rgw.users.swift id 9
+  nothing is going on
+
+
+2020-04-07 11:12:26.667305 7f9e1d831700  0 lockdep stop
+
+# ./rados df
+2020-04-07 11:14:59.865548 7f2584b38a40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:14:59.866512 7f2584b38a40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:14:59.899009 7f2584b38a40 -1 WARNING: the following dangerous and experimental features are enabled: *
+pool name                 KB      objects       clones     degraded      unfound           rd        rd KB           wr        wr KB
+.rgw.root                  2            4            0            0            0            0            0            4            5
+default.rgw.control            0            8            0            0            0            0            0            0            0
+default.rgw.data.root            0            0            0            0            0            0            0            0            0
+default.rgw.gc             0           32            0            0            0           96           64           64            0
+default.rgw.log            0          127            0            0            0          762          635          508            0
+default.rgw.users.email            1            3            0            0            0            0            0            3            3
+default.rgw.users.keys            1            3            0            0            0            0            0            3            3
+default.rgw.users.swift            1            1            0            0            0            0            0            1            1
+default.rgw.users.uid            2            4            0            0            0            0            0           11            5
+rbd                        0            0            0            0            0            0            0            0            0
+  total used       137340900          182
+  total avail       97939236
+  total space      235280136
+2020-04-07 11:14:59.931645 7f2584b38a40  0 lockdep stop
+{% endhighlight %}
+之后，我们创建一个pool并在其上运行一些benchmarks:
+{% highlight string %}
+# ./rados mkpool mypool
+2020-04-07 11:19:45.616841 7fa375b5ba40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:19:45.618207 7fa375b5ba40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:19:45.655335 7fa375b5ba40 -1 WARNING: the following dangerous and experimental features are enabled: *
+successfully created pool mypool
+2020-04-07 11:19:46.026736 7fa375b5ba40  0 lockdep stop
+# ./rados -p mypool bench 10 write -b 123
+2020-04-07 11:20:24.984180 7f3fa2f77a40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:20:24.984408 7f3fa2f77a40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:20:25.005372 7f3fa2f77a40 -1 WARNING: the following dangerous and experimental features are enabled: *
+Maintaining 16 concurrent writes of 123 bytes to objects of size 123 for up to 10 seconds or 0 objects
+Object prefix: benchmark_data_localhost.localdomain_88020
+  sec Cur ops   started  finished  avg MB/s  cur MB/s last lat(s)  avg lat(s)
+    0       0         0         0         0         0           -           0
+    1      16       346       330  0.038795 0.0387096   0.0807099   0.0460022
+    2      16       541       525 0.0308099 0.0228739   0.0318836    0.059042
+    3      16       569       553  0.021611 0.00328445    0.135172   0.0750213
+    4      16       706       690 0.0202186 0.0160704   0.0357038   0.0839862
+    5      16       865       849 0.0199035  0.018651    0.411248   0.0863968
+    6      16      1011       995 0.0194387 0.0171261   0.0260452   0.0904323
+    7      16      1173      1157  0.019375 0.0190029   0.0368545    0.094143
+    8      16      1317      1301 0.0190634 0.0168915   0.0734105   0.0944436
+    9      16      1481      1465 0.0190815 0.0192375   0.0222677   0.0981518
+   10      16      1619      1603 0.0187919 0.0161877   0.0382804    0.097628
+Total time run:         10.323772
+Total writes made:      1620
+Write size:             123
+Object size:            123
+Bandwidth (MB/sec):     0.0184069
+Stddev Bandwidth:       0.00865831
+Max bandwidth (MB/sec): 0.0387096
+Min bandwidth (MB/sec): 0.00328445
+Average IOPS:           156
+Stddev IOPS:            73
+Max IOPS:               330
+Min IOPS:               28
+Average Latency(s):     0.101956
+Stddev Latency(s):      0.128364
+Max latency(s):         0.727147
+Min latency(s):         0.00689636
+Cleaning up (deleting benchmark objects)
+Clean up completed and total clean up time :2.174140
+2020-04-07 11:20:38.252923 7f3fa2f77a40  0 lockdep stop
+{% endhighlight %}
+之后我们通过如下的命令上传一些文件到pool中：
+{% highlight string %}
+# echo "hello,world, this is the first file" >> /opt/helloworld.txt
+# echo "this file just for test" >> /opt/ossobject.txt
+# ./rados -p mypool put objectone /opt/helloworld.txt 
+2020-04-07 11:27:05.979105 7fad259ffa40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:27:05.979418 7fad259ffa40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:27:06.001004 7fad259ffa40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:27:06.035992 7fad259ffa40  0 lockdep stop
+# ./rados -p mypool put objecttwo /opt/ossobject.txt 
+2020-04-07 11:27:19.146952 7fb41d43ca40  0 lockdep start
+2020-04-07 11:27:19.147590 7fb41d43ca40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:27:19.148017 7fb41d43ca40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:27:19.175291 7fb41d43ca40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:27:19.209158 7fb41d43ca40  0 lockdep stop
+{% endhighlight %}
+上传完成后，我们通过如下命令列出pool中的object:
+{% highlight string %}
+# ./rados -p mypool ls
+2020-04-07 11:32:19.140324 7f97cea6ea40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:32:19.140542 7f97cea6ea40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:32:19.161769 7f97cea6ea40 -1 WARNING: the following dangerous and experimental features are enabled: *
+objectone
+objecttwo
+2020-04-07 11:32:19.203814 7f97cea6ea40  0 lockdep stop
 {% endhighlight %}
 
+然后我们在把刚上床的那两个object下载下来看看：
+{% highlight string %}
+# ./rados -p mypool get objectone /opt/download_helloworld.txt
+2020-04-07 11:34:20.877566 7fca88094a40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:34:20.878229 7fca88094a40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:34:20.906457 7fca88094a40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:34:20.948758 7fca88094a40  0 lockdep stop
+# ./rados -p mypool get objecttwo /opt/download_ossobject.txt
+2020-04-07 11:34:40.642173 7f5dee1f1a40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:34:40.642473 7f5dee1f1a40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:34:40.665007 7f5dee1f1a40 -1 WARNING: the following dangerous and experimental features are enabled: *
+2020-04-07 11:34:40.693866 7f5dee1f1a40  0 lockdep stop
+
+
+# cat /opt/download_helloworld.txt 
+hello,world, this is the first file
+# cat /opt/download_ossobject.txt 
+this file just for test
+{% endhighlight %}
+可以看到当前我们的ceph集群可以正常的进行上传下载操作。
 
 3) **停止开发集群**
 
