@@ -258,10 +258,26 @@ v0.20.2
 --prefix=/usr/local/ceph --sysconfdir=/etc/ceph
 </pre>
 
-如果需要调试的话，可以执行如下命令安装调试依赖包：
+如果我们想要使用GDB来进行调试的话，我们需要修改Makefile文件，找到所有```O2```行，把它替换成```-O0-Wall -g```:
+<pre>
+# pwd
+/root/ceph-inst/ceph
+
+# grep -nw "O2" ./Makefile
+431:CCASFLAGS = -g -O2
+433:CFLAGS = -D_LARGEFILE64_SOURCE -g -O2
+443:CXXFLAGS = -g -O2 -std=gnu++11
+532:PYTHON_CFLAGS = -I/usr/include/python2.7 -I/usr/include/python2.7 -fno-strict-aliasing -O2 -g ...
+</pre>
+
+
+如果需要进行更深层次调试的话，可以执行如下命令安装调试依赖包：
 <pre>
 # yum install  lttng-tools* lttng-ust* lttng*
 </pre>
+
+
+
 
 * 1.3 编译
 
