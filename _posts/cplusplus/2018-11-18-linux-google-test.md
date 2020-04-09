@@ -259,7 +259,32 @@ int main(int argc, char *argv[])
               ::testing::internal::GetTypeId<test_fixture>())
 {% endhighlight %}
 
-TEST是一个宏定义，而```GTEST_TEST_```也是一个宏，其会根据test_suit_name以及test_name字符串拼接出一个class name，然后会采用该class生成相应的对象登记到google测试框架中。从而在调用RUN_ALL_TESTS()时就会一个个的执行相应的测试用例。
+TEST是一个宏定义，而```GTEST_TEST_```也是一个宏，其会根据```test_fixture```以及```test_name```字符串拼接出一个class name，然后会采用该class生成相应的对象登记到google测试框架中。从而在调用RUN_ALL_TESTS()时就会一个个的执行相应的测试用例。例如:
+{% highlight string %}
+TEST_F(FooTest, InitializesCorrectly) {
+     EXPECT_TRUE(a_.StatusIsOK());
+}
+
+//展开后会变成：
+class FooTest_InitializesCorrectly_Test : public FooTest{
+public:
+	FooTest_InitializesCorrectly_Test(FooTest, InitializesCorrectly){}
+
+private:                                                                 \
+    void TestBody() override; 
+	
+	static ::testing::TestInfo* const test_info_ GTEST_ATTRIBUTE_UNUSED_;
+	GTEST_DISALLOW_COPY_AND_ASSIGN_(GTEST_TEST_CLASS_NAME_(test_suite_name,test_name));
+};
+
+//然后再构造FooTest_InitializesCorrectly_Test对象，然后调用TestBody()方法。其中TestBody()方法其实就是通过宏拼凑出一个类似
+//如下的函数
+void FooTest_InitializesCorrectly_Test::TestBody(){
+	EXPECT_TRUE(a_.StatusIsOK());
+}
+{% endhighlight %}
+
+
 
 因为上面每个拼接生成的类都会继承自testing::Test，因此这里提供了另外一个宏定义```TEST_F```允许我们对testing::Testing做一些相应的修改，即我们可以通过继承testing::Test来对相应的成员函数进行重载，从而满足一些特定的需求。
 
@@ -395,8 +420,14 @@ public:
 };
 
 TEST_F(TestMap, test1){
-
+	cout<<"this is test1"<<endl;
 	s->print();
+	count<<"end test1"<<endl;
+}
+TEST_F(TestMap, test2){
+	cout<<"this is test2"<<endl;
+	s->print();
+	count<<"end test2"<<endl;
 }
 
 int main(int argc, char *argv[]){
@@ -461,16 +492,27 @@ bool IsPrime(int n)
 	return true;
 }
 
+bool isEven(int n)
+{
+	return n % 2 == 0 ? true : false;
+}
 
-class IsPrimeParamTest : public::testing::TestWithParam<int>{};
-TEST_P(IsPrimeParamTest, HandleTrueReturn)
+
+class MyParamTest : public::testing::TestWithParam<int>{};
+TEST_P(MyParamTest, CheckPrimer)
 {
 	int n =  GetParam();
 	EXPECT_TRUE(IsPrime(n));
 }
 
+TEST_P(MyParamTest, CheckEven)
+{
+	int n = GetParam();
+	EXPECT_TRUE(isEven(n));
+}
+
 //被测函数须传入多个相关的值
-INSTANTIATE_TEST_CASE_P(TrueReturn, IsPrimeParamTest, testing::Values(3, 5, 11, 23, 17));
+INSTANTIATE_TEST_CASE_P(NumberTest, MyParamTest, testing::Values(3, 5, 11, 23, 17));
 int main(int argc, char **argv)
 {
 	testing::InitGoogleTest(&argc, argv);
