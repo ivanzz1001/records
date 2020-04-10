@@ -454,7 +454,6 @@ this is test1
 end test1
 TearDown()
 [       OK ] TestMap.test1 (0 ms)
-
 [ RUN      ] TestMap.test2
 SetUp() is running
 this is test2
