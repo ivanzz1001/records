@@ -272,7 +272,42 @@ Context *onreadable 和 Context *onreadable_sync 这两个函数分别对应于�
 Context *ondisk   这个回调函数就是事务进行on_commit后的回调函数
 {% endhighlight %}
 
+### 2.2 ObjectStore代码示例
+下面通过一段ObjectStore的测试代码，来展示ObjectStore的基本功能和接口使用：
 
+1) 首先调用create方法创建一个ObjectStore实例。参数分别为配置选项CephContext，对象存储的类型： filestore，对象存储的目录名，日志文件名。如下
+{% highlight string %}
+ObjectStore *store_ = ObjectStore::create(g_ceph_context,
+                                              string(GetParam()),
+                                              string("store_test_temp_dir"),
+                                              string("store_test_temp_journal"));
+{% endhighlight %}
+
+2) 创建并加载ObjectStore本地对象存储
+{% highlight string %}
+store_->mkfs();             //此处会创建数据存储目录store_test_temp_dir下面的相关文件，以及journal日志文件store_test_temp_journal
+store_->mount()
+{% endhighlight %}
+
+3) 创建了一个collection，并写数据到一个对象中。对象的任何写操作，都先调用事务的相关写操作。事务把相关操作的元数据和数据封装，然后调用store的apply_transaction来真正实现数据的更改。
+{% highlight string %}
+ObjectStore::Sequencer osr("test");
+int r;
+coll_t cid;
+ghobject_t hoid(hobject_t(sobject_t("Object 1", CEPH_NOSNAP)));
+
+ObjectStore::Transaction t;
+bufferlist bl;
+
+bl.append("123456");
+t.create_collection(cid, 0);             //创建一个collection(pg)，直观上我们看到的就是一个文件夹。并不需要每次都创建，
+t.write(cid, hoid, 0, bl.length(), bl);  //写对象数据
+
+r = store->apply_transaction(&osr, std::move(t));   //事务的应用，真正实现数据的写入操作
+
+store->umount();               
+r = store->mount();
+{% endhighlight %}
 
 
 ## 8. 附录--ceph存储object的attr和omap操作

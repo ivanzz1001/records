@@ -291,7 +291,10 @@ v0.20.2
 <pre>
 # make
 
+//单独编译osd模块，可执行(src目录下)
+# make ceph-osd
 //执行make check会运行src/tests目录下的单元测试
+
 # make check
 ============================================================================
 Testsuite summary for ceph 10.2.10
