@@ -23,6 +23,12 @@ KStore和Memstore两种存储引擎比较简单，这里就不介绍了（会在
 
 在了解ceph filestore本地对象对象存储的具体实现之前，建议先参看本章```附录```相关内容，以对object的attr及omap操作有一个直观上的认识。
 
+我们可以通过ceph_test_objectstore来对本地对象存储有一个更深的理解，执行如下命令进行编译：
+<pre>
+# cd src
+# make ceph_test_objectstore
+</pre>
+
 <!-- more -->
 
 ## 1. 基本概念介绍
