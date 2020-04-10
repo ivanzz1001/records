@@ -258,7 +258,7 @@ statfs 获取objectstore系统信息
 <pre>
 getattr   获取对象的扩展属性xattr
 omap_get  获取对象的omap信息 
-<pre>
+</pre>
 
 * queue_transactions是所有ObjectStore更新操作的接口。更新相关的操作(例如创建一个对象，修改属性，写数据等）都是以事务的方式提交给ObjectStore，该函数被重载成各种不同的接口。其参数为：
 {% highlight string %}
