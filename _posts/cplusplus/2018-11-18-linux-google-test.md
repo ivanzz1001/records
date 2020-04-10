@@ -422,12 +422,12 @@ public:
 TEST_F(TestMap, test1){
 	cout<<"this is test1"<<endl;
 	s->print();
-	count<<"end test1"<<endl;
+	cout<<"end test1"<<endl;
 }
 TEST_F(TestMap, test2){
 	cout<<"this is test2"<<endl;
 	s->print();
-	count<<"end test2"<<endl;
+	cout<<"end test2"<<endl;
 }
 
 int main(int argc, char *argv[]){
@@ -441,24 +441,34 @@ int main(int argc, char *argv[]){
 编译运行：
 <pre>
 # gcc -o test test.cpp -lstdc++ -std=c++11 `pkg-config --cflags --libs gtest`
-# ./test
-[==========] Running 1 test from 1 test suite.
+# ./test 
+[==========] Running 2 tests from 1 test suite.
 [----------] Global test environment set-up.
 Foo FooEnvironment SetUP
-[----------] 1 test from TestMap
+[----------] 2 tests from TestMap
 SetUpTestCase()
 [ RUN      ] TestMap.test1
 SetUp() is running
+this is test1
 *********** 23 **********
+end test1
 TearDown()
 [       OK ] TestMap.test1 (0 ms)
+
+[ RUN      ] TestMap.test2
+SetUp() is running
+this is test2
+*********** 23 **********
+end test2
+TearDown()
+[       OK ] TestMap.test2 (1 ms)
 TearDownTestCase()
-[----------] 1 test from TestMap (0 ms total)
+[----------] 2 tests from TestMap (1 ms total)
 
 [----------] Global test environment tear-down
 Foo FooEnvironment TearDown
-[==========] 1 test from 1 test suite ran. (0 ms total)
-[  PASSED  ] 1 test.
+[==========] 2 tests from 1 test suite ran. (1 ms total)
+[  PASSED  ] 2 tests.
 </pre>
 
 ## 6. 参数化
