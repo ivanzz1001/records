@@ -235,6 +235,100 @@ WRITE_INTTYPE_ENCODER(int16_t, le16)
 从上面可以看出，对基本数据类型的编码还是比较简单，不考虑大小端。
 
 
+## 5. Finisher
+类Finisher用来完成回调函数Context的执行，其内部有一个FinisherThread线程来用于执行Context回调函数:
+{% highlight string %}
+class Finisher {
+  CephContext *cct;
+  Mutex        finisher_lock;           //Protects access to queues and finisher_running.
+  Cond         finisher_cond;           //Signaled when there is something to process
+  Cond         finisher_empty_cond;     //Signaled when the finisher has nothing more to process
+  bool         finisher_stop            //Set when the finisher should stop
+  bool         finisher_running;        //True when the finisher is currently executing contexts.
+
+  //需要执行的Context列表。若对应的Context不为NULL，则执行complete(0)回调； 否则，表明应该执行finisher_queue_rval
+  //队列中相应元素的complete(r)回调
+  vector<Context*> finisher_queue;
+
+  //执行complete(r)这样的回调 
+  list<pair<Context*,int> > finisher_queue_rval;
+};
+{% endhighlight %}
+
+## 6. Throttle
+类Throttle用来限制消费的资源数量（也常称为槽位"slot")，当请求的slot数量达到max值时，请求就会被阻塞在一个```队列```中，直到有新的slot被释放出来，然后会唤醒阻塞在队列中的第一个请求。代码如下（src/common/throttle.cc）：
+{% highlight string %}
+class Throttle {
+  CephContext *cct;
+  const std::string name;
+  PerfCounters *logger;
+  ceph::atomic_t count, max;    //count: 当前占用的slot数量  max: slot数量的最大值
+  Mutex lock;                   //等待的互斥锁
+  list<Cond*> cond;             //等待的条件变量。这里采用队列，因为在slot被释放时，排在队列头的请求应该优先被满足
+  const bool use_perf;
+};
+{% endhighlight %}
+
+1） **函数get**
+
+函数原型如下：
+{% highlight string %}
+bool Throttle::get(int64_t c, int64_t m);
+{% endhighlight %}
+函数get()用于获取数量为c个slot，参数c默认为1，参数m默认为0。如果m不为默认的值0，就用m值重新设置slot的max值。如果成功获取数量为c个slot，就返回true，否则就阻塞等待。
+
+2) **函数get_or_fail**
+
+原型如下：
+{% highlight string %}
+bool Throttle::get_or_fail(int64_t c);
+{% endhighlight %}
+函数get_or_fail()当获取不到数量为c个slot时，就直接返回false，不阻塞等待。
+
+3) **函数put**
+
+原型如下：
+{% highlight string %}
+int64_t Throttle::put(int64_t c);
+{% endhighlight %}
+
+函数put用于释放数量为c个slot资源。
+
+## 7. SafeTimer
+类SafeTimer实现了定时器的功能，代码如下(src/common/timer.cc)：
+{% highlight string %}
+class SafeTimer{
+  CephContext *cct;
+  Mutex& lock;
+  Cond cond;
+  bool safe_callbacks;         //是否是safe_callbacks
+
+  SafeTimerThread *thread;     //定时器执行线程
+
+  //目标时间和定时任务执行函数Context
+  std::multimap<utime_t, Context*> schedule;
+
+  //定时任务<--->定时任务在schedule中的位置映射
+  std::map<Context*, std::multimap<utime_t, Context*>::iterator> events;
+  bool stopping;
+};
+{% endhighlight %}
+
+添加定时任务的命令如下：
+{% highlight string %}
+void SafeTimer::add_event_at(utime_t when, Context *callback);
+{% endhighlight %}
+
+取消定时任务的命令如下：
+{% highlight string %}
+bool SafeTimer::cancel_event(Context *callback);
+{% endhighlight %}
+
+定时任务的执行如下：
+{% highlight string %}
+void SafeTimer::timer_thread();
+{% endhighlight %}
+
 
 
 <br />

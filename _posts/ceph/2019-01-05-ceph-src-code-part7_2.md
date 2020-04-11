@@ -86,7 +86,57 @@ public:
 };
 {% endhighlight %}
 
-结构体write_item封装了一条提交的日志，seq为提交日志的序号，bl保存了提交的日志数据，也就是提交的事务或事务的集合序列化后的数据。Journal并不关心日志数据的内容，它认为一条日志就是一段写入的数据，只负责把数据正确写入日志盘。
+结构体write_item封装了一条提交的日志，seq为提交日志的序号，bl保存了提交的日志数据，也就是提交的事务或事务的集合序列化后的数据。Journal并不关心日志数据的内容，它认为一条日志就是一段写入的数据，只负责把数据正确写入日志盘。orig_len记录日志的原始长度，由于日志字节对齐的需要，最终写入的数据长度可能会变化。
+
+所有提交的日志，都先保存到writeq这个内部的队列中，writeq_lock和writeq_cond是writeq相应的锁和条件变量。
+
+
+2） **completion_item部分**
+{% highlight string %}
+struct completion_item {
+uint64_t seq;                        //日志的序号
+Context *finish;                     //完成后的回调函数
+utime_t start;                       //提交时间
+TrackedOpRef tracked_op;
+completion_item(uint64_t o, Context *c, utime_t s,
+	    TrackedOpRef opref)
+  : seq(o), finish(c), start(s), tracked_op(opref) {}
+
+completion_item() : seq(0), finish(0), start(0) {}
+};
+
+Mutex completions_lock;
+list<completion_item> completions;
+{% endhighlight %}
+结构体completion_item记录准备提交的item，保存在列表completions中。由锁completions_lock保护。
+
+3） **日志头部header_t**
+{% highlight string %}
+struct header_t{
+	enum {
+		FLAG_CRC = (1<<0),
+	};
+	
+	uint64_t flags;                   //日志的一些标志
+	uuid_d fsid;                      //文件系统的id
+	__u32 block_size;                 //日志文件或设备的块大小
+	__u32 alignment;                  //对齐
+	int64_t max_size;                 //日志的最大size。日志是一段一段的，每一段日志都要有一个日志头
+	int64_t start;                    //offset of first entry
+	uint64_t committed_up_to;         //已经提交的日志的seq，等同于journaled_seq
+	
+	/*
+	 * 本日志段的起始seq，header.start处的日志的seq >= start_seq
+	 *
+	 * 通常情况下，header.start处的日志的seq会等于start_seq。唯一的例外是当新创建一个日志文件时，由于
+	 * 并不知道初始seq是什么，这种情况下就会出现header.start处的seq > start_seq
+	 *
+	 * 假如在打开一个日志文件后，初始读取日志失败，若start_seq > committed_up_thru的话，我们就认为
+	 * 日志已经遭到了破坏，因为header.start处的日志的seq >= start_seq，因此肯定会 > committed_up_thru
+	 */
+	uint64_t start_seq;               
+}header;	
+{% endhighlight %}
 
 <br />
 <br />
