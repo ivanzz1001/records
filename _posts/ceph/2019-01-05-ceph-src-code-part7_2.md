@@ -132,11 +132,51 @@ struct header_t{
 	 * 并不知道初始seq是什么，这种情况下就会出现header.start处的seq > start_seq
 	 *
 	 * 假如在打开一个日志文件后，初始读取日志失败，若start_seq > committed_up_thru的话，我们就认为
-	 * 日志已经遭到了破坏，因为header.start处的日志的seq >= start_seq，因此肯定会 > committed_up_thru
+	 * 日志已经遭到了破坏，因为header.start处的日志的seq >= start_seq，因此肯定会有 seq > committed_up_thru
 	 */
 	uint64_t start_seq;               
 }header;	
 {% endhighlight %}
+
+4） **其他字段**
+{% highlight string %}
+bool must_write_header;         //是否必须写入一个header，当日志同步完成后，就设置本标准，必须要写入一个header，
+                                //以持久化保存因日志同步而变化了的header结构
+off64_t write_pos;              //日志写的开始位置
+off64_t read_pos;               //日志读取的位置
+
+uint64_t last_committed_seq;    //最后同步完成的seq           
+
+
+enum {
+	FULL_NOTFULL = 0,
+	FULL_FULL = 1,
+	FULL_WAIT = 2,
+} full_state;                  //日志的磁盘空间状态
+
+
+deque<pair<uint64_t, off64_t> > journalq;  // 跟踪记录在日志中的偏移，用于在日志删除时可以方便的知道偏移位置
+uint64_t writing_seq;                      //当前正在写入的最大的seq
+
+Mutex write_lock;                          //
+bool write_stop;                           //写线程是否停止的标记
+
+
+Mutex finisher_lock;
+Cond finisher_cond;
+uint64_t journaled_seq;                    //已提交成功的日志的最大seq
+{% endhighlight %}
+
+
+### 2.2 日志的格式
+日志的格式如下：
+<pre>
+entry_header_t + journal data + entry_header_t
+</pre>
+每条日志数据的头部和尾部都添加了entry_header_t结构。此外，日志在每次同步完成的时候设置must_write_header为true时会强制插入一个日志头header_t的结构，用于持久化存储header中变化了的字段。日志的结构如下图7-1所示。
+
+
+
 
 <br />
 <br />
