@@ -132,16 +132,16 @@ void BWInsertSort(SqList *L, SqList *D)
 				middle = (low + high) /2;
 				
 				if(D->r[(middle -1 + len) % len + 1] <= L->r[i]){
-					low++;
+					low = middle+1;
 				}else{
-					high--;
+					high = middle-1;
 				}
 			}
 			
-			for(j = first; j <= high + 1; j++)
+			for(j = first; j <= low -1; j++
 				D->r[((j-1) - 1 + len) % len + 1] = D->r[(j -1 + len) % len + 1];
-				
-			D->r[((high + 1) -1 + len) % len + 1] = L->r[i];	
+	
+			D->r[((low-1) -1 + len) % len + 1] = L->r[i];	
 			
 			first--;
 		}else{
@@ -151,19 +151,20 @@ void BWInsertSort(SqList *L, SqList *D)
 			while(low <= high){
 				middle = (low + high) >> 1;
 				if(D->r[(middle -1 + len) % len + 1] <= L->r[i])
-					low++;
+					low = middle + 1;
 				else{
-					high--;
+					high = middle -1;
 				}
-				
-				for(j = last; j>=high+1; j--){
-					D->r[((j+1)-1 + len) % len + 1] = D->r[(j -1 + len) % len +1];
-				}
-				
-				D->r[((high+1)-1 + len) % len + 1] = L->r[i];
-				
-				last++;
 			}
+				
+			for(j = last; j>=high+1; j--){
+				D->r[((j+1)-1 + len) % len + 1] = D->r[(j -1 + len) % len +1];
+			}
+				
+			D->r[((high+1)-1 + len) % len + 1] = L->r[i];
+				
+			last++;
+			
 		}
 	}
 }
