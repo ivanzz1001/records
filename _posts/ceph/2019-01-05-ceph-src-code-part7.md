@@ -115,6 +115,7 @@ struct TransactionData {
       __le32 fadvise_flags;                //一些标志
 };
 {% endhighlight %}
+比如我们对一个Transaction t进行了两次write操作，那么t.data.ops的值就是2，后面我们在构造FileStore::Op时可能就会需要用到该值。
 
 一个事务中，对应如下三类回调函数，分别在事务不同的处理阶段调用。当事务完成相应阶段工作后，就调用相应的回调函数来通知事件完成。注意每一类都可以注册多个回调函数：
 {% highlight string %}
@@ -123,6 +124,8 @@ list<Context *> on_commit;
 list<Context *> on_applied_sync;
 {% endhighlight %}
 on_commit是事务提交完成之后调用的回调函数；on_applied_sync和on_applied都是事务应用完成之后的回调函数。前者是被同步调用执行，后者是在Finisher线程里异步调用执行。
+
+注： on_commit是在事务提交完成之后会通过Finisher线程进行异步回调。这里对```事务提交完成```进行一下说明，对于journal writeahead模式，由于首先是进行写日志操作，然后才是应用日志操作，那么此种情况下，写日志完成即认为```事务提交完成```；而对于journal parallel模式，由于写日志与应用日志是并行进行的，因此这两个操作任意一个完成即认为```事务提交完成```。
 
 
 
