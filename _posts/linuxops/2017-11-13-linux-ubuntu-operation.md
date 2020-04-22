@@ -678,7 +678,7 @@ abcd   efg
 
 
 * 去除行尾空格
-{% highlight string 5}
+{% highlight string %}
 # sed 's/[ \t]*$//g' ./mytest.txt 
    abcd   efg
 {% endhighlight %}
