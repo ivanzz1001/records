@@ -534,8 +534,161 @@ a.out: ELF 64-bit LSB executable, AMD x86-64, version 1 (SYSV), for GNU/Linux 2.
 {% endhighlight %}
 
 
+**29) shell awk 统计重复个数**
+
+现有如下```file.log```文件：
+{% highlight string %}
+# cat file.log
+http://www.sohu.com/aaa
+http://www.sina.com/111
+http://www.sohu.com/bbb
+http://www.sina.com/222
+http://www.sohu.com/ccc
+http://www.163.com/zzz
+http://www.sohu.com/ddd
+{% endhighlight %}
+现在要统计每个域名出现的次数，并按倒序排列：
+{% highlight string %}
+# awk -F / '{a[$3]++} END{for(i in a) {print i, a[i] | "sort -rnk 2"} }' ./file.log 
+www.sohu.com 4
+www.sina.com 2
+www.163.com 1
+{% endhighlight %}
+
+**30) shell去除空行**
+
+有时我们在处理和查看文件时，经常会有很多空行，为了美观或是有需要时，就有必要把这些空行去除掉。例如我们有如下文件````file.log```：
+{% highlight string %}
+#  tee << 'EOF' > file.log
+> http://www.sohu.com/aaa 
+> 
+> http://www.sina.com/111 
+> 
+> http://www.sohu.com/bbb 
+> 
+> http://www.sina.com/222 
+> 
+> http://www.sohu.com/ccc 
+> 
+> http://www.163.com/zzz 
+> 
+> http://www.sohu.com/ddd 
+> 
+> EOF
+# cat file.log
+http://www.sohu.com/aaa 
+
+http://www.sina.com/111 
+
+http://www.sohu.com/bbb 
+
+http://www.sina.com/222 
+
+http://www.sohu.com/ccc 
+
+http://www.163.com/zzz 
+
+http://www.sohu.com/ddd 
+
+{% endhighlight %}
+我们可以用如下4种方法来去除里面的空行：
+
+* tr命令
+<pre>
+# cat file.log | tr -s '\r\n'
+http://www.sohu.com/aaa 
+http://www.sina.com/111 
+http://www.sohu.com/bbb 
+http://www.sina.com/222 
+http://www.sohu.com/ccc 
+http://www.163.com/zzz 
+http://www.sohu.com/ddd 
+</pre>
+
+* sed命令
+<pre>
+# cat file.log | sed '/^$/d'
+http://www.sohu.com/aaa 
+http://www.sina.com/111 
+http://www.sohu.com/bbb 
+http://www.sina.com/222 
+http://www.sohu.com/ccc 
+http://www.163.com/zzz 
+http://www.sohu.com/ddd
+</pre>
+
+* awk命令
+{% highlight string %}
+# cat file.log | awk '{if ($0 != "") print}'
+http://www.sohu.com/aaa 
+http://www.sina.com/111 
+http://www.sohu.com/bbb 
+http://www.sina.com/222 
+http://www.sohu.com/ccc 
+http://www.163.com/zzz 
+http://www.sohu.com/ddd 
+
+# cat file.log | awk '{if (length != 0) print $0}'
+http://www.sohu.com/aaa 
+http://www.sina.com/111 
+http://www.sohu.com/bbb 
+http://www.sina.com/222 
+http://www.sohu.com/ccc 
+http://www.163.com/zzz 
+http://www.sohu.com/ddd 
+{% endhighlight %}
+
+* grep命令
+{% highlight string %}
+# grep -v "^$" ./file.log 
+http://www.sohu.com/aaa 
+http://www.sina.com/111 
+http://www.sohu.com/bbb 
+http://www.sina.com/222 
+http://www.sohu.com/ccc 
+http://www.163.com/zzz 
+http://www.sohu.com/ddd
+{% endhighlight %}
+
+**31) shell去除空格**
+
+假设我们有如下文件:
+{% highlight string %}
+# tee << 'EOF' > mytest.txt
+>    abcd   efg  
+> EOF
+{% endhighlight %}
+
+* 去除行首空格
+{% highlight string %}
+# sed 's/^[ \t]*//g' ./mytest.txt 
+abcd   efg
+{% endhighlight %}
+说明：
+
+第一个```/```的左边是s表示替换，即将空格替换为空。
+
+第一个```/```的右边是表示后面的以xx开头。
+
+中括号表示“或”，空格或tab中的任意一种。这是正则表达式的规范。中括号右边是```*```，表示一个或多个。
+
+第二个和第三个```/```中间没有东西，表示空
+
+整体的意思是：用空字符去替换一个或多个用空格或tab开头的本体字符串
 
 
+* 去除行尾空格
+{% highlight string 5}
+# sed 's/[ \t]*$//g' ./mytest.txt 
+   abcd   efg
+{% endhighlight %}
+上面```$```符号表示以xx结尾的字符串为对象
+
+* 去除所有空格
+{% highlight string %}
+# sed 's/[ \t]*//g' ./mytest.txt 
+abcdefg
+{% endhighlight %}
 
 <br />
 <br />
