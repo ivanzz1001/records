@@ -366,6 +366,73 @@ WRITE_INTTYPE_ENCODER(int16_t, le16)
 {% endhighlight %}
 从上面可以看出，对基本数据类型的编码还是比较简单，不考虑大小端。
 
+## 4. 线程池
+线程池(ThreadPool)在分布式存储系统的实现中是必不可少的，在ceph的代码中广泛用到。Ceph中线程池的实现也比较复杂，结构如下：
+{% highlight string %}
+class ThreadPool : public md_config_obs_t {
+  CephContext *cct;
+  string name;                             //线程池的名字
+  string thread_name;
+  string lockname;                         //锁的名字
+  Mutex _lock;                             //线程互斥的锁，也是工作队列访问互斥的锁
+  Cond _cond;                              //锁对应的条件变量
+  bool _stop;                              //线程池是否停止的标志
+  int _pause;                              //暂时终止线程池的标志
+  int _draining;
+  Cond _wait_cond;
+  int ioprio_class, ioprio_priority;
+  
+  vector<WorkQueue_*> work_queues;        //工作队列
+  int last_work_queue;                    //最后访问的工作队列
+  
+  set<WorkThread*> _threads;              //线程池中的工作线程
+  list<WorkThread*> _old_threads;        ///< need to be joined
+  int processing;
+};
+{% endhighlight %}
+
+
+另外，
+{% highlight string %}
+class ThreadPool : public md_config_obs_t {
+public:
+  class TPHandle {};
+  
+private:
+
+  /// Basic interface to a work queue used by the worker threads.
+  struct WorkQueue_ {};
+  
+public:
+  /** @brief Work queue that processes several submitted items at once.
+   * The queue will automatically add itself to the thread pool on construction
+   * and remove itself on destruction. */
+  template<class T>
+  class BatchWorkQueue : public WorkQueue_ {};
+  
+  /** @brief Templated by-value work queue.
+   * Skeleton implementation of a queue that processes items submitted by value.
+   * This is useful if the items are single primitive values or very small objects
+   * (a few bytes). The queue will automatically add itself to the thread pool on
+   * construction and remove itself on destruction. */
+  template<typename T, typename U = T>
+  class WorkQueueVal : public WorkQueue_ {};
+  
+  /** @brief Template by-pointer work queue.
+   * Skeleton implementation of a queue that processes items of a given type submitted as pointers.
+   * This is useful when the work item are large or include dynamically allocated memory. The queue
+   * will automatically add itself to the thread pool on construction and remove itself on
+   * destruction. */
+  template<class T>
+  class WorkQueue : public WorkQueue_ {};
+  
+  template<typename T>
+  class PointerWQ : public WorkQueue_ {};
+  
+  struct WorkThread : public Thread {};
+};
+{% endhighlight %}
+
 
 ## 5. Finisher
 类Finisher用来完成回调函数Context的执行，其内部有一个FinisherThread线程来用于执行Context回调函数:
