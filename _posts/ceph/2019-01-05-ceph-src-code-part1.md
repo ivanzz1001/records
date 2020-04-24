@@ -11,6 +11,138 @@ description: ceph源代码分析
 
 <!-- more -->
 
+## 1. Object
+对象Object是默认为4MB大小的数据块。一个对象就对应本地文件系统中的一个文件。在代码实现中，有object、sobject、hobject、ghobject等不同的类。它们之间的类图层次结构如下所示：
+
+![ceph-chapter2-2](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter2_2.jpg)
+
+相关代码位置： src/include/object.h src/common/hobject.h 
+
+1） **object_t**
+
+结构object_t对应本地文件系统的一个文件，name就是对象名：
+{% highlight string %}
+struct object_t {
+  string name;
+  ....
+};
+{% endhighlight %}
+
+另外针对object_t，在代码中对其特化了一个hash方法：
+{% highlight string %}
+namespace std {
+  template<> struct hash<object_t> {
+    size_t operator()(const object_t& r) const { 
+      //static hash<string> H;
+      //return H(r.name);
+      return ceph_str_hash_linux(r.name.c_str(), r.name.length());
+    }
+  };
+} // namespace std
+{% endhighlight %}
+
+2) **sobject_t**
+
+sobject_t在object_t之上增加了snapshot信息，用于标识是否是快照对象。数据成员snap为快照对象的对应的快照序号。如果一个对象不是快照对象（也就是head对象)，那么snap字段就被设置为```CEPH_NOSNAP```值。
+{% highlight string %}
+struct sobject_t {
+  object_t oid;
+  snapid_t snap;
+  ....
+};
+{% endhighlight %}
+
+
+另外针对sobject_t，在代码中对其特化了一个hash方法：
+{% highlight string %}
+namespace std {
+  template<> struct hash<sobject_t> {
+    size_t operator()(const sobject_t &r) const {
+      static hash<object_t> H;
+      static rjhash<uint64_t> I;
+      return H(r.oid) ^ I(r.snap);
+    }
+  };
+} // namespace std
+{% endhighlight %}
+
+3) **hobject_t**
+
+hobject_t的名字应该是hash object的缩写：
+{% highlight string %}
+struct hobject_t {
+  object_t oid;
+  snapid_t snap;
+private:
+  uint32_t hash;
+  bool max;
+  uint32_t nibblewise_key_cache;
+  uint32_t hash_reverse_bits;
+  static const int64_t POOL_META = -1;
+  static const int64_t POOL_TEMP_START = -2; // and then negative
+  friend class spg_t;  // for POOL_TEMP_START
+public:
+  int64_t pool;
+  string nspace;
+
+private:
+  string key;
+};
+{% endhighlight %}
+如上所示，其在sobject_t的基础上增加了一些字段：
+
+* pool: 所在pool的id；
+
+* nspace: nspace一般为空，它用于标识特殊的对象；
+
+* key: 对象的特殊标记；
+
+* hash: hash和key不能同时设置，hash值一般设置为就是pg的id值；
+
+另外针对hobject_t, 在代码中对其特化了一个hash方法：
+{% highlight string %}
+namespace std {
+  template<> struct hash<hobject_t> {
+    size_t operator()(const hobject_t &r) const {
+      static hash<object_t> H;
+      static rjhash<uint64_t> I;
+      return H(r.oid) ^ I(r.snap);
+    }
+  };
+} // namespace std
+{% endhighlight %}
+
+4) **ghobject_t**
+
+ghobject_t在对象hobject_t的基础上，添加了generation字段和shard_id字段，这个用于ErasureCode模式下的PG：
+{% highlight string %}
+typedef version_t gen_t;
+
+struct ghobject_t {
+  hobject_t hobj;
+  gen_t generation;
+  shard_id_t shard_id;
+  bool max;
+  ....
+};
+{% endhighlight %}
+
+* shard_id: 用于标识对象所在的OSD在EC类型的PG中的序号，对应EC来说，每个OSD在PG中的序号在数据恢复时非常关键。如果是Replicate类型的PG，那么字段就设置为NO_SHARD(-1)，该字段对于replicate是没用。
+
+* generation: 用于记录对象的版本号。当PG为EC时，写操作需要区分写前后两个版本的object，写操作保存对象的上一个版本(generation)的对象，当EC写失败时，可以rollback到上一个版本。
+
+另外针对ghobject_t, 在代码中对其特化了一个hash方法：
+{% highlight string %}
+namespace std {
+  template<> struct hash<ghobject_t> {
+    size_t operator()(const ghobject_t &r) const {
+      static hash<object_t> H;
+      static rjhash<uint64_t> I;
+      return H(r.hobj.oid) ^ I(r.hobj.snap);
+    }
+  };
+} // namespace std
+{% endhighlight %}
 
 ## 2. Buffer
 buffer是一个命名空间，在这个命名空间下定义了Buffer相关的数据结构，这些数据结构在ceph的源代码中广泛使用。下面介绍的buffer:raw类是基础类，其子类完成了Buffer数据空间的分配；buffer::ptr类实现了Buffer内部的一段数据；buffer::list封装了多个数据段。
