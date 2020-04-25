@@ -372,7 +372,7 @@ WRITE_INTTYPE_ENCODER(int16_t, le16)
 class ThreadPool : public md_config_obs_t {
   CephContext *cct;
   string name;                             //线程池的名字
-  string thread_name;
+  string thread_name;                      //线程池中线程的名字
   string lockname;                         //锁的名字
   Mutex _lock;                             //线程互斥的锁，也是工作队列访问互斥的锁
   Cond _cond;                              //锁对应的条件变量
@@ -383,19 +383,30 @@ class ThreadPool : public md_config_obs_t {
   int ioprio_class, ioprio_priority;
   
   vector<WorkQueue_*> work_queues;        //工作队列
-  int last_work_queue;                    //最后访问的工作队列
+  int last_work_queue;                    //最后访问的工作队列(work_queues)
   
   set<WorkThread*> _threads;              //线程池中的工作线程
-  list<WorkThread*> _old_threads;        ///< need to be joined
-  int processing;
+
+  //< need to be joined（如果线程在运行过程中，发现线程数超出了当前的设置，
+  //那么就会自动退出，从而加入到等待joined的队列中）
+  list<WorkThread*> _old_threads;        
+  int processing;                        //当前正在处理的任务数
 };
 {% endhighlight %}
+类ThreadPool里包含一些比较重要的数据成员：
 
+* _threads: 工作线程集合；
 
-另外，
+* _old_threads: 等待join操作的旧线程集合；
+
+* work_queues: 工作队列集合，保存所有要处理的任务。一般情况下，一个工作队列对应一个类型的处理任务，一个线程池对应一个工作队列，专门用于处理该类型的任务。如果是后台任务，又不紧急，就可以多个工作队列放置到一个线程池里，该线程池可以处理不同类型的任务。
+
+另外，ThreadPool中还含有大量的内部类，从而使得代码结构比较冗长，这里我们列出：
 {% highlight string %}
 class ThreadPool : public md_config_obs_t {
 public:
+  //通过heartbeat的方式检测线程池中的线程是否处于健康状态，假如某一个任务执行时间过程，
+  //则会被heartbeat判断为违规，并打印出相应的提示
   class TPHandle {};
   
 private:
@@ -432,6 +443,30 @@ public:
   struct WorkThread : public Thread {};
 };
 {% endhighlight %}
+
+下面我们简要介绍一下ThreadPool中的一些内部类：
+
+* TPHandle: 是ThreadPool Handle的简称，线程池中的每一个线程在执行队列任务时，都会通过heartbeat来检测是否工作超时。在src/common/ceph_context.cc中，CephContext会启动一个service线程来执行heartbeat操作，在其中就会检测注册到cct->get_heartbeat_map()中的handle。
+
+* WorkQueue_： 线程池相关的工作队列的抽象
+
+* BatchWorkQueue：可以批量的处理工作队列中的任务。此外，在创建BatchWorkQueue时，其会自动的加入到线程池中；而在对其进行销毁时，也可以自动的从线程池中移除。
+
+* WorkQueueVal: 通过by-value的形式对WorkQueue_进行的特化。对于一些small objects或者基本数据类型而言，直接通过by-value的形式来进行入队列、出队列均能够获得较好的性能。同样在创建WorkQueueVal时，其会自动的加入到线程池中；而在对其进行销毁时，也可以自动的从线程池中移除。
+
+* WorkQueue：通过by-pointer的形式对WorkQueue_进行特化，这样在处理一些大对象时，使用此队列可以获得较好的性能。同样在创建WorkQueue时，其会自动的加入到线程池中；而在对其进行销毁时，也可以自动的从线程池中移除。
+
+* PointerWQ: 是一个by-pointer形式的WorkQueue。其用一个std::list来存放相应的任务，注意PointerWQ是一个具体的实现，并不是一个抽象类。（注意PointerWQ::drain()的实现）
+
+
+
+>注： 对于ThreadPool的测试，我们可以参看ceph中已有的单元测试程序src/test/test_workqueue.cc
+
+线程池的实现主要包括：线程池的启动过程，线程池对应的工作队列的管理，线程池对应的执行函数如何执行任务。下面分别介绍这些实现。然后介绍一些Ceph线程池实现的超时检查功能，最后介绍ShardedThreadPool的实现原理。
+
+
+
+
 
 
 ## 5. Finisher
