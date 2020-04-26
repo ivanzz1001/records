@@ -458,16 +458,127 @@ public:
 
 * PointerWQ: 是一个by-pointer形式的WorkQueue。其用一个std::list来存放相应的任务，注意PointerWQ是一个具体的实现，并不是一个抽象类。（注意PointerWQ::drain()的实现）
 
+* WorkThread: 线程池中的工作线程的抽象
 
 
 >注： 对于ThreadPool的测试，我们可以参看ceph中已有的单元测试程序src/test/test_workqueue.cc
 
 线程池的实现主要包括：线程池的启动过程，线程池对应的工作队列的管理，线程池对应的执行函数如何执行任务。下面分别介绍这些实现。然后介绍一些Ceph线程池实现的超时检查功能，最后介绍ShardedThreadPool的实现原理。
 
+### 4.1 线程池的启动
+函数ThreadPool::start()用来启动线程池，其在加锁的情况下，调用函数start_threads()，该函数检查当前线程数，如果小于配置的线程数，就创建新的工作线程。
+
+### 4.2 工作队列
+工作队列(WorkQueue)定义了线程池要处理的任务，任务类型在模板参数中指定。在构造函数里，就把自己加入到线程池的工作队列集合中：
+{% highlight string %}
+template<class T>
+class WorkQueue : public WorkQueue_ {
+   ThreadPool *pool;
+
+public:
+    WorkQueue(string n, time_t ti, time_t sti, ThreadPool* p) : WorkQueue_(n, ti, sti), pool(p) {
+      pool->add_work_queue(this);
+    }
+  
+   ....
+};
+{% endhighlight %}
+WorkQueue实现了一部分功能： 进队列和出队列，以及加锁，并通过条件变量通知相应的处理线程：
+{% highlight string %}
+bool queue(T *item) {
+  pool->_lock.Lock();
+  bool r = _enqueue(item);
+  pool->_cond.SignalOne();
+  pool->_lock.Unlock();
+  return r;
+}
+void dequeue(T *item) {
+  pool->_lock.Lock();
+  _dequeue(item);
+  pool->_lock.Unlock();
+}
+void clear() {
+  pool->_lock.Lock();
+  _clear();
+  pool->_lock.Unlock();
+}
+{% endhighlight %}
+还有一部分功能，需要使用者自己定义。需要自己定义实现保存任务的容器，添加和删除方法，以及如何处理任务的方法：
+{% highlight string %}
+virtual bool _enqueue(T *) = 0;
+
+virtual void _dequeue(T *) = 0;
+
+virtual T *_dequeue() = 0;
+
+virtual void _process(T *t, TPHandle &) = 0;
+{% endhighlight %}
+
+### 4.3 线程池的执行函数
+函数worker为线程池的执行函数：
+{% highlight string %}
+void ThreadPool::worker(WorkThread *wt);
+{% endhighlight %}
+其处理过程如下：
+
+1) 首先检查_stop标志，确保线程池没有关闭；
+
+2) 调用函数join_old_threads()把旧的工作线程释放掉。检查如果线程数量大于配置的数量_num_threads，就把当前线程从线程集合中删除，并加入_old_threads队列中，并退出循环；
+
+3)  如果线程池没有暂停，并且work_queues不为空，就从last_work_queue开始，遍历每一个工作队列，如果工作队列不为空，就取出一个item，调用工作队列的处理函数做处理。
+
+### 4.4 超时检查
+TPHandle是一个有意思的事情，每次线程函数执行时，都会设置一个grace超时时间，当线程执行超过该时间，就认为是unhealthy的状态。当执行时间超过suicide_grace时，OSD就会产生断言而导致自杀，代码如下：
+{% highlight string %}
+struct heartbeat_handle_d {
+  const std::string name;
+  atomic_t timeout, suicide_timeout;
+  time_t grace, suicide_grace;
+  std::list<heartbeat_handle_d*>::iterator list_item;
+
+  explicit heartbeat_handle_d(const std::string& n)
+    : name(n), grace(0), suicide_grace(0)
+  { }
+};
 
 
+class TPHandle {
+	friend class ThreadPool;
+	CephContext *cct;
+	heartbeat_handle_d *hb;
+	time_t grace;
+	time_t suicide_grace;
 
+public:
+	TPHandle(
+ 	 CephContext *cct,
+ 	 heartbeat_handle_d *hb,
+ 	 time_t grace,
+ 	 time_t suicide_grace)
+ 	 : cct(cct), hb(hb), grace(grace), suicide_grace(suicide_grace) {}
 
+	void reset_tp_timeout();
+	void suspend_tp_timeout();
+};
+{% endhighlight %}
+
+结构体heartbeat_handle_d记录了相关信息，并把该结构添加到HeartbeatMap的系统链表中保存。OSD会有一个定时器，定时检查是否超时。
+
+### 4.5 SharedThreadPool
+这里简单介绍一个SharedThreadPool。在之前的介绍中，ThreadPool实现的线程池，其每个线程都有机会处理工作队列的任意一个任务。这就会导致一个问题，如果任务之间有互斥性，那么正在处理该任务的两个线程有一个必须等待另一个处理完成后才能处理，从而导致线程的阻塞，性能下降。
+
+例如下表2-1所示，线程Thread1和Thread2分别正在处理Job1和Job2:
+
+![ceph-chapter2-3](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter2_3.jpg)
+
+由于Job1和Job2的关联性，二者不能并发执行，只能顺序执行，二者之间用一个互斥锁来控制。如果Thread1先获得互斥锁就先执行，Thread2必须等待，直到Thread1执行完Job1后释放了互斥锁，Thread2获得该互斥锁才能执行Job2.显然，这种任务的调度方式应对这种不能完全并行的任务是由缺陷的。实际上Thread2可以去执行其他任务，比如Job5。Job1和Job2既然是顺序的，就都可以交给Thread1执行。
+
+因此，引入了SharedThreadPool进行管理。SharedThreadPool对上述的任务调度方式做了改进，其在线程的执行函数里，添加了表示线程的thread_index:
+{% highlight string %}
+void shardedthreadpool_worker(uint32_t thread_index);
+{% endhighlight %}
+
+具体如何实现Shard方式，还需要使用者自己去实现。其基本的思想就是： 每个线程对应一个任务队列，所有需要顺序执行的任务都放在同一个线程的任务队列里，全部由该线程执行。
 
 ## 5. Finisher
 类Finisher用来完成回调函数Context的执行，其内部有一个FinisherThread线程来用于执行Context回调函数:
