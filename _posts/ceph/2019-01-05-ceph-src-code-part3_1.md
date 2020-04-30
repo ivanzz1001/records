@@ -269,7 +269,41 @@ messenger->set_default_policy(Messenger::Policy::lossy_client(0, 0));
 
 3) 创建Dispatcher类并添加，用于接收消息
 {% highlight string %}
+dispatcher = new SimpleDispatcher(messenger);
+messenger->add_dispatcher_head(dispatcher);
+
+dispatcher->set_active(); // this side is the pinger
 {% endhighlight %}
+
+4） 启动消息
+{% highlight string %}
+r = messenger->start();
+if (r < 0)
+	goto out;
+{% endhighlight %}
+
+5) 下面开始发送请求，先获取目标Server的链接
+{% highlight string %}
+conn = messenger->get_connection(dest_server);
+{% endhighlight %}
+
+6） 通过Connection来发送请求消息。这里的消息发送方式都是异步发送，接收到请求消息的ACK应答消息后，将在Dispatcher的ms_dispatch或者ms_fast_dispatch处理函数里做相关的处理
+{% highlight string %}
+int msg_ix;
+Message *m;
+for (msg_ix = 0; msg_ix < n_msgs; ++msg_ix) {
+	/* add a data payload if asked */
+	if (! n_dsize) {
+		m = new MPing();
+	} else {
+		m = new_simple_ping_with_data("simple_client", n_dsize);
+	}
+	conn->send_message(m);
+}
+{% endhighlight %}
+综上所述，通过Ceph的网络框架发送消息比较简单。在Server端，只需要创建一个Messenger实例，设置相应的策略并绑定服务端口，然后设置一个Dispatcher来处理接收到的请求。在Client端，只需要创建一个Messenger实例，设置相关的策略和Dispatcher用于处理返回的应答消息。通过获取对应Server的connection来发送消息即可。
+
+
 
 
 <br />

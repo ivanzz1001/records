@@ -232,8 +232,10 @@ v0.20.2
 
 执行如下命令生成编译对应的Makefile文件：
 <pre>
-# ./configure --with-rbd --with-debug --with-rados --with-radosgw --with-cephfs
+# ./configure --with-rbd --with-debug --with-rados --with-radosgw --with-cephfs --enable-client --enable-server --enable-xio --enable-pgrefdebugging --enable-valgrind
 </pre>
+上面我们```enable```一些选项，主要是为了便于我们后边在研究ceph源代码时可以对相关的单元测试脚本进行测试。
+
 在执行configure过程中可能会提示需要安装相应的软件包，执行如下命令安装：
 <pre>
 # yum install snappy-devel
@@ -251,6 +253,7 @@ v0.20.2
 # yum install libedit-devel
 # yum install expat-devel
 </pre>
+
 >如果不想要依赖于google-perftools，请使用: ./configure --without-tcmalloc；如果需要调试以及编译测试程序可以加上```--with-debug```选项
 
 此外还可以设置```--prefix=<dir>```来控制编译安装目录，例如：
