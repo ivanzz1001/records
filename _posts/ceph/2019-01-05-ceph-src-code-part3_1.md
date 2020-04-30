@@ -303,7 +303,11 @@ for (msg_ix = 0; msg_ix < n_msgs; ++msg_ix) {
 {% endhighlight %}
 综上所述，通过Ceph的网络框架发送消息比较简单。在Server端，只需要创建一个Messenger实例，设置相应的策略并绑定服务端口，然后设置一个Dispatcher来处理接收到的请求。在Client端，只需要创建一个Messenger实例，设置相关的策略和Dispatcher用于处理返回的应答消息。通过获取对应Server的connection来发送消息即可。
 
+### 1.7 小结
 
+下面我们画出ceph网络通信模块的整体架构图：
+
+![ceph-chapter3-3](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter3_3.jpg)
 
 
 <br />
