@@ -309,6 +309,217 @@ for (msg_ix = 0; msg_ix < n_msgs; ++msg_ix) {
 
 ![ceph-chapter3-3](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter3_3.jpg)
 
+从上面我们可以看到，SimpleMessenger作为一个中心类，管理着rank_pipe以及dispatchers，rank_pipe中的Pipe负责数据的收发，并将收到的数据放入in_q中以等待相应的线程进行转发。
+
+## 2. Simple的实现
+Simple在Ceph里实现比较早，目前也比较稳定，是在生产环境中使用的网络通信模块。如其名字所示，实现相对简单。下面具体分析一下，Simple如何实现Ceph网络通信框架的各个模块。
+
+### 2.1 SimpleMessenger
+类SimpleMessenger实现了Messenger接口：
+{% highlight string %}
+class SimpleMessenger : public SimplePolicyMessenger {
+public:
+  Accepter accepter;                //用于接受客户端的链接请求
+  DispatchQueue dispatch_queue;     //接收到的请求的消息分发队列
+
+  bool did_bind;                    //是否绑定
+  
+
+  __u32 global_seq;                //生成全局的消息seq
+  ceph_spinlock_t global_seq_lock; //用于保护global_seq
+
+  //addr与pipe的映射
+  ceph::unordered_map<entity_addr_t, Pipe*> rank_pipe;
+
+  //正在处理的pipes
+  set<Pipe *> accepting_pipes;
+  set<Pipe*>      pipes;           //所有的Pipes
+  list<Pipe*>     pipe_reap_queue; //准备释放的Pipe列表
+  int cluster_protocol;            //内部集群的协议版本
+};
+{% endhighlight %}
+
+### 2.2 Acceptor
+类Acceptor用来在Server端监听端口，接收链接，它继承了Thread类，本身是一个线程，来不断监听Server的端口：
+{% highlight string %}
+class Accepter : public Thread {
+  SimpleMessenger *msgr;
+  bool done;
+  int listen_sd;            //所监听的socket句柄
+  uint64_t nonce;
+
+  ....
+};
+{% endhighlight %}
+
+
+### 2.3 DispatchQueue
+DispatchQueue类用于把接收到的请求保存在内部，通过其内部的线程，调用SimpleMessenger类注册的Dispatchers来处理相应的消息：
+{% highlight string %}
+class DispatchQueue {
+  class QueueItem {
+    int type;
+    ConnectionRef con;
+    MessageRef m;
+    ....
+  };
+
+
+  SimpleMessenger *msgr;
+  mutable Mutex lock;
+  Cond cond;
+
+  PrioritizedQueue<QueueItem, uint64_t> mqueue;    //接收消息的优先队列
+
+  set<pair<double, Message*> > marrival;           //接收到的消息集合。pair为(recv_time,message)
+
+  //消息->所在集合位置的映射
+  map<Message *, set<pair<double, Message*> >::iterator> marrival_map;
+};
+{% endhighlight %}
+其内部的mqueue为优先级队列，用来保存消息；marrival保存了接收到的消息；marrival_map保存消息在集合中的位置。
+
+函数DispatchQueue::enqueue()用来把接收到的消息添加到消息队列中，函数DispatchQueue::entry()为线程的处理函数，用于处理消息。
+
+### 2.4 Pipe
+类Pipe实现了PipeConnection的接口，它实现了两个端口之间的类似管道的功能。
+
+对于每一个pipe，内部都有一个Reader和一个Writer线程，分别用来处理这个Pipe有关的消息接收和请求的发送。线程DelayedDelivery用于故障注入测试：
+
+{% highlight string %}
+class Pipe : public RefCountedObject {
+	class Reader : public Thread {
+		...
+	}reader_thread;                //接收线程，用于接收数据
+
+	class Writer : public Thread {
+		...
+	}writer_thread;                //发送线程，用于发送数据
+
+	
+	SimpleMessenger *msgr;         //msgr的指针
+	uint64_t conn_id;              //分配给Pipe自己唯一的id
+
+	char *recv_buf;                //接收缓冲区
+	size_t recv_max_prefetch;      //接收缓冲区一次预取的最大值
+	size_t recv_ofs;               //接收的偏移量
+	size_t recv_len;               //接收的长度
+
+	int sd;                        //pipe对应的socket fd
+	struct iovec msgvec[SM_IOV_MAX];   //发送消息的iovec结构
+
+	int port;                      //链接端口
+	int peer_type;                 //链接对方的类型： OSD、MON、MDS等
+	entity_addr_t peer_addr;       //对方地址
+	Messenger::Policy policy;      //策略
+
+	Mutex pipe_lock;
+	int state;                     //当前连接的状态
+	atomic_t state_closed;        // non-zero iff state = STATE_CLOSED
+
+
+	PipeConnectionRef connection_state;    //PipeConnection的引用
+	utime_t backoff;              //backoff的时间
+
+	map<int, list<Message*> > out_q;   //准备发送消息的优先级队列
+	DispatchQueue *in_q;               //接收消息的DispatchQueue
+	list<Message*> sent;               //要发送的消息
+	Cond cond;
+	bool send_keepalive;
+	bool send_keepalive_ack;
+	utime_t keepalive_ack_stamp;
+	bool halt_delivery;                //如果Pipe队列销毁，停止增加
+
+	__u32 connect_seq, peer_global_seq;
+	uint64_t out_seq;                  //发送消息的序列号
+	uint64_t in_seq, in_seq_acked;     //接收到消息序号和ACK的序号
+};
+{% endhighlight %}
+
+### 2.5 消息的发送
+
+**1）** 当发送一个消息时，首先要通过Messenger类，获取对应的Connection
+{% highlight string %}
+conn = messenger->get_connection(dest_server);
+{% endhighlight %}
+
+具体到SimpleMessenger的实现如下：
+
+a) 首先比较，如果dest.addr是my_inst.addr，就直接返回local_connection
+
+b) 调用函数_lookup_pipe在已经存在的Pipe中查找。如果找到，就直接返回PipeConnectionRef；否则调用函数connect_rank新创建一个Pipe，并加入到msgr的register_pipe里。
+
+**2)** 当获得一个Connection之后，就可以调用Connection的发送函数来发送消息
+{% highlight string %}
+conn->send_message(m);
+{% endhighlight %}
+
+其最终调用了SimpleMessenger::submit_message()函数：
+
+a） 如果Pipe不为空，并且状态不是Pipe::STATE_CLOSED状态，调用函数pipe->_send()把发送的消息添加到out_q发送队列里，触发发送线程。
+
+b） 如果Pipe为空，就调用connect_rank创建Pipe，并把消息添加到out_q发送队列中。
+
+**3）** 发送线程writer把消息发送出去。通过步骤2，要发送的消息已经保存在相应Pipe的out_q队列里，并触发了发送线程。每个Pipe的Writer线程负责发送out_q的消息，其线程入口函数为Pipe::writer，实现功能：
+
+a) 调用函数_get_next_outgoing()从out_q中获取消息；
+
+b) 调用函数write_message(header, footer, blist)把消息的header、footer、数据blist发送出去。
+
+### 2.6 消息的接收
+
+**1)** 每个Pipe对应的线程Reader用于接收消息。入口函数为Pipe::reader()，其功能如下
+
+a) 判断当前的state，如果为STATE_ACCEPTING，就调用函数Pipe::accept来接受连接；如果不是STATE_CLOSED，并且不是STATE_CONNECTING状态，就接收消息。
+
+b) 先调用函数tcp_read()来接收一个tag
+
+c) 根据tag，来接收不同类型的消息如下所示
+<pre>
+CEPH_MSGR_TAG_KEEPALIVE: keepalive消息；
+
+CEPH_MSGR_TAG_KEEPALIVE2： 在CEPH_MSGR_TAG_KEEPALIVE的基础上添加了时间；
+
+CEPH_MSGR_TAG_KEEPALIVE2_ACK: keepalive2的响应
+
+CEPH_MSGR_TAG_ACK:
+
+CEPH_MSGR_TAG_MSG: 这里才是接收到的消息
+
+CEPH_MSGR_TAG_CLOSE: 关闭消息
+</pre>
+
+d) 调用函数read_message()来接收消息，当本函数返回后，就完成了接收消息
+
+**2）** 调用函数in_q->fast_preprocess(m)预处理消息
+
+**3）** 调用函数in_q->can_fast_dispatch(m)，如果可以进行fast_dispatch，就in_q->fast_dispatch(m)处理。fast_dispatch并不把消息加入到mqueue里，而是直接调用msgr->ms_fast_dispatch()函数，并最终调用注册的fast_dispatcher来进行处理。
+
+**4)** 如果不能fast_dispatch，就调用函数in_q->enqueue(m, m->get_priority(), conn_id)把接收到的消息加入到DispatchQueue的mqueue队列里，由DispatchQueue的分发线程调用ms_dispatch处理。
+
+ms_fast_dispatch和ms_dispatch两种处理的区别在于：ms_dispatch是由DispatchQueue的线程处理的，它是一个单线程；ms_fast_dispatch函数是由Pipe接收线程直接调用处理的，因此性能比前者好。
+
+>注： 目前其实只有OSD实现了Dispatcher接口。OSD中需要高效处理的消息，一般就需要fast_dispatch。
+
+
+### 2.7 错误处理
+网络模块复杂的功能是如何处理网络错误。无论是接收还是发送，会出现各种异常错误，包括返回异常错误码，接收数据的magic验证不一致，接收的数据的校验验证不一致，等等。错误的原因主要是由于网络本身的错误（物理链路等），或者字节跳变引起的。
+
+目前错误处理的方法比较简单，处理流程如下：
+
+1） 关闭当前socket链接
+
+2） 重新建立一个socket链接
+
+3） 重新发送没有接收到ACK响应的消息
+
+函数Pipe::fault用来处理错误：
+
+1） 调用shutdown_socket关闭pipe的socket
+
+2) 调用函数requeue_sent把没有收到ACK的消息重新加入发送队列，当发送队列有请求时，发送线程会不断尝试重新发送。
+
+
 
 <br />
 <br />
