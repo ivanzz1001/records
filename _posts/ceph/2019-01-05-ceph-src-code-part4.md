@@ -157,7 +157,7 @@ rule replicated_sata {
         step chooseleaf firstn 0 type rack
         step emit
 }
-{% highlight string %}
+{% endhighlight %}
 
 ```例4-2``` Placement Rules: 三个副本分布在三个Cabinet中
 
