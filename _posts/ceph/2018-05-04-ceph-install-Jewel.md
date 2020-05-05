@@ -1265,7 +1265,6 @@ rbd rm rbd-01/test-image
 
 创建之后，可以通过如下命令获取realm信息：
 <pre>
-2. 获取 realm 的信息
 # radosgw-admin realm get --rgw-realm=oss
 {
     "id": "78e7a255-d6cb-440e-bd82-124d34116f95",
@@ -1277,14 +1276,97 @@ rbd rm rbd-01/test-image
 
 2) 创建master zone group
 <pre>
+# radosgw-admin zonegroup delete --rgw-zonegroup=default     //先删除默认的zonegroup
 # radosgw-admin zonegroup create --rgw-zonegroup=cn --rgw-realm=oss --master --default
+# radosgw-admin zonegroup list
+read_default_id : 0
+{
+    "default_info": "14d4a228-3567-4dd1-bc4e-25f5e40eb653",
+    "zonegroups": [
+        "cn"
+    ]
+}
+# radosgw-admin zonegroup get --rgw-zonegroup=cn
+{
+    "id": "14d4a228-3567-4dd1-bc4e-25f5e40eb653",
+    "name": "nanhai",
+    "api_name": "nanhai",
+    "is_master": "true",
+    "endpoints": [],
+    "hostnames": [],
+    "hostnames_s3website": [],
+    "master_zone": "135882fc-2865-43ab-9f71-7dd4b2095406",
+    "zones": [
+        {
+            "id": "135882fc-2865-43ab-9f71-7dd4b2095406",
+            "name": "nanhai-01",
+            "endpoints": [],
+            "log_meta": "false",
+            "log_data": "false",
+            "bucket_index_max_shards": 8,
+            "read_only": "false"
+        }
+    ],
+    "placement_targets": [
+        {
+            "name": "default-placement",
+            "tags": []
+        }
+    ],
+    "default_placement": "default-placement",
+    "realm_id": "2573cc0a-ec71-4b15-8e6e-2773616bad7a"
+}
 </pre>
 
 3) 创建master zone
 <pre>
-radosgw-admin zone create --rgw-zonegroup=cn --rgw-zone=cn-oss \
+# radosgw-admin zone delete --rgw-zone=default   //先删除默认的zone
+# radosgw-admin zone create --rgw-zonegroup=cn --rgw-zone=cn-oss \
                             --master --default 
+
 </pre>
+创建完成后查看如下：
+{% highlight string %}
+# radosgw-admin zone list
+{
+    "default_info": "135882fc-2865-43ab-9f71-7dd4b2095406",
+    "zones": [
+        "cn-oss"
+    ]
+}
+# radosgw-admin zone get --rgw-zone=cn-oss
+{
+    "id": "135882fc-2865-43ab-9f71-7dd4b2095406",
+    "name": "cn-oss",
+    "domain_root": "cn-oss.rgw.data.root",
+    "control_pool": "cn-oss.rgw.control",
+    "gc_pool": "cn-oss.rgw.gc",
+    "log_pool": "cn-oss.rgw.log",
+    "intent_log_pool": "cn-oss.rgw.intent-log",
+    "usage_log_pool": "cn-oss.rgw.usage",
+    "user_keys_pool": "cn-oss.rgw.users.keys",
+    "user_email_pool": "cn-oss.rgw.users.email",
+    "user_swift_pool": "cn-oss.rgw.users.swift",
+    "user_uid_pool": "cn-oss.rgw.users.uid",
+    "system_key": {
+        "access_key": "",
+        "secret_key": ""
+    },
+    "placement_pools": [
+        {
+            "key": "default-placement",
+            "val": {
+                "index_pool": "cn-oss.rgw.buckets.index",
+                "data_pool": "cn-oss.rgw.buckets.data",
+                "data_extra_pool": "cn-oss.rgw.buckets.non-ec",
+                "index_type": 0
+            }
+        }
+    ],
+    "metadata_heap": "",
+    "realm_id": "2573cc0a-ec71-4b15-8e6e-2773616bad7a"
+}
+{% endhighlight %}
 
 4) 删除默认的zone-group,zone,realm
 <pre>
@@ -1340,8 +1422,39 @@ default.rgw.buckets.non-ec
 首先通过命令获取到当前的zonegroup:
 {% highlight string %}
 # radosgw-admin zonegroup get --rgw-zonegroup=cn > zonegroup.json
+# cat zonegroup.json
+# radosgw-admin zonegroup get --rgw-zonegroup=nanhai
+{
+    "id": "14d4a228-3567-4dd1-bc4e-25f5e40eb653",
+    "name": "cn",
+    "api_name": "cn",
+    "is_master": "true",
+    "endpoints": [],
+    "hostnames": [],
+    "hostnames_s3website": [],
+    "master_zone": "135882fc-2865-43ab-9f71-7dd4b2095406",
+    "zones": [
+        {
+            "id": "135882fc-2865-43ab-9f71-7dd4b2095406",
+            "name": "nanhai-01",
+            "endpoints": [],
+            "log_meta": "false",
+            "log_data": "false",
+            "bucket_index_max_shards": 16,
+            "read_only": "false"
+        }
+    ],
+    "placement_targets": [
+        {
+            "name": "default-placement",
+            "tags": []
+        }
+    ],
+    "default_placement": "default-placement",
+    "realm_id": "2573cc0a-ec71-4b15-8e6e-2773616bad7a"
+}
 {% endhighlight %}
-接着修改```zonegroup.json```,将```bucket_index_max_shards```设置为8，然后在导入到rgw中：
+接着修改```zonegroup.json```,将```bucket_index_max_shards```设置为16，然后在导入到rgw中：
 <pre>
 # radosgw-admin zonegroup set --rgw-zonegroup=cn --infile=zonegroup.json
 </pre>
@@ -1913,6 +2026,10 @@ ceph-10.2.3-0.el7.x86_64
 8. [GNU Parted](https://wiki.archlinux.org/index.php/GNU_Parted)
 
 9. [linux下获取scsi上的磁盘设备的序列号](https://blog.csdn.net/wwyyxx26/article/details/7739070)
+
+10. [Ceph Multisite](https://www.jianshu.com/p/31a6f8df9a8f)
+
+11. [Ceph多区域网关](https://www.cnblogs.com/zyxnhr/p/10599990.html#_label1_1)
 
 <br />
 <br />
