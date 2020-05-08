@@ -1082,6 +1082,7 @@ ceph osd pool delete benchmark benchmark --yes-i-really-really-mean-it
 # ceph daemon osd.0 help
 
 # ceph daemon /var/run/ceph/ceph-osd.0.asok help 
+# ceph daemon /var/run/ceph/radosgw-uat-oss-test-08.asok help
 {% endhighlight %}
 
 2) 查看默认配置参数
