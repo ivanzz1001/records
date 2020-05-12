@@ -336,7 +336,7 @@ class ObjectExtent {
 
 public:
   object_t    oid;                                       //对象的id
-  uint64_t    objectno;                                  //分片序号
+  uint64_t    objectno;                                  //属于object set中的哪一个Object
   uint64_t    offset;                                    //对象内的偏移
   uint64_t    length;                                    //长度
   uint64_t    truncate_size;	                         //对象truncate的操作的size
@@ -359,6 +359,34 @@ void Striper::file_to_extents(
 ```例5-1``` file_to_extents示例
 
 ![ceph-chapter5-6](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter5_6.jpg)
+
+如上图5-5所示，要计算的文件的offset为2KB，length为16KB。文件的分片信息： stripe unit为4KB，stripe count为3，object size为8KB。则对象Object 0对应的ObjectExtent为：
+{% highlight string %}
+object_extents["Object 0"] = {
+	oid = "Object 0",
+	objectno = 0,
+	offset = 2KB,
+	length = 6KB,
+	buffer_extents = { [0, 2KB], [10KB, 4KB]}
+}
+{% endhighlight %}
+
+其中，oid就是映射对象的id，objectno为stripe对象的序号， offset为映射的数据段在对象内的起始偏移，length为对象内的长度。buffer_extents为映射的数据在buffer内的偏移和长度。
+
+### 2.5 ObjectCacher
+类ObjectCacher提供了客户端的基于LRU算法的对象数据缓存功能，其实比较简单，这里就不深入分析了(src/osdc/ObjectCacher.h)。
+
+### 2.6 小结
+
+librados层的整体架构如下：
+
+![ceph-chapter5-7](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter5_7.jpg)
+
+对于librados我们可以分如下两个层面来看：
+
+1） 从大的接口封装层面来说，提供了C语言的封装rados_t，以及C++语言的抽象librados::Rados(注意： C++接口的抽象在librados这个namespace中)
+
+2) 从RadosClient、IoCtxImpl、Objecter层面来说，是一个抽象到具体的一个实现的过程。RadosClient是粗粒度的Rados操作接口；IoCtxImpl是针对某一个pool的较为细粒度的操作接口；而Objecter则是object层面的更为细粒度的操作实现。
 
 
 
