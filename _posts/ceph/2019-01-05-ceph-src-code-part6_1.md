@@ -35,7 +35,40 @@ OSD模块的核心类及其之间的静态类图说明如下：
 
 * 类SnapMapper额外保存对象和对象的快照信息，在对象的属性里保存了相关的快照信息。这里保存的快照信息为冗余信息，用于数据校验。
 
-## 2. 
+## 2. 相关数据结构
+下面将介绍OSD模块相关的一些核心的数据结构。从最高的逻辑层次为pool的概念，然后是PG的概念。其次是OSDMap记录了集群的所有的配置信息。数据结构OSDOp是一个操作上下文的封装。结构object_info_t保存了一个对象的元数据信息和访问信息。对象ObjectState是在object_info_t的基础上添加了一些内存的状态信息。SnapSetContext和ObjectContext分别保存了快照和对象的上下文相关的信息。Session保存了一个端到端的链接相关的上下文信息。
+
+### 2.1 Pool
+Pool是整个集群层面定义的一个逻辑的存储池。对一个Pool可以设置相应的数据冗余类型，目前有副本和纠删码两种实现。数据结构pg_pool_t用于保存Pool的相关信息。Pool的数据结构如下(src/osd/osd_types.h)：
+{% highlight string %}
+struct pg_pool_t {
+	enum {
+		TYPE_REPLICATED = 1,     //副本
+		//TYPE_RAID4 = 2,        //从来没有实现的raid4
+		TYPE_ERASURE = 3,        //纠删码
+	};
+	
+	uint64_t flags;              //pool的相关的标志，见FLAG_*
+	__u8 type;                   //类型
+	__u8 size, min_size;         //pool的size和min_size，也就是副本数和至少保证的副本数（一个PG中的OSD个数)。
+	__u8 crush_ruleset;          //rule set的编号
+	__u8 object_hash;            //将对象名映射为ps的hash函数
+	
+private:
+  __u32 pg_num, pgp_num;         //PG、PGP的数量
+  
+public:
+  map<string,string> properties;  //过时，当前已经不再使用
+  string erasure_code_profile;    //EC的配置信息
+  
+  ...
+  uint64_t quota_max_bytes;      //pool最大的存储字节数
+  uint64_t quota_max_objects;    //pool最大的object个数
+  ....
+};
+{% endhighlight %}
+
+
 
 
 
