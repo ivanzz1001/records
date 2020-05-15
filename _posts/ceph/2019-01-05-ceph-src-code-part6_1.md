@@ -68,6 +68,29 @@ public:
 };
 {% endhighlight %}
 
+* type: 定义了Pool的类型，目前有replication和ErasureCode两种类型；
+
+* size和min_size定义了Pool的冗余模式
+
+&emsp; - 如果是replication模式，size定义了副本数目，min_size为副本的最小数目。例如：如果size设置为3，副本数为3，min_size设置为1就只允许两副本损坏。
+
+&emsp; - 如果是Erasure Code(M+N)，size是总的分片数M+N； min_size是实际数据的分片数M。
+
+* crush_ruleset: Pool对应的crush规则号
+
+* erasure_code_profile: EC的配置方式
+
+* object_hash: 通过对象名映射到PG的hash函数
+
+* pg_num: Pool里的PG的数量
+
+通过上面的介绍可以了解到，Pool根据类型不同，定义了两种模式，分别保存了两种模式相关的参数。此外，在结构pg_pool_t里还定义了Pool级别的快照相关的数据结构、Cache Tier相关的数据结构，以及其他一些统计信息。在介绍快照(参见第9章）和Cache Tier（参见第13章）时再详细介绍相关的字段。
+
+### 2.2 PG
+PG可以认为是一组对象的集合，该集合里的对象有共同的特征： 副本都分布在相同的OSD列表中。PG的数据结构如下：
+{% highlight string %}
+{% endhighlight %}
+
 
 
 

@@ -1,6 +1,6 @@
 ---
 layout: post
-title: ceph本地对象存储(1)
+title: ceph本地对象存储(2)
 tags:
 - ceph
 categories: ceph
