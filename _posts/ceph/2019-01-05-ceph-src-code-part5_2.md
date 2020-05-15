@@ -384,10 +384,600 @@ librados层的整体架构如下：
 
 对于librados我们可以分如下两个层面来看：
 
-1） 从大的接口封装层面来说，提供了C语言的封装rados_t，以及C++语言的抽象librados::Rados(注意： C++接口的抽象在librados这个namespace中)
+1） 从大的接口封装层面来说，提供了C语言的封装rados_t，以及C++语言的抽象librados::Rados(注意： Objecter处于全局名称空间，而其他处于librados名称空间)
 
 2) 从RadosClient、IoCtxImpl、Objecter层面来说，是一个抽象到具体的一个实现的过程。RadosClient是粗粒度的Rados操作接口；IoCtxImpl是针对某一个pool的较为细粒度的操作接口；而Objecter则是object层面的更为细粒度的操作实现。
 
+
+## 3. 客户端写操作分析
+以下代码是通过librados库的接口写入数据到对象中的典型例程，对象的其他操作过程都类似：
+{% highlight string %}
+rados_t cluster;
+rados_ioctx_t ioctx;
+
+rados_create(&cluster, NULL);
+rados_conf_read_file(cluster, NULL);
+rados_connect(cluster);
+rados_ioctx_create(cluster, pool_name.c_str(), &ioctx);
+rados_write(ioctx, "foo", buf, sizeof(buf), 0);
+{% endhighlight %}
+
+上述代码是C语言接口完成的，其流程如下：
+
+1） 首先调用rados_create()函数创建一个RadosClient对象，输出类型为rados_t，它是一个void类型的指针，通过librados::RadosClient对象的强制转换产生。第二个参数id为一个标识符，一般传入为NULL。
+
+2） 调用函数rados_conf_read来读取配置文件。第二个参数为配置文件的路径，如果是NULL，就搜索默认的配置文件。
+
+3） 调用rados_connect()函数，它调用了RadosClient的connect()函数，做相关的初始化工作。
+
+4） 调用函数rados_ioctx_create()，它调用RadosClient的create_ioctx()函数，创建pool相关的IoCtxImpl类，其输出类型为rados_ioctx_t，它也是void类型的指针，有IoCtxImpl对象转换而来；
+
+5） 调用函数rados_write()函数，向该pool的名为```foo```的对象写入数据。此调用IoCtxImpl的write()操作
+
+### 3.1 写操作消息封装
+本函数完成具体的写操作，代码如下(src/librados/IoCtxImpl.cc)：
+{% highlight string %}
+int librados::IoCtxImpl::write(const object_t& oid, bufferlist& bl,
+			       size_t len, uint64_t off)
+{
+  if (len > UINT_MAX/2)
+    return -E2BIG;
+  ::ObjectOperation op;
+  prepare_assert_ops(&op);
+  bufferlist mybl;
+  mybl.substr_of(bl, 0, len);
+  op.write(off, mybl);
+  return operate(oid, &op, NULL);
+}
+{% endhighlight %}
+其实现过程如下：
+
+1） 创建ObjectOperation对象，封装写操作的相关参数；
+
+2） 调用函数operate()完成处理:
+{% highlight string %}
+int librados::IoCtxImpl::operate(const object_t& oid, ::ObjectOperation *o,
+				 ceph::real_time *pmtime, int flags);
+{% endhighlight %}
+&emsp; a) 调用函数objecter->prepare_mutate_op()把ObjectOperation类型封装成Op类型，添加了object_locator_t相关的pool信息；
+{% highlight string %}
+// a locator constrains the placement of an object.  mainly, which pool
+// does it go in.
+struct object_locator_t {
+  // You specify either the hash or the key -- not both
+  int64_t pool;                     ///< pool id
+  string key;                       ///< key string (if non-empty)
+  string nspace;                    ///< namespace
+  int64_t hash;                     ///< hash position (if >= 0)
+};
+{% endhighlight %}
+
+&emsp; b) 调用objecter->op_submit()把消息发送出去；
+
+&emsp; c) 等待操作完成；
+
+### 3.2 发送数据op_submit
+函数op_submit()用来把封装好的操作Op通过网络发送出去：
+{% highlight string %}
+void Objecter::op_submit(Op *op, ceph_tid_t *ptid, int *ctx_budget)
+{
+  shunique_lock rl(rwlock, ceph::acquire_shared);
+  ceph_tid_t tid = 0;
+  if (!ptid)
+    ptid = &tid;
+  _op_submit_with_budget(op, rl, ptid, ctx_budget);
+}
+{% endhighlight %}
+函数_op_submit_with_budget()用来处理Throttle相关的流量限制。如果osd_timeout大于0，就设置定时器，当操作超时，就调用定时器回调函数op_cancel取消操作：
+{% highlight string %}
+void Objecter::_op_submit_with_budget(Op *op, shunique_lock& sul,
+				      ceph_tid_t *ptid,
+				      int *ctx_budget)
+{
+  assert(initialized.read());
+
+  assert(op->ops.size() == op->out_bl.size());
+  assert(op->ops.size() == op->out_rval.size());
+  assert(op->ops.size() == op->out_handler.size());
+
+  // throttle.  before we look at any state, because
+  // _take_op_budget() may drop our lock while it blocks.
+  if (!op->ctx_budgeted || (ctx_budget && (*ctx_budget == -1))) {
+    int op_budget = _take_op_budget(op, sul);
+    // take and pass out the budget for the first OP
+    // in the context session
+    if (ctx_budget && (*ctx_budget == -1)) {
+      *ctx_budget = op_budget;
+    }
+  }
+
+  if (osd_timeout > timespan(0)) {
+    if (op->tid == 0)
+      op->tid = last_tid.inc();
+    auto tid = op->tid;
+    op->ontimeout = timer.add_event(osd_timeout,
+				    [this, tid]() {
+				      op_cancel(tid, -ETIMEDOUT); });
+  }
+
+  _op_submit(op, sul, ptid);
+}
+{% endhighlight %}
+
+函数_op_submit完成了关键的地址寻址和发送工作，其处理过程如下：
+
+1) 调用函数_calc_target来计算对象的目标OSD
+
+2） 调用函数_get_session获取目标OSD的链接，如果返回值为-EAGAIN，就升级为写锁，重新获取；
+
+3） 检查当前的状态标志，如果当前是```CEPH_OSDMAP_PAUSEWR```或者```OSD空间满```(注： 因为这里我们讲述的是对象的写操作，因此flag中CEPH_OSD_FLAG_WRITE肯定被设置），就暂时不发送请求；否则调用函数_prepare_osd_op()准备请求的消息，然后调用函数_send_op()发送出去。
+
+### 3.3 对象寻址_calc_target
+函数_calc_target用于完成对象到OSD的寻址过程：
+{% highlight string %}
+int Objecter::_calc_target(op_target_t *t, epoch_t *last_force_resend,
+			   bool any_change);
+{% endhighlight %}
+其处理过程如下：
+
+1） 首先根据```t->base_oloc.pool```的pool信息，获取pg_pool_t对象；
+{% highlight string %}
+const pg_pool_t *pi = osdmap->get_pg_pool(t->base_oloc.pool);
+if (!pi) {
+	t->osd = -1;
+	return RECALC_OP_TARGET_POOL_DNE;
+}
+{% endhighlight %}
+
+2） 检查如果强制重发，force_resend设置为true;
+
+3) 检查cache tier，如果是读操作，并且有读缓存，就设置target_oloc.pool为该pool的read_tier值；如果是写操作，并且有写缓存，就设置target_oloc.pool为该pool的write_tier值
+{% highlight string %}
+if (need_check_tiering &&
+	(t->flags & CEPH_OSD_FLAG_IGNORE_OVERLAY) == 0) {
+
+	if (is_read && pi->has_read_tier())
+		t->target_oloc.pool = pi->read_tier;
+	if (is_write && pi->has_write_tier())
+		t->target_oloc.pool = pi->write_tier;
+}
+{% endhighlight %}
+
+
+4) 调用函数osdmap->object_locator_to_pg()获取目标对象所在的PG
+{% highlight string %}
+int ret = osdmap->object_locator_to_pg(t->target_oid, t->target_oloc,
+					   pgid);
+{% endhighlight %}
+
+5) 调用函数osdmap->pg_to_up_acting_osds()，通过CRUSH算法，获取该PG对应的OSD列表；
+{% highlight string %}
+osdmap->pg_to_up_acting_osds(pgid, &up, &up_primary,
+			       &acting, &acting_primary);
+{% endhighlight %}
+
+6） 如果是写操作，target的OSD就设置为主OSD；如果是读操作，如果设置了CEPH_OSD_FLAG_BALANCE_READS标志，就随机选择一个副本读取；如果设置了CEPH_OSD_FLAG_LOCALIZE_READS标志，就尽可能选择本地副本来读取；否则选择主OSD来进行读取
+{% highlight string %}
+int osd;
+bool read = is_read && !is_write;
+
+if (read && (t->flags & CEPH_OSD_FLAG_BALANCE_READS)) {
+	int p = rand() % acting.size();
+	if (p)
+		t->used_replica = true;
+
+	osd = acting[p];
+	ldout(cct, 10) << " chose random osd." << osd << " of " << acting << dendl;
+
+} 
+else if (read && (t->flags & CEPH_OSD_FLAG_LOCALIZE_READS) && acting.size() > 1) {
+
+	// look for a local replica.  prefer the primary if the
+	// distance is the same.
+	int best = -1;
+	int best_locality = 0;
+
+	for (unsigned i = 0; i < acting.size(); ++i) {
+		int locality = osdmap->crush->get_common_ancestor_distance(
+			cct, acting[i], crush_location);
+
+		ldout(cct, 20) << __func__ << " localize: rank " << i << " osd." << acting[i]
+			<< " locality " << locality << dendl;
+
+		if (i == 0 || (locality >= 0 && best_locality >= 0 && locality < best_locality) ||
+			(best_locality < 0 && locality >= 0)) {
+
+				best = i;
+				best_locality = locality;
+
+				if (i)
+					t->used_replica = true;
+		}
+	}
+
+	assert(best >= 0);
+	osd = acting[best];
+} 
+else {
+	osd = acting_primary;
+}
+t->osd = osd;
+{% endhighlight %}
+
+
+### 3.4 查询object对应的PG
+
+object到PG的映射是通过object_locator_to_pg()函数来实现的(src/osd/osdmap.cc):
+{% highlight string %}
+// mapping
+int OSDMap::object_locator_to_pg(
+	const object_t& oid,
+	const object_locator_t& loc,
+	pg_t &pg) const
+{
+  // calculate ps (placement seed)
+  const pg_pool_t *pool = get_pg_pool(loc.get_pool());
+  if (!pool)
+    return -ENOENT;
+  ps_t ps;
+  if (loc.hash >= 0) {
+    ps = loc.hash;
+  } else {
+    if (!loc.key.empty())
+      ps = pool->hash_key(loc.key, loc.nspace);
+    else
+      ps = pool->hash_key(oid.name, loc.nspace);
+  }
+  pg = pg_t(ps, loc.get_pool(), -1);
+  return 0;
+}
+{% endhighlight %}
+从上面来看，过程比较简单，首先计算ps(placement seed)，然后根据pool id就可以获得PG。
+
+### 3.5 通过pg求OSD列表
+pg到OSD列表的映射是通过pg_to_up_acting_osds()来实现的（src/osd/osdmap.cc)：
+{% highlight string %}
+/**
+* map a pg to its acting set as well as its up set. You must use
+* the acting set for data mapping purposes, but some users will
+* also find the up set useful for things like deciding what to
+* set as pg_temp.
+* Each of these pointers must be non-NULL.
+*/
+void pg_to_up_acting_osds(pg_t pg, vector<int> *up, int *up_primary,
+	vector<int> *acting, int *acting_primary) const {
+
+	_pg_to_up_acting_osds(pg, up, up_primary, acting, acting_primary);
+}
+void pg_to_up_acting_osds(pg_t pg, vector<int>& up, vector<int>& acting) const {
+	int up_primary, acting_primary;
+	pg_to_up_acting_osds(pg, &up, &up_primary, &acting, &acting_primary);
+}
+
+void OSDMap::_pg_to_up_acting_osds(const pg_t& pg, vector<int> *up, int *up_primary,
+                                   vector<int> *acting, int *acting_primary) const
+{
+	const pg_pool_t *pool = get_pg_pool(pg.pool());
+	if (!pool) {
+		if (up)
+			up->clear();
+
+		if (up_primary)
+			*up_primary = -1;
+
+		if (acting)
+			acting->clear();
+
+		if (acting_primary)
+			*acting_primary = -1;
+
+		return;
+	}
+
+	vector<int> raw;
+	vector<int> _up;
+	vector<int> _acting;
+	int _up_primary;
+	int _acting_primary;
+	ps_t pps;
+
+	_pg_to_osds(*pool, pg, &raw, &_up_primary, &pps);
+	_raw_to_up_osds(*pool, raw, &_up, &_up_primary);
+	_apply_primary_affinity(pps, *pool, &_up, &_up_primary);
+	_get_temp_osds(*pool, pg, &_acting, &_acting_primary);
+
+	if (_acting.empty()) {
+		_acting = _up;
+
+		if (_acting_primary == -1) {
+			_acting_primary = _up_primary;
+		}
+	}
+
+	if (up)
+		up->swap(_up);
+
+	if (up_primary)
+		*up_primary = _up_primary;
+
+	if (acting)
+		acting->swap(_acting);
+
+	if (acting_primary)
+		*acting_primary = _acting_primary;
+}
+{% endhighlight %}
+pg_to_up_acting_osds()函数实现将pg映射为acting set。我们在进行对象读写时，都需要通过acting set来进行（对于pg_temp等少数情况，我们可能只需要知道PG对应的up set即可，也可以通过本函数来返回）。其实现步骤如下：
+
+1） _pg_to_osds()会根据pool所对应的crush rule来计算出PG所对应的OSD
+{% highlight string %}
+int ruleno = crush->find_rule(pool.get_crush_ruleset(), pool.get_type(), size);
+if (ruleno >= 0)
+	crush->do_rule(ruleno, pps, *osds, size, osd_weight);
+{% endhighlight %}
+此时计算出来的OSD其实只是原始的仍在osd map列表中存在的OSD(这里在调用该函数时我们传递的是raw)，之间是没有primary、secondary、tertiary这样区分的。
+
+2） _raw_to_up_osds()函数从raw中返回当前仍处于UP状态的OSD，把处于down状态的进行```标记```或```移除```。同时这里简单的将返回的OSD列表中的第一个作为up_primary
+
+3) _apply_primary_affinity()用于计算up_primary的亲和性，就是根据一定的规则从up osds里面选出其中一个作为primay。
+
+4） _get_temp_osds()用于求出PG对应的acting set
+{% highlight string %}
+void OSDMap::_get_temp_osds(const pg_pool_t& pool, pg_t pg,
+                            vector<int> *temp_pg, int *temp_primary) const
+{
+	pg = pool.raw_pg_to_pg(pg);
+
+	map<pg_t,vector<int32_t> >::const_iterator p = pg_temp->find(pg);
+	temp_pg->clear();
+	if (p != pg_temp->end()) {
+		for (unsigned i=0; i<p->second.size(); i++)
+		{
+			if (!exists(p->second[i]) || is_down(p->second[i])) 
+			{
+				if (pool.can_shift_osds()) {
+					continue;
+				} else {
+					temp_pg->push_back(CRUSH_ITEM_NONE);
+				}
+			} 
+			else {
+				temp_pg->push_back(p->second[i]);
+			}
+		}
+	}
+
+	map<pg_t,int32_t>::const_iterator pp = primary_temp->find(pg);
+	*temp_primary = -1;
+
+	if (pp != primary_temp->end()) {
+		*temp_primary = pp->second;
+	} 
+	else if (!temp_pg->empty()) { // apply pg_temp's primary
+		for (unsigned i = 0; i < temp_pg->size(); ++i) 
+		{
+			if ((*temp_pg)[i] != CRUSH_ITEM_NONE) {
+				*temp_primary = (*temp_pg)[i];
+				break;
+			}
+		}
+	}
+}
+{% endhighlight %}
+
+上面我们看到首先调用pool.raw_pg_to_pg(pg)将raw pg转换，然后再在pg_temp中查找转换后的PG所对应的OSD列表即为acting set。
+
+## 4. Cls
+Cls是Ceph的一个扩展模块，它允许用户自定义对象的操作接口和实现方法，为用户提供了一种比较方便的接口扩展方式。目前rbd和lock等模块都采用了这种机制（即通过加载额外的动态链接库的方式来进行处理，类似于Nginx中的dynamic module）。
+
+### 4.1 模块以及方法的注册
+类ClassHandler用来管理所有的扩展模块。函数register_class用来注册模块(src/osd/ClassHandler.h)：
+{% highlight string %}
+class ClassHandler
+{
+public:
+  CephContext *cct;
+  Mutex mutex;
+
+  map<string, ClassData> classes;    //所有注册的模块： 模块名->模块元数据信息。
+};
+{% endhighlight %}
+一个ClassData代表一个模块，一个模块中可以有很多方法。可以在一个ClassHandler中注册多个模块。
+
+
+类ClassData描述了一个模块相关的元数据信息。它描述了一个扩展模块的相关信息，包括模块名、模块相关的操作方法以及依赖的模块：
+{% highlight string %}
+struct ClassData {
+    enum Status { 
+      CLASS_UNKNOWN,                           //初始未知状态
+      CLASS_MISSING,                           //缺失状态(动态链接库找不到)
+      CLASS_MISSING_DEPS,                      //依赖的模块缺失
+      CLASS_INITIALIZING,                      //正在初始化
+      CLASS_OPEN,                             //已经初始化(动态链接库以及加载成功)
+    } status;                                 //当前模块的加载状态
+
+    string name;                              //模块的名字
+    ClassHandler *handler;                    //管理模块的指针
+    void *handle;                             //指向加载动动态链接库(dlopen())
+
+    map<string, ClassMethod> methods_map;     //模块下所有注册的ClassMethod
+    map<string, ClassFilter> filters_map;     //模块下所有的过滤器ClassFilter
+
+    set<ClassData *> dependencies;            //本模块所依赖的模块
+    set<ClassData *> missing_dependencies;    //缺失的依赖模块
+};
+{% endhighlight %}
+
+ClassMethod定义一个模块具体的方法名，以及函数类型：
+{% highlight string %}
+struct ClassMethod {
+	struct ClassHandler::ClassData *cls;      //所属模块的ClassData的指针
+	string name;                              //方法的名字
+	int flags;                                //方法相关的标志
+	cls_method_call_t func;                   //C类型函数指针
+	cls_method_cxx_call_t cxx_func;           //C++类型函数指针
+};
+{% endhighlight %}
+
+在src/objclass/Objectclass.h， src/objclass/class_api.c里定义了一些辅助函数用来注册模块以及方法：
+
+* 注册一个模块如下
+{% highlight string %}
+int cls_register(const char *name, cls_handle_t *handle);
+{% endhighlight %}
+
+* 注册一个模块的方法如下
+{% highlight string %}
+int cls_register_method(cls_handle_t hclass, const char *method,
+                        int flags,
+                        cls_method_call_t class_call, cls_method_handle_t *handle);
+{% endhighlight %}
+
+### 4.2 cls模块的工作原理
+1） ClassHandler的初始化
+在src/osd/OSD.cc的init()函数中有如下：
+{% highlight string %}
+int OSD::init()
+{
+	....
+
+	class_handler = new ClassHandler(cct);
+	cls_initialize(class_handler);
+
+	...
+}
+{% endhighlight %}
+通过上面我们看到是调用cls_initialize()来完成初始化，现在我们来看看该函数(src/objclass/Class_api.cc):
+{% highlight string %}
+static ClassHandler *ch;
+
+#define dout_subsys ceph_subsys_objclass
+
+void cls_initialize(ClassHandler *h)
+{
+  ch = h;
+}
+{% endhighlight %}
+这里可以看到，是将OSD::init()中创建的ClassHandler对象赋给了一个静态全局变量。
+
+2） 加载动态链接库
+
+通过上面创建出的ClassHandler对象调用open_all_classes()来加载ceph配置文件中以```libcls_```开头的动态链接库，加载步骤如下：
+{% highlight string %}
+int ClassHandler::_load_class(ClassData *cls)
+{
+  // already open
+  if (cls->status == ClassData::CLASS_OPEN)
+    return 0;
+
+  if (cls->status == ClassData::CLASS_UNKNOWN ||
+      cls->status == ClassData::CLASS_MISSING) {
+    char fname[PATH_MAX];
+    snprintf(fname, sizeof(fname), "%s/" CLS_PREFIX "%s" CLS_SUFFIX,
+	     cct->_conf->osd_class_dir.c_str(),
+	     cls->name.c_str());
+    dout(10) << "_load_class " << cls->name << " from " << fname << dendl;
+
+    cls->handle = dlopen(fname, RTLD_NOW);
+    if (!cls->handle) {
+      struct stat st;
+      int r = ::stat(fname, &st);
+      if (r < 0) {
+        r = -errno;
+        dout(0) << __func__ << " could not stat class " << fname
+                << ": " << cpp_strerror(r) << dendl;
+      } else {
+	dout(0) << "_load_class could not open class " << fname
+      	        << " (dlopen failed): " << dlerror() << dendl;
+      	r = -EIO;
+      }
+      cls->status = ClassData::CLASS_MISSING;
+      return r;
+    }
+
+    cls_deps_t *(*cls_deps)();
+    cls_deps = (cls_deps_t *(*)())dlsym(cls->handle, "class_deps");
+    if (cls_deps) {
+      cls_deps_t *deps = cls_deps();
+      while (deps) {
+	if (!deps->name)
+	  break;
+	ClassData *cls_dep = _get_class(deps->name);
+	cls->dependencies.insert(cls_dep);
+	if (cls_dep->status != ClassData::CLASS_OPEN)
+	  cls->missing_dependencies.insert(cls_dep);
+	deps++;
+      }
+    }
+  }
+
+  // resolve dependencies
+  set<ClassData*>::iterator p = cls->missing_dependencies.begin();
+  while (p != cls->missing_dependencies.end()) {
+    ClassData *dc = *p;
+    int r = _load_class(dc);
+    if (r < 0) {
+      cls->status = ClassData::CLASS_MISSING_DEPS;
+      return r;
+    }
+    
+    dout(10) << "_load_class " << cls->name << " satisfied dependency " << dc->name << dendl;
+    cls->missing_dependencies.erase(p++);
+  }
+  
+  // initialize
+  void (*cls_init)() = (void (*)())dlsym(cls->handle, "__cls_init");
+  if (cls_init) {
+    cls->status = ClassData::CLASS_INITIALIZING;
+    cls_init();
+  }
+  
+  dout(10) << "_load_class " << cls->name << " success" << dendl;
+  cls->status = ClassData::CLASS_OPEN;
+  return 0;
+}
+{% endhighlight %}
+从上面我们可以看到步骤较为简单：
+
+* 调用dlopen()打开动态链接库
+
+* 调用dlsym()读取动态链接库中的class_deps()函数，从而获得该动态链接库所需要的一些依赖；
+
+* 调用dlsym()读取动态链接库中的```__cls_init()```函数，从而完成对应模块的初始化。下面我们以src/cls/rbd/cls_rbd.cc为例，大体看一下__cls_init()的实现：
+{% highlight string %}
+void __cls_init()
+{
+  CLS_LOG(20, "Loaded rbd class!");
+
+  cls_register("rbd", &h_class);
+  cls_register_cxx_method(h_class, "create",
+			  CLS_METHOD_RD | CLS_METHOD_WR,
+			  create, &h_create);
+
+  ...
+}
+{% endhighlight %}
+从上面我们可以看到，其首先调用cls_register()向ClassHandler注册该模块，其实就是在ClassHandler中创建了一个ClassData。然后，调用cls_register_cxx_method()来向该模块注册C++方法，这样该ClassData中就有该模块所有相关的方法了。
+
+### 4.3 模块的方法执行
+模块方法的执行在类ReplicatedPG的函数do_osd_ops()里实现（src/osd/ReplicatedPG.cc）。执行方法对应的操作码为CEPH_OSD_OP_CALL值：
+{% highlight string %}
+int ReplicatedPG::do_osd_ops(OpContext *ctx, vector<OSDOp>& ops)
+{
+	....
+	case CEPH_OSD_OP_CALL:
+		ClassHandler::ClassData *cls;
+		result = osd->class_handler->open_class(cname, &cls);
+		assert(result == 0);      //函数init_op_flags()已经对结果做了验证
+
+		//根据方法名获取方法
+		ClassHandler::ClassMethod *method = cls->get_method(mname.c_str());
+
+		//执行方法
+		result = method->exec((cls_method_context_t)&ctx, indata, outdata);
+	....
+}
+{% endhighlight %}
 
 
 
