@@ -405,6 +405,26 @@ explicit Session(CephContext *cct) :
 2） 如果该PG不分裂，就不把PG和OpRequest加入到waiting_for_pg队列里。
 
 
+### 2.10 ShardedOpWQ
+OSD在进行数据读写等操作时，通常要求一个PG内的事务具有严格的顺序性，而不同PG间事务是可以并发执行的，ShardedOpWQ用于实现此一功能(src/osd/OSD.h):
+{% highlight string %}
+class ShardedOpWQ: public ShardedThreadPool::ShardedWQ < pair <PGRef, PGQueueable> > {
+	struct ShardData {
+		Mutex sdata_lock;
+		Cond sdata_cond;
+		Mutex sdata_op_ordering_lock;
+		map<PG*, list<PGQueueable> > pg_for_processing;
+		std::unique_ptr<OpQueue< pair<PGRef, PGQueueable>, entity_inst_t>> pqueue;      //PG对应的队列
+	};
+
+	vector<ShardData*> shard_list;                //PGs要shard到的队列向量
+	OSD *osd;
+	uint32_t num_shards;                          //shard_list的长度
+
+};
+{% endhighlight %}
+
+这样我们一个shardData一个线程，确保了单个PG的顺序性(当然，一个shardData多个线程的话，我们可以通过ShardData::lock来保证顺序性）。
 
 
 
