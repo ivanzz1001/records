@@ -16,7 +16,7 @@ description: ceph源代码分析
 ## 1. 读写操作的序列图
 写操作的序列图如下图6-2所示：
 
-
+![ceph-chapter6-2](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter6_2.jpg)
 
 
 
