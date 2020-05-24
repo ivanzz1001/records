@@ -263,7 +263,14 @@ void ReplicatedPG::do_op(OpRequestRef& op);
 
 5） 如果里面含有includes_pg_op操作，调用pg_op_must_wait()检查该操作是否需要等待。如果需要等待，加入waiting_for_all_missing队列；如果不需要等待，调用do_pg_op()处理PG相关的操作。这里的PG操作，都是CEPH_OSD_OP_PGLS等类似的PG相关的操作，需要确保该PG上没有需要修复的对象，否则ls列出的对象就不准确。
 
-6） 检查对象的名字是否超长
+6） 构建要访问对象的head对象(head对象和快照对象的概念可查看后面介绍快照的章节）
+{% highlight string %}
+hobject_t head(m->get_oid(), m->get_object_locator().key,
+		 CEPH_NOSNAP, m->get_pg().ps(),
+		 info.pgid.pool(), m->get_object_locator().nspace);
+{% endhighlight %}
+
+7） 检查对象的名字是否超长
 {% highlight string %}
 // object name too long?
 if (m->get_oid().name.size() > g_conf->osd_max_object_name_len) {
@@ -297,14 +304,14 @@ if (int r = osd->store->validate_hobject_key(head)) {
 }
 {% endhighlight %}
 
-7) 检查操作的客户端是否在黑名单(blacklist)中
+8) 检查操作的客户端是否在黑名单(blacklist)中
 
-8) 检查磁盘空间是否满
+9) 检查磁盘空间是否满
 {% highlight string %}
 op->may_write();
 {% endhighlight %}
 
-9) 检查如果是写操作，并且是snap，返回EINVAL，快照不允许写操作。如果写操作带的数据大于osd_max_write_size(如果设置了），直接返回OSD_WRITETOOBIG错误。
+10) 检查如果是写操作，并且是snap，返回EINVAL，快照不允许写操作。如果写操作带的数据大于osd_max_write_size(如果设置了），直接返回OSD_WRITETOOBIG错误。
 {% highlight string %}
 // invalid?
 if (m->get_snapid() != CEPH_NOSNAP) {
@@ -323,8 +330,390 @@ if (cct->_conf->osd_max_write_size && m->get_data_len() > cct->_conf->osd_max_wr
 }
 {% endhighlight %}
 
+可以看到，以上完成基本的与操作相关的参数检查。
+
+11) 如果是顺序写，调用函数scrubber.write_blocked_by_scrub()检查：如果head对象正在进行scrub操作，就加入waiting_for_active队列，等待scrub操作完成后继续本次请求的处理。
+{% highlight string %}
+if (write_ordered && scrubber.write_blocked_by_scrub(head, get_sort_bitwise())) {
+	dout(20) << __func__ << ": waiting for scrub" << dendl;
+	waiting_for_active.push_back(op);
+	op->mark_delayed("waiting for scrub");
+	return;
+}
+{% endhighlight %}
+
+12) 检查head对象是否处于缺失状态(missing)需要恢复，调用函数wait_for_unreadable_object()把当前请求加入相应的队列里等待恢复完成
+{% highlight string %}
+// missing object?
+if (is_unreadable_object(head)) {
+	wait_for_unreadable_object(head, op);
+	return;
+}
+{% endhighlight %}
+
+13) 如果是顺序写，检查head对象是否is_degraded_or_backfilling_object()，也就是正在恢复状态，需要调用wait_for_degraded_object()加入相应的队列等待
+{% highlight string %}
+// degraded object?
+if (write_ordered && is_degraded_or_backfilling_object(head)) {
+	wait_for_degraded_object(head, op);
+	return;
+}
+{% endhighlight %}
+
+14） 检查head对象的特殊情况
+
+&emsp; a) 检查队列objects_blocked_on_degraded_snap里如果保存有head对象，就需要等待。该队列里保存的head对象在rollback到某个版本的快照时，该版本的snap对象处于缺失状态，必须等待该snap对象恢复，从而完成rollback操作。因此，该队列的head对象目前处于缺失状态。
+
+&emsp; b) 队列objects_blocked_on_snap_promotion里的对象标识head对象rollback到某个版本的快照时，该版本的快照对象在Cache pool层没有，需要到Data pool层获取。
+
+如果head对象在上述的两个队列中，head对象都不能执行写操作，需要等待获取快照对象，完成rollback后才能写入。
+
+可知，以上11~14步骤是构建并检查head对象的状态是否正常。
 
 
+15） 如果是顺序写，检查该对象是否在objects_blocked_on_cache_full队列中，该队列中的对象因Cache pool层空间满而阻塞写操作
+{% highlight string %}
+if (write_ordered && objects_blocked_on_cache_full.count(head)) {
+    block_write_on_full_cache(head, op);
+    return;
+}
+{% endhighlight %}
+
+>注意：当head对象被删除时，系统自动创建一个snapdir对象用来保存快照相关的信息。head对象和snapdir对象只能有一个存在，其都可以用来保存快照相关的信息。
+
+16) 检查该对象的snapdir对象（如果存在）是否处于missing状态
+
+
+17） 检查snapdir对象是否可读，如果不能读，就调用函数wait_for_unreadable_object()等待；
+
+18） 如果是顺序写操作，调用函数is_degraded_or_backfilling_object()检查snapdir对象是否缺失；
+
+19） 检查如果是CEPH_SNAPDIR类型的操作，则只能是读操作。snapdir对象只能读取；
+
+20） 检查是否是客户端replay操作
+
+21） 构建对象oid，这才是实际要操作的对象，可能是snap对象也可能是head对象
+{% highlight string %}
+hobject_t oid(m->get_oid(),
+		m->get_object_locator().key,
+		m->get_snapid(),
+		m->get_pg().ps(),
+		m->get_object_locator().get_pool(),
+		m->get_object_locator().nspace);
+{% endhighlight %}
+
+22) 调用函数检查maybe_await_blocked_snapset是否被block，检查该对象缓存的ObjectContext如果设置为blocked状态，该object有可能正在flush，或者copy(由于Cache Tier)，暂时不能写，需要等待
+{% highlight string %}
+// io blocked on obc?
+if (!m->has_flag(CEPH_OSD_FLAG_FLUSH) &&
+	maybe_await_blocked_snapset(oid, op)) {
+	return;
+}
+{% endhighlight %}
+
+23） 调用函数find_object_context()获取object_context，如果获取成功，需要检查oid的状态
+{% highlight string %}
+int r = find_object_context(
+	oid, &obc, can_create,
+	m->has_flag(CEPH_OSD_FLAG_MAP_SNAP_CLONE),
+	&missing_oid);
+{% endhighlight %}
+
+24） 如果hit_set不为空，就需要设置hit_set。```hit_set```和```agent_state```都是Cache tier的机制，hit_set记录了cachepool中对象是否命中，暂时不深入分析；
+
+25） 如果agent_state不为空，就调用函数agent_choose_mode()设置agent的状态，调用函数maybe_handle_cache来处理，如果可以处理，就返回
+{% highlight string %}
+if (agent_state) {
+	if (agent_choose_mode(false, op))
+		return;
+}
+
+if (maybe_handle_cache(op,
+		write_ordered,
+		obc,
+		r,
+		missing_oid,
+		false,
+		in_hit_set))
+	return;
+{% endhighlight %}
+
+26) 获取object_locator，验证是否和msg里的相同
+{% highlight string %}
+// make sure locator is consistent
+object_locator_t oloc(obc->obs.oi.soid);
+if (m->get_object_locator() != oloc) {
+	dout(10) << " provided locator " << m->get_object_locator() 
+		<< " != object's " << obc->obs.oi.soid << dendl;
+		osd->clog->warn() << "bad locator " << m->get_object_locator() 
+		<< " on object " << oloc
+		<< " op " << *m << "\n";
+}
+{% endhighlight %}
+
+27） 检查该对象是否被阻塞
+{% highlight string %}
+// io blocked on obc?
+if (obc->is_blocked() && !m->has_flag(CEPH_OSD_FLAG_FLUSH)) {
+	wait_for_blocked_object(obc->obs.oi.soid, op);
+	return;
+}
+{% endhighlight %}
+
+
+28） 获取src_obc，也就是src_oid对应的ObjectContext： 同样的方法，对src_oid做各种状态检查，然后调用find_object_context()函数获取ObjectContext。
+
+29） 如果是操作对象snapdir，相关的操作就需要所有的clone对象，获取clone对象的ObjectContext。对每个clone对象，调用get_object_context()构建ObjectContext，并把它加入到src_objs中。
+
+30） 创建opContext
+{% highlight string %}
+OpContext *ctx = new OpContext(op, m->get_reqid(), m->ops, obc, this);
+{% endhighlight %}
+
+31) 调用execute_ctx(ctx);
+
+总之，do_op()主要检查相关对象的(head对象、snapdir对齐、src对象等）状态是否正常，并获取ObjectContext、OpContext相关的上下文信息。
+
+
+###### 4. get_object_context()
+本函数获取一个对象的ObjectContext信息：
+{% highlight string %}
+ObjectContextRef ReplicatedPG::get_object_context(const hobject_t& soid,       //soid要获取的对象
+						  bool can_create,                                     //是否允许创建新的ObjectContext
+						  map<string, bufferlist> *attrs);                     //attrs对象的属性
+{% endhighlight %}
+
+关键是从属性OI_ATTR中获取object_info_t信息。具体过程如下：
+
+1） 首先从LRU缓存object_contexts中获取该对象的ObjectContext，如果获取成功，就直接返回结果；
+
+2） 如果从LRU cache没有查找到：
+
+&emsp; a) 如果参数attrs值不为空，就从attrs里获取OI_ATTR的属性值；
+
+&emsp; b) 否则，调用函数pgbackend->objects_get_attr()获取该对象的OI_ATTR属性值。如果获取失败，并且不允许创建，就直接返回ObjectContextRef()的空值。
+
+3） 如果成功获取OI_ATTR属性值，就从该属性值中decode后获取object_info_t的值；
+
+4） 调用get_snapset_context获取SnapSetContext
+
+5) 调用相关函数设置obc相关的参数，并返回obc
+
+###### 5. get_snapset_context()
+本函数获取对象的snapset_context结构，其过程和函数get_object_context()类似。具体实现如下：
+{% highlight string %}
+SnapSetContext *ReplicatedPG::get_snapset_context(
+  const hobject_t& oid,
+  bool can_create,
+  map<string, bufferlist> *attrs,
+  bool oid_existed);
+{% endhighlight %}
+
+1） 首先从LRU缓存snapset_contexts获取该对象的snapset_context，如果成功，直接返回结果；
+
+2） 如果不存在，并且can_create，就调用pgbackend->objects_get_attr()函数获取SS_ATTR属性。只有head对象或者snapdir对象保存有SS_ATTR属性，如果head对象不存在，就获取snapdir对象的SS_ATTR属性值，根据获得的值，decode后获得SnapsetContext结构；
+
+###### 6. find_object_context()
+本函数查找对象的object_context，这里需要理解snapshot相关的知识。根据snap_seq正确与否获取相应的clone对象，然后获取相应的object_context:
+{% highlight string %}
+
+/*
+ * If we return an error, and set *pmissing, then promoting that
+ * object may help.
+ *
+ * If we return -EAGAIN, we will always set *pmissing to the missing
+ * object to wait for.
+ *
+ * If we return an error but do not set *pmissing, then we know the
+ * object does not exist.
+ */
+int ReplicatedPG::find_object_context(const hobject_t& oid,      //要查找的对象
+				      ObjectContextRef *pobc,                    //输出对象的ObjectContext
+				      bool can_create,                           //是否需要创建
+				      bool map_snapid_to_clone,                  //映射snapid到clone对象
+				      hobject_t *pmissing);                      //如果对象不存在，返回缺失的对象
+{% endhighlight %}
+
+参数map_snapid_to_clone指该snap是否可以直接对应一个clone对象，也就是snap对象的snap_id在SnapSet的clones列表中。
+
+1） 如果是head对象，就调用函数get_object_context()获取head对象的ObjectContext，如果失败，设置head对象为pmissing对象，返回-ENOENT；如果获取成功，返回0；
+
+2） 如果是snapdir对象，先获取head对象的ObjectContext，如果失败，继续获取snapdir对象的ObjectContext，如果失败，返回-ENOENT；如果成功，返回0；
+
+3） 如果非map_snapid_to_clone并且该snap已经标记删除了，就直接返回-ENOENT，pmissing为空，意味着该对象确实不存在。
+{% highlight string %}
+// we want a snap
+if (!map_snapid_to_clone && pool.info.is_removed_snap(oid.snap)) {
+	dout(10) << __func__ << " snap " << oid.snap << " is removed" << dendl;
+	return -ENOENT;
+}
+{% endhighlight %}
+
+4） 调用函数get_snapset_context()来获取SnapSetContext，如果不存在，设置pmissing为head对象，返回-ENOENT。
+{% highlight string %}
+SnapSetContext *ssc = get_snapset_context(oid, can_create);
+if (!ssc || !(ssc->exists || can_create)) {
+	dout(20) << __func__ << " " << oid << " no snapset" << dendl;
+	if (pmissing)
+		*pmissing = head;  // start by getting the head
+	if (ssc)
+		put_snapset_context(ssc);
+	return -ENOENT;
+}
+{% endhighlight %}
+5） 如果是map_snapid_to_clone：
+
+&emsp; a) 如果oid.snap大于ssc->snapset.seq，说明该snap是最新做的快照，osd端还没有完成相关的信息更新，直接返回head对象object_context，如果head对象存在，就返回0，否则返回-ENOENT。
+
+
+&emsp; b) 否则，直接检查SnapSet的clones列表，如果没有，就直接返回-ENOENT.
+
+&emsp; c) 如果找到，检查对象如果处于missing， pmissing就设置为该clone对象，返回-EAGAIN。如果没有，就获取该clone对象的object_context。
+
+6） 如果不是map_snapid_to_clone，就不能从snap_id直接获取clone对象，需要根据snaps和clones列表，计算snap_id对应的clone对象：
+
+&emsp; a) 如果oid.snap > ssc->snapset.seq，获取head对象的ObjectContext；
+
+&emsp; b) 计算oid.snap首次大于ssc->snapset.clones列表中的clone对象，就是oid对应的clone对象；
+
+&emsp; c) 检查该clone对象如果missing，设置pmissing为该clone对象，返回-EAGAIN。
+
+&emsp; d) 获取该clone对象的ObjectContext；
+
+&emsp; e) 最后检查该clone对象如果是在first到last之间，这是合理情况，返回0；否则，就是异常情况，返回-ENOENT。
+
+本函数是获取实际对象的ObjectContext，如果不是head对象，就需要获取快照对象实际对应的clone对象的ObjectContext。
+
+###### 7. execute_ctx()
+在do_op()函数里，做了大量的对象状态的检查和上下文相关信息的获取，本函数执行相关的操作：
+{% highlight string %}
+void ReplicatedPG::execute_ctx(OpContext *ctx);
+{% endhighlight %} 
+
+处理过程如下：
+
+1） 首先在OpContext中创建一个新的事务，该事务为pgbackend定义的事务
+{% highlight string %}
+// this method must be idempotent since we may call it several times
+// before we finally apply the resulting transaction.
+ctx->op_t.reset(pgbackend->get_transaction());
+{% endhighlight %}
+
+2) 如果是写操作，更新ctx->snapc值。ctx->snapc值保存了该操作的客户端附带的快照相关信息：
+
+&emsp; a) 如果是给整个pool的快照操作，就设置ctx->snapc等于pool.snapc的值；
+
+&emsp; b) 如果是用户特定快照(目前只有rbd实现），ctx->snapc值就设置为消息带的相关信息：
+{% highlight string %}
+// client specified snapc
+ctx->snapc.seq = m->get_snap_seq();
+ctx->snapc.snaps = m->get_snaps();
+{% endhighlight %}
+
+&emsp; c) 如果设置了CEPH_OSD_FLAG_ORDERSNAP标志，客户端的snap_seq比服务端的小，就直接返回-EOLDSNAPC错误码。
+
+3） 如果是read操作，该对象的ObjectContext加ondisk_read_lock锁；对于源对象，无论读写操作，都需要加ondisk_read_lock锁。
+{% highlight string %}
+if (op->may_read()) {
+	dout(10) << " taking ondisk_read_lock" << dendl;
+	obc->ondisk_read_lock();
+}
+{% endhighlight %}
+
+>提示： 所谓源对象，就是一个操作中带两个对象，比如copy操作，源对象会有读操作。
+
+4) 调用函数prepare_transaction()把相关的操作封装到ctx->op_t的事务中。如果是读操作，对于replicate类型，该函数直接调用pgbackend->objects_read_sync同步读取数据；如果是EC，就把请求加入pending_async_reads完成异步读取操作
+{% highlight string %}
+int result = prepare_transaction(ctx);
+{% endhighlight %}
+
+5) 解除操作3）中加的相关锁；
+
+6) 如果是读操作，并且ctx->pending_async_reads为空，说明是同步读取，调用complete_read_ctx完成读取操作，给客户端返回应答消息。如果是异步读取，就调用函数ctx->start_async_reads()完成异步读取。```读操作```到这里就结束，后续都是写操作的流程。
+{% highlight string %}
+// read or error?
+if (ctx->op_t->empty() || result < 0) {
+	// finish side-effects
+	if (result == 0)
+		do_osd_op_effects(ctx, m->get_connection());
+
+	if (ctx->pending_async_reads.empty()) {
+		complete_read_ctx(result, ctx);
+	} else {
+		in_progress_async_reads.push_back(make_pair(op, ctx));
+		ctx->start_async_reads(this);
+	}
+
+	return;
+}
+{% endhighlight %}
+
+7) 调用calc_trim_to()，计算需要trim的pg log的版本
+{% highlight string %}
+// trim log?
+calc_trim_to();
+{% endhighlight %}
+
+8） 调用函数issue_repop()向各个副本发送同步操作请求；
+
+9） 调用函数eval_repop()，检查发向各个副本的同步操作是否已经reply成功，做相应的操作。
+
+从上可以看出，execute_ctx()操作把相关的操作打包成事务，并没有真正的对对象的数据做修改。
+
+###### 8. calc_trim_to()
+本函数用于计算是否应该将旧的pg log日志进行trim操作：
+{% highlight string %}
+void ReplicatedPG::calc_trim_to()
+{
+  size_t target = cct->_conf->osd_min_pg_log_entries;
+  if (is_degraded() ||
+      state_test(PG_STATE_RECOVERING |
+		 PG_STATE_RECOVERY_WAIT |
+		 PG_STATE_BACKFILL |
+		 PG_STATE_BACKFILL_WAIT |
+		 PG_STATE_BACKFILL_TOOFULL)) {
+    target = cct->_conf->osd_max_pg_log_entries;
+  }
+
+  if (min_last_complete_ondisk != eversion_t() &&
+      min_last_complete_ondisk != pg_trim_to &&
+      pg_log.get_log().approx_size() > target) {
+    size_t num_to_trim = pg_log.get_log().approx_size() - target;
+    if (num_to_trim < cct->_conf->osd_pg_log_trim_min) {
+      return;
+    }
+    list<pg_log_entry_t>::const_iterator it = pg_log.get_log().log.begin();
+    eversion_t new_trim_to;
+    for (size_t i = 0; i < num_to_trim; ++i) {
+      new_trim_to = it->version;
+      ++it;
+      if (new_trim_to > min_last_complete_ondisk) {
+	new_trim_to = min_last_complete_ondisk;
+	dout(10) << "calc_trim_to trimming to min_last_complete_ondisk" << dendl;
+	break;
+      }
+    }
+    dout(10) << "calc_trim_to " << pg_trim_to << " -> " << new_trim_to << dendl;
+    pg_trim_to = new_trim_to;
+    assert(pg_trim_to <= pg_log.get_head());
+    assert(pg_trim_to <= min_last_complete_ondisk);
+  }
+}
+{% endhighlight %}
+处理过程如下：
+
+1） 首先计算target值： target值为最少保留的日志条数，默认设置为配置项cct->_conf->osd_min_pg_log_entries的值。如果pg处于degraded，或者正在修复的状态，target值为cct->_conf->osd_max_pg_log_entries(默认10000条）
+
+2） 变量min_last_complete_ondisk为本PG在本OSD上完成的最后一条日志记录的版本。如果它不为空，且不等于pg_trim_to，当前pg log的size大于target值，就计算需要trim掉的日志条数：
+
+&emsp; a) num_to_trim为日志总数目减去target，如果它小于日志一次trim的最小值cct->_conf->osd_pg_log_trim_min，就返回；
+
+&emsp; b) 否则，从日志头开始计算最新的pg_trim_to版本。
+
+###### 9. prepare_transaction()
+本函数用于把相关的更新操作打包为事务，包括比较复杂的部分为对象的snapshot的处理：
+{% highlight string %}
+{% endhighlight %}
 
 
 
