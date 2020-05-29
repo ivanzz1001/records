@@ -1284,6 +1284,7 @@ rbd rm rbd-01/test-image
 注： 后续如果要删除，可以使用如下命令
 <pre>
 # radosgw-admin realm delete --rgw-realm=oss
+
 # radosgw-admin realm list
 {
     "default_info": "",
