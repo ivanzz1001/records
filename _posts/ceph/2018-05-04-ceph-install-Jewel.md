@@ -1265,12 +1265,29 @@ rbd rm rbd-01/test-image
 
 创建之后，可以通过如下命令获取realm信息：
 <pre>
+# radosgw-admin realm list
+{
+    "default_info": "cfce6f5a-b5b4-404f-a0a9-74605c0ff705",
+    "realms": [
+        "oss"
+    ]
+}
 # radosgw-admin realm get --rgw-realm=oss
 {
     "id": "78e7a255-d6cb-440e-bd82-124d34116f95",
     "name": "oss",
     "current_period": "b376eed3-ddc5-4ea8-8c03-391013d5c021",
     "epoch": 1
+}
+</pre>
+
+注： 后续如果要删除，可以使用如下命令
+<pre>
+# radosgw-admin realm delete --rgw-realm=oss
+# radosgw-admin realm list
+{
+    "default_info": "",
+    "realms": []
 }
 </pre>
 
