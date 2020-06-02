@@ -28,7 +28,7 @@ description: ceph源代码分析
 
 通过上面，其实我们可以这样理解OSD、ReplicatedPG以及ReplicatedBackend三者之间的关系： OSD是PG操作的主入口，而ReplicatedPG对应于一个特定的PG，其调用ReplicatedBackend来完成Object读写消息的发送及事件的处理。
 
->注： OSD进程的主入口为src/ceph_osd.cc
+>注： OSD进程的主入口为src/ceph_osd.cc。这里从RadosClient发送过来的对象读写消息都为CEPH_MSG_OSD_OP
 
 ## 2. 读写流程代码分析
 在介绍了上述的数据结构和基本的流程之后，下面将从服务端接收到消息开始，分三个阶段具体分析读写的过程。
@@ -713,8 +713,445 @@ void ReplicatedPG::calc_trim_to()
 ###### 9. prepare_transaction()
 本函数用于把相关的更新操作打包为事务，包括比较复杂的部分为对象的snapshot的处理：
 {% highlight string %}
+int ReplicatedPG::prepare_transaction(OpContext *ctx);
+{% endhighlight %}
+处理过程如下：
+
+1） 首先调用调用函数ctx->snapc.is_valid()来验证SnapSet的有效性；
+
+2） 调用函数do_osd_ops()打包请求到ctx->op_t的transaction中
+{% highlight string %}
+// prepare the actual mutation
+int result = do_osd_ops(ctx, ctx->ops);
+if (result < 0)
+	return result;
+{% endhighlight %}
+do_osd_ops()函数CEPH_OSD_OP_WRITE实现对写请求的封装。
+
+3） 如果事务为空，或者没有修改操作，就直接返回result
+{% highlight string %}
+// read-op?  done?
+if (ctx->op_t->empty() && !ctx->modify) {
+	unstable_stats.add(ctx->delta_stats);
+	return result;
+}
 {% endhighlight %}
 
+4) 检查磁盘空间是否满
+{% highlight string %}
+// check for full
+if ((ctx->delta_stats.num_bytes > 0 ||
+		ctx->delta_stats.num_objects > 0) &&  // FIXME: keys?
+		(pool.info.has_flag(pg_pool_t::FLAG_FULL) ||
+		get_osdmap()->test_flag(CEPH_OSDMAP_FULL))) {
+	MOSDOp *m = static_cast<MOSDOp*>(ctx->op->get_req());
+	if (ctx->reqid.name.is_mds() ||   // FIXME: ignore MDS for now
+		m->has_flag(CEPH_OSD_FLAG_FULL_FORCE)) {
+		dout(20) << __func__ << " full, but proceeding due to FULL_FORCE or MDS"<< dendl;
+	} else if (m->has_flag(CEPH_OSD_FLAG_FULL_TRY)) {
+		// they tried, they failed.
+		dout(20) << __func__ << " full, replying to FULL_TRY op" << dendl;
+		return pool.info.has_flag(pg_pool_t::FLAG_FULL) ? -EDQUOT : -ENOSPC;
+	} else {
+		// drop request
+		dout(20) << __func__ << " full, dropping request (bad client)" << dendl;
+		return -EAGAIN;
+	}
+}
+{% endhighlight %}
+
+5) 如果该对象是head对象，就有相关快照对象COW机制的操作，需要调用函数make_writable()来完成，在关于快照的介绍中会详细介绍到。
+{% highlight string %}
+// clone, if necessary
+if (soid.snap == CEPH_NOSNAP)
+	make_writeable(ctx);
+{% endhighlight %}
+
+6) 调用函数finish_ctx来完成后续处理，该函数主要完成了快照相关的处理。如果head对象存在，就删除snapdir对象；如果不存在，就创建snapdir对象，用来保存快照相关的信息。后文会进一步介绍。
+
+###### 10. issue_repop()
+{% highlight string %}
+void ReplicatedPG::issue_repop(RepGather *repop, OpContext *ctx)
+{
+  const hobject_t& soid = ctx->obs->oi.soid;
+  dout(7) << "issue_repop rep_tid " << repop->rep_tid
+          << " o " << soid
+          << dendl;
+
+  repop->v = ctx->at_version;
+  if (ctx->at_version > eversion_t()) {
+    for (set<pg_shard_t>::iterator i = actingbackfill.begin();
+	 i != actingbackfill.end();
+	 ++i) {
+      if (*i == get_primary()) continue;
+      pg_info_t &pinfo = peer_info[*i];
+      // keep peer_info up to date
+      if (pinfo.last_complete == pinfo.last_update)
+	pinfo.last_complete = ctx->at_version;
+      pinfo.last_update = ctx->at_version;
+    }
+  }
+
+  ctx->obc->ondisk_write_lock();
+  if (ctx->clone_obc)
+    ctx->clone_obc->ondisk_write_lock();
+
+  bool unlock_snapset_obc = false;
+  if (ctx->snapset_obc && ctx->snapset_obc->obs.oi.soid !=
+      ctx->obc->obs.oi.soid) {
+    ctx->snapset_obc->ondisk_write_lock();
+    unlock_snapset_obc = true;
+  }
+
+  ctx->apply_pending_attrs();
+
+  if (pool.info.require_rollback()) {
+    for (vector<pg_log_entry_t>::iterator i = ctx->log.begin();
+	 i != ctx->log.end();
+	 ++i) {
+      assert(i->mod_desc.can_rollback());
+      assert(!i->mod_desc.empty());
+    }
+  }
+
+  Context *on_all_commit = new C_OSD_RepopCommit(this, repop);
+  Context *on_all_applied = new C_OSD_RepopApplied(this, repop);
+  Context *onapplied_sync = new C_OSD_OndiskWriteUnlock(
+    ctx->obc,
+    ctx->clone_obc,
+    unlock_snapset_obc ? ctx->snapset_obc : ObjectContextRef());
+  pgbackend->submit_transaction(
+    soid,
+    ctx->at_version,
+    std::move(ctx->op_t),
+    pg_trim_to,
+    min_last_complete_ondisk,
+    ctx->log,
+    ctx->updated_hset_history,
+    onapplied_sync,
+    on_all_applied,
+    on_all_commit,
+    repop->rep_tid,
+    ctx->reqid,
+    ctx->op);
+}
+{% endhighlight %} 
+本函数的处理过程如下：
+
+1） 首先更新actingbackfill的osd对应的peer_info的相关信息：如果pinfo.last_update和pinfo.last_complete二者相等，说明该peer的状态处于clean状态，就同时更新二者，否则只更新pinfo.last_update值。(注：通过pinfo.last_update、pinfo.last_complete来反应当前PG的状态信息）
+
+2） 对该对象的ObjectContext的ondisk_write_lock加写锁，如果有clone对象，对该clone对象的ObjectContext的ondisk_write_lock加写锁。如果snapset_obc不为空，也就是可能创建或者删除snapdir对象，对该ObjectContext的ondisk_write_lock加锁。
+
+3） 如果pool是可以rollback的(也就是ErasureCode模式），检查pg log也应该支持rollback操作；
+
+4） 分别设置三个回调Context，调用函数pgbackend->submit_transaction()来完成事务向从OSD的发送；
+
+本函数调用pgbackend的submit_transaction()函数向从osd开始发送操作日志。
+
+
+### 2.3 阶段3： PGBackend的处理
+PGBackend为PG的更新操作增加了一层与PG类型相关的实现。对于Replicate类型的PG由类ReplicatedBackend实现。其核心处理过程是把封装好的事务分发到该PG对应的其他从OSD上；对于ErasureCode类型的PG由类ECBackend实现，其核心处理过程为主chunk向各个分片chunk分发数据的过程。下面着重介绍Replicate的处理方式。
+
+ReplicatedBackend::submit_transaction()函数最终调用网络接口，把更新请求发送给从OSD：
+{% highlight string %}
+void ReplicatedBackend::submit_transaction(
+  const hobject_t &soid,
+  const eversion_t &at_version,
+  PGTransactionUPtr &&_t,
+  const eversion_t &trim_to,
+  const eversion_t &trim_rollback_to,
+  const vector<pg_log_entry_t> &log_entries,
+  boost::optional<pg_hit_set_history_t> &hset_history,
+  Context *on_local_applied_sync,
+  Context *on_all_acked,
+  Context *on_all_commit,
+  ceph_tid_t tid,
+  osd_reqid_t reqid,
+  OpRequestRef orig_op)
+{
+  std::unique_ptr<RPGTransaction> t(
+    static_cast<RPGTransaction*>(_t.release()));
+  assert(t);
+  ObjectStore::Transaction op_t = t->get_transaction();
+
+  assert(t->get_temp_added().size() <= 1);
+  assert(t->get_temp_cleared().size() <= 1);
+
+  assert(!in_progress_ops.count(tid));
+  InProgressOp &op = in_progress_ops.insert(
+    make_pair(
+      tid,
+      InProgressOp(
+	tid, on_all_commit, on_all_acked,
+	orig_op, at_version)
+      )
+    ).first->second;
+
+  op.waiting_for_applied.insert(
+    parent->get_actingbackfill_shards().begin(),
+    parent->get_actingbackfill_shards().end());
+  op.waiting_for_commit.insert(
+    parent->get_actingbackfill_shards().begin(),
+    parent->get_actingbackfill_shards().end());
+
+
+  issue_op(
+    soid,
+    at_version,
+    tid,
+    reqid,
+    trim_to,
+    trim_rollback_to,
+    t->get_temp_added().empty() ? hobject_t() : *(t->get_temp_added().begin()),
+    t->get_temp_cleared().empty() ?
+      hobject_t() : *(t->get_temp_cleared().begin()),
+    log_entries,
+    hset_history,
+    &op,
+    op_t);
+
+  if (!(t->get_temp_added().empty())) {
+    add_temp_objs(t->get_temp_added());
+  }
+  clear_temp_objs(t->get_temp_cleared());
+
+  parent->log_operation(
+    log_entries,
+    hset_history,
+    trim_to,
+    trim_rollback_to,
+    true,
+    op_t);
+  
+  op_t.register_on_applied_sync(on_local_applied_sync);
+  op_t.register_on_applied(
+    parent->bless_context(
+      new C_OSD_OnOpApplied(this, &op)));
+  op_t.register_on_commit(
+    parent->bless_context(
+      new C_OSD_OnOpCommit(this, &op)));
+
+  vector<ObjectStore::Transaction> tls;
+  tls.push_back(std::move(op_t));
+
+  parent->queue_transactions(tls, op.op);
+}
+{% endhighlight %}
+其处理过程如下：
+
+1） 首先构建InProgressOp请求记录；
+
+2） 调用函数ReplicatedBackend::issue_op把请求发送出去： 对于该PG中的每一个从OSD,
+
+&emsp; a) 调用函数generate_subop()生成MSG_OSD_REPOP类型的请求；
+
+&emsp; b) 调用函数get_parent()->send_message_osd_cluster()把消息发送出去；
+
+3） 最后调用parent->queue_transactions()函数来完成自己，也就是该PG的主OSD上本地对象的数据修改。这里我们可以看到主OSD的OnCommit的结果可以通过回调C_OSD_OnOpCommit()来获得，而其又会回调ReplicatedBackend::op_commit()；相似的，OnApply的结果可以通过回调C_OSD_OnOpApplied()来获得，而其又会回调ReplicatedBackend::op_applied()。在op_commit()以及on_applied()两个函数里会回调ReplicatedBackend::InProgressOp结构体中注册的Context，关于这一点我们会在本章最后一节进行分析。
+
+### 2.4 从副本的处理
+当PG的从副本OSD接收到MSG_OSD_REPOP类型的操作，也就是主副本发来的同步写的操作时，处理流程和上述流程都一样。在函数sub_op_modify()里，对本地存储应用相应的事务，完成本地对象的数据写入：
+{% highlight string %}
+void ReplicatedBackend::sub_op_modify(OpRequestRef op)
+{
+  MOSDRepOp *m = static_cast<MOSDRepOp *>(op->get_req());
+  m->finish_decode();
+  int msg_type = m->get_type();
+  assert(MSG_OSD_REPOP == msg_type);
+
+  const hobject_t& soid = m->poid;
+
+  dout(10) << "sub_op_modify trans"
+           << " " << soid
+           << " v " << m->version
+	   << (m->logbl.length() ? " (transaction)" : " (parallel exec")
+	   << " " << m->logbl.length()
+	   << dendl;
+
+  // sanity checks
+  assert(m->map_epoch >= get_info().history.same_interval_since);
+
+  // we better not be missing this.
+  assert(!parent->get_log().get_missing().is_missing(soid));
+
+  int ackerosd = m->get_source().num();
+
+  op->mark_started();
+
+  RepModifyRef rm(std::make_shared<RepModify>());
+  rm->op = op;
+  rm->ackerosd = ackerosd;
+  rm->last_complete = get_info().last_complete;
+  rm->epoch_started = get_osdmap()->get_epoch();
+
+  assert(m->logbl.length());
+  // shipped transaction and log entries
+  vector<pg_log_entry_t> log;
+
+  bufferlist::iterator p = m->get_data().begin();
+  ::decode(rm->opt, p);
+
+  if (m->new_temp_oid != hobject_t()) {
+    dout(20) << __func__ << " start tracking temp " << m->new_temp_oid << dendl;
+    add_temp_obj(m->new_temp_oid);
+  }
+  if (m->discard_temp_oid != hobject_t()) {
+    dout(20) << __func__ << " stop tracking temp " << m->discard_temp_oid << dendl;
+    if (rm->opt.empty()) {
+      dout(10) << __func__ << ": removing object " << m->discard_temp_oid
+	       << " since we won't get the transaction" << dendl;
+      rm->localt.remove(coll, ghobject_t(m->discard_temp_oid));
+    }
+    clear_temp_obj(m->discard_temp_oid);
+  }
+
+  p = m->logbl.begin();
+  ::decode(log, p);
+  rm->opt.set_fadvise_flag(CEPH_OSD_OP_FLAG_FADVISE_DONTNEED);
+
+  bool update_snaps = false;
+  if (!rm->opt.empty()) {
+    // If the opt is non-empty, we infer we are before
+    // last_backfill (according to the primary, not our
+    // not-quite-accurate value), and should update the
+    // collections now.  Otherwise, we do it later on push.
+    update_snaps = true;
+  }
+  parent->update_stats(m->pg_stats);
+  parent->log_operation(
+    log,
+    m->updated_hit_set_history,
+    m->pg_trim_to,
+    m->pg_trim_rollback_to,
+    update_snaps,
+    rm->localt);
+
+  rm->opt.register_on_commit(
+    parent->bless_context(
+      new C_OSD_RepModifyCommit(this, rm)));
+  rm->localt.register_on_applied(
+    parent->bless_context(
+      new C_OSD_RepModifyApply(this, rm)));
+  vector<ObjectStore::Transaction> tls;
+  tls.reserve(2);
+  tls.push_back(std::move(rm->localt));
+  tls.push_back(std::move(rm->opt));
+  parent->queue_transactions(tls, op);
+  // op is cleaned up by oncommit/onapply when both are executed
+}
+{% endhighlight %}
+
+如下是从OSD接收消息并处理的流程图：
+
+![ceph-chapter6-2](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter6_3.jpg)
+
+此外，通过上面的代码我们可以看到，本地数据写入的结果可以通过所注册的C_OSD_RepModifyCommit()以及C_OSD_RepModifyApply()两个回调函数获得。这里onCommit的回调函数为：
+{% highlight string %}
+void ReplicatedBackend::sub_op_modify_commit(RepModifyRef rm)
+{
+  rm->op->mark_commit_sent();
+  rm->committed = true;
+
+  // send commit.
+  dout(10) << "sub_op_modify_commit on op " << *rm->op->get_req()
+	   << ", sending commit to osd." << rm->ackerosd
+	   << dendl;
+
+  assert(get_osdmap()->is_up(rm->ackerosd));
+  get_parent()->update_last_complete_ondisk(rm->last_complete);
+
+  Message *m = rm->op->get_req();
+  Message *commit = NULL;
+  if (m->get_type() == MSG_OSD_SUBOP) {
+    // doesn't have CLIENT SUBOP feature ,use Subop
+    MOSDSubOpReply  *reply = new MOSDSubOpReply(
+      static_cast<MOSDSubOp*>(m),
+      get_parent()->whoami_shard(),
+      0, get_osdmap()->get_epoch(), CEPH_OSD_FLAG_ONDISK);
+    reply->set_last_complete_ondisk(rm->last_complete);
+    commit = reply;
+  } else if (m->get_type() == MSG_OSD_REPOP) {
+    MOSDRepOpReply *reply = new MOSDRepOpReply(
+      static_cast<MOSDRepOp*>(m),
+      get_parent()->whoami_shard(),
+      0, get_osdmap()->get_epoch(), CEPH_OSD_FLAG_ONDISK);
+    reply->set_last_complete_ondisk(rm->last_complete);
+    commit = reply;
+  }
+  else {
+    assert(0);
+  }
+
+  commit->set_priority(CEPH_MSG_PRIO_HIGH); // this better match ack priority!
+  get_parent()->send_message_osd_cluster(
+    rm->ackerosd, commit, get_osdmap()->get_epoch());
+
+  log_subop_stats(get_parent()->get_logger(), rm->op, l_osd_sop_w);
+}
+{% endhighlight %}
+从上面可以看到，最终其会通过cluster_messenger向主OSD发送应答信息。
+
+
+
+
+### 2.5 主副本接收到从副本的应答
+当PG的主副本接收到从副本的应答消息MSG_OSD_REPOPREPLY时，处理流程和上述类似，不同之处在于，在函数ReplicatedPG::do_request()里调用了函数ReplicatedBackend::handle_message(),在该函数里调用了ReplicatedBackend::sub_op_modify_reply()函数处理该请求。
+
+>注：从OSD向主OSD发送MSG_OSD_REPOPREPLY应答消息，主OSD收到应答消息后，又会经历一次OSD::ms_fast_dispatch()到ReplicatedPG::do_request()这一大段流程，可以参看“图6-2 OSD处理写操作的序列图”
+
+sub_op_modify_reply函数的处理过程如下：
+{% highlight string %}
+void ReplicatedBackend::sub_op_modify_reply(OpRequestRef op)；
+{% endhighlight %}
+
+1） 首先在in_progress_ops中查找到该请求；
+
+2） 如果是ondisk的ACK，也就是事务已经应答，就在ip_op.waiting_for_commit删除该OSD。该事务已经应答，那么必定已经提交了，那么从ip_op.waiting_for_applied删除该OSD；
+
+3） 如果只是事务提交到日志中的ACK，就从ip_op.waiting_for_applied删除
+
+>注： 这里特别说明的是，从副本需要给主副本发送两次ACK，一次是事务提交到日志中，并没有应用到实际的对象数据中；一次是完成应用操作返回的ACK。
+
+4） 最后检查，如果ip_op.waiting_for_applied为空，也就是所有从OSD的请求都返回来了，并且ip_op.on_applied（其为一个Context)不为NULL，就调用该Context的complete函数。同样，检查ip_op.waiting_for_commit为空，并且ip_op.on_commit(其为一个Context)不为NULL，就调用该Context的complte函数。
+
+下面看一下，in_progress_ops注册的回调函数。其回调函数是在ReplicatedPG::issue_repop()函数调用里注册的：
+{% highlight string %}
+void ReplicatedPG::issue_repop(RepGather *repop, OpContext *ctx)
+{
+  ....
+  Context *on_all_commit = new C_OSD_RepopCommit(this, repop);
+  Context *on_all_applied = new C_OSD_RepopApplied(this, repop);
+  Context *onapplied_sync = new C_OSD_OndiskWriteUnlock(
+    ctx->obc,
+    ctx->clone_obc,
+    unlock_snapset_obc ? ctx->snapset_obc : ObjectContextRef());
+  pgbackend->submit_transaction(
+    soid,
+    ctx->at_version,
+    std::move(ctx->op_t),
+    pg_trim_to,
+    min_last_complete_ondisk,
+    ctx->log,
+    ctx->updated_hset_history,
+    onapplied_sync,
+    on_all_applied,
+    on_all_commit,
+    repop->rep_tid,
+    ctx->reqid,
+    ctx->op);
+}
+{% endhighlight %}
+回调函数都最终调用了函数ReplicatedPG::eval_repop，其最终向client发送应答消息。这里强调的是，主副本必须等待所有的处于up的OSD都返回成功的ACK应答消息，才向客户端返回请求成功的应答。
+
+注： 只要所有处于up状态的OSD都返回了onApplied应答（事务已经写入日志）即可向client发送响应消息，不必等到OnCommit应答。
+
+下面再贴出一张官网上面关于ceph写数据的图：
+
+![ceph-chapter6-4](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter6_4.jpg)
+
+
+## 3. 总结
+本章介绍了OSD读写流程核心处理过程。通过本章的介绍，可以了解读写流程的主干流程，并对一些核心概念和数据结构的处理做了介绍。当然，读写流程是ceph文件系统的核心流程，其实现细节比较复杂，还需要读者对照代码继续研究。目前在这方面的工作，许多都集中在提供ceph的读写性能。其基本的方法更多的就是优化读写流程的关键路径，通过减少锁来提供并发，同时简化一些关键流程。
 
 
 
