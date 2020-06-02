@@ -767,6 +767,26 @@ void OSDMap::_get_temp_osds(const pg_pool_t& pool, pg_t pg,
 
 上面我们看到首先调用pool.raw_pg_to_pg(pg)将raw pg转换，然后再在pg_temp中查找转换后的PG所对应的OSD列表即为acting set。
 
+### 3.5 写操作的应答
+上面讲写请求发送出去之后，就会等待相应的应答。当从网络收到应答之后，首先会回调：
+{% highlight string %}
+bool Objecter::ms_dispatch(Message *m)
+{
+  ldout(cct, 10) << __func__ << " " << cct << " " << *m << dendl;
+  if (!initialized.read())
+    return false;
+
+  switch (m->get_type()) {
+    // these we exlusively handle
+  case CEPH_MSG_OSD_OPREPLY:
+    handle_osd_op_reply(static_cast<MOSDOpReply*>(m));
+  }
+
+  ....
+}
+{% endhighlight %}
+对于对象的读写操作，应答都是```CEPH_MSG_OSD_OPREPLY```消息，其会调用handle_osd_op_reply()来进行处理。
+
 ## 4. Cls
 Cls是Ceph的一个扩展模块，它允许用户自定义对象的操作接口和实现方法，为用户提供了一种比较方便的接口扩展方式。目前rbd和lock等模块都采用了这种机制（即通过加载额外的动态链接库的方式来进行处理，类似于Nginx中的dynamic module）。
 
