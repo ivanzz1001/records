@@ -1149,6 +1149,8 @@ void ReplicatedPG::issue_repop(RepGather *repop, OpContext *ctx)
 
 ![ceph-chapter6-4](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter6_4.jpg)
 
+![ceph-chapter6-5](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter6_5.jpg)
+
 
 ## 3. 总结
 本章介绍了OSD读写流程核心处理过程。通过本章的介绍，可以了解读写流程的主干流程，并对一些核心概念和数据结构的处理做了介绍。当然，读写流程是ceph文件系统的核心流程，其实现细节比较复杂，还需要读者对照代码继续研究。目前在这方面的工作，许多都集中在提供ceph的读写性能。其基本的方法更多的就是优化读写流程的关键路径，通过减少锁来提供并发，同时简化一些关键流程。
