@@ -131,7 +131,7 @@ struct pg_info_t {
 	pg_history_t history;                  //PG的历史信息
 	pg_hit_set_history_t hit_set;          //这是Cache Tier用的hit_set
 };
-{% highlight string %}
+{% endhighlight %}
 
 
 
