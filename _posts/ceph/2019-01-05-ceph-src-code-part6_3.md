@@ -133,6 +133,49 @@ struct pg_info_t {
 };
 {% endhighlight %}
 
+下面简单画出三者之间的关系示意图：
+
+![ceph-chapter6-6](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter6_6.jpg)
+
+
+其中：
+
+* last_complete: 在该指针之前的版本都已经在所有的OSD上完成更新（只表示内存更新完成）；
+
+* last_update: PG内最近一次更新的对象的版本，还没有在所有OSD上完成更新。在last_update与last_complete之间的操作表示该操作已在部分OSD上完成，但是还没有全部完成。
+
+* log_tail: 指向pg log最老的那条记录；
+
+* head: 最新的pg log记录
+
+* tail: 指向最老的pg log记录的前一个；
+
+* log： 存放实际的pglog记录的list
+
+从上面结构可以得知，PGLog里只有对象更新操作相关的内容，没有具体的数据以及偏移大小等，所以后续以PGLog来进行恢复时都是按照整个对象来进行恢复的（默认对象大小是4MB)。
+
+另外，这里再介绍两个概念：
+
+* epoch是一个单调递增序列，其序列由monitor负责维护，当集群中的配置及OSD状态(up、down、in、out)发生变更时，其数值加1。这一机制等同于时间轴，每次序列变化是时间轴上的点。这里说的epoch是针对OSD的，具体到PG时，即对于每个PG的版本eversion中的epoch的变化并不是跟随集群epoch变化的，而是当前PG所在OSD的状态变化，当前PG的epoch才会发生变化。
+
+如下图所示：
+
+![ceph-chapter6-7](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter6_7.jpg)
+
+* 根据epoch增长的概念，即引入第二个重要概念interval
+
+因为pg的epoch在其变化的时间轴上并非是完全连续的，所以在每两个变化的pg epoch所经历的时间段我们称之为intervals。
+
+
+## 2. PGLog的存储方式
+
+了解了PGLog的格式之后，我们就来分析一下PGLog的存储方式。在ceph实现里，对于写IO的处理，都是先封装成一个transaction，然后将这个transaction写到journal里。在Journal写完后，触发回调流程，经过多个线程及回调的处理后，再进行写数据到buffer cache的操作，从而完成整个写journal和本地缓存的流程（具体的流程在《OSD读写处理流程》一文中有详细描述）。
+
+总体来说，PGLog也是封装到transaction中，在写journal的时候一起写到日志磁盘上，最后在写本地缓存的时候遍历transaction里的内容，将PGLog相关的东西写到LevelDB里，从而完成该OSD上PGLog的更新操作。
+
+### 2.1 PGLog更新到journal
+
+
 
 
 
@@ -148,6 +191,8 @@ struct pg_info_t {
 2. [ceph存储 ceph中pglog处理流程](https://blog.csdn.net/skdkjzz/article/details/51488926)
 
 3. [ceph PGLog处理流程](https://my.oschina.net/linuxhunter/blog/679829?p=1)
+
+4. [Log Based PG](https://docs.ceph.com/docs/mimic/dev/osd_internals/log_based_pg/)
 
 4. [ceph基于pglog的一致性协议](https://jingyan.baidu.com/article/fa4125ace14cf028ac7092f4.html)
 
