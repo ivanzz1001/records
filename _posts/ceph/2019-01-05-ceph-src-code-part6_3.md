@@ -810,7 +810,11 @@ osdmap e16540 pool 'oss-uat.rgw.buckets.data' (189) object '-003-KZyxg.docx.VLRH
 
 ## 4. PGLog如何参与恢复
 
-PGLog参与恢复主要体现在ceph进行peering的时候建立missing列表来标记过时的数据，以便于对这些数据进行恢复。故障OSD重新上线后，PG就会标记为peering状态并暂停处理请求。
+根据PG的状态机（主要是pg 从```reset -> activte```过程中的状态转换，其中包括pg从peering到activate 以及epoch变化时pg 状态恢复的处理流程。如下图所示）我们可以看到，
+
+![ceph-chapter6-10](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter6_10.jpg)
+
+PG状态恢复为active的过程需要区分```Primary```和```Replicated```两种，因为不论是pg还是osd的消息都是由```Primary```主导，再分发给从组件。同时PGLog参与恢复主要体现在ceph进行peering的时候建立missing列表来标记过时的数据，以便于对这些数据进行恢复。故障OSD重新上线后，PG就会标记为peering状态并暂停处理请求。
 
 ###### 对于故障OSD所拥有的Primary PG
 
