@@ -128,7 +128,7 @@ struct pg_info_t {
 	
 	pg_stat_t stats;                       //PG的统计信息
 	
-	pg_history_t history;                  //PG的历史信息
+	pg_history_t history;                  //用于保存最近一次PG peering获取到的epoch等相关信息
 	pg_hit_set_history_t hit_set;          //这是Cache Tier用的hit_set
 };
 {% endhighlight %}
@@ -834,6 +834,130 @@ PGLog参与恢复主要体现在ceph进行peering的时候建立missing列表来
 ###### Peering过程中涉及到PGLog(pg_info、pg_log)的主要步骤
 
 1） **GetInfo**
+
+PG的Primary OSD通过发送消息获取各个Replicate OSD的pg_info信息。在收到各个Replicate OSD的pg_info后，会调用PG::proc_replica_info()处理副本OSD的pg_info，在这里面会调用info.history.merge()合并Replicate OSD发过来的pg_info信息，合并的原则就是更新为最新的字段（比如last_epoch_started和last_epoch_clean都变成最新的）
+
+{% highlight string %}
+bool PG::proc_replica_info(
+  pg_shard_t from, const pg_info_t &oinfo, epoch_t send_epoch)
+{
+	...
+	unreg_next_scrub();
+	if (info.history.merge(oinfo.history))
+		dirty_info = true;
+	reg_next_scrub();
+	...
+}
+
+bool merge(const pg_history_t &other) {
+	// Here, we only update the fields which cannot be calculated from the OSDmap.
+	bool modified = false;
+	if (epoch_created < other.epoch_created) {
+		epoch_created = other.epoch_created;
+		modified = true;
+	}
+	if (last_epoch_started < other.last_epoch_started) {
+		last_epoch_started = other.last_epoch_started;
+		modified = true;
+	}
+	if (last_epoch_clean < other.last_epoch_clean) {
+		last_epoch_clean = other.last_epoch_clean;
+		modified = true;
+	}
+	if (last_epoch_split < other.last_epoch_split) {
+		last_epoch_split = other.last_epoch_split; 
+		modified = true;
+	}
+	if (last_epoch_marked_full < other.last_epoch_marked_full) {
+		last_epoch_marked_full = other.last_epoch_marked_full;
+		modified = true;
+	}
+	if (other.last_scrub > last_scrub) {
+		last_scrub = other.last_scrub;
+		modified = true;
+	}
+	if (other.last_scrub_stamp > last_scrub_stamp) {
+		last_scrub_stamp = other.last_scrub_stamp;
+		modified = true;
+	}
+	if (other.last_deep_scrub > last_deep_scrub) {
+		last_deep_scrub = other.last_deep_scrub;
+		modified = true;
+	}
+	if (other.last_deep_scrub_stamp > last_deep_scrub_stamp) {
+		last_deep_scrub_stamp = other.last_deep_scrub_stamp;
+		modified = true;
+	}
+	if (other.last_clean_scrub_stamp > last_clean_scrub_stamp) {
+		last_clean_scrub_stamp = other.last_clean_scrub_stamp;
+		modified = true;
+	}
+	return modified;
+}
+{% endhighlight %}
+
+2） **GetLog**
+
+根据pg_info的比较，选择一个拥有权威日志的OSD(auth_log_shard)，如果Primary OSD不是拥有权威日志的OSD，就去该OSD上获取权威日志。
+{% highlight string %}
+PG::RecoveryState::GetLog::GetLog(my_context ctx)
+  : my_base(ctx),
+    NamedState(
+      context< RecoveryMachine >().pg->cct, "Started/Primary/Peering/GetLog"),
+    msg(0)
+{
+	...
+
+	// adjust acting?
+	if (!pg->choose_acting(auth_log_shard, false,
+			&context< Peering >().history_les_bound)){
+	}
+
+	...
+}
+{% endhighlight %}
+
+选取拥有权威日志的OSD时，遵循3个原则（在find_best_info()函数里)
+{% highlight string %}
+/**
+ * find_best_info
+ *
+ * Returns an iterator to the best info in infos sorted by:
+ *  1) Prefer newer last_update
+ *  2) Prefer longer tail if it brings another info into contiguity
+ *  3) Prefer current primary
+ */
+map<pg_shard_t, pg_info_t>::const_iterator PG::find_best_info(
+  const map<pg_shard_t, pg_info_t> &infos,
+  bool restrict_to_up_acting,
+  bool *history_les_bound) const
+{
+	...
+}
+{% endhighlight %}
+也就是说对比各个OSD的pg_info_t，谁的last_update大，就选谁； 如果last_update一样大，则谁的log_tail小，就选谁；如果log_tail也一样，就选当前的Primary OSD
+
+如果Primary OSD不是拥有权威日志的OSD，则需要去拥有权威日志的OSD上去拉取权威日志，收到权威日志后，会调用proc_master_log()将权威日志合并到本地pg log。在merge权威日志到本地pg log的过程中，会将merge的pg_log_entry_t对应的oid和eversion放到missing列表里，这个missing列表里的对象就是Primary OSD缺失的对象，后续在recovery的时候需要从其他OSD pull的。
+{% highlight string %}
+void PG::proc_master_log(
+  ObjectStore::Transaction& t, pg_info_t &oinfo,
+  pg_log_t &olog, pg_missing_t& omissing, pg_shard_t from)
+{	
+	...
+	merge_log(t, oinfo, olog, from);
+	...
+}
+{% endhighlight %}
+
+3） **GetMissing**
+
+拉取其他Replicate OSD的pg log(或者部分获取，或者全部获取FULL_LOG)，通过与本地的auth log对比，调用proc_replica_log()处理日志，会将Replicate OSD里缺失的对象放到peer_missing列表里，以用于后续recovery过程的依据。
+
+>注意： 实际上是在PG::activate()里更新peer_missing列表的，在proc_replica_log()处理的只是从replica传过来它本地的missing（就是replica重启后根据自身的last_update和last_complete构造的missing列表），一般情况下这个missing列表是空。
+
+
+
+
 
 
 
