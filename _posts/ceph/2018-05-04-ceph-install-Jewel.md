@@ -1615,7 +1615,9 @@ rgw_num_rados_handles=512
 
 4) 启动RGW
 {% highlight string %}
-radosgw -c /etc/ceph/ceph.conf -n client.radosgw.ceph001-node1
+# radosgw -c /etc/ceph/ceph.conf -n client.radosgw.ceph001-node1
+
+# systemctl restart ceph-radosgw@radosgw.ceph001-node1
 {% endhighlight %}
 
 查看是否启动成功：
