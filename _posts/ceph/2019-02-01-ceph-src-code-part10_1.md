@@ -437,6 +437,84 @@ boost::statechart::result PG::RecoveryState::Initial::react(const Load& l)
 然后出发PG的Peering过程。
 
 
+## 4. PG创建后状态机的状态转换
+下图10-2为PG总体状态转换图的简化版： 状态Peering、Active、ReplicaActive的内部状态没有添加进去：
+
+![ceph-chapter10-2](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_2.jpg)
+
+再结合前面PG状态转换图的详细版本，我们可以大体画出PG状态机的一个层次结构：
+
+![ceph-chapter10-3](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_3.jpg)
+
+通过上图可以了解PG的高层状态转换过程，如下所示：
+
+1） 当PG创建后，同时在该类内部创建了一个属于该PG的RecoveryMachine类型的状态机，该状态机的初始化状态为默认初始化状态Initial。
+
+2) 在PG创建后，调用函数pg->handle_create(&rctx)来给状态机投递事件
+{% highlight string %}
+void PG::handle_create(RecoveryCtx *rctx)
+{
+  dout(10) << "handle_create" << dendl;
+  rctx->created_pgs.insert(this);
+  Initialize evt;
+  recovery_state.handle_event(evt, rctx);
+  ActMap evt2;
+  recovery_state.handle_event(evt2, rctx);
+}
+{% endhighlight %}
+由以上代码可知：该函数首先向RecoveryMachine投递了Initialize类型的事件。由上图```10-2```可知，状态机在RecoveryMachine/Initial状态接收到Initialize类型的事件后直接转移到Reset状态。其次，向RecoveryMachine投递了ActMap事件。
+
+3） 状态Reset接收到ActMap事件，跳转到Started状态
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Reset::react(const ActMap&)
+{
+  PG *pg = context< RecoveryMachine >().pg;
+  if (pg->should_send_notify() && pg->get_primary().osd >= 0) {
+    context< RecoveryMachine >().send_notify(
+      pg->get_primary(),
+      pg_notify_t(
+	pg->get_primary().shard, pg->pg_whoami.shard,
+	pg->get_osdmap()->get_epoch(),
+	pg->get_osdmap()->get_epoch(),
+	pg->info),
+      pg->past_intervals);
+  }
+
+  pg->update_heartbeat_peers();
+  pg->take_waiters();
+
+  return transit< Started >();
+}
+{% endhighlight %}
+在自定义的react函数里直接调用了transit函数跳转到Started状态。
+
+4) 进入状态RecoveryMachine/Started后，就进入RecoveryMachine/Started的默认的子状态RecoveryMachine/Started/Start中
+{% highlight string %}
+PG::RecoveryState::Start::Start(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Start")
+{
+  context< RecoveryMachine >().log_enter(state_name);
+
+  PG *pg = context< RecoveryMachine >().pg;
+  if (pg->is_primary()) {
+    dout(1) << "transitioning to Primary" << dendl;
+    post_event(MakePrimary());
+  } else { //is_stray
+    dout(1) << "transitioning to Stray" << dendl; 
+    post_event(MakeStray());
+  }
+}
+{% endhighlight %}
+由以上代码可知，在Start状态的构造函数中，根据本OSD在该PG中担任的角色不同分别进行如下处理：
+
+* 如果是主OSD，就调用函数post_event()，抛出事件MakePrimary，进入主OSD的默认子状态Primary/Peering中；
+
+* 如果是从OSD，就调用函数post_event()，抛出事件MakeStray，进入Started/Stray状态；
+
+对于一个OSD的PG处于Stray状态，是指该OSD上的PG副本目前状态不确定，但是可以响应主OSD的各种查询操作。它有两种可能：一种是最终转移到状态ReplicaActive，处于活跃状态，成为PG的一个副本；另一种可能的情况是：如果是数据迁移的源端，可能一直保持Stray状态，该OSD上的副本可能在数据迁移完成后，PG以及数据就都被删除了。
+
+
 <br />
 <br />
 
