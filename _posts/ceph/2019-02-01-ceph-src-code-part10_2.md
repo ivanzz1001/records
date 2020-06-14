@@ -34,8 +34,161 @@ acting set是一个PG对应副本所在的OSD列表，该列表是有序的，�
 ### 1.4 up_thru
 引入up_thru的概念是为了解决特殊情况： 当两个以上的OSD处于down状态，但是Monitor在两次epoch中检测到了这种状态，从而导致Monitor认为它们是先后宕掉。后宕的OSD有可能产生数据的更新，导致需要等待该OSD的修复，否则有可能产生数据丢失。
 
+```例10-1``` up_thru处理过程
+
+下图为初始情况：
+
+![ceph-chapter10-4](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_4.jpg)
+
+过程如下所示：
+
+1） 在epoch1时，一个PG中有A、B两个OSD（两个副本）都处于up状态。
+
+2） 在epoch2时，Monitor检测到了A处于down状态，B仍然处于up状态。由于Monitor检测可能滞后，实际可能有两种情况：
+
+* 情况1： 此时B其实也已经和A同时宕了，只是Monitor没有检测到。此时PG不可能完成Peering过程，PG没有新数据写入；
+
+* 情况2： 此时B确实处于up状态，由于B上保持了完整的数据，PG可以完成Peering过程并处于active的状态，可以接受新的数据写操作；
+
+上述两种不同的情况，Monitor无法区分。
+
+3） 在epoch3时，Monitor检测到B也宕了。
+
+4） 在epoch4时，A恢复了up的状态后，该PG发起Peering过程，该PG是否允许完成Peering过程处于active状态，可以接受读写操作?
+
+* 如果在epoch2时，属于```情况1```： PG并没有数据更新，B上不会新写入数据，A上的数据保存完整，此时PG可以完成Peering过程从而处于active状态，接受写操作；
+
+* 如果在epoch2时，属于```情况2```: PG上有新数据更新到了osd B，此时osd A缺失一些数据，该PG不能完成Peering过程。
 
 
+----------
+为了使Monitor能够区分上述两种情况，引入了up_thru的概念，up_thru记录了每个OSD完成Peering后的epoch值。其初始值设置为0。
+
+在上述```情况2```，PG如何可以恢复为active状态，在Peering过程，须向Monitor发送消息，Monitor用数组up_thru[osd]来记录该OSD完成Peering后的epoch值。
+
+>注： OSD是通过OSD::send_alive()来向monitor报告up_thru信息的
+
+当引入up_thru后，上述例子的处理过程如下：
+
+###### 情况1
+![ceph-chapter10-5](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_5.jpg)
+情况1的处理流程如下：
+
+1） 在epoch1时，up_thru[B]为0，也就是说B在epoch为0时参与完成peering
+
+2） 在epoch2时，Monitor检查到OSD A处于down状态，OSD B仍处于up状态（实际B已经处于down状态），PG没有完成Peering过程，不会向Monitor上报更新up_thru的值。
+
+3） epoch3时，A和B两个OSD都宕了；
+
+4） epoch4时，A恢复up状态，PG开始Peering过程，发现up_thru[B]为0，说明在epoch为2时没有更新操作，该PG可以完成Peering过程，PG处于active状态。
+
+###### 情况2
+![ceph-chapter10-6](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_6.jpg)
+情况2的处理流程如下：
+
+1） 在epoch1时，up_thru[B]为0，也就是说B在epoch为0时参与完成Peering过程；
+
+2） 在epoch2时，Monitor检查到OSD A处于down状态，OSD B还处于up状态，该PG完成peering过程，向Monitor上报B的up_thru变为当前epoch的值为2，此时PG可接受写操作请求；
+
+3）之后可能集群其他OSD宕了（图中没画出）导致epoch变为3，但此时up_thru[B]仍为2；
+
+4） 在epoch4时，A和B都宕了，B的up_thru为2；
+
+5） 在epoch5时，A处于up状态，开始Peering，发现up_thru[B]为2，说明在epoch为2时完成了Peering，有可能有更新操作，该PG需要等待B恢复。否则可能丢失B上更新的数据；
+
+## 2. PG日志
+PG日志(pg log)为一个PG内所有更新操作的记录（下文所指的日志，如不特别指出，都是指PG日志）。每个PG对应一个PG日志，它持久化保存在每个PG对应pgmeta_oid对象的omap属性中。
+
+它有如下特点：
+
+* 记录一个PG内所有对象的更新操作元数据信息，并不记录操作的数据；
+
+* 是一个完整的日志记录，版本号是顺序的且连续
+
+
+###### 2.1 pg_log_t
+结构体pg_log_t在内存中保存了该PG的所有操作日志，以及相关的控制结构：
+{% highlight string %}
+struct pg_log_t{
+	eversion_t head;            //日志的头，记录最新的日志记录
+	eversion_t tail;            //日志的尾，记录最旧的日志记录
+
+	//用于EC，指示本地可回滚的版本，可回滚的版本都大于版本can_rollback_to
+	eversion_t can_rollback_to;
+
+	//在EC的实现中，本地保留了不同版本的数据。本数据段指示本PG里可以删除掉的对象版本
+	eversion_t rollback_info_trimmed_to;
+
+	//所有日志的列表
+	list<pg_log_entry_t> log;
+
+	...
+}
+{% endhighlight %}
+需要注意的是， PG日志的记录是以整个PG为单位，包括该PG内所有对象的修改记录。
+
+###### 2.2 pg_log_entry_t
+结构体pg_log_entry_t记录了PG日志的单条记录，其数据结构如下：
+{% highlight string %}
+struct pg_log_entry_t{
+	__s32 op;                       //操作的类型
+	hobject_t soid;                 //操作的对象
+	eversion_t version;             //本次操作的版本
+	eversion_t prior_version;       //前一个操作的版本
+	eversion_t reverting_to;        //本次操作回退的版本（仅用于回滚操作）
+
+	ObjectModDesc mod_desc;         //用于保存本地回滚的一些信息，用于EC模式下的回滚操作
+	
+	bufferlist snaps;               //克隆操作用于记录当前对象的snap列表
+	osd_reqid_t reqid;              //请求唯一标识(called+tid)
+	vector<pair<osd_reqid_t, version_t> > extra_reqids;
+
+
+	version_t user_version;         //用户的版本
+	utime_t mtime;                  //这是用户本地时间
+	...
+};
+{% endhighlight %}
+
+
+###### 2.3 IndexedLog
+
+类IndexedLog继承了类pg_log_t，在其基础上添加了根据一个对象来检索日志的功能，以及其他相关的功能。
+
+###### 2.4 日志的写入
+
+函数PG::add_log_entry()添加pg_log_entry_t条目到PG日志中。同时更新了info.last_complete和info.last_update字段。
+
+PGLog::write_log()函数将日志写到对应的pgmeta_oid对象的kv存储中。这里并没有直接写入磁盘，而是先把日志的修改添加到ObjectStore::Transaction类型的事务中，与数据操作组成一个事务整体提交磁盘。这样可以保证数据操作、日志更新及其pg info信息的更新都在一个事务中，都以原子方式提交到磁盘上。
+
+
+###### 2.5 日志的trim操作
+
+函数trim()用来删除不需要的旧日志。当日志条目数大于min_log_entries时，需要进行trim操作：
+{% highlight string %}
+{% endhighlight %}
+
+###### 2.6 合并权威日志
+
+###### 2.7 处理副本日志
+
+## 3. Peering的状态转换图
+
+
+## 4. pg_info数据结构
+
+## 5. GetInfo状态
+
+## 6. GetLog状态
+
+## 7. GetMissing状态
+
+## 8. Active操作
+
+## 9. 副本端的状态转移
+
+
+## 10. 小结
 
 
 
