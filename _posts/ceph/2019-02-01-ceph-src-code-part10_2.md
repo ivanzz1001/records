@@ -166,11 +166,80 @@ PGLog::write_log()函数将日志写到对应的pgmeta_oid对象的kv存储中�
 
 函数trim()用来删除不需要的旧日志。当日志条目数大于min_log_entries时，需要进行trim操作：
 {% highlight string %}
+void PGLog::trim(
+  LogEntryHandler *handler,
+  eversion_t trim_to,
+  pg_info_t &info);
 {% endhighlight %}
 
 ###### 2.6 合并权威日志
+函数merge_log()用于把本地日志和权威日志合并：
+{% highlight string %}
+void PGLog::merge_log(ObjectStore::Transaction& t,
+                      pg_info_t &oinfo, pg_log_t &olog, pg_shard_t fromosd,
+                      pg_info_t &info, LogEntryHandler *rollbacker,
+                      bool &dirty_info, bool &dirty_big_info);
+{% endhighlight %}
+
+其处理过程如下：
+
+1） 本地日志和权威日志没有重叠的部分：在这种情况下就无法依据日志来修复，只能通过Backfill过程来完成修复。所以先确保权威日志和本地日志有重叠的部分：
+{% highlight string %}
+// The logs must overlap.
+assert(log.head >= olog.tail && olog.head >= log.tail);
+{% endhighlight %}
+
+2) 本地日志和权威日志有重叠部分的处理：
+
+* 如果olog.tail小于log.tail，也就是权威日志的尾部比本地日志长。在这种情况下，只要把日志多出的部分添加到本地日志即可，它不影响missing对象集合。
+
+* 本地日志的头部比权威日志的头部长，说明有多出来的divergent日志，调用函数rewind_divergent_log()去处理
+
+* 本地日志的头部比权威日志的头部短，说明有缺失的日志，其处理过程为：把缺失的日志添加到本地日志中，记录missing的对象，并删除多出来的日志记录
+
+
+----------
+下面举例说明merge_log的不同处理情况。
+
+```例10-2``` 函数merge_log()应用举例
+
+**情况1：** 权威日志的尾部版本比本地日志的尾部小，如下所示
+![ceph-chapter10-7](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_7.jpg)
+
+本地log的log_tail为obj10(1,6)，权威日志olog的log_tail为obj3(1,4)。
+
+日志合并的处理方式如下所示：
+
+![ceph-chapter10-8](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_8.jpg)
+
+把日志记录obj3(1,4)、obj4(1,5)添加到本地日志中，修改info.log_tail和log.tail指针即可。
+
+**情况2：** 本地日志的头部版本比权威日志长，如下所示：
+
+![ceph-chapter10-9](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_9.jpg)
+权威日志的log_head为obj13(1,8)，而本地日志的log_head为obj10(1,11)。本地日志的log_head版本大于权威日志的log_head版本，调用函数rewind_divergent_log()来处理本地有分歧的日志。
+
+在本例的具体处理过程为：把对象obj10、obj11、obj13加入missing列表中用于修复。最后删除多余的日志，如下所示：
+
+![ceph-chapter10-10](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_10.jpg)
+
+本例比较简单，函数rewind_divergent_log()会处理比较复杂的一些情况，后面会介绍到。
+
+**情况3:** 本地日志的头部版本比权威日志的头部短，如下所示
+
+![ceph-chapter10-11](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_11.jpg)
+
+权威日志的log_head为obj10(1,11)，而本地日志的log_head为obj13(1,8)，即本地日志的log_head版本小于权威日志的log_head版本。
+
+其处理方式如下：把本地日志缺失的日志添加到本地，并计算本地缺失的对象。最后把缺失的对象加到missing object列表只能够用于后续的修复，处理结果如下所示：
+
+![ceph-chapter10-12](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_12.jpg)
+
 
 ###### 2.7 处理副本日志
+函数proc_replica_log()用于处理其他副本节点发过来的和权威日志有分歧(divergent)的日志。其关键在于计算missing的对象列表，也就是需要修复的对象，如下所示：
+
+
 
 ## 3. Peering的状态转换图
 
