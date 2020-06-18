@@ -260,12 +260,95 @@ void PGLog::proc_replica_log(
 
 1） 如果日志不重叠，就无法通过日志来修复，需要进行Backfill过程，直接返回；
 
-2） 如果日志的head相同，说明没有分歧日志
+2） 如果日志的head相同，说明没有分歧日志(divergent log)，直接返回；
 
+3） 下面处理的都是这种情况： 日志有重叠并且日志的head不相同，需要处理分歧的日志：
+
+![ceph-chapter10-13](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_13.jpg)
+
+  * 计算第一条分歧日志边界first_non_divergent，从本地日志```由后往前```查找小于等于```olog.head```的日志记录
+
+  * 版本lu为分歧日志的边界。如果first_non_divergent没有找到，或者小于log.tail，那么lu就设置为log_tail，否则就设置为first_non_divergent日志记录的版本。
+
+  * 把所有的分歧日志都添加到divergent队列里；
+
+  * 构建一个IndexedLog对象folog，把所有没有分歧的日志添加到folog里
+{% highlight string %}
+IndexedLog folog;
+folog.log.insert(folog.log.begin(), olog.log.begin(), pp);
+{% endhighlight %}
+
+  * 调用函数_merge_divergent_entries()处理分歧日志；
+
+  * 更新oinfo的last_update为lu版本
+
+  * 如果有对象missing，就设置last_complete为小于first_missing的版本；
+
+函数_merge_divergent_entries()处理所有的分歧日志，首先把所有分歧日志的对象按照对象分类，然后分别调用函数_merge_object_divergent_entries()对每个分歧日志的对象进行处理。
+
+
+----------
+
+
+函数_merge_object_divergent_entries()用于处理单个对象的divergent日志，其处理过程如下：
+
+1） 首先进行比较，如果处理的对象hoid大于info.last_backfill，说明该对象本来就不存在，没有必要修复
+
+>注意：这种情况一般发生在如下情景
+>
+> 该PG在上一次Peering操作成功后，PG还没有处于clean状态，正在Backfill过程中，就再一次触发了Peering的过程。info.last_backfill为上次最后一个修复的对象。
+>
+> 在本PG完成Peering后就开始修复，先完成Recovery操作，然后会继续完成上次的Backfill操作，所以没有必要在这里检查来修复。
+
+2） 通过该对象的日志记录来检查版本是否一致。首先确保是同一个对象，本次日志记录的版本prior_version等于上一条日志记录的version值；
+
+3） 版本first_divergent_update为该对象的日志记录中第一个产生分歧的版本；版本last_divergent_update为最后一个产生分歧的版本；版本prior_version为第一个分歧产生的前一个版本，也就是应该存在的对象版本。布尔变量object_not_in_store用来标记该对象不缺失，且第一条分歧日志操作是删除操作。处理分歧日志的5种情况如下所示：
+
+
+**情况1：**在没有分歧的日志里查找该对象，但是已存在的对象的版本大于第一个分歧对象的版本。这种情况的出现，是由于在merge_log()中产生权威日志时的日志更新，相应的处理已经做了，这里不做任何处理；
+
+**情况2：**如果prior_version为eversion_t()，为对象的create操作或者clone操作，那么这个对象就不需要恢复。如果已经在missing记录中，就删除该missing记录。
+
+**情况3：**如果该对象已经处于missing列表中，如下进行处理：
+
+* 如果日志记录显示当前已经拥有的该对象版本have等于prior_version，说明对象不缺失，不需要修复，删除missing中的记录；
+
+* 否则，修改需要修复的版本need为prior_version；如果prior_version小于等于info.log_tail时，这是不合理的，设置new_divergent_prior用于后续处理；
+
+**情况4：** 如果该对象的所有版本都可以回滚，直接通过本地回滚操作就可以修复，不需要加入missing列表来修复；
+
+**情况5：** 如果不是所有的对象版本都可以回滚，删除相关的版本，把prior_version加入missing记录中用于修复
 
 
 ## 3. Peering的状态转换图
 
+由上一章“ceph peering机制”的分析可知，主OSD上PG对应的状态机RecoveryMachine目前已经处于Started/Primary/Peering状态，从OSD上的PG对应的RecoveryMachine处于Started/Stray状态。本节总体介绍Peering过程的状态转换。
+
+如下图```10-14```所示为Peering状态转换图，其过程如下：
+
+![ceph-chapter10-14](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_14.jpg)
+
+1） 当进入Primary/Peering状态后，就进入默认子状态GetInfo中；
+
+2） 状态GetInfo接收事件```GotInfo```后，转移到GetLog状态中；
+
+3） 如果状态GetLog接收到IsIncomplete事件后，跳转到InComplete状态；
+
+4） 状态GetLog接收到事件```GotLog```后，就转入GetMissing状态
+
+5） 状态GetMissing接收到事件Activate，转入状态Active
+
+由上述Peering的状态转换过程可知，Peering过程基本分为如下三个步骤：
+
+**步骤1** GetInfo: PG的主OSD通过发送消息获取所有从OSD的pg_info信息；
+
+**步骤2** GetLog: 根据各个副本获取的pg_info信息的比较，选择一个拥有权威日志的OSD(auth_log_shard)。如果主OSD不是拥有权威日志的OSD，就从该OSD上拉取权威日志。主OSD完成拉取权威日志后也就拥有了权威日志。
+
+**步骤3** GetMissing: 主OSD拉取其他从OSD的PG日志（或者部分获取，或者全部获取FULL_LOG)。通过与本地权威日志的对比，来计算该OSD上缺失的object信息，作为后续Recovery操作过程的依据。
+
+最后通过Active操作激活主OSD，并发送notify通知消息，激活相应的从OSD。
+
+下面我们会介绍这三个主要步骤。
 
 ## 4. pg_info数据结构
 
