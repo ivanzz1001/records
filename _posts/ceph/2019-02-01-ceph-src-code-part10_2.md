@@ -70,7 +70,8 @@ acting set是一个PG对应副本所在的OSD列表，该列表是有序的，�
 
 当引入up_thru后，上述例子的处理过程如下：
 
-###### 情况1
+**情况1:**
+
 ![ceph-chapter10-5](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_5.jpg)
 情况1的处理流程如下：
 
@@ -82,7 +83,8 @@ acting set是一个PG对应副本所在的OSD列表，该列表是有序的，�
 
 4） epoch4时，A恢复up状态，PG开始Peering过程，发现up_thru[B]为0，说明在epoch为2时没有更新操作，该PG可以完成Peering过程，PG处于active状态。
 
-###### 情况2
+**情况2:**
+
 ![ceph-chapter10-6](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_6.jpg)
 情况2的处理流程如下：
 
@@ -238,6 +240,27 @@ assert(log.head >= olog.tail && olog.head >= log.tail);
 
 ###### 2.7 处理副本日志
 函数proc_replica_log()用于处理其他副本节点发过来的和权威日志有分歧(divergent)的日志。其关键在于计算missing的对象列表，也就是需要修复的对象，如下所示：
+{% highlight string %}
+void PGLog::proc_replica_log(
+  ObjectStore::Transaction& t,
+  pg_info_t &oinfo, const pg_log_t &olog, pg_missing_t& omissing,
+  pg_shard_t from) const；
+{% endhighlight %}
+其参数都为远程节点的信息：
+
+- oinfo: 远程节点的pg_info_t
+
+- olog: 远程节点的日志
+
+- omissing: 远程节点的missing信息，为输出信息
+
+- from: 来自远程节点
+
+函数proc_replica_log()的具体处理过程如下：
+
+1） 如果日志不重叠，就无法通过日志来修复，需要进行Backfill过程，直接返回；
+
+2） 如果日志的head相同，说明没有分歧日志
 
 
 
