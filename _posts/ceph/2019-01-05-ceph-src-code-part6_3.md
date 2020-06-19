@@ -71,8 +71,8 @@ struct pg_log_t {
 	 *          complete negative information.  
 	 * i.e. we can infer pg contents for any store whose last_update >= tail.
 	*/
-	eversion_t head;                           //日志的头，记录最新的日志记录
-	eversion_t tail;                           //指向最老的pg log记录的前一个
+	eversion_t head;                           //日志的头，记录最新的日志记录版本
+	eversion_t tail;                           //指向最老的pg log记录的前一个版本
 
 
 	eversion_t can_rollback_to;                //用于EC，指示本地可以回滚的版本， 可回滚的版本都大于can_rollback_to的值

@@ -351,8 +351,170 @@ folog.log.insert(folog.log.begin(), olog.log.begin(), pp);
 下面我们会介绍这三个主要步骤。
 
 ## 4. pg_info数据结构
+数据结构pg_info_t保存了PG在OSD上的一些描述信息。该数据结构在Peering的过程中，以及后续的数据修复中都发挥了重要的作用，理解该数据结构的各个关节字段的含义可以更好地理解相关的过程。pg_info_t数据结构如下：
+{% highlight string %}
+struct pg_info_t {
+	spg_t pgid;                             //PG的id
+	eversion_t last_update;                 //PG最后一次更新的版本
+	eversion_t last_complete;               //last version pg was complete through.
+	epoch_t last_epoch_started;             //last epoch at which this pg started on this osd
+	
+	version_t last_user_version;            //最后更新的user object的版本号，用于分层存储
+	
+	eversion_t log_tail;                    //日志的尾部版本
+	
+	//上一次backfill操作的对象指针。如果该OSD的Backfill操作没有完成，那么[last_bakfill, last_complete)之间的对象可能
+	//处于missing状态
+	hobject_t last_backfill;             
+	bool last_backfill_bitwise;             //true if last_backfill reflects a bitwise (vs nibblewise) sort
+	
+	interval_set<snapid_t> purged_snaps;    //PG要删除的snap集合
+	
+	pg_stat_t stats;                        //PG的统计信息
+	
+	pg_history_t history;                   //PG的历史信息
+	pg_hit_set_history_t hit_set;           //这是Cache Tier用的hit_set
+};
+{% endhighlight %}
+
+结构pg_history_t保存了PG的一些历史信息：
+{% highlight string %}
+struct pg_history_t {
+	epoch_t epoch_created;            //PG创建时候的epoch值
+	epoch_t last_epoch_started;       //PG启动时候的epoch值
+	epoch_t last_epoch_clean;         //PG处于clean状态时的epoch值
+	epoch_t last_epoch_split;         //该PG上一次分裂时候的epoch值
+	epoch_t last_epoch_marked_full;   
+	...
+};
+{% endhighlight %}
+###### 4.1 last_epoch_started介绍
+last_epoch_started字段有两个地方出现，一个是pg_info_t结构里的last_epoch_started，代表最后一次Peering成功后的epoch值，是本地PG完成Peering后就设置的。另一个是pg_history_t结构体里的last_epoch_started，是PG里所有的OSD都完成Peering后设置的epoch值。
+
+###### 4.2 last_complete和last_backfill的区别
+在这里特别指出last_update和last_complete、last_backfill之间的区别。下面通过一个例子来讲解，同时也可以大概了解PG数据恢复的流程。在数据恢复过程中先进行Recovery过程，再进行Backfill过程（可以参考第11章的详细介绍）。
+
+**情况1：** 在PG处于clean状态时，last_complete就等于last_update的值，并且等于PG日志中的head版本。它们都同步更新，此时没有区别。last_backfill设置为MAX值。例如，下面的PG日志里有三条日志记录。此时last_update和last_complete以及pg_log.head都指向版本(1,2)。由于没有缺失的对象，不需要恢复，last_backfill设置为MAX值。示例如下图所示：
+
+![ceph-chapter10-15](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_15.jpg)
+
+**情况2：** 当该osd1发生异常之后，过一段时间后又重新恢复，当完成了Peering状态后的情况。此时该PG可以继续接受更新操作。例如：下面的灰色字体的日志记录为该osd1崩溃期间缺失的日志，obj7为新的写入的操作日志记录。last_update指向最新的更新版本(1,7)，last_complete仍然指向版本(1,2)。即last_update指的是最新的版本，last_complete指的是上次的更新版本。过程如下：
+
+![ceph-chapter10-16](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_16.jpg)
+
+```last_complte为Recovery修复进程完成的指针```。当该PG开始进行Recovery工作时，last_complete指针随着Recovery过程推进，它指向完成修复的版本。例如：当Recovery完成后last_complete指针指向最后一个修复的对象的版本(1,6)，如下图所示：
+
+![ceph-chapter10-17](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_17.jpg)
+
+```last_backfill为Backfill修复进程的指针```。在Ceph Peering的过程中，该PG有osd2无法根据PG日志记录来恢复，就需要进行Backfill过程。last_backfill初始化为MIN对象，用来记录Backfill的修复进程中已修复的对象。例如：进行Backfill操作时，扫描本地对象(按照对象的hash值排序）。last_backfill随修复的过程不断推进。如果对象小于等于last_backfill，就是已经修复完成的对象。如果对象大于last_backfill且对象的版本小于last_complete，就是处于缺失还没有修复的对象。过程如下所示：
+
+![ceph-chapter10-18](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_18.jpg)
+
+当恢复完成之后，last_backfill设置为MAX值，表明恢复完成，设置last_complete等于last_update的值。
 
 ## 5. GetInfo状态
+
+GetInfo过程获取该PG在其他OSD上的结构图pg_info_t信息（也成pg_info信息）。这里的其他OSD包括当前PG的活跃OSD，以及past_interval期间该PG所有处于up状态的OSD。
+
+由上面的第3节介绍可知，当PG进入Primary/Peering状态后，就进入默认的子状态GetInfo里。其主要流程在构造函数里完成：
+{% highlight string %}
+PG::RecoveryState::GetInfo::GetInfo(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Started/Primary/Peering/GetInfo")
+{
+  context< RecoveryMachine >().log_enter(state_name);
+
+  PG *pg = context< RecoveryMachine >().pg;
+  pg->generate_past_intervals();
+  unique_ptr<PriorSet> &prior_set = context< Peering >().prior_set;
+
+  assert(pg->blocked_by.empty());
+
+  if (!prior_set.get())
+    pg->build_prior(prior_set);
+
+  pg->reset_min_peer_features();
+  get_infos();
+  if (peer_info_requested.empty() && !prior_set->pg_down) {
+    post_event(GotInfo());
+  }
+}
+{% endhighlight %}
+在构造函数GetInfo里，完成了核心的功能，实现过程如下：
+
+1) 调用函数generate_past_intervals()计算past_intervals的值
+{% highlight string %}
+pg->generate_past_intervals();
+{% endhighlight %}
+
+2) 调用函数build_prior()构造获取pg_info_t信息的OSD列表
+{% highlight string %}
+pg->build_prior(prior_set);
+{% endhighlight %}
+
+3) 调用函数get_infos()给参与的OSD发送获取请求
+{% highlight string %}
+get_infos();
+{% endhighlight %}
+由上述可知，GetInfo()过程基本分成三个步骤：计算past_interval的过程；通过调用函数build_prior()来计算要获取pg_info信息的OSD列表；最后调用函数get_infos()给相关的OSD发送消息来获取pg_info信息，并处理接收到的Ack应答。
+
+###### 5.1 计算past_interval
+past_interval是epoch的一个序列。在该序列内一个PG的acting set和up set不会变化。current_interval是一个特殊的past_interval，它是当前最新的一个没有变化的序列。示例如下：
+
+说明如下：
+
+1） Ceph系统当前的epoch值为20，PG1.0的acting set和up set都为列表[0,1,2]；
+
+2） osd3失效导致了osd map变化，epoch变为21；
+
+3） osd5失效导致了osd map变化，epoch变为22；
+
+4） osd6失效导致了osd map变化，epoch变为23；
+
+上述3次epoch变化都不会改变PG1.0的acting set和up set。
+
+![ceph-chapter10-19](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_19.jpg)
+
+5) osd2失效导致了osd map变化，epoch变为24；此时导致PG1.0的acting set和up set变为[0,1,8]，若此时Peering过程成功完成，则last_epoch_started为24。
+
+6） osd12失效导致了osd map变化，epoch变为25，此时如果PG1.0完成了Recovery操作，处于clean状态，last_epoch_clean就为25；
+
+7） osd13失效导致了osd map变化，epoch变为26。
+
+epoch序列[20,21,22,23]就为PG1.0的一个past_interval，epoch序列[24,25,26]就为PG1.0的current_interval。
+
+数据结构```pg_interval_t```用于保存past_interval的信息（src/osd/osd_types.h)：
+{% highlight string %}
+struct pg_interval_t {
+	vector<int32_t> up, acting;          //在本interval阶段PG处于up和acting状态的OSD
+	epoch_t first, last;                 //起始和结束epoch
+	bool maybe_went_rw;                  //在这个阶段是否有数据读写操作
+	int32_t primary;                     //主OSD
+	int32_t up_primary;                  //up状态的主OSD
+};
+{% endhighlight %}
+上例中，past_interval对象的p值为：
+{% highlight string %}
+p = {
+	up = [0,1,2],
+	acting = [0,1,2],
+	first = 20,
+	last = 23,
+	maybe_went_rw = true,
+	primary = 0,
+	up_primary = 0,
+}
+{% endhighlight %}
+函数generate_past_intervals()用于计算past_intervals的值，计算的结果保存在PG中past_intervals的map结构里，map的key值为first epoch的值：
+{% highlight string %}
+map<epoch_t, pg_interval_t> past_intervals;
+{% endhighlight %}
+
+具体计算过程如下：
+
+1） 
+
+
 
 ## 6. GetLog状态
 
