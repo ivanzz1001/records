@@ -512,7 +512,65 @@ map<epoch_t, pg_interval_t> past_intervals;
 
 具体计算过程如下：
 
-1） 
+1） 调用函数_calc_past_interval_range()推测需要计算的past_interval的起始epoch值（start)和结束epoch值(end)。如果返回false，说明不需要计算past_interval，所有的past_interval已经计算好了。
+
+2） 从start到end开始计算past_interval。过程为调用函数check_new_interval()比较两次epoch对应的osd map的变化。如果检查是一个新值，就创建一个新的past_interval对象。
+
+
+----------
+
+{% highlight string %}
+bool PG::_calc_past_interval_range(epoch_t *start, epoch_t *end, epoch_t oldest_map);
+{% endhighlight %}
+函数_calc_past_interval_range()用于计算past_interval的范围。参数oldest_map为OSD的superblock里保存的最老osd map，输出为start和end，分别为需要计算的past_interval的start和end值。具体实现过程如下：
+
+**计算end值如下所示：**
+
+1） 变量end为当前osd map的epoch值，而如果info.history.same_interval_since不为空，就设置为该值。该值表示和当前的osd map的epoch值在同一个interval中。
+{% highlight string %}
+if (info.history.same_interval_since) {
+	*end = info.history.same_interval_since;
+} else {
+	//当前PG可能是新引入的，计算整个range期间interval
+	*end = osdmap_ref->get_epoch();
+}
+{% endhighlight %}
+
+2） 查看past_intervals里已经计算的past_interval的第一个epoch，如果已经比info.history.last_epoch_clean小，就不用计算了，直接返回false。否则设置end为其first值
+{% highlight string %}
+*end = past_intervals.begin()->first;
+{% endhighlight %}
+
+
+**计算start值如下所示：**
+
+1） start设置为info.history.last_epoch_clean，从最后一次last_epoch_clean算起；
+
+2） 当PG为新建时，从info.history.epoch_create开始计算
+
+3) oldest_map值为保存的最早osd map的值，如果start小于这个值，相关的osd map信息缺失，所以无法计算。
+
+所以将start设置为三者的最大值：
+{% highlight string %}
+*start = MAX(MAX(info.history.epoch_created,
+		   info.history.last_epoch_clean),
+	       oldest_map);
+{% endhighlight %}
+
+下面举例说明计算past_interval的过程。
+
+**例10-3** past_interval计算示例
+
+![ceph-chapter10-20](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_20.jpg)
+
+如上表所示： 一个PG有4个interval。past_interval 1的开始epoch为4，结束epoch为8；past_interval 2的epoch区间为[9,11]；past_interval 3的epoch区间为[12,13]；current_interval的epoch区间为[14,16]。最新的epoch为16，info.history.same_interval_since为14，意指是从epoch 14开始，之后的epoch值和当前的epoch值在同一个interval内。info.history.last_epoch_clean为8，就是说在epoch值为8时，该PG处于clean状态。
+
+计算start和end的方法如下：
+
+1） start的值设置为info.history.last_epoch_clean值，其值为8
+
+2） end值从14开始计算，检查当前已经计算好的past_intervals的值。past_interval的计算是从后往前计算。如果第一个past interval的first小于等于8，也就是past_interval 1已经计算过了，那么后面的past_interval 2和past_interval 3都已经计算过，就直接退出。否则就继续查找没有计算过的past_interval的值。
+
 
 
 
