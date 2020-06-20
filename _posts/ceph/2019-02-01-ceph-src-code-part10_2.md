@@ -571,10 +571,257 @@ if (info.history.same_interval_since) {
 
 2） end值从14开始计算，检查当前已经计算好的past_intervals的值。past_interval的计算是从后往前计算。如果第一个past interval的first小于等于8，也就是past_interval 1已经计算过了，那么后面的past_interval 2和past_interval 3都已经计算过，就直接退出。否则就继续查找没有计算过的past_interval的值。
 
+###### 5.2 构建OSD列表
+函数build_prior()根据past_intervals来计算probe_targets列表，也就是要去获取pg_info的OSD列表。
+{% highlight string %}
+void PG::build_prior(std::unique_ptr<PriorSet> &prior_set);
+{% endhighlight %}
+具体实现为： 首先重新构造一个PriorSet对象，在PriorSet的构造函数中完成下列操作：
 
+1） 把当前PG的acting set和up set中的OSD加入到probe列表中；
+
+2） 检查每个past_intervals阶段：
+
+&emsp; a) 如果interval.last小于info.history.last_epoch_started，这种情况下past_interval就没有意义，直接跳过；
+
+&emsp; b) 如果该interval的act为空，就跳过；
+
+&emsp; c) 如果该interval没有rw操作，就跳过；
+
+&emsp; d) 对于当前interval的每一个处于acting状态的OSD进行检查：
+
+  * 如果该OSD当前处于up状态，就加入到up_now列表中。同时加入到probe列表中，用于获取权威日志以及后续数据恢复；
+
+  * 如果该OSD当前不是up状态，但是在该past_interval期间还处于up状态，就加入up_now列表中；
+
+  * 否则就加入down列表，该列表保存所有宕了的OSD
+
+  * 如果当前interval确实有宕的OSD，就调用函数pcontdec()，也就是PG的IsPGRecoverablePredicate函数。该函数判断该PG在该interval期间是否可恢复。如果无法恢复，直接设置pg_down为true值。
+
+>注意： 这里特别强调的是，要确保每个interval期间都可以进行修复。函数IsPGRecoverablePredicate实际上是一个类的运算符重载。对于不同类型的PG有不同的实现。对于ReplicatedPG对应的实现类为RPCRecPred，其至少保证有一个处于up状态的OSD；对应ErasureCode(n+m)类型的PG，至少有n个处于up状态的OSD。
+
+3） 如果prior.pg_down设置为true，就直接设置PG为PG_STATE_DOWN状态；
+
+4） 检查是否需要need_up_thru设置；
+
+5）用prior_set->probe设置probe_targets列表
+
+
+###### 5.3 获取pg_info信息
+在上述过程中计算出了PG在past_interval期间以及当前处于up状态的OSD列表，下面就发送请求给OSD来获取pg_info信息：
+{% highlight string %}
+void PG::RecoveryState::GetInfo::get_infos();
+{% endhighlight %}
+
+函数get_infos()向prior_set的probe集合中的每一个OSD发送pg_query_t::INFO消息，来获取PG在该OSD上的pg_info信息。发送消息的过程调用RecoveryMachine类的send_query()函数来进行：
+{% highlight string %}
+context< RecoveryMachine >().send_query(
+	peer, pg_query_t(pg_query_t::INFO,
+			 it->shard, pg->pg_whoami.shard,
+			 pg->info.history,
+			 pg->get_osdmap()->get_epoch()));
+
+peer_info_requested.insert(peer);
+pg->blocked_by.insert(peer.osd);
+{% endhighlight %}
+数据结构pg_notify_t定义了获取pg_info的ACK信息：
+{% highlight string %}
+struct pg_notify_t {
+  epoch_t query_epoch;         //查询时请求消息的epoch
+  epoch_t epoch_sent;          //发送时响应消息的epoch
+  pg_info_t info;              //pg_info的信息
+  shard_id_t to;               //目标OSD
+  shard_id_t from;             //源OSD
+};
+
+boost::statechart::result PG::RecoveryState::Stray::react(const MQuery& query)
+{
+  PG *pg = context< RecoveryMachine >().pg;
+  if (query.query.type == pg_query_t::INFO) {
+    pair<pg_shard_t, pg_info_t> notify_info;
+    pg->update_history_from_master(query.query.history);
+    pg->fulfill_info(query.from, query.query, notify_info);
+    context< RecoveryMachine >().send_notify(
+      notify_info.first,
+      pg_notify_t(
+	notify_info.first.shard, pg->pg_whoami.shard,
+	query.query_epoch,
+	pg->get_osdmap()->get_epoch(),
+	notify_info.second),
+      pg->past_intervals);
+  } else {
+    pg->fulfill_log(query.from, query.query, query.query_epoch);
+  }
+  return discard_event();
+}
+{% endhighlight %}
+
+----------
+
+在主OSD接收到pg_info的ACK消息后封装成MNotifyRec事件发送给该PG对应的状态机。在下列的事件处理函数中来处理MNotifyRec事件：
+{% highlight string %}
+void OSD::dispatch_op(OpRequestRef op)
+{
+  switch (op->get_req()->get_type()) {
+
+  case MSG_OSD_PG_CREATE:
+    handle_pg_create(op);
+    break;
+  case MSG_OSD_PG_NOTIFY:
+    handle_pg_notify(op);
+    break;
+  case MSG_OSD_PG_QUERY:
+    handle_pg_query(op);
+    break;
+  case MSG_OSD_PG_LOG:
+    handle_pg_log(op);
+    break;
+  case MSG_OSD_PG_REMOVE:
+    handle_pg_remove(op);
+    break;
+  case MSG_OSD_PG_INFO:
+    handle_pg_info(op);
+    break;
+  case MSG_OSD_PG_TRIM:
+    handle_pg_trim(op);
+    break;
+  case MSG_OSD_PG_MISSING:
+    assert(0 ==
+	   "received MOSDPGMissing; this message is supposed to be unused!?!");
+    break;
+
+  case MSG_OSD_BACKFILL_RESERVE:
+    handle_pg_backfill_reserve(op);
+    break;
+  case MSG_OSD_RECOVERY_RESERVE:
+    handle_pg_recovery_reserve(op);
+    break;
+  }
+}
+
+void OSD::handle_pg_notify(OpRequestRef op){
+	...
+}
+
+void PG::handle_peering_event(CephPeeringEvtRef evt, RecoveryCtx *rctx){
+	....
+}
+
+boost::statechart::result PG::RecoveryState::GetInfo::react(const MNotifyRec& infoevt){
+	...
+}
+{% endhighlight %}
+
+react()的具体处理过程如下：
+
+1） 首先从peer_info_requested里删除该peer，同时从blocked_by队列里删除；
+
+2） 调用函数PG::proc_replica_info()来处理副本的pg_info消息：
+
+&emsp; a) 首先检查该OSD的pg_info信息，如果已经存在，并且last_update参数相同，则说明已经处理过，返回false值；否则保存该pg_info的值
+
+&emsp; b) 调用函数has_been_up_since()检查该OSD在send_epoch时已经处于up状态；
+
+&emsp; c) 确保自己是主OSD，把该OSD的pg_info信息保存到peer_info数组，并加入might_have_unfound里。该数组里的OSD用于后续的数据恢复；
+
+&emsp; d) 调用函数unreg_next_scrub()使该PG不在scrub操作的队列中；
+
+&emsp; e) 调用info.history.merge()函数处理```从OSD```发过来的pg_info信息。处理方法是：更新为最新的字段，设置dirty_info为true值；
+
+&emsp; f) 调用函数reg_next_scrub()注册PG下一次的scrub的时间；
+
+&emsp; g) 如果该OSD既不在up数组中也不在acting数组中，那就加入stray_set列表中。当PG处于clean状态时，就会调用purge_strays()函数删除stray状态的PG及其上的对象数据；
+
+&emsp; h) 如果是一个新的OSD，就调用函数update_heartbeat_peers()更新需要heartbeat的OSD列表；
+
+3） 在变量old_start里保存了调用PG::proc_replica_info()前主OSD的pg->info.history.last_epoch_started，如果该epoch值小于合并后的值，说明该值被更新了，从OSD上的epoch值比较新，需要进行如下操作：
+
+&emsp; a) 调用pg->build_prior()重新构建prior_set对象；
+
+&emsp; b) 从peer_info_requested队列中去掉上次构建的prior_set中存在的OSD，这里最新构建上次不存在的OSD列表；
+
+&emsp; c) 调用get_infos()函数重新发送查询peer_info请求；
+
+
+4） 调用pg->apply_peer_features()更新相关的features值；
+
+5） 当peer_info_requested队列为空，并且prior_set不处于pg_down的状态时，说明收到所有OSD的peer_info并处理完成；
+
+6） 最后检查past_interval阶段至少有一个OSD处于up状态且非incomplete状态；否则该PG无法恢复，标记状态为PG_STATE_DOWN并直接返回；
+
+7） 最后完成处理，调用函数post_event(GotInfo())抛出GetInfo事件进入状态机的下一个状态
+
+在GetInfo状态里直接定义了当前状态接收到```GotInfo```事件后，直接跳转到下一个状态```GetLog```里：
+{% highlight string %}
+struct GetInfo : boost::statechart::state< GetInfo, Peering >, NamedState {
+	set<pg_shard_t> peer_info_requested;
+
+	explicit GetInfo(my_context ctx);
+	void exit();
+	void get_infos();
+
+	typedef boost::mpl::list <
+		boost::statechart::custom_reaction< QueryState >,
+		boost::statechart::transition< GotInfo, GetLog >,
+		boost::statechart::custom_reaction< MNotifyRec >
+	> reactions;
+	boost::statechart::result react(const QueryState& q);
+	boost::statechart::result react(const MNotifyRec& infoevt);
+};
+{% endhighlight %}
 
 
 ## 6. GetLog状态
+当PG的主OSD获取到所有从OSD（以及past interval期间的所有参与该PG且目前仍处于active状态的OSD）的pg_info信息后，就跳转到GetLog状态。
+{% highlight string %}
+PG::RecoveryState::GetLog::GetLog(my_context ctx);
+{% endhighlight %}
+然后在GetLog的构造函数里做相应的处理，其具体处理过程分析如下：
+
+1） 调用函数pg->choose_acting(auth_log_shard)选出具有权威日志的OSD，并计算出acting_backfill和backfill_targets两个OSD列表。输出保存在auth_log_shard里；
+
+2） 如果选择失败并且want_acting不为空，就抛出NeedActingChange事件，状态机转移到Primary/WaitActingChange状态，等待申请临时PG返回结果。如果want_acting为空，就抛出IsIncomplete事件，PG的状态机转移到Primary/Peering/Incomplete状态。表明失败，PG就处于InComplete状态。
+
+3）如果auth_log_shard等于pg->pg_whoami的值，也就是选出的拥有权威日志的OSD为当前主OSD，直接抛出事件GotLog()完成GetLog过程。
+
+4） 如果pg->info.last_update小于权威OSD的log_tail，也就是本OSD的日志和权威日志不重叠，那么本OSD无法恢复，抛出IsIncomplete事件。经过函数choose_acting()的选择后，主OSD必须是可恢复的。如果主OSD不可恢复，必须申请一个临时PG，选择拥有权威日志的OSD为临时主OSD；
+
+5） 如果自己不是权威日志的OSD，则需要去拥有权威日志的OSD上去拉取权威日志，并与本地合并。
+
+###### 6.1 choose_acting
+函数choose_acting用来计算PG的acting_backfill和backfill_targets两个OSD列表。acting_backfill保存了当前PG的acting列表，包括需要进行Backfill操作的OSD列表；backfill_targets列表保存了需要进行Backfill的OSD列表。
+{% highlight string %}
+bool PG::choose_acting(pg_shard_t &auth_log_shard_id,
+		       bool restrict_to_up_acting,
+		       bool *history_les_bound);
+{% endhighlight %}
+
+其处理过程如下：
+
+1) 首先调用函数find_best_info来选举出一个拥有权威日志的OSD，保存在变量auth_log_shard里；
+
+2） 如果没有选举出拥有权威日志的OSD，则进入如下流程：
+
+&emsp; a) 如果up不等于acting，申请临时PG，返回false值；
+
+&emsp; b) 否则确保want_acting列表为空，返回false值
+
+3） 计算是否是compat_mode模式，检查是，如果所有的OSD都支持纠删码，就设置compat_mode值为true；
+
+4） 根据PG的不同类型，调用不同的函数。对应ReplicatedPG调用函数calc_replicated_acting来计算PG的需要列表；
+{% highlight string %}
+set<pg_shard_t> want_backfill, want_acting_backfill;
+vector<int> want;
+pg_shard_t want_primary;
+{% endhighlight %}
+
+
+
+###### 6.2 find_best_info
+
+###### 6.3 calc_replicated_acting
+
+
 
 ## 7. GetMissing状态
 
@@ -594,6 +841,11 @@ if (info.history.same_interval_since) {
 
 1. [Ceph源码解析：PG peering](https://www.cnblogs.com/chenxianpao/p/5565286.html)
 
+2. [PEERING](https://docs.ceph.com/docs/master/dev/peering/)
+
+3. [ceph存储 PG的数据恢复过程](https://blog.csdn.net/skdkjzz/article/details/51579432)
+
+4. [Ceph: manually repair object](https://ceph.com/planet/ceph-manually-repair-object/)
 
 <br />
 <br />
