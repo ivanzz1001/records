@@ -810,27 +810,220 @@ bool PG::choose_acting(pg_shard_t &auth_log_shard_id,
 
 4） 根据PG的不同类型，调用不同的函数。对应ReplicatedPG调用函数calc_replicated_acting来计算PG的需要列表；
 {% highlight string %}
+//want_backfill为该PG需要进行Backfill的pg_shard
+//want_acting_backfill: 包括进行acting和Backfill的pg_shard
 set<pg_shard_t> want_backfill, want_acting_backfill;
+
+//主OSD
 vector<int> want;
+
+//在compat_mode模式下，和want_acting_backfill相同
 pg_shard_t want_primary;
 {% endhighlight %}
 
 
+5） 下面就是对PG做的一些检查：
+
+&emsp; a) 计算num_want_acting数量，检查如果小于min_size，进行如下操作
+
+  * 如果对于EC，清空want_acting，返回false
+
+  * 对于ReplicatedPG，如果该PG不允许小于min_size的恢复，清空want_acting，返回false值；
+
+&emsp; b) 调用IsPGRecoverablePredicate来判断PG现有的OSD列表是否可以恢复，如果不能恢复，清空want_acting，返回false值
+
+6） 检查如果want不等于acting，设置want_acting为want:
+
+&emsp; a) 如果want_acting等于up，申请empty为pg_temp的OSD列表；
+
+&emsp; b) 否则申请want为pg_temp的OSD列表；
+
+7） 最后设置PG的actingbackfill为want_acting_backfill，设置backfill_targets为want_backfill，并检查backfill_targets里的pg_shard应该不在stray_set里面；
+
+8） 最终返回true值；
+
+
+----------
+
+下面举例说明需要申请pg_temp的场景：
+
+1） 当前```PG1.0```，其acting列表和up列表都为[0,1,2]，PG处于clean状态；
+
+2） 此时，osd0崩溃，导致该PG经过CRUSH算法重新获得acting和up列表都为[3,1,2]
+
+3) 选择出拥有权威日志的OSD为1，经过calc_replicated_acting()算法，want列表为[1,3,2]，acting_backfill为[1,3,2]，want_backfill为[3]。特别注意want列表第一个为主OSD，如果up_primary无法恢复，就选择权威日志的OSD为主OSD。
+
+4） want[1,3,2]不等于acting[3,1,2]，并且不等于up[3,1,2]，需要向monitor申请pg_temp为want
+
+5） 申请成功pg_temp以后，acting为[3,1,2]，up为[1,3,2]，osd1作为临时的主OSD，处理读写请求。当PG恢复处于clean状态时，pg_temp取消，acting和up都恢复为[3,1,2]。
+
+
 
 ###### 6.2 find_best_info
+函数find_best_info()用于选取一个拥有权威日志的OSD。根据last_epoch_clean到目前为止，各个past_interval期间参与该PG的所有目前还处于up状态的OSD上的pg_info_t信息，来选取一个拥有权威日志的OSD，选择的优先顺序如下：
+
+1） 具有最新last_update的OSD；
+
+2） 如果条件1相同，选择日志更长的OSD；
+
+3） 如果1,2条件相同，选择当前的主OSD；
+{% highlight string %}
+map<pg_shard_t, pg_info_t>::const_iterator PG::find_best_info(
+  const map<pg_shard_t, pg_info_t> &infos,
+  bool restrict_to_up_acting,
+  bool *history_les_bound) const{
+}
+{% endhighlight %}
+代码实现具体的过程如下：
+
+1） 首先在所有OSD中计算max_last_epoch_started，然后在拥有最大的last_epoch_started的OSD中计算min_last_update_acceptable的值；
+
+2） 如果min_last_update_acceptable为eversion_t::max()，返回infos.end()，选取失败；
+
+3） 根据以下条件选择一个OSD：
+
+&emsp; a) 首先过滤掉last_update小于min_last_update_acceptable，或者last_epoch_started小于max_last_epoch_started_found，或者处于incomplete的OSD。
+
+&emsp; b) 如果PG类型是EC，选择最小的last_update；如果PG类型是副本，选择最大的last_update的OSD；
+
+&emsp; c) 如果上述条件都相同，选择log tail最小的，也就是日志最长的OSD；
+
+&emsp; d) 如果上述条件都相同，选择当前的主OSD；
+
+
+综上的选择过程可知，拥有权威日志的OSD特征如下：必须是非incomplete的OSD；必须有最大的last_epoch_started；last_update有可能是最大，但至少是min_last_update_acceptable，有可能是日志最长的OSD，有可能是主OSD。
+
+
 
 ###### 6.3 calc_replicated_acting
 
+本函数计算本PG相关的OSD列表：
+{% highlight string %}
+void PG::calc_replicated_acting(
+  map<pg_shard_t, pg_info_t>::const_iterator auth_log_shard,
+  unsigned size,
+  const vector<int> &acting,
+  pg_shard_t acting_primary,
+  const vector<int> &up,
+  pg_shard_t up_primary,
+  const map<pg_shard_t, pg_info_t> &all_info,
+  bool compat_mode,
+  bool restrict_to_up_acting,
+  vector<int> *want,
+  set<pg_shard_t> *backfill,
+  set<pg_shard_t> *acting_backfill,
+  pg_shard_t *want_primary,
+  ostream &ss)
+{
+}
+{% endhighlight %}
 
+* want_primary: 主OSD，如果它不是up_primary，就需要申请pg_temp;
+
+* backfill: 需要进行Backfill操作的OSD；
+
+* acting_backfill: 所有进行acting和Backfill的OSD的集合；
+
+* want和acting_backfill的OSD相同，前者类型是pg_shard_t，后者是int类型
+
+具体处理过程如下：
+
+1） 首先选择want_primary列表中的OSD：
+
+&emsp; a) 如果up_primary处于非incomplete状态，并且last_update大于等于权威日志的log_tail，说明up_primary的日志和权威日志有重叠，可通过日志记录恢复，优先选择up_primary为主OSD；
+
+&emsp; b) 否则选择auth_log_shard，也就是拥有权威日志的OSD为主OSD；
+
+&emsp; c) 把主OSD加入到want和acting_backfill列表中；
+
+2） 函数的输入参数size为要选择的副本数，依次从up、acting、all_info里选择size个副本OSD：
+
+&emsp; a) 如果该OSD上的PG处于incomplete的状态，或者cur_info.last_update小于主OSD和auth_log_shard的最小值，则该PG副本无法通过日志修复，只能通过Backfill操作来修复。把该OSD分别加入backfill和acting_backfill集合中。
+
+&emsp; b) 否则就可以根据PG日志来恢复，只加入acting_backfill集合和want列表中，不用加入到Backfill列表中。
+
+###### 6.4 收到缺失的权威日志
+如果主OSD不是拥有权威日志的OSD，就需要去拥有权威日志的OSD上拉取权威日志：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::GetLog::react(const MLogRec& logevt)
+{
+  assert(!msg);
+  if (logevt.from != auth_log_shard) {
+    dout(10) << "GetLog: discarding log from "
+	     << "non-auth_log_shard osd." << logevt.from << dendl;
+    return discard_event();
+  }
+  dout(10) << "GetLog: received master log from osd"
+	   << logevt.from << dendl;
+  msg = logevt.msg;
+  post_event(GotLog());
+  return discard_event();
+}
+{% endhighlight %}
+当收到权威日志后，封装成MLogRec类型的事件。本函数就用于处理该事件。它首先确认是从auth_log_shard端发送的消息，然后抛出GotLog()事件：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::GetLog::react(const GotLog&)
+{
+  dout(10) << "leaving GetLog" << dendl;
+  PG *pg = context< RecoveryMachine >().pg;
+  if (msg) {
+    dout(10) << "processing master log" << dendl;
+    pg->proc_master_log(*context<RecoveryMachine>().get_cur_transaction(),
+			msg->info, msg->log, msg->missing, 
+			auth_log_shard);
+  }
+  pg->start_flush(
+    context< RecoveryMachine >().get_cur_transaction(),
+    context< RecoveryMachine >().get_on_applied_context_list(),
+    context< RecoveryMachine >().get_on_safe_context_list());
+  return transit< GetMissing >();
+}
+{% endhighlight %}
+
+本函数捕获GotLog事件，处理过程如下：
+
+1) 如果msg不为空，就调用函数proc_master_log()合并自己缺失的权威日志，并更新自己pg_info相关的信息。从此，作为主OSD，也是拥有权威日志的OSD。
+
+2） 调用函数pg->start_flush()添加一个空操作；
+
+3) 状态转移到GetMissing状态
+
+经过GetLog阶段的处理后，该PG的主OSD已经获取了权威日志，以及pg_info的权威信息。
 
 ## 7. GetMissing状态
+GetMissing的处理过程为：首先，拉取各个从OSD上的有效日志。其次，用主OSD上的权威日志与各个从OSD的日志进行对比，从而计算出各从OSD上不一致的对象并保存在对应的pg_missing_t结构中，作为后续数据修复的依据。
+
+主OSD的不一致的对象信息，已经在调用proc_master_log()合并权威日志的过程中计算出来，所以这里只计算从OSD上的不一致对象。
+
+###### 7.1 拉取从副本上的日志
+在GetMissing的构造函数里，通过对比主OSD上的权威pg_info信息，来获取从OSD上的日志信息：
+{% highlight string %}
+PG::RecoveryState::GetMissing::GetMissing(my_context ctx);
+{% endhighlight %}
+
+其具体处理过程为遍历pg->actingbackfill的OSD列表，然后做如下的处理：
+
+1）不需要获取PG日志的情况：
+
+&emsp; a) pi.is_empty()为空，没有任何信息，需要Backfill过程来修复，不需要获取日志；
+
+&emsp; b) pi.last_update小于pg->pg_log.get_tail()，该OSD的pg_info记录中，last_update小于权威日志的尾部，该OSD的日志和权威日志不重叠，该OSD操作已经远远落后于权威OSD，已经无法根据日志来修复，需要Backfill过程来修复；
+
+&emsp; c) pi.last_backfill为hobject_t()，说明在past_interval期间，该OSD标记需要Backfill操作，实际并没开始Backfill的工作，需要继续Backfill过程；
+
+&emsp; d) pi.last_update等于pi.last_complete，说明该PG没有丢失的对象，已经完成Recovery操作阶段，并且pi.last_update等于pg->info.last_update，说明日志和权威日志的最后更新一致，说明该PG数据完整，不需要回复。
+
+
+
+
 
 ## 8. Active操作
 
 ## 9. 副本端的状态转移
 
+## 10. 状态机异常处理
 
-## 10. 小结
+## 11. 小结
 
 
 
