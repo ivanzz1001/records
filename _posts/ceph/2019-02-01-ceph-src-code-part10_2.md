@@ -1013,11 +1013,78 @@ PG::RecoveryState::GetMissing::GetMissing(my_context ctx);
 
 &emsp; d) pi.last_update等于pi.last_complete，说明该PG没有丢失的对象，已经完成Recovery操作阶段，并且pi.last_update等于pg->info.last_update，说明日志和权威日志的最后更新一致，说明该PG数据完整，不需要回复。
 
+2） 获取日志的情况：当pi.last_update大于pg->info.log_tail，该OSD的日志记录和权威日志记录重叠，可以通过日志来修复。变量since是从last_epoch_started开始的版本值：
 
+&emsp; a) 如果该PG的日志记录pi.log_tail小于等于版本值since，那就发送消息pg_query_t::LOG，从since开始获取日志记录；
+
+&emsp; b) 如果该PG的日志记录pi.log_tail大于版本值since，就发送消息pg_query_t::FULLLOG来获取该OSD的全部日志记录。
+
+
+3） 最后检查如果peer_missing_requested为空，说明所有获取日志的请求返回并处理完成。如果需要pg->need_up_thru，抛出post_event(NeedUpThru())；否则，直接调用post_event(Activate(pg->get_osdmap()->get_epoch()))进入```Activate```状态。
+
+下面举例说明获取日志的两种情况：
+
+![ceph-chapter10-21](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_21.jpg)
+
+当前last_epoch_started的值为10,since是last_epoch_started后的首个日志版本值。当前需要恢复的有效日志是经过since操作之后的日志，之前的日志已经没有用了。
+
+对应osd0，其日志log_tail大于since，全部拷贝osd0上的日志；对应osd1，其日志log_tail小于since，只拷贝从since开始的日志记录。
+
+
+###### 7.2 收到从副本上的日志记录处理
+当一个PG的主OSD收到从OSD返回的获取日志ACK应答后，就把该消息封装成MLogRec事件。状态GetMissing接收到该事件后，在下列事件函数里处理该事件：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::GetMissing::react(const MLogRec& logevt)
+{
+  PG *pg = context< RecoveryMachine >().pg;
+
+  peer_missing_requested.erase(logevt.from);
+  pg->proc_replica_log(*context<RecoveryMachine>().get_cur_transaction(),
+		       logevt.msg->info, logevt.msg->log, logevt.msg->missing, logevt.from);
+  
+  if (peer_missing_requested.empty()) {
+    if (pg->need_up_thru) {
+      dout(10) << " still need up_thru update before going active" << dendl;
+      post_event(NeedUpThru());
+    } else {
+      dout(10) << "Got last missing, don't need missing "
+	       << "posting CheckRepops" << dendl;
+      post_event(Activate(pg->get_osdmap()->get_epoch()));
+    }
+  }
+  return discard_event();
+}
+{% endhighlight %}
+具体过程如下：
+
+1） 调用proc_replica_log()处理日志。通过日志的对比，获取该OSD上处于missing状态的对象列表；
+
+2) 如果peer_missing_requested为空，即所有的获取日志请求返回并处理。如果需要pg->need_up_thru，抛出NeedUpThru()事件。否则，直接调用函数post_event(Activate(pg->get_osdmap()->get_epoch()))进入Activate状态。
+
+函数proc_replica_log()处理各个从OSD上发过来的日志。它通过比较该OSD的日志和本地权威日志，来计算该OSD上处于missing状态的对象列表。具体处理过程调用pg_log.proc_replica_log()来处理日志，输出为omissing，也就是该OSD缺失的对象。
 
 
 
 ## 8. Active操作
+由上可知，如果GetMissing处理成功，就跳转到Activate状态。到本阶段为止，可以说peering主要工作已经完成，但还需要后续的处理，激活各个副本，如下所示：
+{% highlight string %}
+PG::RecoveryState::Active::Active(my_context ctx);
+{% endhighlight %}
+状态Activate的构造函数里处理过程如下：
+
+1） 在构造函数里初始化了remote_shards_to_reserve_recovery和remote_shards_to_reserve_backfill，需要Recovery操作和Backfill操作的OSD。
+
+2） 调用函数pg->start_flush()来完成相关数据的flush工作。
+
+3） 调用函数pg->activate()完成最后的激活工作
+
+
+###### 8.1 MissingLoc
+类MissingLoc用来记录处于missing状态对象的位置，也就是缺失对象的正确版本分别在哪些OSD上。恢复时就去这些OSD上去拉取正确对象的对象数据：
+{% highlight string %}
+{% endhighlight %}
+
+
 
 ## 9. 副本端的状态转移
 
