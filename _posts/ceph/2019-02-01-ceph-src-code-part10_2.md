@@ -1082,7 +1082,89 @@ PG::RecoveryState::Active::Active(my_context ctx);
 ###### 8.1 MissingLoc
 类MissingLoc用来记录处于missing状态对象的位置，也就是缺失对象的正确版本分别在哪些OSD上。恢复时就去这些OSD上去拉取正确对象的对象数据：
 {% highlight string %}
+ class MissingLoc {
+	//缺失的对象 ---> item(现在版本，缺失的版本)
+	map<hobject_t, pg_missing_t::item, hobject_t::BitwiseComparator> needs_recovery_map;
+
+	//缺失的对象 ---> 所在的OSD集合
+	map<hobject_t, set<pg_shard_t>, hobject_t::BitwiseComparator > missing_loc;
+
+	//所有缺失对象所在的OSD集合
+	set<pg_shard_t> missing_loc_sources;
+	PG *pg;
+	set<pg_shard_t> empty_set;
+};
 {% endhighlight %}
+
+下面介绍一些MissingLoc处理函数，作用是添加相应的missing对象列表。其对应两个函数：add_active_missing()函数和add_source_info()函数。
+
+add_active_missing()函数用于把一个副本中的所有缺失对象添加到MissingLoc的needs_recovery_map结构里：
+{% highlight string %}
+void add_active_missing(const pg_missing_t &missing);
+{% endhighlight %}
+
+add_source_info()函数用于计算每个缺失对象是否在本OSD上：
+{% highlight string %}
+/// Adds info about a possible recovery source
+bool add_source_info(
+	pg_shard_t source,               ///< [in] source
+	const pg_info_t &oinfo,         ///< [in] info
+	const pg_missing_t &omissing,   ///< [in] (optional) missing
+	bool sort_bitwise,             ///< [in] local sort bitwise (vs nibblewise)
+	ThreadPool::TPHandle* handle   ///< [in] ThreadPool handle
+	);                             ///< @return whether a new object location was discovered
+{% endhighlight %}
+具体实现如下：
+
+遍历needs_recovery_map里的所有对象，对每个对象做如下处理：
+
+1） 如果oinfo.last_update < need(所需的缺失对象的版本），就跳过；
+
+2） 如果该PG正常的last_backfill指针小于MAX值，说明还处于Backfill阶段，但是sort_bitwise不正确，跳过；
+
+3） 如果该对象大于last_backfill，显然该对象不存在，跳过；
+
+4） 如果该对象大于last_complete，说明该对象或者是上次Peering之后缺失的对象，还没有来得及修复；或者是新创建的对象。检查如果在missing记录已存在，就是上次缺失的对象，直接跳过；否则就是新创建的对象，存在该OSD中。
+
+5） 经过上述检查后，确认该对象在本OSD上，在missing_loc添加该对象的location为本OSD。
+
+###### 8.2 Active状态
+PG::activate()函数是Peering过程的最后一步：
+{% highlight string %}
+void PG::activate(ObjectStore::Transaction& t,
+		  epoch_t activation_epoch,
+		  list<Context*>& tfin,
+		  map<int, map<spg_t,pg_query_t> >& query_map,
+		  map<int,
+		      vector<
+			pair<pg_notify_t,
+			     pg_interval_map_t> > > *activator_map,
+                  RecoveryCtx *ctx);
+{% endhighlight %}
+该函数完成以下功能：
+
+- 更新一些pg_info的参数信息
+
+- 给replica发消息，激活副本PG
+
+- 计算MissingLoc，也就是缺失对象分布在哪些OSD上，用于后续的恢复
+
+具体处理过程如下：
+
+1） 如果需要客户回答，就把PG添加到replay_queue队列里；
+
+2） 更新info.last_epoch_started变量，info.last_epoch_started指的是本OSD在完成目前Peering进程后的更新，而info.history.last_epoch_started是PG的所有OSD都确认完成Peering的更新。
+
+3） 更新一些相关的字段；
+
+4） 注册C_PG_ActivateCommitted()回调函数，该函数最终完成activate的工作；
+
+5） 初始化snap_trimq快照相关的变量；
+
+6） 设置info.last_complete指针：
+
+  * 如果missing.num_missing()等于0，
+
 
 
 
