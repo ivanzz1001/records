@@ -72,6 +72,12 @@ top - 14:39:02 up 1 day,  2:46,  4 users,  load average: 0.00, 0.00, 0.00
 
 * 过去1分钟，5分钟，15分钟的系统平均负载
 
+注： 其实我们可以通过```uptime```命令来查看系统启动时间
+<pre>
+# uptime
+ 01:59:31 up  1:08,  2 users,  load average: 0.00, 0.01, 0.01
+</pre>
+
 <br />
 
 **(2) TASK and CPU States**
