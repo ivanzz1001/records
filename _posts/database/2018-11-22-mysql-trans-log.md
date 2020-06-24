@@ -10,7 +10,7 @@ description:  MySQL事务日志
 
 在数据库系统中，既有存放数据的文件，也有存放日志的文件。日志在内存中也是有缓存log buffer，也有磁盘文件log file，本文主要描述存放日志的文件。
 
-
+mysql中的
 
 <!-- more -->
 
