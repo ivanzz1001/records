@@ -250,7 +250,42 @@ ntpstat                 #查看当前的同步状态
 注：这个过程需要在3台虚拟机都进行一遍。一般情况下在开机启动的时候直接调用```ntpdate```来强制进行时间同步； 而启动之后采用ntpd守护进程自动的完成时间同步。
 
 
-也可以采用其他的方式进行时间同步，例如采用```chrony```。
+也可以采用其他的方式进行时间同步，例如采用```chrony```。执行如下命令安装chrony:
+<pre>
+# yum install chrony 
+</pre>
+修改/etc/chrony.conf:
+<pre>
+# cat /etc/chrony.conf
+server 0.centos.pool.ntp.org iburst       #这里修改成自己的同步源
+driftfile /var/lib/chrony/drift
+makestep 1.0 3
+rtcsync
+logdir /var/log/chrony
+</pre>
+然后执行如下命令重启```chronyd```:
+<pre>
+# systemctl restart chronyd
+        
+# date
+Wed Jun 24 10:20:03 CST 2020
+
+# systemctl enable chronyd    //设置为开机启动 
+# systemctl status chronyd
+● chronyd.service - NTP client/server
+   Loaded: loaded (/usr/lib/systemd/system/chronyd.service; enabled; vendor preset: enabled)
+   Active: active (running) since Wed 2020-06-24 18:19:58 CST; 7h left
+ Main PID: 15309 (chronyd)
+   CGroup: /system.slice/chronyd.service
+           └─15309 /usr/sbin/chronyd
+
+Jun 24 18:19:58 nh-old-oss.localdomain systemd[1]: Starting NTP client/server...
+Jun 24 18:19:58 nh-old-oss.localdomain chronyd[15309]: chronyd version 2.1.1 starting (+CMDMON +NTP +REFCLOCK +RTC +PRIVDROP +DEBUG +ASYNCDNS +IPV6 +SECHASH)
+Jun 24 18:19:58 nh-old-oss.localdomain chronyd[15309]: Frequency -13.792 +/- 0.784 ppm read from /var/lib/chrony/drift
+Jun 24 18:19:58 nh-old-oss.localdomain systemd[1]: Started NTP client/server.
+Jun 24 18:20:02 nh-old-oss.localdomain chronyd[15309]: Selected source 172.18.30.33
+Jun 24 10:20:00 nh-old-oss.localdomain chronyd[15309]: System clock was stepped by -28802.133717 seconds
+</pre>
 
 
 8) TTY
