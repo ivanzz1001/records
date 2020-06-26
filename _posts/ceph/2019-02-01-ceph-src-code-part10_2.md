@@ -1163,16 +1163,119 @@ void PG::activate(ObjectStore::Transaction& t,
 
 6） 设置info.last_complete指针：
 
-  * 如果missing.num_missing()等于0，
+  * 如果missing.num_missing()等于0，表明处于clean状态。直接更新info.last_complete等于info.last_update，并调用pg_log.reset_recovery_pointers()调整log的complete_to指针。
+
+  * 否则，如果有需要恢复的对象，就调用函数pg_log.activate_not_complete(info)，设置info.last_complete为缺失的第一个对象的前一个版本。
+
+7） 以下都是主OSD的操作，给每个从OSD发送MOSDPGLog类型的消息，激活该PG的从OSD上的副本。分别对应三种不同处理：
+
+  * 如果pi.last_update等于info.last_update，这种情况下，该OSD本身就是clean的，不需要给该OSD发送其他信息。添加到activator_map只发送pg_info来激活从OSD。其最终的执行在PeeringWQ的线程执行完状态机的事件处理后，在函数OSD::dispatch_context()里调用OSD::do_info()函数实现；
+
+  * 需要Backfill操作的OSD，发送pg_info，以及osd_min_pg_log_entries数量的PG日志；
+
+  * 需要Recovery操作的OSD，发送pg_info，以及从缺失的日志
+
+8） 设置MissingLoc，也就是统计缺失的对象，以及缺失的对象所在的OSD，核心就是调用MissingLoc的add_source_info()函数，见MissingLoc的相关分析。
+
+9） 如果需要恢复，把该PG加入到osd->queue_for_recovery(this)的恢复队列中
+
+10） 如果PG的size小于act set的size，也就是当前的OSD不够，就标记PG的状态为```PG_STATE_DEGRADED```和```PG_STATE_UNDERSIZED```状态，最后标记PG为```PG_STATE_ACTIVATING```状态
+
+###### 8.3 收到从OSD的MOSDPGLog的应对
+当收到从OSD发送的MOSDPGLog的ACK消息后，触发MInfoRec事件，下面这个函数处理该事件：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Active::react(const MInfoRec& infoevt);
+{% endhighlight %}
+
+处理过程比较简单： 检查该请求的源OSD在本PG的actingbackfill列表中，以等待列表中删除该OSD。最后检查，当收集到所有从OSD发送的ACK，就调用函数all_activated_and_committed()触发AllReplicasActivated事件。
+
+对应主OSD在事务的回调函数C_PG_ActivateCommitted()里实现，最终调用_activate_committed()加入peer_activated集合里。
+
+###### 8.4 AllReplicasActivated
+这个函数处理AllReplicasActivated事件：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Active::react(const AllReplicasActivated &evt);
+{% endhighlight %}
+当所有的replica处于activated状态时，进行如下处理：
+
+1） 取消PG_STATE_ACTIVATING和PG_STATE_CREATING状态，如果该PG上acting状态的OSD数量大于等于pool的min_size，设置该PG为PG_STATE_ACTIVE的状态，否则设置为PG_STATE_PEERED状态；
+
+2） ReplicatedPG::check_local()检查本地的stray对象是否被删除
+
+3） 如果有读写请求在等待peering操作，则把该请求添加到处理队列pg->requeue_ops(pg->waiting_for_peered)；
+
+4） 调用函数ReplicatedPG::on_activate()，如果需要Recovery操作，触发DoRecovery事件，如果需要Backfill操作，触发RequestBackfill事件；否则触发AllReplicasRecovered事件；
+
+5） 初始化Cache Tier需要的hit_set对象；
+
+6） 初始化Cache Tier需要的agent对象；
+
 
 
 
 
 ## 9. 副本端的状态转移
+当创建PG后，根据不同的角色，如果是主OSD，PG对应的状态机就进入Primary状态。如果不是主OSD，就进入Stray状态。
+
+###### 9.1 Stray状态
+Stray状态有两种情况：
+
+**情况1：** 只接收到PGINFO的处理
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Stray::react(const MInfoRec& infoevt);
+{% endhighlight %}
+
+从PG接收到主PG发送的MInfoRec事件，也就是接收到主OSD发送的pg_info信息。其判断如果当前pg->info.last_update大于infoevt.info.last_update，说明当前的日志有divergent的日志，调用函数rewind_divergent_log()清理日志即可。最后抛出Activate(infoevt.info.last_epoch_started)事件，进入ReplicaActive状态。
+
+
+----------
+
+
+**情况2：** 接收到MOSDPGLog消息
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Stray::react(const MLogRec& logevt);
+{% endhighlight %}
+当从PG接收到MLogRec事件，就对应这接收到主PG发送的MOSDPGLog消息，其通知PG处于activate状态，具体处理过程如下：
+
+1） 如果msg->info.last_backfill为hobject_t()，需要Backfill操作的OSD；
+
+2） 否则就是需要Recovery操作的OSD，调用merge_log()把主OSD发送过来的日志合并
+
+抛出Activate(logevt.msg->info.last_eopch_started)事件，使副本转移到ReplicaActive状态。
+
+
+###### 9.2 ReplicaActive状态
+ReplicaActive状态如下：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::ReplicaActive::react(
+  const Activate& actevt);
+{% endhighlight %}
+
+当处于ReplicaActive状态，接收到Activate事件，就调用函数pg->activate()。在函数_activate_committed()给主PG发送应答信息，告诉自己处于activate状态，设置PG为activate状态。
+
+
+
+
 
 ## 10. 状态机异常处理
 
+在上面的流程介绍中，只介绍了正常状态机的转换流程。Ceph之所以用状态机来实现PG的状态转换，就是可以实现任何异常情况下的处理。下面介绍当OSD失效时，导致相关的PG重新进行Peering的机制。
+
+当一个OSD失效，Monitor会通过heartbeat检测到，导致osd map发生了变化，Monitor会把最新的osd map推送给OSD，导致OSD上的受影响PG重新进行Peering操作。
+
+具体流程如下：
+
+1） 在函数OSD::handle_osd_map()处理osd map的变化，该函数调用consume_map()，对每一个PG调用pg->queue_null()，把PG加入到peering_wq中。
+
+2） peering_wq的处理函数process_peering_events()调用OSD::advance_pg()函数，在该函数里调用PG::handle_advance_map()给PG的状态机RecoveryMachine发送AdvMap事件：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Started::react(const AdvMap& advmap);
+{% endhighlight %}
+当处于Started状态，接收到AdvMap事件，调用函数pg->should_restart_peering()检查，如果是new_interval，就跳转到Reset状态，重新开始一次Peering过程。
+
 ## 11. 小结
+
+本章介绍了Ceph的Peering过程，其核心过程就是通过各个OSD上保存的PG日志选出一个权威日志的OSD。以该OSD上的日志为基础，对比其他OSD上的日志记录，计算出各个OSD上缺失的对象信息。这样，PG就使各个OSD的数据达成了一致。
 
 
 
