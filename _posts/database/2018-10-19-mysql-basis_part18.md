@@ -296,6 +296,7 @@ UNLOCK TABLES;
 {% endhighlight %}
 如下是一个具体的实例：
 {% highlight string %}
+# mysql -uroot -ptestAa@123 test < student.sql
 # mysql -uroot -ptestAa@123 < selected_db.sql
 {% endhighlight %}
 
