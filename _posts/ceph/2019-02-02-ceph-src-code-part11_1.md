@@ -401,10 +401,140 @@ struct ObjectRecoveryProgress {
 
 函数prepare_pull()具体处理过程如下：
 
+1） 通过调用函数get_parent()来获取PG对象的指针。pgbackend的parent就是相应的PG对象。通过PG获取missing、peer_missing、missing_loc等信息；
+
+2） 从soid对象对应的missing_loc的map中获取该soid对象所在的OSD集合。把该集合保存在shuffle这个向量中。调用random_shuffle操作对OSD列表随机排序，然后选择向量中首个OSD作为缺失对象来拉取源OSD的值。从这一步可知，当修复主OSD上的对象，而多个从OSD上有该对象时，随机选择其中一个源OSD来拉取。
+
+3） 当选择了一个源shard之后，查看该shard对应的peer_missing来确保该OSD上不缺失该对象，即确实拥有该版本的对象。
+
+4） 确定拉取对象的数据范围：
+
+&emsp; a) 如果是head对象，直接拷贝对象的全部，在copy_subset()加入区间(0,-1)，表示全部拷贝，最后设置size为-1：
+{% highlight string %}
+recovery_info.copy_subset.insert(0, (uint64_t)-1);
+recovery_info.size = ((uint64_t)-1);
+{% endhighlight %}
+
+&emsp; b) 如果该对象是snap对象，确保head对象或者snapdir对象二者必须存在一个。如果headctx不为空，就可以获取SnapSetContext对象，它保存了snapshot相关的信息。调用函数calc_clone_subsets()来计算需要拷贝的数据范围。
+
+5） 设置PullOp的相关字段，并添加到RPGHandle中
+
+函数calc_clone_subsets()用于修复快照对象。在介绍它之前，这里需要介绍SnapSet的数据结构和clone对象的overlap概念。
+
+在SnapSet结构中，字段clone_overlap保存了clone对象和上一次clone对象的重叠部分：
+{% highlight string %}
+struct SnapSet {
+  snapid_t seq;
+  bool head_exists;
+  vector<snapid_t> snaps;                                 // 序号降序排列
+  vector<snapid_t> clones;                                // 序号升序排列
+
+  //写操作导致的和最新的克隆对象重叠的部分
+  map<snapid_t, interval_set<uint64_t> > clone_overlap;  
+
+  map<snapid_t, uint64_t> clone_size;
+};
+{% endhighlight %}
+
+下面通过一个示例来说明```clone_overlap```数据结构的概念。
+
+```例11-2``` clone_overlap数据结构如图11-2所示:
+
+![ceph-chapter11-4](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter11_4.jpg)
+
+snap3从snap2对象clone出来，并修改了区间3和4，其在对象中范围的offset和length为(4,8)和(8,12)。那么在SnapSet的clone_overlap中就记录：
+{% highlight string %}
+clone_overlap[3] = {(4,8), (8,12)}
+{% endhighlight %}
+
+函数calc_clone_subset()用于修复快照对象时，计算应该拷贝的数据区间。在修复快照对象时，并不是完全拷贝快照对象，这里用于优化的关键在于：快照对象之间是有数据重叠，数据重叠的部分可以通过已存在的本地快照对象的数据拷贝来修复；对于不能通过本地快照对象拷贝修复的部分，才需要从其他副本上拉取对应的数据。
+
+函数calc_clone_subsets()具体实现如下：
+
+1) 首先获取该快照对象的size，把(0,size)加入到data_subset中：
+{% highlight string %}
+data_subset.insert(0, size);
+{% endhighlight %}
 
 
+2） 向前查找(oldest snap)和当前快照相交的区间，直到找到一个不缺失的快照对象，添加到clone_subset中。这里找的不重叠区间，是从不缺失快照对象到当前修复的快照对象之间从没修改过的区间，所以修复时，直接从已存在的快照对象拷贝所需区间数据即可。
 
+3） 同理，向后查找（newest snap)和当前快照对象相重叠的对象，直到找到一个不缺失的对象，添加到clone_subset中。
 
+4） 去除掉所有重叠的区间，就是需要拉取的数据区间；
+{% highlight string %}
+data_subset.subtract(cloning);
+{% endhighlight %}
+
+对于上述算法，下面举例来说明：
+
+```例11-3``` 快照对象修复示例如图11-3所示：
+
+![ceph-chapter11-5](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter11_5.jpg)
+
+要修复的对象为snap4，不同长度代表各个clone对象的size是不同的，其中```深红色```的区间代表clone后修改的区间。snap2、snap3和snap5都是已经存在的非缺失对象。
+
+算法处理流程如下：
+
+1） 向前查找和snap4重叠的区间，直到遇到非缺失对象snap2为止。从snap4到snap2一直重叠的区间为1,5,8三个区间。因此，修复对象snap4时，修复1,5,8区间的数据，可以直接从已存在的本地非缺失对象snap2拷贝即可。
+
+2） 同理，向后查找和snap4重叠的区间，直到遇到非缺失对象snap5为止。snap5和snap4重叠的区间为1,2,3,4,7,8六个区间。因此，修复对象4时，直接从本地对象snap4中拷贝区间1,2,3,4,7,8即可。
+
+3） 去除上述本地就可修复的区间，对象snap4只有区间6需要从其他OSD上拷贝数据来修复。
+
+###### 3.3.2 push操作
+函数start_pushes()获取actingbackfill的OSD列表，通过peer_missing查找缺失该对象的OSD，调用prep_push_to_replica()打包PushOp请求。
+
+函数prep_push_to_replica()函数实现过程如下：
+{% highlight string %}
+void ReplicatedBackend::prep_push_to_replica(
+  ObjectContextRef obc, const hobject_t& soid, pg_shard_t peer,
+  PushOp *pop, bool cache_dont_need);
+{% endhighlight %}
+
+1) 如果需要push的对象是snap对象：检查如果head对象缺失，调用prep_push()推送head对象;如果是headdir对象缺失，则调用prep_push()推送headdir对象；
+
+2） 如果是snap对象，调用函数calc_clone_subsets()来计算需要推送的快照对象的数据区间；
+
+3） 如果是head对象，调用函数calc_head_subsets()来计算需要推送的head对象的区间，其原理和计算快照对象类似，这里就不详细说明了。最后调用prep_push()封装PushInfo信息，在函数build_push_op()里读取要push的实际数据。
+
+###### 3.3.3 处理修复操作
+函数run_recover_op()调用send_pushed()函数和send_pulls()函数把请求发送给相关的OSD，这个流程比较简单。
+
+当主OSD把对象推送给缺失该对象的从OSD后，从OSD需要调用函数handle_push()来实现数据写入工作，从而完成该对象的修复。同样，当主OSD给从OSD发起拉取对象的请求来修复自己缺失的对象时，需要调用函数handle_pulls()来处理该请求的应对。
+
+在函数ReplicatedBackend::handle_push()里处理handle_push的请求，主要调用submit_push_data()函数来写入数据。
+
+handle_pull()函数收到一个PullOp操作，返回PushOp操作，处理流程如下：
+{% highlight string %}
+void ReplicatedBackend::handle_pull(pg_shard_t peer, PullOp &op, PushOp *reply)
+{
+  const hobject_t &soid = op.soid;
+  struct stat st;
+  int r = store->stat(ch, ghobject_t(soid), &st);
+  if (r != 0) {
+    get_parent()->clog_error() << get_info().pgid << " "
+			       << peer << " tried to pull " << soid
+			       << " but got " << cpp_strerror(-r) << "\n";
+    prep_push_op_blank(soid, reply);
+  } else {
+    ObjectRecoveryInfo &recovery_info = op.recovery_info;
+    ObjectRecoveryProgress &progress = op.recovery_progress;
+    if (progress.first && recovery_info.size == ((uint64_t)-1)) {
+      // Adjust size and copy_subset
+      recovery_info.size = st.st_size;
+      recovery_info.copy_subset.clear();
+      if (st.st_size)
+        recovery_info.copy_subset.insert(0, st.st_size);
+      assert(recovery_info.clone_subset.empty());
+    }
+
+    r = build_push_op(recovery_info, progress, 0, reply);
+    if (r < 0)
+      prep_push_op_blank(soid, reply);
+  }
+}
+{% endhighlight %}
 
 
 
