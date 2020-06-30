@@ -178,6 +178,25 @@ CREATE TABLE IF NOT EXISTS `runoob_tbl`(
    `submission_date` DATE,
    PRIMARY KEY ( `runoob_id` )
 )ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `runoob_tbl2`(
+  `seqid` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT '唯一ID值',
+  `site` varchar(10) NOT NULL COMMENT 'site info',
+  `bucket` varchar(64) NOT NULL COMMENT 'bucket info',
+  `md5` varchar(64) NOT NULL COMMENT 'file md5 info',
+  `mmhash` bigint(20) unsigned NOT NULL COMMENT 'site and bucket mmurhash',
+  `createTs` bigint(20) NOT NULL COMMENT 'create timestamp',
+  `modifyTs` bigint(20) NOT NULL COMMENT 'modify timestamp',
+  `reserved` int(10) DEFAULT 0 COMMENT 'keep reserved',
+  PRIMARY KEY (`seqid`),
+  UNIQUE KEY `unique_record` (`md5`, `mmhash`) COMMENT '唯一索引',
+)ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+
+-- 单行注释
+
+/*
+   多行注释
+ */
 {% endhighlight %}
 
 **1） 索引和外键**
