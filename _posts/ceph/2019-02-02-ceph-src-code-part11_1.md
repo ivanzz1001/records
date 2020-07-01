@@ -616,9 +616,68 @@ backfills_inf_flight保存了正在进行Backfill操作的对象，pending_backf
 
 6） 当获取所有OSD的对象列表后，就对比当前主OSD的对象列表来进行修复。
 
-7） check对象指针，就是当前OSD中最小的需要进行Backfill操作的对象
+7） check对象指针，就是当前OSD中最小的需要进行Backfill操作的对象：
+
+&emsp; a) 检查check对象，如果小于backfill_info.begin，就需要在各个需要Backfill操作的OSD上删除该对象，加入到to_remove队列中；
+
+&emsp; b) 如果check对象大于或者等于backfill_info.begin，检查拥有check对象的OSD，如果版本不一致，加入need_ver_targ中。如果版本相同，就加入keep_ver_targs中。
+
+&emsp; c) 那些begin对象不是check对象的OSD，如果pinfo.last_backfill小于backfill_info.begin，那么，该对象缺失，加入missing_targs列表中；
+
+&emsp; d) 如果pinfo.last_backfill大于backfill_info.begin，说明该OSD修复的进度已经超越当前的主OSD指示的修复进度，加入skip_targs中；
+
+8） 对于keep_ver_targs列表中的OSD，不做任何操作。对于need_ver_targs和missing_targs中的OSD，该对象需要加入到to_push中去修复。
+
+9） 调用函数send_remove_op()给OSD发送删除的消息来删除to_remove中的对象；
+
+10） 调用函数prep_backfill_object_push()把操作打包成PushOp，调用函数pgbackend->run_recovery_op()把请求发送出去。其流程和Recovery流程类似。
+
+11） 最后用new_last_backfill更新各个OSD的pg_info的last_backfill值。如果pinfo.last_backfill为MAX，说明backfill操作完成，给该OSD发送MOSDPGBackfill::OP_BACKFILL_FINISH消息；否则发送MOSDPGBackfill::OP_BACKFILL_PROGRESS来更新各个OSD上的pg_info的last_backfill字段。
+
+下面举例说明。
+
+```例11-4``` 如下图11-4所示，该PG分布在5个OSD上（也就是5个副本，这里为了方便列出各种处理情况），每一行上的对象列表都是相应OSD当前对应backfillInterval的扫描对象列表。osd5为主OSD，是权威的对象列表，其他OSD都对照主OSD上的对象列表来修复。
+
+![ceph-chapter11-6](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter11_6.jpg)
+
+下面举例来说明步骤7中的不同的修复方法：
+
+1） 当前check对象指针为主OSD上保存的peer_backfill_info中begin的最小值，图中check对象应该为obj4对象；
+
+2） 比较check对象和主osd5上的backfill_info.begin对象，由于check小于obj5，所以obj4为多余的对象，所有拥有该check对象的OSD都必须删除该对象。故osd0和osd2上的obj4对象被删除，同时对应的begin指针前移。
+
+![ceph-chapter11-7](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter11_7.jpg)
 
 
+3） 当前各个OSD的状态如图11-5所示：此时check对象为obj5，比较check和backfill_info.begin的值：
+
+&emsp; a) 对于当前begin未check对象的osd0、osd1、osd4:
+
+    * 对于osd0和osd4，check对象he backfill_info.begin对象都是obj5，且版本号都为(1,4)，加入到keep_ver.targs列表中，不需要修复；
+
+    * 对于osd1，版本号不一致，加入need_ver_targs列表中，需要修复
+
+&emsp; b) 对于当前begin不是check对象的osd2和osd3:
+
+    * 对于osd2，其last_backfill小于backfill_info.begin，显然对象obj5缺失，加入missing_targs修复；
+
+    * 对于osd3，其last_backfill大于backfill_info.begin，也就是说其已经修复到obj6了，obj5应该恢复了，加入skip_targs跳过；
+
+4) 步骤3处理完成，设置last_backfill_started为当前的backfill_info.begin的值。backfill_info.begin指针前移，所有begin等于check对象的begin指针前移，重复以上步骤继续修复。
+
+函数update_range()调用函数scan_range()更新BackfillInterval修复的对象列表，同时检查上次扫描对象列表中，如果有对象发生写操作，就更新该对象修复的版本。
+
+具体实现步骤如下：
+
+1） bi->version记录了扫描要修复的对象列表时PG最新更新的版本号，一般设置为last_update_applied或者info.last_update的值。初始化时，bi->version默认设置为(0,0)，所以小于info.log_tail，就更新bi->version的设置，调用函数scan_range()扫描对象。
+
+2） 检查如果bi->version的值等于info.last_update，说明从上次扫描对象开始到当前时间，PG没有写操作，直接返回。
+
+3） 如果bi->version的值小于info.last_update，说明PG有写操作，需要检查从bi->version到log_head这段日志中的对象：如果该对象有更新操作，修复时就修复最新的版本；如果该对象已经删除，就不需要修复，在修复队列中删除。
+
+
+----------
+下面举例说明update_range()的处理过程：
 
 
 
