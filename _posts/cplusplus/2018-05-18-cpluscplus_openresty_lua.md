@@ -11,6 +11,11 @@ description: openresty lua模块指令
 
 <!-- more -->
 
+## 1. lua指令
+
+使用Lua来构建nginx脚本就是通过一条条指令来完成的，指令常用于指定 Lua 代码是什么时候执行的以及如何使用运行的结果。下图展示了指令执行的顺序：
+
+![ngx-lua-order](https://ivanzz1001.github.io/records/assets/img/cplusplus/ngx_lua_order.png)
 
 
 
