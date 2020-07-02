@@ -169,7 +169,7 @@ configure arguments:
 
 这里我们安装```openresty-1.11.2.5```版本：
 <pre>
-# https://openresty.org/download/openresty-1.11.2.5.tar.gz
+# wget https://openresty.org/download/openresty-1.11.2.5.tar.gz
 </pre>
 
 **2) 安装pcre依赖库**
@@ -227,6 +227,9 @@ configure arguments:
  --with-http_ssl_module \
  --with-pcre=../pcre-8.40 \
  --with-zlib=../zlib-1.2.11
+
+# make
+# make install
 {% endhighlight %}
 增加```--with-luajit```以支持lua脚本。
 
@@ -299,6 +302,25 @@ root     25588     1  0 21:36 ?        00:00:00 nginx: master process sbin/nginx
 nobody   25589 25588  0 21:36 ?        00:00:00 nginx: worker process
 root     25591  2957  0 21:36 pts/0    00:00:00 grep --color=auto nginx
 </pre>
+其实在/usr/local/openresty/bin目录下建立了openresty的软链接，我们也可以使用如下命令来启动：
+{% highlight string %}
+# cd /usr/local/openresty
+# ls bin/
+total 148
+drwxr-xr-x. 2 root root   123 Jul  2 16:30 .
+drwxr-xr-x. 8 root root   117 Jul  2 16:30 ..
+-rwxr-xr-x. 1 root root 19109 Jul  2 16:30 md2pod.pl
+-rwxr-xr-x. 1 root root 15655 Jul  2 16:30 nginx-xml2pod
+lrwxrwxrwx. 1 root root    37 Jul  2 16:30 openresty -> /usr/local/openresty/nginx/sbin/nginx
+-rwxr-xr-x. 1 root root 63463 Jul  2 16:30 opm
+-rwxr-xr-x. 1 root root 17165 Jul  2 16:30 resty
+-rwxr-xr-x. 1 root root 14957 Jul  2 16:30 restydoc
+-rwxr-xr-x. 1 root root  8452 Jul  2 16:30 restydoc-index
+
+#pwd
+/usr/local/openresty
+# bin/openresty
+{% endhighlight %}
 
 3) 再接着执行如下命令进行简单测试
 {% highlight string %}
@@ -307,6 +329,237 @@ root     25591  2957  0 21:36 pts/0    00:00:00 grep --color=auto nginx
 {% endhighlight %}
 
 可以看到上面打印出了lua脚本设置的```hello,world```。
+
+### 2.4 luajit与lualib
+我们进入/usr/local/openresy目录：
+<pre>
+# pwd
+/usr/local/openresty
+# ls
+bin  COPYRIGHT  luajit  lualib  nginx  pod  resty.index  site
+</pre>
+发现该目录下有```luajit```和```lualib```两个文件夹。
+
+1) **luajit**
+
+LuaJIT是采用C语言写的Lua即时编译器。LuaJIT被设计成完全兼容Lua5.1标准，因此LuaJIT代码的语法和标准Lua的语法并没有多大的区别。打我们大概来看一下luajit这个目录：
+{% highlight string %}
+# tree luajit
+luajit
+├── bin
+│   ├── luajit -> luajit-2.1.0-beta3
+│   └── luajit-2.1.0-beta3
+├── include
+│   └── luajit-2.1
+│       ├── lauxlib.h
+│       ├── luaconf.h
+│       ├── lua.h
+│       ├── lua.hpp
+│       ├── luajit.h
+│       └── lualib.h
+├── lib
+│   ├── libluajit-5.1.a
+│   ├── libluajit-5.1.so -> libluajit-5.1.so.2.1.0
+│   ├── libluajit-5.1.so.2 -> libluajit-5.1.so.2.1.0
+│   ├── libluajit-5.1.so.2.1.0
+│   ├── lua
+│   │   └── 5.1
+│   └── pkgconfig
+│       └── luajit.pc
+└── share
+    ├── lua
+    │   └── 5.1
+    ├── luajit-2.1.0-beta3
+    │   └── jit
+    │       ├── bc.lua
+    │       ├── bcsave.lua
+    │       ├── dis_arm64be.lua
+    │       ├── dis_arm64.lua
+    │       ├── dis_arm.lua
+    │       ├── dis_mips64el.lua
+    │       ├── dis_mips64.lua
+    │       ├── dis_mipsel.lua
+    │       ├── dis_mips.lua
+    │       ├── dis_ppc.lua
+    │       ├── dis_x64.lua
+    │       ├── dis_x86.lua
+    │       ├── dump.lua
+    │       ├── p.lua
+    │       ├── v.lua
+    │       ├── vmdef.lua
+    │       └── zone.lua
+    └── man
+        └── man1
+            └── luajit.1
+{% endhighlight %}
+在OpenResty中就是采用该编译器来即时解析我们的lua脚本的。
+
+2) **lualib**
+
+有编译器原则上就可以执行符合相关标准的lua脚本了，但这里为什么还有一个lualib呢？举个例子，在C语言中，我们有gcc编译器，但是假如我们不使用posix C库的话，我们可能只能编写类似如下的最简单的程序(main.c)：
+{% highlight string %}
+int main(int argc, char *argv[])
+{
+        int a = 1;
+        int b = 2;
+
+        int c = a + b;
+
+        return c;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o main main.c
+# ./main
+</pre>
+如果我们不使用任何库，可能连最基本的```打印输出结果```都做不到。
+
+这里lualib就是OpenResty为我们准备的一个基础lua库，我们后续编写的程序都可以基于该库来完成。现在我们大体看一下该基础库：
+{% highlight string %}
+# tree lualib/
+lualib/
+├── cjson.so
+├── ngx
+│   ├── balancer.lua
+│   ├── errlog.lua
+│   ├── ocsp.lua
+│   ├── process.lua
+│   ├── re.lua
+│   ├── semaphore.lua
+│   ├── ssl
+│   │   └── session.lua
+│   └── ssl.lua
+├── rds
+│   └── parser.so
+├── redis
+│   └── parser.so
+└── resty
+    ├── aes.lua
+    ├── core
+    │   ├── base64.lua
+    │   ├── base.lua
+    │   ├── ctx.lua
+    │   ├── exit.lua
+    │   ├── hash.lua
+    │   ├── misc.lua
+    │   ├── regex.lua
+    │   ├── request.lua
+    │   ├── response.lua
+    │   ├── shdict.lua
+    │   ├── time.lua
+    │   ├── uri.lua
+    │   ├── var.lua
+    │   └── worker.lua
+    ├── core.lua
+    ├── dns
+    │   └── resolver.lua
+    ├── limit
+    │   ├── conn.lua
+    │   ├── req.lua
+    │   └── traffic.lua
+    ├── lock.lua
+    ├── lrucache
+    │   └── pureffi.lua
+    ├── lrucache.lua
+    ├── md5.lua
+    ├── memcached.lua
+    ├── mysql.lua
+    ├── random.lua
+    ├── redis.lua
+    ├── sha1.lua
+    ├── sha224.lua
+    ├── sha256.lua
+    ├── sha384.lua
+    ├── sha512.lua
+    ├── sha.lua
+    ├── string.lua
+    ├── upload.lua
+    ├── upstream
+    │   └── healthcheck.lua
+    └── websocket
+        ├── client.lua
+        ├── protocol.lua
+        └── server.lua
+{% endhighlight %}
+对于在该默认路径下的```基础lua库```，openresy可以自动找到，我们不必在nginx.conf的http配置段中通过如下命令来显式指定：
+<pre>
+lua_package_path "/usr/local/openresty/lualib/?.lua;;";
+lua_package_cpath "/usr/local/openresty/lualib/?.so;;";
+</pre>
+
+下面我们来测试一下使用```基础lua库```中的string，修改nginx.conf:
+{% highlight string %}
+#user  nobody;
+worker_processes  1;
+
+#pid        logs/nginx.pid;
+
+
+events {
+    worker_connections  1024;
+}
+
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+
+   
+    #access_log  logs/access.log  main;
+
+    sendfile        on;
+    #tcp_nopush     on;
+
+    #keepalive_timeout  0;
+    keepalive_timeout  65;
+
+    #gzip  on;
+
+    init_by_lua_block { str = require "resty.string" }
+
+    server {
+        listen       80;
+        server_name  localhost;
+
+        #charset koi8-r;
+
+        #access_log  logs/host.access.log  main;
+
+        location / {
+            default_type text/html;
+            content_by_lua '
+                local s = str.to_hex("aaa")
+                local s2 = string.sub("aaabbbccc",1,4)
+                ngx.say("<p>hello, world</p>", "hex(aaa):", s, s2)
+            ';
+        }
+
+        #error_page  404              /404.html;
+
+        # redirect server error pages to the static page /50x.html
+        #
+        error_page   500 502 503 504  /50x.html;
+        location = /50x.html {
+            root   html;
+        }
+
+      
+    }
+
+}
+{% endhighlight %}
+测试运行：
+{% highlight string %}
+# bin/openresty -s reload
+# curl -X GET http://127.0.0.1
+<p>hello, world</p>hex(aaa):616161aaab
+{% endhighlight %}
+
+
+
+
+
 
 <br />
 <br />
