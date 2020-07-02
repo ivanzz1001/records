@@ -29,7 +29,13 @@ description: openresty lua模块指令
 
 4. [openresty之指令与常用API](https://www.cnblogs.com/jimodetiantang/p/9257819.html)
 
-5. [Nginx Lua 模块指令](https://www.cnblogs.com/babycomeon/p/11109499.html)
+5. [OpenResty中LUA指令的执行顺序](https://blog.csdn.net/wwsl123/article/details/103308295)
+
+6. [nginx api for lua](https://github.com/openresty/lua-nginx-module#nginx-api-for-lua)
+
+7. [Nginx Lua 模块指令](https://www.cnblogs.com/babycomeon/p/11109499.html)
+
+
 
 <br />
 <br />
