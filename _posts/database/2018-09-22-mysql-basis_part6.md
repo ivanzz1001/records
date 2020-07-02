@@ -171,6 +171,10 @@ reference_definition:
 
 例如，下面创建名为```runoob```的表：
 {% highlight string %}
+CREATE DATABASE IF NOT EXISTS test DEFAULT CHARSET utf8 COLLATE utf8_general_ci;
+
+use test;
+
 CREATE TABLE IF NOT EXISTS `runoob_tbl`(
    `runoob_id` INT UNSIGNED AUTO_INCREMENT,
    `runoob_title` VARCHAR(100) NOT NULL,
@@ -197,6 +201,8 @@ CREATE TABLE IF NOT EXISTS `runoob_tbl2`(
 /*
    多行注释
  */
+INSERT INTO runoob_tbl2 (site, bucket, md5, mmhash, createTs, modifyTs reserved) 
+VALUES('cn', 'test', 'aaaa', 0, unix_timestamp(now()), unix_timestamp(now()), 0);
 {% endhighlight %}
 
 **1） 索引和外键**
