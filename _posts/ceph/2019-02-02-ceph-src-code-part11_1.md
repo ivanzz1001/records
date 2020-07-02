@@ -536,10 +536,148 @@ void ReplicatedBackend::handle_pull(pg_shard_t peer, PullOp &op, PushOp *reply)
 }
 {% endhighlight %}
 
+1) 首先调用store->stat()函数，验证该对象是否存在，如果不存在，则调用函数prep_push_op_blank()，直接返回空值；
+
+2） 如果该对象存在，获取ObjectRecoveryInfo和ObjectRecoveryProgress结构。如果progress.first为true并且recovery_info.size为-1，说明是全拷贝修复：将recovery_info.size设置为实际对象的size，清空recovery_info.copy_subset，并把(0,size)区间添加到recovery_info.copy_subset.insert(0, st.st_size)的拷贝区间。
+
+3） 调用函数build_push_op()，构建PullOp结构。如果出错，调用prep_push_op_blank()，直接返回空值。
 
 
+----------
+
+函数build_push_op()完成构建push的请求。具体处理如下：
+{% highlight string %}
+int ReplicatedBackend::build_push_op(const ObjectRecoveryInfo &recovery_info,
+				     const ObjectRecoveryProgress &progress,
+				     ObjectRecoveryProgress *out_progress,
+				     PushOp *out_op,
+				     object_stat_sum_t *stat,
+                                     bool cache_dont_need);
+{% endhighlight %}
+
+1) 如果progress.first为true，就需要获取对象的元数据信息。通过store->omap_get_header()获取omap的header信息，通过store->getattrs()获取对象的扩展属性信息，并验证oi.version是否为recovery_info.version；否则返回-EINVAL值。如果成功，new_progress.first设置为false。
+
+2） 上一步只是获取了omap的header信息，并没有获取omap信息。这一步首先判断progress.omap_complete是否完成（初始化设置为false)，如果没有完成，就迭代获取omap的(key,value)信息，并检查一次获取信息的大小不能超过cct->_conf->osd_recovery_max_chunk设置的值（默认为8MB）。特别需要注意的是，当该配置参数的值小于一个对象的size时，一个对象的修复需要多次数据的push操作。为了保证数据的完整一致性，先把数据拷贝到PG的temp存储空间。当拷贝完成之后，再移动到该PG的实际空间中。
+
+3） 开始拷贝数据：检查recovery_info.copy_subset，也就是拷贝的区间；
+
+4） 调用函数store->fiemap()来确定有效数据的区间out_op->data_included的值，通过store->read()读取相应的数据到data里。
+
+5） 设置PullOp的相关字段，并返回。
+
+## 4. Backfill过程
+
+当PG完成了Recovery过程之后，如果backfill_targets不为空，表明有需要Backfill过程的OSD，就需要启动Backfill的任务，来完成PG的全部修复。下面介绍Backfill过程相关的数据结构和具体处理过程。
 
 
+### 4.1 相关数据结构
+数据结构BackfillInterval用来记录每个peer上的Backfill过程（src/osd/pg.h)。
+{% highlight string %}
+struct BackfillInterval {
+	//一个peer的backfill_interval信息
+	eversion_t version;                         //扫描时的最新对象版本
+
+	map<hobject_t,eversion_t,hobject_t::Comparator> objects;
+	bool sort_bitwise;
+	hobject_t begin;
+	hobject_t end;
+};
+{% endhighlight %}
+
+其字段说明如下：
+
+* version: 记录扫描对象列表时，当前PG对象更新的最新版本，一般为last_update，由于此时PG处于active状态，可能正在进行写操作。其用来检查从上次扫描到现在是否有对象写操作。如果有，完成写操作的对象在已扫描的对象列表中，进行Backfill操作时，该对象就需要更新为最新版本。
+
+* objects: 扫描到准备进行Backfill操作的对象列表；
+
+* begin: 当前处理的对象；
+
+* end: 本次扫描对象的结束，用于作为下次扫描对象的开始：
+
+
+### 4.2 Backfill的具体实现
+函数recovery_backfill()作为Backfill过程的核心函数，控制整个Backfill修复进程。其工作流程如下。
+
+1） 初始设置
+
+在函数on_activate()里设置了PG的属性值new_backfill为true，设置了last_backfill_started为earliest_backfill()的值。该函数计算需要backfill的OSD中，peer_info信息里保存的last_backfill的最小值。
+
+peer_backfill_info的map中保存各个需要backfill的OSD所对应backfillInterval对象信息。首先初始化begin和end都为peer_info.last_backfill，由PG的Peering过程可知，在函数activate()里，如果需要Backfill的OSD，设置该OSD的peer_info的last_backfill为hobject_t()，也就是MIN对象。
+
+backfills_inf_flight保存了正在进行Backfill操作的对象，pending_backfill_updates保存了需要删除的对象。
+
+2） 设置backfill_info.begin为last_backfill_started，调用函数update_range()来更新需要进行Backfill操作的对象列表；
+
+3） 根据各个peer_info的last_backfill对应的backfillInterval信息进行trim操作。根据last_backfill_started来更新backfill_info里相关字段；
+
+4） 如果backfill_info.begin小于等于earliest_peer_backfill()，说明需要继续扫描更多的对象，backfill_info重新设置，这里特别注意的是，backfill_info的version字段也重新设置为(0,0)，这会导致在随后调用的update_scan()函数再调用scan_range()函数来扫描对象；
+
+5） 进行比较，如果pbi.begin小于backfill_info.begin，需要向各个OSD发送MOSDPGScan::OP_SCAN_GET_DIGEST消息来获取该OSD目前拥有的对象列表；
+
+6） 当获取所有OSD的对象列表后，就对比当前主OSD的对象列表来进行修复。
+
+7） check对象指针，就是当前OSD中最小的需要进行Backfill操作的对象：
+
+&emsp; a) 检查check对象，如果小于backfill_info.begin，就需要在各个需要Backfill操作的OSD上删除该对象，加入到to_remove队列中；
+
+&emsp; b) 如果check对象大于或者等于backfill_info.begin，检查拥有check对象的OSD，如果版本不一致，加入need_ver_targ中。如果版本相同，就加入keep_ver_targs中。
+
+&emsp; c) 那些begin对象不是check对象的OSD，如果pinfo.last_backfill小于backfill_info.begin，那么，该对象缺失，加入missing_targs列表中；
+
+&emsp; d) 如果pinfo.last_backfill大于backfill_info.begin，说明该OSD修复的进度已经超越当前的主OSD指示的修复进度，加入skip_targs中；
+
+8） 对于keep_ver_targs列表中的OSD，不做任何操作。对于need_ver_targs和missing_targs中的OSD，该对象需要加入到to_push中去修复。
+
+9） 调用函数send_remove_op()给OSD发送删除的消息来删除to_remove中的对象；
+
+10） 调用函数prep_backfill_object_push()把操作打包成PushOp，调用函数pgbackend->run_recovery_op()把请求发送出去。其流程和Recovery流程类似。
+
+11） 最后用new_last_backfill更新各个OSD的pg_info的last_backfill值。如果pinfo.last_backfill为MAX，说明backfill操作完成，给该OSD发送MOSDPGBackfill::OP_BACKFILL_FINISH消息；否则发送MOSDPGBackfill::OP_BACKFILL_PROGRESS来更新各个OSD上的pg_info的last_backfill字段。
+
+下面举例说明。
+
+```例11-4``` 如下图11-4所示，该PG分布在5个OSD上（也就是5个副本，这里为了方便列出各种处理情况），每一行上的对象列表都是相应OSD当前对应backfillInterval的扫描对象列表。osd5为主OSD，是权威的对象列表，其他OSD都对照主OSD上的对象列表来修复。
+
+![ceph-chapter11-6](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter11_6.jpg)
+
+下面举例来说明步骤7中的不同的修复方法：
+
+1） 当前check对象指针为主OSD上保存的peer_backfill_info中begin的最小值，图中check对象应该为obj4对象；
+
+2） 比较check对象和主osd5上的backfill_info.begin对象，由于check小于obj5，所以obj4为多余的对象，所有拥有该check对象的OSD都必须删除该对象。故osd0和osd2上的obj4对象被删除，同时对应的begin指针前移。
+
+![ceph-chapter11-7](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter11_7.jpg)
+
+
+3） 当前各个OSD的状态如图11-5所示：此时check对象为obj5，比较check和backfill_info.begin的值：
+
+&emsp; a) 对于当前begin未check对象的osd0、osd1、osd4:
+
+    * 对于osd0和osd4，check对象he backfill_info.begin对象都是obj5，且版本号都为(1,4)，加入到keep_ver.targs列表中，不需要修复；
+
+    * 对于osd1，版本号不一致，加入need_ver_targs列表中，需要修复
+
+&emsp; b) 对于当前begin不是check对象的osd2和osd3:
+
+    * 对于osd2，其last_backfill小于backfill_info.begin，显然对象obj5缺失，加入missing_targs修复；
+
+    * 对于osd3，其last_backfill大于backfill_info.begin，也就是说其已经修复到obj6了，obj5应该恢复了，加入skip_targs跳过；
+
+4) 步骤3处理完成，设置last_backfill_started为当前的backfill_info.begin的值。backfill_info.begin指针前移，所有begin等于check对象的begin指针前移，重复以上步骤继续修复。
+
+函数update_range()调用函数scan_range()更新BackfillInterval修复的对象列表，同时检查上次扫描对象列表中，如果有对象发生写操作，就更新该对象修复的版本。
+
+具体实现步骤如下：
+
+1） bi->version记录了扫描要修复的对象列表时PG最新更新的版本号，一般设置为last_update_applied或者info.last_update的值。初始化时，bi->version默认设置为(0,0)，所以小于info.log_tail，就更新bi->version的设置，调用函数scan_range()扫描对象。
+
+2） 检查如果bi->version的值等于info.last_update，说明从上次扫描对象开始到当前时间，PG没有写操作，直接返回。
+
+3） 如果bi->version的值小于info.last_update，说明PG有写操作，需要检查从bi->version到log_head这段日志中的对象：如果该对象有更新操作，修复时就修复最新的版本；如果该对象已经删除，就不需要修复，在修复队列中删除。
+
+
+----------
+下面举例说明update_range()的处理过程：
 
 
 
