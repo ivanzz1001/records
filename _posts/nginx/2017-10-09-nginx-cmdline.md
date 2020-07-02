@@ -153,6 +153,14 @@ http {
 
 我们如下操作均是针对这一环境。
 
+注： 对于日志我们一般配置为如下即可
+{% highlight string %}
+log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+access_log  /var/log/nginx/access.log combined buffer=512k flush=5m;
+{% endhighlight %}
+
 ### 1.1 默认启动方式
 
 直接执行Nginx二进制程序：
