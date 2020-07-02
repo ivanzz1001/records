@@ -679,6 +679,31 @@ backfills_inf_flight保存了正在进行Backfill操作的对象，pending_backf
 ----------
 下面举例说明update_range()的处理过程：
 
+```例11-5``` update_range的处理过程
+
+1) 日志记录如下图所示：
+
+![ceph-chapter11-8](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter11_8.jpg)
+
+BackfillInterval的扫描的对象列表： bi->begin为对象obj1(1,3)，bi->end为对象obj6(1,6)，当前info.last_update为版本(1,6)，所以bi->version设置为(1,6)。由于本次扫描的对象列表不一定能修复完，只能等下次修复。
+
+
+2） 日志记录如下所示：
+
+![ceph-chapter11-9](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter11_9.jpg)
+
+第二次进入函数recovery_backfill，此时begin对象指向了obj2对象。说明上次只完成了对象obj1的修复。继续修复时，期间有对象发生更新操作：
+
+&emsp; a) 对象obj3有些操作，版本更新为(1,7)。此时对象列表中要修复的对象obj3版本(1,5)，需要更新为版本(1,7)的值。
+
+&emsp; b) 对象obj4发送删除操作，不需要修复了，所以需要从对象列表中删除。
+
+综上所述可知，Ceph的Backfill过程是扫描OSD上该PG的所有对象列表，和主OSD做对比，修复不存在的或版本不一致的对象，同时删除多余的对象。
+
+## 5. 小结
+本章介绍了Ceph的数据修复的过程，有两个过程：Recovery过程和Backfill过程。Recovery过程根据missing记录，先完成主副本的修复，然后完成从副本的修复。对于不能通过日志修复的OSD，Backfill过程通过扫描各个部分上的对象来全量修复。整个Ceph的数据修复过程比较清晰，比较复杂的副本可能就是涉及快照对象的修复处理。
+
+目前这部分代码时Ceph最核心的代码，除非必要，都不会轻易修改。目前社区也提出了修复时的一种优化方法。就是在日志里记录修改的对象范围，这样Recovery过程中不必拷贝整个对象来修复，只修复修改过的对象对应的范围即可，这样在某些情况下可以减少修复的数据量。
 
 
 
