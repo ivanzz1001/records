@@ -21,28 +21,10 @@ description: openresty lua模块指令
 
 如下我们列出nginx lua相关的一些指令：
 <pre>
-lua_load_resty_core   lua_capture_error_log    lua_use_default_type
-lua_malloc_trim
-lua_code_cache
-lua_regex_cache_max_entries
-lua_regex_match_limit
-lua_package_path
-lua_package_cpath
-init_by_lua
-init_by_lua_block
-init_by_lua_file
-init_worker_by_lua
-init_worker_by_lua_block
-init_worker_by_lua_file
-set_by_lua
-set_by_lua_block
-set_by_lua_file
-content_by_lua
-content_by_lua_block
-content_by_lua_file
-rewrite_by_lua
-rewrite_by_lua_block
-rewrite_by_lua_file
+lua_load_resty_core          lua_capture_error_log        lua_use_default_type         lua_malloc_trim            lua_code_cache
+lua_regex_cache_max_entries  lua_regex_match_limit        lua_package_path             lua_package_cpath          init_by_lua                  init_by_lua_block            init_by_lua_file             init_worker_by_lua           init_worker_by_lua_block   init_worker_by_lua_file
+set_by_lua                   set_by_lua_block             set_by_lua_file              content_by_lua             content_by_lua_block
+content_by_lua_file          rewrite_by_lua               rewrite_by_lua_block         rewrite_by_lua_file
 access_by_lua
 access_by_lua_block
 access_by_lua_file
