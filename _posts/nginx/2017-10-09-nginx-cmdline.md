@@ -160,6 +160,7 @@ log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
                       '"$http_user_agent" "$http_x_forwarded_for"';
 access_log  /var/log/nginx/access.log combined buffer=512k flush=5m;
 {% endhighlight %}
+对于上面打印出的日志，这里```time_local```是响应时的时间戳，而不是请求时的时间戳。
 
 ### 1.1 默认启动方式
 
