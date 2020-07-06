@@ -226,7 +226,7 @@ phase: loading-config
 {% endhighlight %}
 与```init_by_lua```等价，除了这里是通过path-to-lua-script-file来指定所要执行的Lua脚本外。
 
-注：当我们使用类似于```foo/bar.lua```这样的相对路径时，会转换成相对于```server prefix```所指定的绝对路径。我们可以在Nginx启动的时候通过```-p Path```来指定server prefix path。
+注：当我们使用类似于```foo/bar.lua```这样的相对路径时，会转换成相对于```server prefix```的绝对路径。我们可以在Nginx启动的时候通过```-p Path```来指定server prefix path。
 
 9) **init_worker_by_lua**
 {% highlight string %}
@@ -300,6 +300,9 @@ phase: starting-worker
 {% endhighlight %}
 与```init_worker_by_lua```等价，除了这里是通过lua-file-path来指定所要执行的Lua脚本外。
 
+自```v0.10.12```版本以来，该钩子不再在 cache manager 和 cache loader 进程中运行。
+
+
 12) **set_by_lua**
 {% highlight string %}
 syntax: set_by_lua $res <lua-script-str> [$arg1 $arg2 ...]
@@ -310,8 +313,85 @@ phase: rewrite
 {% endhighlight %}
 >注：注意在 v0.9.17 发行版以后不鼓励使用该指令，应使用set_by_lua_block指令代替
 
+* 执行```lua-script-str```所指定的Lua代码，参数通过```$arg1 $arg2 ....```传入，并将输出字符串保存到```res```中。```lua-script-str```可以执行[Nginx Lua API](https://github.com/openresty/lua-nginx-module#nginx-api-for-lua)调用，并且可以从ngx.arg表中获取输入参数（参数索引从1开始）。
 
-13) **content_by_lua**
+* 本指令被设计用于执行```简短```、```快速```的Lua脚本，因为当在执行这一Lua脚本时，其会阻塞Nginx event loop。因此，我们应该尽力避免在lua-script-str中执行耗时任务。
+
+* 本指令的实现原理是通过向ngx_http_rewrite_module的命令列表注入自定义命令。由于本身ngx_http_rewrite_module中的命令并不支持非阻塞IO，因此在本指令中并不能运行Lua API中涉及的```light thread```。
+
+* 不能在set_by_lua上下文中执行如下的API函数：
+
+    * 输出API函数（例如： ngx.say、ngx.send_headers)
+
+    * 控制API函数(例如: ngx.exit)
+
+    * subrequest API函数（例如： ngx.location.capture、ngx.location.capture_multi)
+
+    * Cosocket API函数（例如： ngx.socket.tcp、ngx.req.socket)
+
+    * Sleeping API函数(例如： ngx.sleep)
+
+另外，值得注意的是本指令一次只能返回一个值。然而，我们可以使用```ngx.var.VARIABLE```来实现返回多个值。例如：
+<pre>
+ location /foo {
+     set $diff ''; # we have to predefine the $diff variable here
+
+     set_by_lua $sum '
+         local a = 32
+         local b = 56
+
+         ngx.var.diff = a - b;  -- write to $diff directly
+         return a + b;          -- return the $sum value normally
+     ';
+
+     echo "sum = $sum, diff = $diff";
+ }
+</pre>
+
+本指令可以和ngx_http_rewrite_module、set-misc-nginx-module、array-var-nginx-module中的指令混合使用。这些指令的执行顺序会按照配置文件中的配置顺序执行（注： 一般nginx 配置文件中的指令是没有顺序的）
+<pre>
+set $foo 32;
+set_by_lua $bar 'return tonumber(ngx.var.foo) + 1';
+set $baz "bar: $bar";  # $baz == "bar: 33"
+</pre>
+
+13) **set_by_lua_block**
+{% highlight string %}
+syntax: set_by_lua_block $res { lua-script }
+
+context: server, server if, location, location if
+
+phase: rewrite
+{% endhighlight %}
+与```set-by-lua```指令类似，不同之处在于：
+
+* 此指令直接在一对花括号（{}）内部而不是在NGINX字符串文字（需要特殊字符转义）中内联Lua代码
+
+* 本指令不支持向其传递参数
+
+参看如下使用示例：
+<pre>
+set_by_lua_block $res { return 32 + math.cos(32) } # $res now has the value "32.834223360507" or alike.
+</pre>
+
+14） **set_by_lua_file**
+{% highlight string %}
+syntax: set_by_lua_file $res <path-to-lua-script-file> [$arg1 $arg2 ...]
+
+context: server, server if, location, location if
+
+phase: rewrite
+{% endhighlight %}
+与```set-by-lua```等价，除了这里是通过path-to-lua-script-file来指定所要执行的Lua脚本外。
+
+* set-by-lua-file指令支持传递参数字符串，但请注意可能导致的注入攻击
+
+* 当path-to-lua-script-file是一个类似于```foo/bar.lua```这样的相对路径，最终会转化成一个相对于```server prefix```的绝对路径。我们可以在Nginx启动的时候通过```-p Path```来指定server prefix path
+
+* 如果启用了Lua code cache(默认会被启用），则Lua代码会在第一个请求时被加载并缓存。因此，假如我们要修改相应的Lua脚本的话，则我们必须重新加载配置文件。在测试调试过程中，我们可以通过```lua_code_cache```指令临时关闭cache，从而避免我们需要每次手动重新加载配置文件。
+
+
+15) **content_by_lua**
 {% highlight string %}
 syntax: content_by_lua <lua-script-str>
 
@@ -321,11 +401,14 @@ phase: content
 {% endhighlight %}
 >注：注意在 v0.9.17 发行版以后不鼓励使用该指令，应使用content_by_lua_block指令代替
 
-作为一个```content handler```，其会为每一个请求执行```<lua-script-str>```所指定的Lua 代码。该lua代码可能会进行API调用，并且在独立的全局环境（例如 sandbox）中作为一个新派生的协程执行。
+作为一个```content handler```，其会为每一个请求执行```<lua-script-str>```所指定的Lua 代码。该lua代码可能会进行[API调用](https://github.com/openresty/lua-nginx-module#nginx-api-for-lua)，并且在独立的全局环境（例如 sandbox）中作为一个新派生的协程执行。
 
-不要在同一个location中同时使用该指令和其他的content handler指令。如，该指令和 proxy_pass指令不应该在同一个 location 中出现。
+不要在同一个location中同时使用该指令和其他的content handler指令。例如，该指令和proxy_pass指令不应该在同一个location中出现。
 
-14) **content_by_lua_block**
+
+
+
+16) **content_by_lua_block**
 {% highlight string %}
 syntax: content_by_lua_block { lua-script }
 
@@ -334,8 +417,142 @@ context: location, location if
 phase: content
 {% endhighlight %}
 
+与```content_by_lua```指令类似，不同之处在于此指令直接在一对花括号（{}）内部而不是在NGINX字符串文字（需要特殊字符转义）中内联Lua代码。例如：
+<pre>
+content_by_lua_block {
+     ngx.say("I need no extra escaping here, for example: \r\nblah")
+ }
+</pre>
 
-15) **access_by_lua**
+17) **content_by_lua_file**
+{% highlight string %}
+syntax: content_by_lua_file <path-to-lua-script-file>
+
+context: location, location if
+
+phase: content
+{% endhighlight %}
+与```content_by_lua```指令类似，不同之处在于此指令在于通过```path-to-lua-script-file```来指定所要执行的Lua脚本的路径。
+
+* 可以在```path-to-lua-script-file```字串中使用nginx variables以提供更高的灵活性。然而这可能会带来某些风险，不建议使用此方式。
+
+* 当我们指定的是一个类似于```foo/bar.lua```这样的相对路径，最终会转化成一个相对于```server prefix```的绝对路径。我们可以在Nginx启动的时候通过```-p Path```来指定server prefix path
+
+* 如果启用了Lua code cache(默认会被启用），则Lua代码会在第一个请求时被加载并缓存。因此，假如我们要修改相应的Lua脚本的话，则我们必须重新加载配置文件。在测试调试过程中，我们可以通过```lua_code_cache```指令临时关闭cache，从而避免我们需要每次手动重新加载配置文件。
+
+* 在文件路径中可以支持nginx variables，这样就可以实现动态的分发。例如：
+<pre>
+# CAUTION: contents in nginx var must be carefully filtered,
+# otherwise there'll be great security risk!
+location ~ ^/app/([-_a-zA-Z0-9/]+) {
+   set $path $1;
+   content_by_lua_file /path/to/lua/app/root/$path.lua;
+}
+</pre>
+注意： 使用此种方式可能存在一定的风险，请对相应的输入参数进行仔细的校验。
+
+
+18） **rewrite_by_lua**
+{% highlight string %}
+syntax: rewrite_by_lua <lua-script-str>
+
+context: http, server, location, location if
+
+phase: rewrite tail
+{% endhighlight %}
+>注：注意在 v0.9.17 发行版以后不鼓励使用该指令，应使用rewrite_by_lua_block指令代替
+
+* ```rewrite_by_lua```作为一个rewrite阶段的handler，其会在```每一个```请求时执行```lua-script-str```所指定的Lua脚本。在Lua脚本中可以执行[nginx lua api调用](https://github.com/openresty/lua-nginx-module#nginx-api-for-lua)，并且该调用是通过一个全局环境独立的coroutine来执行。
+
+* 值得注意的是，rewrite_by_lua总是运行于ngx_http_rewrite_module之后，因此如下配置是可以正常工作的：
+<pre>
+location /foo {
+     set $a 12; # create and initialize $a
+     set $b ""; # create and initialize $b
+     rewrite_by_lua 'ngx.var.b = tonumber(ngx.var.a) + 1';
+     echo "res = $b";
+ }
+</pre>
+这是因为```set $a 12```以及```set $b ""```是运行与rewrite_by_lua指令之前的。
+
+相反对于下面的配置，将```不能够```进行正常工作：
+<pre>
+ ?  location /foo {
+ ?      set $a 12; # create and initialize $a
+ ?      set $b ''; # create and initialize $b
+ ?      rewrite_by_lua 'ngx.var.b = tonumber(ngx.var.a) + 1';
+ ?      if ($b = '13') {
+ ?         rewrite ^ /bar redirect;
+ ?         break;
+ ?      }
+ ?
+ ?      echo "res = $b";
+ ?  }
+</pre>
+这是因为```if```语句运行于```rewrite_by_lua```指令之前（这里虽然在配置文件中其写在rewrite_by_lua指令之后）。
+
+针对这种情况，正确的做法是：
+<pre>
+ location /foo {
+     set $a 12; # create and initialize $a
+     set $b ''; # create and initialize $b
+     rewrite_by_lua '
+         ngx.var.b = tonumber(ngx.var.a) + 1
+         if tonumber(ngx.var.b) == 13 then
+             return ngx.redirect("/bar");
+         end
+     ';
+
+     echo "res = $b";
+ }
+</pre>
+
+* 通过使用```rewrite_by_lua```，我们可以实现类似于[ngx_eval模块](http://www.grid.net.ru/nginx/eval.en.html)的功能。例如：
+<pre>
+ location / {
+     eval $res {
+         proxy_pass http://foo.com/check-spam;
+     }
+
+     if ($res = 'spam') {
+         rewrite ^ /terms-of-use.html redirect;
+     }
+
+     fastcgi_pass ...;
+ }
+</pre>
+
+如下我们使用```rewrite_by_lua```来实现：
+<pre>
+location = /check-spam {
+     internal;
+     proxy_pass http://foo.com/check-spam;
+ }
+
+ location / {
+     rewrite_by_lua '
+         local res = ngx.location.capture("/check-spam")
+         if res.body == "spam" then
+             return ngx.redirect("/terms-of-use.html")
+         end
+     ';
+
+     fastcgi_pass ...;
+ }
+</pre>
+
+与任何其他的rewrite阶段的handler一样，rewrite_by_lua也是运行于subrequest中。
+
+* 值得注意的是，当在一个rewrite_by_lua指令中调用ngx.exit(ngx.OK)时，nginx请求处理控制流程仍会继续执行后续的content handler。如果要在```rewrite_by_lua``` handler中止当前的请求处理，那么在执行ngx.exit时传入如下status参数：
+
+    * 要返回成功，status的值应该>=200(ngx.HTTP_OK)且<300(ngx.HTTP_SPECIAL_RESPONSE)；
+
+    * 要返回失败，status的值应该为ngx.HTTP_INTERNAL_SERVER_ERROR;
+
+
+
+
+19) **access_by_lua**
 {% highlight string %}
 syntax: access_by_lua <lua-script-str>
 
