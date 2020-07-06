@@ -549,7 +549,16 @@ location = /check-spam {
 
     * 要返回失败，status的值应该为ngx.HTTP_INTERNAL_SERVER_ERROR;
 
-
+* 假如使用ngx_http_rewrite_module的rewrite指令来更改URI，并且重新进行location的查找(internal redirections)，那么rewrite_by_lua或者rewrite_by_lua_file中的任何Lua脚本序列都将不会被执行。例如：
+<pre>
+location /foo {
+     rewrite ^ /bar;
+     rewrite_by_lua 'ngx.exit(503)';
+ }
+ location /bar {
+     ...
+ }
+</pre>
 
 
 19) **access_by_lua**
