@@ -559,9 +559,45 @@ location /foo {
      ...
  }
 </pre>
+这里的Lua代码```ngx.exit(503)```将不会被执行。这里```rewrite ^ /bar```与```rewrite ^ /bar last```类似，都会初始化一个内部重定向。但是假如我们使用```break```修正符来代替的话，那么将不会执行内部重定向，这样rewrite_by_lua指令就会得到执行。
 
+除非我们启用了rewrite_by_lua_no_postpone，否则```rewrite_by_lua```指令会在```rewrite```请求处理的最后阶段才开始执行。
 
-19) **access_by_lua**
+19） **rewrite_by_lua_block**
+{% highlight string %}
+syntax: rewrite_by_lua_block { lua-script }
+
+context: http, server, location, location if
+
+phase: rewrite tail
+{% endhighlight %}
+与```rewrite_by_lua```指令类似，不同之处在于此指令直接在一对花括号（{}）内部而不是在NGINX字符串文字（需要特殊字符转义）中内联Lua代码。例如：
+<pre>
+ rewrite_by_lua_block {
+     do_something("hello, world!\nhiya\n")
+ }
+</pre>
+本指令是从```v0.9.17```版本开始引入的。
+
+20） **rewrite_by_lua_file**
+{% highlight string %}
+syntax: rewrite_by_lua_file <path-to-lua-script-file>
+
+context: http, server, location, location if
+
+phase: rewrite tail
+{% endhighlight %}
+与```rewrite_by_lua```指令类似，不同之处在于此指令是通过path-to-lua-script-file来指定要执行的lua脚本的路径。
+
+* 可以在path-to-lua-script-file字串中使用nginx variables，从而可以获得更高的灵活性。但是请注意，这可能会带来某种类型的安全风险，不建议在路径字串中使用nginx variables
+
+* 当我们指定的是一个类似于```foo/bar.lua```这样的相对路径，最终会转化成一个相对于```server prefix```的绝对路径。我们可以在Nginx启动的时候通过```-p Path```来指定server prefix path
+
+* 如果启用了Lua code cache(默认会被启用），则Lua代码会在第一个请求时被加载并缓存。因此，假如我们要修改相应的Lua脚本的话，则我们必须重新加载配置文件。在测试调试过程中，我们可以通过```lua_code_cache```指令临时关闭cache，从而避免我们需要每次手动重新加载配置文件。
+
+* 除非我们启用了rewrite_by_lua_no_postpone，否则```rewrite_by_lua```指令会在```rewrite```请求处理的最后阶段才开始执行。
+
+20) **access_by_lua**
 {% highlight string %}
 syntax: access_by_lua <lua-script-str>
 
@@ -623,6 +659,93 @@ phase: access tail
 
 * 与其他的access phase handlers一样，access_by_lua也不能够运行在subrequests中
 
+* 值得注意的是，当在access_by_lua中执行```ngx.exit(ngx.OK)```时，nginx请求处理控制流程仍会继续执行后续的content handler。如果想要在```access_by_lua```脚本中终止当前的请求处理，那么在执行ngx.exit()时传入如下status参数：
+
+    * 要返回成功，status的值应该>=200(ngx.HTTP_OK)且<300(ngx.HTTP_SPECIAL_RESPONSE)；
+
+    * 要返回失败，status的值应该为ngx.HTTP_INTERNAL_SERVER_ERROR；
+
+
+* 从版本```v0.9.20```开始，可以使用access_by_lua_no_postpone指令来控制在access请求处理阶段的哪一个时间点来执行access_by_lua指令；
+
+21) **access_by_lua_block**
+{% highlight string %}
+syntax: access_by_lua_block { lua-script }
+
+context: http, server, location, location if
+
+phase: access tail
+{% endhighlight %}
+与```access_by_lua```指令相似，不同之处在于此指令直接在一对花括号（{}）内部而不是在NGINX字符串文字（需要特殊字符转义）中内联Lua代码。例如：
+<pre>
+ access_by_lua_block {
+     do_something("hello, world!\nhiya\n")
+ }
+</pre>
+本指令首次引入是在```v0.9.17```版本。
+
+
+22） **access_by_lua_file**
+{% highlight string %}
+syntax: access_by_lua_file <path-to-lua-script-file>
+
+context: http, server, location, location if
+
+phase: access tail
+{% endhighlight %}
+与```access_by_lua```指令类似，不同之处在于此指令是通过path-to-lua-script-file来指定要执行的lua脚本的路径。
+
+* 可以在path-to-lua-script-file字串中使用nginx variables，从而可以获得更高的灵活性。但是请注意，这可能会带来某种类型的安全风险，不建议在路径字串中使用nginx variables
+
+* 当我们指定的是一个类似于```foo/bar.lua```这样的相对路径，最终会转化成一个相对于```server prefix```的绝对路径。我们可以在Nginx启动的时候通过```-p Path```来指定server prefix path
+
+* 如果启用了Lua code cache(默认会被启用），则Lua代码会在第一个请求时被加载并缓存。因此，假如我们要修改相应的Lua脚本的话，则我们必须重新加载配置文件。在测试调试过程中，我们可以通过```lua_code_cache```指令临时关闭cache，从而避免我们需要每次手动重新加载配置文件。
+
+23) **lua_shared_dict**
+{% highlight string %}
+syntax: lua_shared_dict <name> <size>
+
+default: no
+
+context: http
+
+phase: depends on usage
+{% endhighlight %}
+声明一个共享内存区域，用于存储Lua共享字典。共享内存由当前Nginx实例的所有worker进程所共享。
+
+在指定```size```时可以接受```k```和```m```两种单位：
+<pre>
+ http {
+     lua_shared_dict dogs 10m;
+     ...
+ }
+</pre>
+通常我们要求size最小为```8k```或```12k```。
+
+可以查看[ngx.shared.DICT](https://github.com/openresty/lua-nginx-module#ngxshareddict)以获得更详细的信息介绍。
+
+## 2. 为Lua提供的Nginx API
+nginx.conf配置文件中大量的```*_by_lua```、```*_by_lua_block```、```*_by_lua_file```指令类似于Lua API网关。如下所描述的Nginx Lua API只能够在这些配置指令的Lua代码中调用。
+
+这些所暴露出来的Lua API通常在```ngx```与```ndk```这两个标准的package中。这些包位于ngx_lua默认的全局作用域中，在ngx_lua指令中可以直接使用。
+
+同时，这些package也可以被引入到外部的Lua模块中。例如：
+<pre>
+local say = ngx.say
+
+local _M = {}
+
+function _M.foo(a)
+ say(a)
+end
+
+return _M
+</pre>
+此外，也可以在外部Lua模块直接require这些包：
+<pre>
+local ngx = require "ngx"
+local ndk = require "ndk"
+</pre>
 
 
 
