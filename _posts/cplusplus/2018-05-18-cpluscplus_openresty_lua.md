@@ -128,8 +128,14 @@ context: http
 {% endhighlight %}
 设置```set_by_lua```、```content_by_lua```等指令中Lua C模块的搜索路径。这个```cpath```字符串是标准的lua C路径格式，```;;```常用于表示原始的cpath搜索路径。
 
+
 从发行版 v0.5.0rc29 开始，可以在搜索路径中使用特殊符号 ```$prefix``` 或 ```${prefix}```来指示服务器前缀的路径，通常在 Nginx 服务器启动时通过```-p PATH```命令行选项来指定server prefix。
 
+对于openresy默认路径下的```基础lua库```，openresy可以自动找到，我们不必在nginx.conf的http配置段中通过如下命令来显式指定(这里假设默认安装路径为/usr/local/openresty)：
+<pre>
+lua_package_path "/usr/local/openresty/lualib/?.lua;;";
+lua_package_cpath "/usr/local/openresty/lualib/?.so;;";
+</pre>
 
 6） **init_by_lua**
 {% highlight string %}
@@ -746,6 +752,11 @@ return _M
 local ngx = require "ngx"
 local ndk = require "ndk"
 </pre>
+>注： 从版本v0.2.1rc19开始就可以采用此种方式引入这些package
+
+如果想在用户自己的Lua代码中执行网络IO操作的话，那么就只能通过Nginx Lua API调用来实现，否则可能会造成Nginx event loop阻塞并严重的降低性能。而对于磁盘操作读写少量数据的话，我们可以使用标准的Lua IO库即可，但无论如何我们还是应该避免大数据量的文件IO读写操作，因为其可能会严重阻塞Nginx进程。我们强烈推荐将所有的Network IO以及disk IO操作委托给nginx subrequest来处理，以达到最高的性能（通过ngx.location.capture或其他类似的指令）。
+
+
 
 
 
