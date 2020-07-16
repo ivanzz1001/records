@@ -51,6 +51,21 @@ T1-1, T1-2, T2-1, T2-2, T2*, T1-3, T1*
 
 ![db-mysql-dolog](https://ivanzz1001.github.io/records/assets/img/db/db_dolog_1.jpg)
 
+这里注意下redo log跟binary log的区别，redo log是存储引擎层产生的，而binary log是数据库层产生的。假设一个大事务，对```tba```做10万行的记录插入，在这个过程中，一直不断的往redo log顺序记录，而binary log不会记录，直到这个事务提交，才会一次写入到binary log文件中。
+
+
+redo log包括两部分： 一是内存中日志缓存(redo log buffer)，该部分日志是易失性的；二是磁盘上的重做日志文件(redo log file)，该部分日志是持久的。
+
+在概念上，innodb通过**```force log at commit```**机制实现事务的持久性，即在事务提交的时候，必须先将该事务的所有事务日志写入到磁盘上的redo log file和undo log file中进行持久化。
+
+为了确保每次日志都能写入到事务日志文件中，在每次将log buffer中的日志写入日志文件的过程中都会调用一次操作系统的fsync()操作。因为MariaDB/MySQL是工作在用户空间的，因此MariaDB/MySQL的log buffer处于用户空间的内存中。要写入到磁盘上的log file中（redo:ib_logfileN文件， undo:share_tablespace或.ibd文件），中间还要经过操作系统内核空间的os buffer，调用fsync()的作用就是将os buffer中的日志刷到磁盘上的log file中。
+
+也就是说，从redo log buffer写日志到磁盘的redo log file中，过程如下：
+
+![db-mysql-dolog](https://ivanzz1001.github.io/records/assets/img/db/db_dolog_2.png)
+
+> 在此处需要注意一点， 一般
+
 
 
 
