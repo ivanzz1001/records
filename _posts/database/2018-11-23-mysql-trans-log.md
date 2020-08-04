@@ -182,7 +182,136 @@ mysql> call proc(1000000);
 Query OK, 0 rows affected (11.26 sec)
 {% endhighlight %}
 
-### 1.3 日志快(log block)
+### 1.3 日志块(log block)
+innodb存储引擎中，redo log是以块为单位进行存储的，每个块占用512字节，这称为redo log block。所以不管是log buffer中还是os buffer中以及redo log file on disk中，都是这样以512字节的块存储的。
+
+每个redo log block由3部分组成：
+
+* 日志块头
+
+* 日志块尾
+
+* 日志主体
+
+其中日志块头占用12字节，日志块尾占用8字节，所以每个redo log block的日志主体部分只有512 - 12 -8 = 492字节。
+
+![db-mysql-dolog](https://ivanzz1001.github.io/records/assets/img/db/db_dolog_4.png)
+
+因为redo log记录的是数据页的变化，当一个数据页产生的变化需要使用超过492字节的redo log来记录，那么就会使用多个redo log block来记录该数据页的变化。
+
+日志块头包含4部分：
+
+* log_block_hdr_no: (4字节)该日志块在redo log buffer中的位置ID
+
+* log_block_hdr_data_len： （2字节）该log block中已记录的log大小。写满该log block时为0x200，表示512字节；
+
+* log_block_first_rec_group： （2字节）该log block中第一个log的开始偏移位置；
+
+* log_block_checkpoint_no: (4字节）写入检查点信息的位置；
+
+关于日志块头的第三部分```log_block_first_rec_group```，因为有时候一个数据页产生的日志量超出了一个日志块，这就需要用多个日志块来记录该页的相关日志。例如，某一数据页产生了552字节的日志量，那么需要占用两个日志块，第一个日志块占用492字节，第二个日志块占用60个字节，那么对于第二个日志块来说，它的第一个log的开始位置就是73字节(60+12)。如果该部分的值和```log_block_hdr_data_len```相等，则说明该log block中没有新开始的日志块，即表示该日志块用来延续前一个日志块。
+
+日志尾只有一个部分：log_block_trl_no，该值和块头的log_block_hdr_no相等。
+
+上面说的是一个日志块的内容，在redo log buffer或者redo log file on disk中，由很多log block组成。如下图：
+
+![db-mysql-dolog](https://ivanzz1001.github.io/records/assets/img/db/db_dolog_5.png)
+
+### 1.4 log group和redo log file
+log group表示的是redo log group，一个组内由多个大小完全相同的redo log file组成。组内redo log file的数量由变量innodb_log_files_group决定，默认值为2，即两个redo log file。这个组是一个逻辑的概念，并没有真正的文件来表示这是一个组，但是可以通过变量innodb_log_group_home_dir来定义组的目录，redo log file都放在这个目录下，默认是在datadir下。
+
+{% highlight string %}
+mysql> show global variables like "innodb_log%";
++-----------------------------+----------+
+| Variable_name               | Value    |
++-----------------------------+----------+
+| innodb_log_buffer_size      | 8388608  |
+| innodb_log_compressed_pages | ON       |
+| innodb_log_file_size        | 50331648 |
+| innodb_log_files_in_group   | 2        |
+| innodb_log_group_home_dir   | ./       |
++-----------------------------+----------+
+
+[root@xuexi data]# ll /mydata/data/ib*
+-rw-rw---- 1 mysql mysql 79691776 Mar 30 23:12 /mydata/data/ibdata1
+-rw-rw---- 1 mysql mysql 50331648 Mar 30 23:12 /mydata/data/ib_logfile0
+-rw-rw---- 1 mysql mysql 50331648 Mar 30 23:12 /mydata/data/ib_logfile1
+{% endhighlight %}
+可以看到在默认的数据目录下，有两个ib_logfile开头的文件，它们就是log group中的redo log file，而且它们的大小完全一致且等于变量innodb_log_file_size定义的值。第一个文件```ibdata1```是在没有开启innodb_file_per_table时的共享表空间文件，对应于开启innodb_file_per_table是的```.ibd```文件。
+
+在innodb将log buffer中的redo log block刷到这些log file中时，会以追加写入的方式循环轮询写入。即先在第一个log file(即ib_logfile0)的尾部追加写，直到满了之后向第二个log file(即ib_logfile1)写。当第二个log file满了会清空一部分第一个log file继续写入。
+
+由于是将log buffer中的日志刷到log file，所以在log file中记录日志的方式也是log block的方式。
+
+在每个组的第一个redo log file中，前2KB记录了4个特定的部分，从2KB之后才开始记录log block。除了第一个redo log file中会记录，log group中的其他log file不会记录这2KB，但是却会腾出这2KB的空间。如下：
+
+![db-mysql-dolog](https://ivanzz1001.github.io/records/assets/img/db/db_dolog_6.png)
+
+redo log file的大小对innodb的性能影响非常大，设置的太大，恢复的时候就会时间较长；设置的太小，就会导致在写redo log的时候循环切换redo log file。
+
+### 1.5 redo log的格式
+
+因为innodb存储引擎存储数据的单元是页(和SQL Server中的一样），所以redo log也是基于页的格式来记录的。默认情况下，innodb的页的大小是16KB(innodb_page_size变量控制），一个页内可以存放非常多的log block(每个512字节），而log block中记录的又是数据页的变化。
+
+其中log block中492字节的部分是log body，该log body的格式分为4部分：
+
+* redo_log_type: 占用1个字节，表示redo log的日志类型；
+
+* space: 表示表空间的ID，采用压缩的方式后，占用的空间可能小于4字节；
+
+* page_no: 表示页的偏移量，同样是压缩过的；
+
+* redo_log_body: 表示每个重做日志的数据部分，恢复时会调用相应的函数进行解析。例如insert语句和delete语句写入redo log的内容
+
+
+如下图，分别是insert和delete大致的记录方式：
+
+![db-mysql-dolog](https://ivanzz1001.github.io/records/assets/img/db/db_dolog_7.png)
+
+
+### 1.6 日志刷盘的规则
+log buffer中未刷到磁盘的日志称为脏日志(dirty log)。
+
+在上面说过，默认情况下事务每次提交的时候都会刷事务日志到磁盘中，这是因为变量innodb_flush_log_at_trx_commit的值为1。但是innodb不仅仅只会在有commit动作后才会刷日志到磁盘，这只是innodb存储引擎刷日志的规则之一。
+
+刷日志到磁盘有以下几种规则：
+
+1. 发出commit动作时。已经说明过，commit发出后是否刷日志由变量innodb_flush_log_at_trx_commit控制；
+
+2. 每秒刷一次。这个刷日志的频率由变量innodb_flush_log_at_timeout值决定，默认是1秒。要注意，这个刷日志频率和commit动作无关。
+
+3. 当log buffer中已经使用的内存超过一半时；
+
+4. 当有checkpoint时，checkpoint在一定程度上代表了刷到磁盘时日志所处的LSN位置。
+
+### 1.7 数据页刷盘的规则及checkpoint
+内存中(buffer pool)未刷到磁盘的数据称为脏数据(dirty data)。由于数据和日志都以页的形式存在，所以脏页表示脏数据和脏日志。
+
+在上面一节我们介绍了日志是何时刷到磁盘的，不仅仅是日志需要刷盘，脏数据页也一样需要刷盘。
+
+在innodb中，数据刷盘的规则只有一个： checkpoint。但是触发checkpoint的情况却有几种。不管怎样，checkpoint触发后，会将buffer中脏数据页和脏日志页都刷到磁盘。
+
+innodb存储引擎中checkpoint分为两种：
+
+* sharp checkpoint: 在重用redo log文件（例如切换日志文件）的时候，将所有已记录到redo log中对应的脏数据刷到磁盘。
+
+* fuzzy checkpoing: 一次只刷一小部分的日志到磁盘，而非将所有脏日志刷盘。有以下几种情况会触发该检查点：
+
+  - master thread checkpoint: 由master线程控制，每秒或每10秒刷入一定比例的脏页到磁盘；
+
+  - flush_lru_list checkpoing: 从MySQL5.6开始可通过innodb_page_cleaners变量指定专门负责脏页刷盘的page cleaner线程的个数，该线程的目的是为了保证lru列表有可用的空闲页。
+  
+  - async/sync flush checkpoint: 同步刷盘还是异步刷盘。例如还有非常多的脏页没刷到磁盘（非常多是多少，有比例控制），这时候会选择同步刷到磁盘，但这很少出现；如果脏页不是很多，可以选择异步刷到磁盘；如果脏页很少，可以暂时不刷脏页到磁盘。
+
+  - dirty page too much checkpoint: 脏页太多时强制触发检查点，目的是为了保证缓存有足够的空闲空间。too much的比例由变量innodb_max_dirt_page_pct控制，MySQL5.6默认的值是75，即当脏页占缓冲池的百分之75后，就强制刷一部分脏页到磁盘。
+
+由于刷脏页需要一定的时间来完成，所以记录检查点的位置是在每次刷盘结束之后才在redo log中标记的。
+
+MySQL停止时是否将脏数据和脏日志刷入磁盘，由变量innodb_fast_shutdown={ 0|1|2 }控制，默认值为1，即停止时只做一部分purge，忽略大多数flush操作(但至少会刷日志)，在下次启动的时候再flush剩余的内容，实现fast shutdown。
+
+### 1.8 LSN超详细分析
+### 1.9 innodb的恢复行为
+在启动innodb的时候，不管上次是正常关闭还是异常关闭，总是会进行恢复操作。
 
 
 
