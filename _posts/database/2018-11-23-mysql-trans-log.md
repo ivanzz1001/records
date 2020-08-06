@@ -313,6 +313,54 @@ MySQL停止时是否将脏数据和脏日志刷入磁盘，由变量innodb_fast_
 ### 1.9 innodb的恢复行为
 在启动innodb的时候，不管上次是正常关闭还是异常关闭，总是会进行恢复操作。
 
+因为redo log记录的是数据页的物理变化，因此恢复的时候速度比逻辑日志（如二进制日志）要快很多。而且，innodb自身也做了一定程度的优化，让恢复速度变得更快。
+
+重启innodb时，checkpoint表示已经完整刷到磁盘上data page上的LSN，因此恢复时仅需要恢复从checkpoint开始的日志部分。例如，当数据库在上一次checkpoint的LSN为10000时宕机，且事务是已经提交过的状态。启动数据库时会检查磁盘中数据页的LSN，如果数据页的LSN小于日志中的LSN，则会从检查点开始恢复。
+
+还有一种情况，在宕机前正处于checkpoint的刷盘过程，且数据页的刷盘进度超过了日志页的刷盘进度。这时候宕机，数据页中记录的LSN就会大于日志页中的LSN，在重启的恢复过程中会检查到这一情况，这时超出日志进度的部分将不会重做，因为这本身就表示已经做过的事情，无需再重做。
+
+另外，事务日志具有幂等性，所以多次操作得到同一结果的行为在日志中只记录一次。而二进制日志不具有幂等性，多次操作会全部记录下来，在恢复的时候会多次执行二进制日志中的记录，速度就慢得多。例如，某记录中id初始值为2，通过update将值设置为了3，后来又设置成了2，在事务日志中记录的将是无变化的页，根本无需恢复；而二进制会记录下两次update操作，恢复时也将执行这两次update操作，速度比事务日志恢复更慢。
+
+### 1.10 和redo log有关的几个变量
+
+* innodb_flush_log_at_trx_commit={0|1|2}： 指定何时将事务日志刷到磁盘，默认为1。
+
+  - 0： 表示每秒将“log buffer”同步到“os buffer”且从“os buffer”刷到磁盘日志文件中；
+  
+  - 1: 表示每事务提交都将“log buffer”同步到“os buffer”且从“os buffer”刷到磁盘日志文件中;
+  
+  - 2： 表示每事务提交都将“log buffer”同步到“os buffer”但每秒才从“os buffer”刷到磁盘日志文件中。
+
+
+* innodb_log_buffer_size： log buffer的大小，默认8M
+
+* innodb_log_file_size： 事务日志的大小，默认5M
+
+* innodb_log_files_group =2： 事务日志组中的事务日志文件个数，默认2个
+
+* innodb_log_group_home_dir =./： 事务日志组路径，当前目录表示数据目录
+
+* innodb_mirrored_log_groups =1： 指定事务日志组的镜像组个数，但镜像功能好像是强制关闭的，所以只有一个log group。在MySQL5.7中该变量已经移除。
+
+
+## 2. undo log
+
+### 2.1 基本概念
+
+undo log有两个作用：提供回滚和多版本并发控制（MVCC: Multi-Version Concurrency Control)。
+
+在数据修改的时候，不仅记录了redo，还记录了相对应的undo，如果因为某些原因导致事务失败或回滚了，可以借助undo来进行回滚。
+
+undo log和redo log记录物理日志不一样，它是逻辑日志。可以认为当delete一条记录时，undo log中会记录一条对应的insert记录，反之亦然，当update一条记录时，它记录一条对应相反的update记录。
+
+当执行rollback时，就可以从undo log中的逻辑记录读取到相应的内容并进行回滚。有时候应用到MVCC的时候，也是通过undo log来实现的： 当读取的某一行被其他事务锁定时，它可以从undo log中分析出该行记录以前的数据是什么，从而提供该行版本信息，让用户实现非锁定一致性读取。
+
+undo log是采用段(segment)的方式来记录的，每个undo操作在记录的时候占用一个undo log segment。
+
+另外，undo log也会产生redo log，因为undo log也要实现持久性保护。
+
+### 2.2 undo log的存储方式
+
 
 
 <br />
