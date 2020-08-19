@@ -141,10 +141,10 @@ nothing to commit, working directory clean
 
 现在，在项目下创建一个新的```mytext.txt```文件。如果之前并不存在这个文件，使用```git status```命令，你将看到一个新的未跟踪的文件：
 {% highlight string %}
-Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+Administrator@ivan1001 MINGW64 /f/worksp/git-start (master)
 $ echo "This is my first Git control file" > mytext.txt
 
-Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+Administrator@ivan1001 MINGW64 /f/worksp/git-start (master)
 $ git status
 On branch master
 Your branch is ahead of 'origin/master' by 1 commit.
@@ -228,7 +228,7 @@ Changes to be committed:
 {% highlight string %}
 $ echo "Add new Line content 1002" >> README.md
 
-Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+Administrator@ivan1001 MINGW64 /f/worksp/git-start (master)
 $ git status
 On branch master
 Your branch is ahead of 'origin/master' by 1 commit.
@@ -253,7 +253,7 @@ $ git add README.md
 warning: LF will be replaced by CRLF in README.md.
 The file will have its original line endings in your working directory.
 
-Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+Administrator@ivan1001 MINGW64 /f/worksp/git-start (master)
 $ git status
 warning: LF will be replaced by CRLF in README.md.
 The file will have its original line endings in your working directory.
@@ -339,7 +339,7 @@ this is another line 1003
 {% highlight string %}
 $ echo "this is another line 1003" >> README.md
 
-Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+Administrator@ivan1001 MINGW64 /f/worksp/git-start (master)
 $ git status
 On branch master
 Your branch is ahead of 'origin/master' by 1 commit.
@@ -484,7 +484,7 @@ The file will have its original line
 {% highlight string %}
 $ rm mytext.txt
 
-Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+Administrator@ivan1001 MINGW64 /f/worksp/git-start (master)
 $ git status
 On branch master
 Your branch is ahead of 'origin/master' by 3 commits.
@@ -506,7 +506,7 @@ no changes added to commit (use "git add" and/or "git commit -a")
 $ git rm --cached mytext.txt
 rm 'mytext.txt'
 
-Administrator@ZHANGYW6668 MINGW64 /f/worksp/git-start (master)
+Administrator@ivan1001 MINGW64 /f/worksp/git-start (master)
 $ git status
 On branch master
 Your branch is ahead of 'origin/master' by 3 commits.
