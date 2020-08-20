@@ -10,6 +10,8 @@ description: ceph源代码分析
 
 本章介绍ceph的服务端OSD（书中简称OSD模块或者OSD）的实现。其对应的源代码在src/osd目录下。OSD模块是Ceph服务进程的核心实现，它实现了服务端的核心功能。本章先介绍OSD模块静态类图相关数据结构，再着重介绍服务端数据的写入和读取流程。
 
+OSD进程启动的主函数位于： src/ceph_osd.cc
+
 <!-- more -->
 
 
