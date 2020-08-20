@@ -359,7 +359,186 @@ undo log是采用段(segment)的方式来记录的，每个undo操作在记录�
 
 另外，undo log也会产生redo log，因为undo log也要实现持久性保护。
 
+undo日志用于存放数据修改被修改前的值，假设修改```tba表```中id=2的行数据，把Name='B'修改为Name='B2'，那么undo日志就会用来存放Name='B'的记录，如果这个修改出现异常，可以使用undo日志来实现回滚操作，保证事务的一致性。对数据的变更操作，主要来自INSERT、UPDATE、DELETE，而undo log分为两种类型，一种是INSERT_UNDO(insert操作），记录插入的唯一键值；一种是UPDATE_UNDO(包含UPDATE及DELETE操作），记录修改的唯一键值以及old column记录。
+
+![db-mysql-dolog](https://ivanzz1001.github.io/records/assets/img/db/db_dolog_8.jpg)
+
 ### 2.2 undo log的存储方式
+
+innodb存储引擎对undo的管理采用段的方式。rollback segment称为回滚段，每个回滚段中有1024个undo log segment。
+
+在以前老版本，只支持1个rollback segment，这样就只能记录1024个undo log segment。后来MySQL5.5可以支持128个rollback segment，即支持```128 * 1024```个undo log segment，还可以通过变量innodb_undo_logs(5.6版本以前该变量是innodb_rollback_segments)自定义多少个rollback segment，默认值为128。
+
+undo log默认存放在共享表空间中：
+<pre>
+# ls /var/lib/mysql/ibd*
+/var/lib/mysql/ibdata1
+</pre>
+
+如果开启了innodb_file_per_table，将放在每个表的```.ibd```文件中。
+
+在MySQL5.6中，undo的存放位置还可以通过变量innodb_undo_directory来自定义存放目录，默认值为```.```，表示datadir。
+
+默认rollback segment全部写在一个文件中，但可以通过设置变量innodb_undo_tablespaces平均分配到多个文件中。该变量默认值为0，即全部写入一个表空间文件。该变量为静态变量，只能在数据库实例停止状态下修改，如写入配置文件或者启动时带对应的参数。但是innodb存储引擎在启动过程中提示，不建议修改为非0的值，如下：
+{% highlight string %}
+2017-03-31 13:16:00 7f665bfab720 InnoDB: Expected to open 3 undo tablespaces but was able
+2017-03-31 13:16:00 7f665bfab720 InnoDB: to find only 0 undo tablespaces.
+2017-03-31 13:16:00 7f665bfab720 InnoDB: Set the innodb_undo_tablespaces parameter to the
+2017-03-31 13:16:00 7f665bfab720 InnoDB: correct value and retry. Suggested value is 0
+{% endhighlight %}
+
+### 2.3 和undo log相关的变量
+undo相关的变量在MySQL5.6中已经变得很少。如下：它们的意义在上文中已经解释了
+{% highlight string %}
+mysql> show global variables like '%undo%';
++--------------------------+------------+
+| Variable_name            | Value      |
++--------------------------+------------+
+| innodb_max_undo_log_size | 1073741824 |
+| innodb_undo_directory    | ./         |
+| innodb_undo_log_truncate | OFF        |
+| innodb_undo_logs         | 128        |
+| innodb_undo_tablespaces  | 3          |
++--------------------------+------------+
+
+mysql> show global variables like '%truncate%';
++--------------------------------------+-------+
+| Variable_name                        | Value |
++--------------------------------------+-------+
+| innodb_purge_rseg_truncate_frequency | 128   |
+| innodb_undo_log_truncate             | OFF   |
++--------------------------------------+-------+
+{% endhighlight %}
+
+### 2.4 delete/update操作的内部机制
+当事务提交的时候，innodb不会立即删除undo log，因为后续还可能会用到undo log，如隔离级别为repeatable read时，事务读取的都是开启事务时的最新提交行版本，只要该事务不结束，该行版本就不能删除，即undo log不能删除。
+
+但是在事务提交的时候，会将该事务对应的undo log放到删除列表中，未来通过purge来删除。并且提交事务时，还会判断undo log分配的页是否可以重用，如果可以重用，则会分配给后面来的事务，避免为每个独立的事务分配独立的undo log页而浪费存储空间和性能。
+
+通过undo log记录delete和update操作的结果发现（insert操作无需分析，就是插入行而已）：
+
+* delete操作实际上不会直接删除，而是将delete对象打上delete tag，标记为删除，最终的删除操作是purge线程完成的。
+
+* update分为两种情况：update的列是否为主键列
+
+  - 如果不是主键列，在undo log中直接反向记录是如何update的。即update是直接进行的
+  
+  - 如果是主键列，update分两步执行： 先删除该行，再插入一行目标行
+
+## 3. undo及redo如何记录事务
+###### 3.1 undo+redo事务的简化过程
+假设有A、B两个数据，值分别为1、2。开始一个事务，事务的操作内容为： 把1修改为3，2修改为4。那么实际的记录如下（简化）：
+<pre>
+A. 事务开始
+
+B. 记录A=1到undo log
+
+C. 修改A=3
+
+D. 记录A=3到redo log
+
+E. 记录B=2到undo log
+
+F. 修改B=4
+
+G. 记录B=4到redo log
+
+H. 将redo log写入磁盘
+
+I. 事务提交
+</pre>
+
+###### 3.2 IO影响
+undo+redo的设计主要考虑的是提升IO性能，增大数据库的吞吐量。可以看出，B、D、E、G、H均是新增操作，但是B、D、E、G是缓冲到buffer区，只有G是增加了IO操作，为了保证redo log能够有比较好的IO性能，InnoDB的redo log的设计有以下几个特点：
+
+1) 尽量保持redo log存储在一段连续的空间上。因此在系统第一次启动时，就会将日志文件的空间完全分配。以顺序追加的方式记录redo log，通过顺序IO来改善性能；
+
+2） 批量写入日志。日志并不是直接写入文件，而是先写入redo log buffer。当需要将日志刷新到磁盘时（如事务提交），将许多日志一起写入磁盘。
+
+3） 并发的事务共享redo log的存储空间，它们的redo log按语句的执行顺序，依次交替的记录在一起，以减少日志占用的空间。例如，redo log中的记录内容可能是这样的：
+{% highlight string %}
+记录1: <trx1, insert …>
+
+记录2: <trx2, update …>
+
+记录3: <trx1, delete …>
+
+记录4: <trx3, update …>
+
+记录5: <trx2, insert …>
+{% endhighlight %}
+
+4) 因为3)的原因，当一个事务将redo log写入磁盘时，也会将其他未提交的事务的日志写入磁盘；
+
+5） redo log上只进行顺序追加的操作，当一个事务需要回滚时，它的redo log记录也不会从redo log中删除掉；
+
+###### 3.3 恢复
+前面说到```未提交```的事务和```回滚```了的事务也会记录redo log，因此在进行恢复时，这些事务要进行特殊的处理。有两种不同的恢复策略：
+
+A: 进行恢复时，只重做已经提交了的事务；
+
+B: 进行恢复时，重做所有事务包括未提交的事务和回滚了的事务，然后通过undo log回滚那些未提交的事务；
+
+MySQL数据库InnoDB存储引擎使用了B策略，InnoDB存储引擎中的恢复机制有如下几个特点：
+
+a) 在重做redo log时，并不关心事务性。恢复时，没有BEGIN，也没有COMMIT、ROLLBACK的行为。也不关心每个日志是哪个事务的。尽管事务ID等事务相关的内容会记入redo log，这些内容只是被当作要操作的数据的一部分。
+
+b) 使用B策略就必须要将undo log持久化，而且必须要在写redo log之前将对应的undo log写入磁盘。undo和redo log这种关联，使得持久化变得复杂起来。为了降低复杂度，innodb将undo log看做数据，因此记录undo log的操作也会记录到redo log中。这样undo log就可以像数据一样缓存起来，而不用在redo log之前写入磁盘了。包含undo log操作的redo log，看起来是这样的：
+{% highlight string %}
+记录1: <trx1, Undo log insert <undo_insert …>>
+
+记录2: <trx1, insert …>
+
+记录3: <trx2, Undo log insert <undo_update …>>
+
+记录4: <trx2, update …>
+
+记录5: <trx3, Undo log insert <undo_delete …>>
+
+记录6: <trx3, delete …>
+{% endhighlight %}
+
+c) 到这里，还有一个问题没有弄清楚。既然redo没有事务性，那岂不是会重新执行被回滚了的事务？确实是这样，同时innodb也会将事务回滚时的操作也记录到redo log中。回滚操作本质上也是对数据进行修改，因此回滚时对数据的操作也会记录到redo log中。一个回滚了的事务的redo log，看起来是这样的：
+{% highlight string %}
+记录1: <trx1, Undo log insert <undo_insert …>>
+
+记录2: <trx1, insert A…>
+
+记录3: <trx1, Undo log insert <undo_update …>>
+
+记录4: <trx1, update B…>
+
+记录5: <trx1, Undo log insert <undo_delete …>>
+
+记录6: <trx1, delete C…>
+
+记录7: <trx1, insert C>
+
+记录8: <trx1, update B to old value>
+
+记录9: <trx1, delete A>
+{% endhighlight %}
+一个被回滚了的事务在恢复时的操作就是先redo再undo，因此不会破坏数据的一致性。
+
+## 4. mysql innodb安装目录下文件介绍
+以下这些文件都是在指定的数据库数据目录下：
+
+1) **redo log重做日志**
+<pre>
+ib_logfile0  ib_logfile1
+</pre>
+
+2) **undo log回滚日志**
+<pre>
+ibdata1  ibdata2(存储在共享表空间中)
+</pre>
+
+3) **临时表**
+
+ibtmp1文件用于存放数据库操作期间产生的临时数据，用完即删除。比如连表查询时产生的一些中间表的存储等。
+
+![db-mysql-dolog](https://ivanzz1001.github.io/records/assets/img/db/db_dolog_9.png)
+
 
 
 
@@ -373,6 +552,7 @@ undo log是采用段(segment)的方式来记录的，每个undo操作在记录�
 
 3. [详细分析MySQL事务日志(redo log和undo log)](https://www.cnblogs.com/f-ck-need-u/archive/2018/05/08/9010872.html)
 
+4. [mysql innodb安装目录下文件介绍： 日志记录redu/undo log及临时表ibtmp1](https://www.cnblogs.com/quzq/p/12833381.html)
 
 <br />
 <br />
