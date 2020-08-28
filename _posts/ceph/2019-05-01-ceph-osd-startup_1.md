@@ -185,6 +185,13 @@ int OSD::init(){
 
 	...
 
+	monc->set_want_keys(CEPH_ENTITY_TYPE_MON | CEPH_ENTITY_TYPE_OSD);
+	r = monc->init();
+	if (r < 0)
+		goto out;
+
+	...
+
 	load_pgs();
 
 	...
@@ -403,6 +410,91 @@ osdmap.8663__0_0A3EE828__none  osdmap.8740__0_0A3EAE28__none  osdmap.8818__0_0A3
 >注：对于ghobject_t对象，通过LFNIndex可以映射为多级目录。这也就是我们上面看到的meta目录下的多个DIR目录
 
 ###### 2.2.5 clear_temp_objects()
+{% highlight string %}
+void OSD::clear_temp_objects()
+{
+	vector<coll_t> ls;
+	store->list_collections(ls);
+
+	for (vector<coll_t>::iterator p = ls.begin(); p != ls.end(); ++p) {
+		...
+	}
+}
+{% endhighlight %}
+上面通过list_collections()函数可以获取出如下一些文件：
+<pre>
+# ls /var/lib/ceph/osd/ceph-0/current/
+...
+23.a1_head  24.14d_TEMP  24.272_head  24.3b7_TEMP  24.d5_head   26.7f_TEMP  36.127_head  36.1c1_TEMP  36.ef_head   39.1b3_TEMP  39.8e_head   42.c_TEMP
+23.a1_TEMP  24.14_head   24.272_TEMP  24.3bb_head  24.d5_TEMP   26.82_head  36.127_TEMP  36.1c2_head  36.ef_TEMP   39.1b9_head  39.8e_TEMP   commit_op_seq
+23.a3_head  24.14_TEMP   24.282_head  24.3bb_TEMP  24.d7_head   26.82_TEMP  36.128_head  36.1c2_TEMP  36.f1_head   39.1b9_TEMP  39.9a_head   meta
+23.a3_TEMP  24.163_head  24.282_TEMP  24.3bc_head  24.d7_TEMP   26.8f_head  36.128_TEMP  36.1c3_head  36.f1_TEMP   39.1c9_head  39.9a_TEMP   nosnap
+23.a9_head  24.163_TEMP  24.291_head  24.3bc_TEMP  24.dd_head   26.8f_TEMP  36.140_head  36.1c3_TEMP  36.fa_head   39.1c9_TEMP  39.a5_head   omap
+23.a9_TEMP  24.16b_head  24.291_TEMP  24.3c0_head  24.dd_TEMP   26.92_head  36.140_TEMP  36.1c8_head  36.fa_TEMP   39.1d1_head  39.a5_TEMP
+...
+</pre>
+查看FileStore::list_collections(ls)的实现：
+{% highlight string %}
+int FileStore::list_collections(vector<coll_t>& ls)
+{
+  return list_collections(ls, false);
+}
+
+int FileStore::list_collections(vector<coll_t>& ls, bool include_temp){
+	...
+
+	while ((r = ::readdir_r(dir, (struct dirent *)&buf, &de)) == 0) {
+		...
+
+		coll_t cid;
+		if (!cid.parse(de->d_name)) {
+			derr << "ignoging invalid collection '" << de->d_name << "'" << dendl;
+			continue;
+		}
+
+		if (!cid.is_temp() || include_temp)
+			ls.push_back(cid);
+	}
+	...
+}
+
+bool coll_t::parse(const std::string& s)
+{
+	if (s == "meta") {
+		type = TYPE_META;
+		pgid = spg_t();
+		removal_seq = 0;
+		calc_str();
+		assert(s == _str);
+		return true;
+	}
+	if (s.find("_head") == s.length() - 5 &&
+		pgid.parse(s.substr(0, s.length() - 5))) {
+		type = TYPE_PG;
+		removal_seq = 0;
+		calc_str();
+		assert(s == _str);
+		return true;
+	}
+	if (s.find("_TEMP") == s.length() - 5 &&
+		pgid.parse(s.substr(0, s.length() - 5))) {
+		type = TYPE_PG_TEMP;
+		removal_seq = 0;
+		calc_str();
+		assert(s == _str);
+		return true;
+	}
+	return false;
+}
+
+bool is_temp() const {
+	return type == TYPE_PG_TEMP;
+}
+{% endhighlight %}
+从这里我们可以看到，这里的clear_temp_objects()所清理的主要是```head```中的临时pool中的对象，并不包括```TEMP```中的对象，这一点需要注意。
+
+###### 2.2.6 MonClient初始化
+
 
 
 <br />
