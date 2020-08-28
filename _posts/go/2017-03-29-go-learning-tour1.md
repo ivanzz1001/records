@@ -851,6 +851,36 @@ func (queue *ThrottleQueue)Length()int{
 
 	return length
 }
+
+func (queue *MessageQueue)Clear()bool{
+	queue.lock.Lock()
+
+	for e := queue.buffer.Front(); e != nil; {
+		next := e.Next()
+		queue.buffer.Remove(e)
+		e = next
+	}
+
+	queue.lock.Unlock()
+
+	return true
+}
+
+type MQClearCallback func(interface{}) bool
+func (queue *MessageQueue)WithCallbackClear(callback MQClearCallback) bool{
+	queue.lock.Lock()
+
+	for e := queue.buffer.Front(); e != nil; {
+		callback(e.Value)
+		next := e.Next()
+		queue.buffer.Remove(e)
+		e = next
+	}
+
+	queue.lock.Unlock()
+
+	return true
+}
 {% endhighlight %}
 
 测试示例：
