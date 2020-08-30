@@ -185,19 +185,14 @@ int OSD::init(){
 
 	...
 
-	monc->set_want_keys(CEPH_ENTITY_TYPE_MON | CEPH_ENTITY_TYPE_OSD);
-	r = monc->init();
-	if (r < 0)
-		goto out;
-
-	...
-
 	load_pgs();
 
 	...
 
 	monc->set_want_keys(CEPH_ENTITY_TYPE_MON | CEPH_ENTITY_TYPE_OSD);
 	r = monc->init();
+	if (r < 0)
+		goto out;
 
 	...
 	service.init();
@@ -235,6 +230,12 @@ int FileStore::mount(){
 }
 {% endhighlight %}
 mount()函数主要完成相关数据的检查，读取/var/lib/ceph/osd/ceph-0/current/commit_op_seq中相关的提交信息，以及完成相关backend线程的启动。
+
+另外需要注意的一点是，在mount()的时候会对临时collection进行处理：
+{% highlight string %}
+void FileStore::init_temp_collections(){
+}
+{% endhighlight %}
 
 ###### 2.2.2 read_superblock()
 本函数用于读取superblock相关信息：
@@ -493,7 +494,473 @@ bool is_temp() const {
 {% endhighlight %}
 从这里我们可以看到，这里的clear_temp_objects()所清理的主要是```head```中的临时pool中的对象，并不包括```TEMP```中的对象，这一点需要注意。
 
-###### 2.2.6 MonClient初始化
+###### 2.2.6 load_pgs()
+本函数是一个十分关键的函数，用于从本地ObjectStore加载PG:
+{% highlight string %}
+void OSD::load_pgs(){
+	...
+
+	vector<coll_t> ls;
+	int r = store->list_collections(ls);
+	if (r < 0) {
+		derr << "failed to list pgs: " << cpp_strerror(-r) << dendl;
+	}
+
+	for (vector<coll_t>::iterator it = ls.begin();it != ls.end(); ++it) {
+		...
+	}
+	...
+}
+{% endhighlight %}
+下面我们会对其进行一个较为详细的分析：
+
+1) **获取所有PG**
+
+通过调用函数store->list_collections()来获取本OSD所管理的所有PG：
+{% highlight string %}
+int FileStore::list_collections(vector<coll_t>& ls)
+{
+	return list_collections(ls, false);
+}
+{% endhighlight %}
+此处获取的PG信息并不包括meta以及temp。
+
+2) **遍历处理每一个PG**
+{% highlight string %}
+void OSD::load_pgs(){
+	...
+
+	for (vector<coll_t>::iterator it = ls.begin();it != ls.end();++it) {
+		spg_t pgid;
+		if (it->is_temp(&pgid) || (it->is_pg(&pgid) && PG::_has_removal_flag(store, pgid))) {
+			dout(10) << "load_pgs " << *it << " clearing temp" << dendl;
+			recursive_remove_collection(store, pgid, *it);
+			continue;
+		}
+	
+		if (!it->is_pg(&pgid)) {
+			dout(10) << "load_pgs ignoring unrecognized " << *it << dendl;
+			continue;
+		}
+	
+		if (pgid.preferred() >= 0) {
+			dout(10) << __func__ << ": skipping localized PG " << pgid << dendl;
+			// FIXME: delete it too, eventually
+			continue;
+		}
+	
+		dout(10) << "pgid " << pgid << " coll " << coll_t(pgid) << dendl;
+		bufferlist bl;
+		epoch_t map_epoch = 0;
+		int r = PG::peek_map_epoch(store, pgid, &map_epoch, &bl);
+		if (r < 0) {
+			derr << __func__ << " unable to peek at " << pgid << " metadata, skipping"<< dendl;
+			continue;
+		}
+	
+		PG *pg = NULL;
+		if (map_epoch > 0) {
+			OSDMapRef pgosdmap = service.try_get_map(map_epoch);
+			if (!pgosdmap) {
+				if (!osdmap->have_pg_pool(pgid.pool())) {
+					derr << __func__ << ": could not find map for epoch " << map_epoch
+						<< " on pg " << pgid << ", but the pool is not present in the "
+						<< "current map, so this is probably a result of bug 10617.  "
+						<< "Skipping the pg for now, you can use ceph-objectstore-tool "
+						<< "to clean it up later." << dendl;
+					continue;
+				} else {
+					derr << __func__ << ": have pgid " << pgid << " at epoch "
+					<< map_epoch << ", but missing map.  Crashing."
+					<< dendl;
+					assert(0 == "Missing map in load_pgs");
+				}
+			}
+
+			pg = _open_lock_pg(pgosdmap, pgid);
+		} else {
+			pg = _open_lock_pg(osdmap, pgid);
+		}
+		// there can be no waiters here, so we don't call wake_pg_waiters
+		
+
+		pg->ch = store->open_collection(pg->coll);
+		
+		// read pg state, log
+		pg->read_state(store, bl);
+		
+		if (pg->must_upgrade()) {
+			if (!pg->can_upgrade()) {
+				derr << "PG needs upgrade, but on-disk data is too old; upgrade to"
+				<< " an older version first." << dendl;
+				assert(0 == "PG too old to upgrade");
+			}
+			if (!has_upgraded) {
+				derr << "PGs are upgrading" << dendl;
+				has_upgraded = true;
+			}
+			dout(10) << "PG " << pg->info.pgid
+			<< " must upgrade..." << dendl;
+
+			pg->upgrade(store);
+		}
+		
+		service.init_splits_between(pg->info.pgid, pg->get_osdmap(), osdmap);
+		
+		// generate state for PG's current mapping
+		int primary, up_primary;
+		vector<int> acting, up;
+		pg->get_osdmap()->pg_to_up_acting_osds(
+		pgid.pgid, &up, &up_primary, &acting, &primary);
+		pg->init_primary_up_acting(
+			up,
+			acting,
+			up_primary,
+			primary);
+
+		int role = OSDMap::calc_pg_role(whoami, pg->acting);
+		pg->set_role(role);
+		
+		pg->reg_next_scrub();
+		
+		PG::RecoveryCtx rctx(0, 0, 0, 0, 0, 0);
+		pg->handle_loaded(&rctx);
+		
+		dout(10) << "load_pgs loaded " << *pg << " " << pg->pg_log.get_log() << dendl;
+		pg->unlock();
+	}
+
+	...
+}
+{% endhighlight %}
+针对每一个PG按如下方式进行处理：
+
+* 对temp类型、非TYPE_PG类型以及preferred类型的PG不做处理；
+
+* 读取PG的epoch信息
+{% highlight string %}
+int PG::peek_map_epoch(ObjectStore *store,
+		       spg_t pgid,
+		       epoch_t *pepoch,
+		       bufferlist *bl){
+	
+}
+{% endhighlight %}
+
+* 获取该PG所对应epoch的OSDMap信息，并以该OSDMap在内存中创建PG对象
+{% highlight string %}
+PG *OSD::_open_lock_pg(
+  OSDMapRef createmap,
+  spg_t pgid, bool no_lockdep_check)
+{
+	assert(osd_lock.is_locked());
+	
+	PG* pg = _make_pg(createmap, pgid);
+	{
+		RWLock::WLocker l(pg_map_lock);
+		pg->lock(no_lockdep_check);
+		pg_map[pgid] = pg;
+		pg->get("PGMap");  // because it's in pg_map
+		service.pg_add_epoch(pg->info.pgid, createmap->get_epoch());
+	}
+	return pg;
+}
+{% endhighlight %}
+
+* 打开该PG所对应的collection句柄
+{% highlight string %}
+pg->ch = store->open_collection(pg->coll);
+{% endhighlight %}
+
+* 读取pg state、pg log等信息
+{% highlight string %}
+void PG::read_state(ObjectStore *store, bufferlist &bl)
+{
+	int r = read_info(store, pg_id, coll, bl, info, past_intervals,
+	info_struct_v);
+	assert(r >= 0);
+	
+	if (g_conf->osd_hack_prune_past_intervals) {
+		_simplify_past_intervals(past_intervals);
+	}
+	
+	ostringstream oss;
+	pg_log.read_log(store,
+		coll,
+		info_struct_v < 8 ? coll_t::meta() : coll,
+		ghobject_t(info_struct_v < 8 ? OSD::make_pg_log_oid(pg_id) : pgmeta_oid),
+		info, oss, cct->_conf->osd_ignore_stale_divergent_priors);
+
+	if (oss.tellp())
+		osd->clog->error() << oss.rdbuf();
+	
+	// log any weirdness
+	log_weirdness();
+}
+{% endhighlight %}
+这里我们直接看info_struct_v为v8版本即可。因为针对Jewel 10.2.10版本，程序在检测到PG版本小于v8版本时，会首先将低版本的PG信息读取出来，然后升级为v8版本再写入，因此这里我们直接看v8版本的pglog读取即可。
+
+
+* 更新PG版本到v8版本
+{% highlight string %}
+if (pg->must_upgrade()) {
+	if (!pg->can_upgrade()) {
+		derr << "PG needs upgrade, but on-disk data is too old; upgrade to"
+		<< " an older version first." << dendl;
+		assert(0 == "PG too old to upgrade");
+	}
+	if (!has_upgraded) {
+		derr << "PGs are upgrading" << dendl;
+		has_upgraded = true;
+	}
+	dout(10) << "PG " << pg->info.pgid << " must upgrade..." << dendl;
+	pg->upgrade(store);
+}
+{% endhighlight %}
+上面代码会自动完成从v7升级到v8版本。
+
+* 检查PG是否需要分裂，如果需要则完成分裂操作
+{% highlight string %}
+service.init_splits_between(pg->info.pgid, pg->get_osdmap(), osdmap);
+{% endhighlight %}
+这里我们跳过，不进行分析。
+
+
+* pg_to_up_acting_osds()
+{% highlight string %}
+/**
+* map a pg to its acting set as well as its up set. You must use
+* the acting set for data mapping purposes, but some users will
+* also find the up set useful for things like deciding what to
+* set as pg_temp.
+* Each of these pointers must be non-NULL.
+*/
+void pg_to_up_acting_osds(pg_t pg, vector<int> *up, int *up_primary,
+	vector<int> *acting, int *acting_primary) const {
+
+	_pg_to_up_acting_osds(pg, up, up_primary, acting, acting_primary);
+}
+void pg_to_up_acting_osds(pg_t pg, vector<int>& up, vector<int>& acting) const {
+	int up_primary, acting_primary;
+	pg_to_up_acting_osds(pg, &up, &up_primary, &acting, &acting_primary);
+}
+{% endhighlight %}
+本函数用于实现获取PG对应的acting set及up set。具体的实现细节，我们来看一下_pg_to_up_acting_osds():
+{% highlight string %}
+void OSDMap::_pg_to_up_acting_osds(const pg_t& pg, vector<int> *up, int *up_primary,
+                                   vector<int> *acting, int *acting_primary) const
+{
+	const pg_pool_t *pool = get_pg_pool(pg.pool());
+	if (!pool) {
+		if (up)
+			up->clear();
+
+		if (up_primary)
+			*up_primary = -1;
+
+		if (acting)
+			acting->clear();
+
+		if (acting_primary)
+			*acting_primary = -1;
+		return;
+	}
+
+	vector<int> raw;
+	vector<int> _up;
+	vector<int> _acting;
+	int _up_primary;
+	int _acting_primary;
+	ps_t pps;
+
+
+	_pg_to_osds(*pool, pg, &raw, &_up_primary, &pps);
+	_raw_to_up_osds(*pool, raw, &_up, &_up_primary);
+	_apply_primary_affinity(pps, *pool, &_up, &_up_primary);
+	_get_temp_osds(*pool, pg, &_acting, &_acting_primary);
+
+	if (_acting.empty()) {
+		_acting = _up;
+		if (_acting_primary == -1) {
+			_acting_primary = _up_primary;
+		}
+	}
+
+	if (up)
+		up->swap(_up);
+
+	if (up_primary)
+		*up_primary = _up_primary;
+
+	if (acting)
+		acting->swap(_acting);
+
+	if (acting_primary)
+		*acting_primary = _acting_primary;
+}
+{% endhighlight %}
+其中函数_pg_to_osds()仅仅是利用crush算法计算出的一个PG所映射的OSD，我们称之为raw set。
+<pre>
+# ceph osd --help | grep lost
+osd lost <int[0-]> {--yes-i-really-mean- mark osd as permanently lost. THIS 
+ it}                                      DESTROYS DATA IF NO MORE REPLICAS 
+                                          EXIST, BE CAREFUL
+
+</pre>
+在计算raw set时我们要去掉CEPH_OSD_EXISTS为0的OSD。一般情况下并不会出现某一个OSD不存在的情况，但是上面为我们提供了一种将某个OSD标记为永久丢失的方法。
+
+接着要获取出该PG对应的up set，需要继续计算：_raw_to_up_osds()用于剔除掉raw set中处于down状态的OSD；_apply_primary_affinity()用于选择亲和性较高的OSD作为up primary OSD。我们这里在实际环境中没有设置primary affinity，因此这里我们可以忽略亲和性计算这一步。
+{% highlight string %}
+# ceph osd --help | grep primary-affinity
+osd primary-affinity <osdname (id|osd.   adjust osd primary-affinity from 0.0 <=
+ id)> <float[0.0-1.0]>                     <weight> <= 1.0
+{% endhighlight %}
+
+之后，再调用_get_temp_osds()来获取出acting set，我们来看相应的实现：
+{% highlight string %}
+void OSDMap::_get_temp_osds(const pg_pool_t& pool, pg_t pg,
+                            vector<int> *temp_pg, int *temp_primary) const
+{
+	pg = pool.raw_pg_to_pg(pg);
+	map<pg_t,vector<int32_t> >::const_iterator p = pg_temp->find(pg);
+	temp_pg->clear();
+
+	if (p != pg_temp->end()) {
+		for (unsigned i=0; i<p->second.size(); i++) {
+			if (!exists(p->second[i]) || is_down(p->second[i])) {
+				if (pool.can_shift_osds()) {
+					continue;
+				} else {
+					temp_pg->push_back(CRUSH_ITEM_NONE);
+				}
+			} else {
+				temp_pg->push_back(p->second[i]);
+			}
+		}
+	}
+
+	map<pg_t,int32_t>::const_iterator pp = primary_temp->find(pg);
+	*temp_primary = -1;
+	if (pp != primary_temp->end()) {
+		*temp_primary = pp->second;
+	} else if (!temp_pg->empty()) { // apply pg_temp's primary
+		for (unsigned i = 0; i < temp_pg->size(); ++i) {
+			if ((*temp_pg)[i] != CRUSH_ITEM_NONE) {
+				*temp_primary = (*temp_pg)[i];
+				break;
+			}
+		}
+	}
+}
+{% endhighlight %}
+可以看到，在有pg temp的情况下，acting set与up set可能会不一样。这里有一点我们需要注意的到```pg_temp```和```primary_temp```都是OSDMap中的一个成员变量，因此可以推断这些temp信息肯定是经过Monitor协调出来的（因为OSDMap这些信息是符合Paxos严格一致性的）。
+
+
+* init_primary_up_acting(): 在上面我们已经求出了up set以及acting set，这里我们需要将其转换成pg_shard_t格式来进行保存，本质上没有特别的变化。
+
+* calc_pg_role()计算当前PG的角色
+{% highlight string %}
+int OSDMap::calc_pg_rank(int osd, const vector<int>& acting, int nrep)
+{
+	if (!nrep)
+		nrep = acting.size();
+
+	for (int i=0; i<nrep; i++) 
+		if (acting[i] == osd)
+			return i;
+
+	return -1;
+}
+
+int OSDMap::calc_pg_role(int osd, const vector<int>& acting, int nrep)
+{
+	if (!nrep)
+		nrep = acting.size();
+
+	return calc_pg_rank(osd, acting, nrep);
+}
+{% endhighlight %}
+这里如果role的值为-1，代表的是replica。
+
+* reg_next_scrub(): PG的scrub操作是由replica来注册的，对于primary PG直接返回；
+
+* 创建PG::RecoveryCtx，并向PG所对应的状态机投递第一个事件：Load
+{% highlight string %}
+void PG::handle_loaded(RecoveryCtx *rctx)
+{
+	dout(10) << "handle_loaded" << dendl;
+
+	Load evt;
+	recovery_state.handle_event(evt, rctx);
+}
+{% endhighlight %}
+对于recovery_state对象，其所对应的状态机machine的初始状态为Initial。因此这里当Initial收到Load事件时，其会直接进入Reset状态：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Initial::react(const Load& l)
+{
+	PG *pg = context< RecoveryMachine >().pg;
+	
+	// do we tell someone we're here?
+	pg->send_notify = (!pg->is_primary());
+	
+	return transit< Reset >();
+}
+{% endhighlight %}
+上面我们还注意到对于replica PG，还会将send_notify置为true。
+
+* 清理该PG老的infos信息： 这里主要是针对进行过升级的PG，我们要清理原来老版的infos信息
+
+* build_past_intervals_parallel(): 本函数的实现很复杂，其主要目的就是从pglog中获取epoch信息，然后再用这些epoch获取到相应的OSDMap，从而计算出后续该PG进行恢复时所需要的相关信息（这里主要是pg->info.history.same_interval_since信息）。我们后面会对恢复相关步骤再进行详细讲解
+
+###### 2.2.7 MonClient初始化
+
+因为OSD后续的运行都需要读写最新的Map信息，因此这里需要调用init来先初始化MonClient:
+{% highlight string %}
+int OSD::init()
+{
+	...
+
+	monc->set_want_keys(CEPH_ENTITY_TYPE_MON | CEPH_ENTITY_TYPE_OSD);
+	r = monc->init();
+	if (r < 0)
+		goto out;
+
+	...
+}
+{% endhighlight %}
+这里我们看到monc会订阅Monitor的OSDMap、MonMap相关信息。
+
+###### 2.2.8 将当前的OSDMap等信息保存到OSDService中
+{% highlight string %}
+int OSD::init(){
+	...
+
+	service.init();
+	service.publish_map(osdmap);
+	service.publish_superblock(superblock);
+	service.max_oldest_map = superblock.oldest_map;
+	...
+}
+{% endhighlight %}
+后续OSDMap等的更新操作都是由OSDService来负责，因此这里需要进行service的初始化。因为后续很多操作都与OSDMap的变化相关，其实OSDService的实现相对还是很复杂的。OSDService也是作为驱动OSD后续运行的一个动力存在。详细的分析，我们会在后面再介绍。
+
+###### 2.2.9 consume_map()
+{% highlight string %}
+int OSD::init(){
+	...
+
+	dout(10) << "ensuring pgs have consumed prior maps" << dendl;
+	consume_map();
+	peering_wq.drain();
+
+	...
+}
+{% endhighlight %}
+这里consume_map()也是作为OSD启动时的一个十分重要的函数，下面我们来看看其具体实现：
+{% highlight string %}
+void OSD::consume_map(){
+}
+{% endhighlight %}
 
 
 
