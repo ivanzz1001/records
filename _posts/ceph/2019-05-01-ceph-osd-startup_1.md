@@ -957,10 +957,149 @@ int OSD::init(){
 }
 {% endhighlight %}
 这里consume_map()也是作为OSD启动时的一个十分重要的函数，下面我们来看看其具体实现：
+
+* 扫描pg_map，找出其中的待移除pg以及待分裂pg，并进行处理
 {% highlight string %}
-void OSD::consume_map(){
+void OSD::consume_map()
+{
+ 	...
+
+	int num_pg_primary = 0, num_pg_replica = 0, num_pg_stray = 0;
+	list<PGRef> to_remove;
+	
+	// scan pg's
+	{
+		RWLock::RLocker l(pg_map_lock);
+		for (ceph::unordered_map<spg_t,PG*>::iterator it = pg_map.begin(); it != pg_map.end(); ++it) {
+			PG *pg = it->second;
+			pg->lock();
+
+			if (pg->is_primary())
+				num_pg_primary++;
+			else if (pg->is_replica())
+				num_pg_replica++;
+			else
+				num_pg_stray++;
+	
+			if (!osdmap->have_pg_pool(pg->info.pgid.pool())) {
+				//pool is deleted!
+				to_remove.push_back(PGRef(pg));
+			} else {
+				service.init_splits_between(it->first, service.get_osdmap(), osdmap);
+			}
+	
+			pg->unlock();
+		}
+	}
+	
+	for (list<PGRef>::iterator i = to_remove.begin(); i != to_remove.end(); to_remove.erase(i++)) {
+		RWLock::WLocker locker(pg_map_lock);
+		(*i)->lock();
+		_remove_pg(&**i);
+		(*i)->unlock();
+	}
+	to_remove.clear();
+
+	...
 }
 {% endhighlight %}
+
+这里首先遍历pg_map列表，会有三种类型的PG：primay、replica、stray(注：此种情况一般出现在PG发生重新映射的情况，比如OSD处于out之后，经过一段时间该OSD又重新回到集群），之后找出待移除的PG以及待分裂的PG。
+
+对于待分裂的PG，调用函数init_splits_between()函数进行处理；对于待移除的PG，调用_remove_pg()来删除该PG。
+
+* 等待service的OSDMap更新到当前指定epoch的OSDMap
+{% highlight string %}
+void OSD::consume_map()
+{
+	service.pre_publish_map(osdmap);
+	service.await_reserved_maps();
+	service.publish_map(osdmap);
+}
+{% endhighlight %}
+将当前osdmap设置为service的预发布(pre-publish)版本，接着调用await_reserved_maps()等待OSD中各元素都同步到该osdmap版本，之后再将该osdmap正式发布（注： 在初始启动时，service初始的osdmap版本与这里pre_publish_map()的版本应该是一样的，因此这里await_reserved_maps()应该马上就会返回）。
+
+这里进行osdmap版本的同步是十分重要的，可以确保该OSD上的PG都达到一个指定的状态才开始进行工作，从而保证系统步调的一致性。
+
+* 处理因等待osdmap同步而阻塞的sessions
+{% highlight string %}
+void OSD::consume_map()
+{
+	dispatch_sessions_waiting_on_map();
+	
+	// remove any PGs which we no longer host from the session waiting_for_pg lists
+	set<spg_t> pgs_to_check;
+	get_pgs_with_waiting_sessions(&pgs_to_check);
+	for (set<spg_t>::iterator p = pgs_to_check.begin();p != pgs_to_check.end();++p) {
+		if (!(osdmap->is_acting_osd_shard(p->pgid, whoami, p->shard))) {
+			set<Session*> concerned_sessions;
+			get_sessions_possibly_interested_in_pg(*p, &concerned_sessions);
+			for (set<Session*>::iterator i = concerned_sessions.begin(); i != concerned_sessions.end(); ++i) {
+				{
+					Mutex::Locker l((*i)->session_dispatch_lock);
+					session_notify_pg_cleared(*i, osdmap, *p);
+				}
+
+				(*i)->put();
+			}
+		}
+	}
+}
+{% endhighlight %}
+由于上面await_reserved_maps()已经同步了osdmap，因此这里先调用dispatch_sessions_waiting_on_map()来解除被阻塞的sessions。由于前面session被阻塞，因此我们可以通过get_pgs_with_waiting_sessions()来获取阻塞在哪些PG上，在这里session阻塞被解除后，我们也可以将这些PG移出session的waiting_for_pg队列。
+
+* 发送NullEvt，触发PG的peering操作
+{% highlight string %}
+void OSD::consume_map()
+{
+	...
+
+	// scan pg's
+	{
+		RWLock::RLocker l(pg_map_lock);
+		for (ceph::unordered_map<spg_t,PG*>::iterator it = pg_map.begin(); it != pg_map.end(); ++it) {
+			PG *pg = it->second;
+			pg->lock();
+			pg->queue_null(osdmap->get_epoch(), osdmap->get_epoch());
+			pg->unlock();
+		}
+		
+		logger->set(l_osd_pg, pg_map.size());
+	}
+
+	...
+}
+{% endhighlight %}
+
+在OSD初始启动过程中，这是一个十分重要的步骤，可以推动PG从Reset状态进入Started状态。下面我们来看queue_null()函数的实现：
+{% highlight string %}
+void OSDService::queue_for_peering(PG *pg)
+{
+  peering_wq.queue(pg);
+}
+
+void PG::queue_peering_event(CephPeeringEvtRef evt)
+{
+  if (old_peering_evt(evt))
+    return;
+  peering_queue.push_back(evt);
+  osd->queue_for_peering(this);
+}
+
+void PG::queue_null(epoch_t msg_epoch,
+		    epoch_t query_epoch)
+{
+  dout(10) << "null" << dendl;
+  queue_peering_event(
+    CephPeeringEvtRef(std::make_shared<CephPeeringEvt>(msg_epoch, query_epoch,
+					 NullEvt())));
+}
+{% endhighlight %}
+
+下面我们给出一个OSD::peering_wq的整体架构图：
+
+![ceph-peering-wq](https://ivanzz1001.github.io/records/assets/img/ceph/sca/peering_wq.png)
+
 
 
 
