@@ -1100,6 +1100,117 @@ void PG::queue_null(epoch_t msg_epoch,
 
 ![ceph-peering-wq](https://ivanzz1001.github.io/records/assets/img/ceph/sca/peering_wq.png)
 
+上面首先将一个NullEvt放入进去pg对应的peering_queue，之后再将该PG放入OSDSerivce中的peering_wq(也即OSD中的peering_wq）。peering_wq所绑定的线程池中的线程就会取出peering_wq中的PG来进行处理，调用OSD::process_peering_events()。下面我们简单分析一下该函数：
+{% highlight string %}
+void OSD::process_peering_events(
+  const list<PG*> &pgs,
+  ThreadPool::TPHandle &handle
+  )
+{
+	...
+
+	for (list<PG*>::const_iterator i = pgs.begin(); i != pgs.end(); ++i) {
+
+		...
+
+		if (!advance_pg(curmap->get_epoch(), pg, handle, &rctx, &split_pgs)) {
+			// we need to requeue the PG explicitly since we didn't actually
+			// handle an event
+			peering_wq.queue(pg);
+		} else {
+			assert(!pg->peering_queue.empty());
+			PG::CephPeeringEvtRef evt = pg->peering_queue.front();
+			pg->peering_queue.pop_front();
+			pg->handle_peering_event(evt, &rctx);
+		}
+
+		...
+	}
+
+	...
+}
+{% endhighlight %}
+通过上面的代码，我们看到对PG peering的处理主要是通过advance_pg()和handle_peering_event()来进行的。那么这两种不同的处理方式是如何选择的呢？其实这是跟PG当前所处的osdmap的版本相关的： 这里假设pg当前所对应的osdmap的epoch为pg_osdmap_epoch, OSD当前所对应的osdmap的epoch为osd_osdmap_epoch。这里就存在两种不同的情况： 如果pg_osdmap_epoch小于osd_osdmap_epoch，那么该PG就可以直接通过获取本地OSD的osdmap信息，完成前期的osdmap的追赶；如果pg_osdmap_epoch等于osd_osdmap_epoch，说明pg已经和osd同步，此时就可以开始调用handle_peering_event()来处理投递进来的其他事件了。
+
+>注：在OSD启动时，第一次调用consume_map()时的状态机状态为Reset，此时回调process_peering_events()函数，从而引发调用advance_pg()。Reset阶段可以接受QueryState、AdvMap、ActMap、FlushedEvt、IntervalFlush等事件，我们在PG状态机转换图中可能有些没有画出，在阅读时请注意对比来看。
+
+
+###### 2.2.10 drain工作队列
+{% highlight string %}
+int OSD::init()
+{
+	...
+
+	peering_wq.drain();	
+
+	...
+}
+{% endhighlight %}
+由于上面consume_map()是异步调用，通过事件的方式触发完成PG的初始化，因此这里要使用peering_wq.drain()来等待相关的事件完成。此时，其实就已经进入peering流程，可以接收peering事件了。
+
+###### 2.2.11 订阅PG创建事件
+{% highlight string %}
+int OSD::init()
+{
+	...
+
+	// subscribe to any pg creations
+	monc->sub_want("osd_pg_creates", last_pg_create_epoch, 0);
+
+	...
+}
+{% endhighlight %}
+通过上面peering_wq.drain()已经基本完成了OSD的初始化，可以处理peering事件了。因此这里订阅PG创建消息，用于处理后续的PG创建请求。
+
+###### 2.2.12 重新更新订阅
+{% highlight string %}
+int OSD::init()
+{
+	...
+
+	monc->renew_subs();
+
+	...
+}
+{% endhighlight %}
+这里重新更新相关的订阅情况。暂不太清楚为何要更新。
+
+###### 2.2.13 完成OSD初始化的最后阶段
+{% highlight string %}
+int OSD::init()
+{
+	...
+
+	start_boot();
+
+	...
+}
+
+void OSD::start_boot()
+{
+	if (!_is_healthy()) {
+		// if we are not healthy, do not mark ourselves up (yet)
+
+		dout(1) << "not healthy; waiting to boot" << dendl;
+		if (!is_waiting_for_healthy())
+			start_waiting_for_healthy();
+
+		// send pings sooner rather than later
+		heartbeat_kick();
+		return;
+	}
+
+
+	dout(1) << "We are healthy, booting" << dendl;
+	set_state(STATE_PREBOOT);
+	dout(10) << "start_boot - have maps " << superblock.oldest_map << ".." << superblock.newest_map << dendl;
+
+	C_OSD_GetVersion *c = new C_OSD_GetVersion(this);
+	monc->get_version("osdmap", &c->newest, &c->oldest, c);
+}
+{% endhighlight %}
+这里如果启动时异常，等待恢复到健康状态；如果启动正常，那么通过monc来获取最新的osdmap信息。
+
 
 
 
