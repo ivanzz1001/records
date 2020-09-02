@@ -1211,6 +1211,172 @@ void OSD::start_boot()
 {% endhighlight %}
 这里如果启动时异常，等待恢复到健康状态；如果启动正常，那么通过monc来获取最新的osdmap信息。
 
+## 3. OSD启动时PG osdmap的追赶
+这里我们接着上一节，在OSD::advance_pg()中会实现PG osdmap的追赶，我们来看相应的实现：
+{% highlight string %}
+bool OSD::advance_pg(
+  epoch_t osd_epoch, PG *pg,
+  ThreadPool::TPHandle &handle,
+  PG::RecoveryCtx *rctx,
+  set<boost::intrusive_ptr<PG> > *new_pgs)
+{
+	assert(pg->is_locked());
+	epoch_t next_epoch = pg->get_osdmap()->get_epoch() + 1;
+	OSDMapRef lastmap = pg->get_osdmap();
+	
+	if (lastmap->get_epoch() == osd_epoch)
+		return true;
+	assert(lastmap->get_epoch() < osd_epoch);
+	
+	epoch_t min_epoch = service.get_min_pg_epoch();
+	epoch_t max;
+
+	if (min_epoch) {
+		max = min_epoch + g_conf->osd_map_max_advance;
+	} else {
+		max = next_epoch + g_conf->osd_map_max_advance;
+	}
+	
+	for (;
+	next_epoch <= osd_epoch && next_epoch <= max;
+	++next_epoch) {
+		OSDMapRef nextmap = service.try_get_map(next_epoch);
+		if (!nextmap) {
+			dout(20) << __func__ << " missing map " << next_epoch << dendl;
+
+			// make sure max is bumped up so that we can get past any
+			// gap in maps
+			max = MAX(max, next_epoch + g_conf->osd_map_max_advance);
+			continue;
+		}
+	
+		vector<int> newup, newacting;
+		int up_primary, acting_primary;
+	
+		nextmap->pg_to_up_acting_osds(
+			pg->info.pgid.pgid,
+			&newup, &up_primary,
+			&newacting, &acting_primary);
+	
+		pg->handle_advance_map(
+			nextmap, lastmap, newup, up_primary,
+			newacting, acting_primary, rctx);
+	
+		// Check for split!
+		set<spg_t> children;
+		spg_t parent(pg->info.pgid);
+
+		if (parent.is_split(
+			lastmap->get_pg_num(pg->pool.id),
+			nextmap->get_pg_num(pg->pool.id),
+			&children)) {
+			service.mark_split_in_progress(pg->info.pgid, children);
+			split_pgs(
+				pg, children, new_pgs, lastmap, nextmap,
+				rctx);
+		}
+	
+		lastmap = nextmap;
+		handle.reset_tp_timeout();
+	}
+
+	service.pg_update_epoch(pg->info.pgid, lastmap->get_epoch());
+	pg->handle_activate_map(rctx);
+
+	if (next_epoch <= osd_epoch) {
+		dout(10) << __func__ << " advanced to max " << max
+		<< " past min epoch " << min_epoch
+		<< " ... will requeue " << *pg << dendl;
+		return false;
+	}
+
+	return true;
+}
+
+// src/include/types.h
+typedef __u32 epoch_t;
+{% endhighlight %}
+在上面for循环中实现pg osdmap的追赶，如下图所示：
+
+![ceph-osdmap-epoch](https://ivanzz1001.github.io/records/assets/img/ceph/sca/pg_osdmap_epoch.png)
+
+在这一追赶过程中，PG根据相应epoch的osdmap，计算出该epoch下pg的up set以及acting set，然后调用PG::handle_advance_map()来进行处理。
+{% highlight string %}
+void PG::handle_advance_map(
+  OSDMapRef osdmap, OSDMapRef lastmap,
+  vector<int>& newup, int up_primary,
+  vector<int>& newacting, int acting_primary,
+  RecoveryCtx *rctx)
+{
+	assert(lastmap->get_epoch() == osdmap_ref->get_epoch());
+	assert(lastmap == osdmap_ref);
+	dout(10) << "handle_advance_map "
+		<< newup << "/" << newacting
+		<< " -- " << up_primary << "/" << acting_primary
+		<< dendl;
+
+	update_osdmap_ref(osdmap);
+	pool.update(osdmap);
+
+	if (cct->_conf->osd_debug_verify_cached_snaps) {
+		interval_set<snapid_t> actual_removed_snaps;
+		const pg_pool_t *pi = osdmap->get_pg_pool(info.pgid.pool());
+		assert(pi);
+		pi->build_removed_snaps(actual_removed_snaps);
+		if (!(actual_removed_snaps == pool.cached_removed_snaps)) {
+			derr << __func__ << ": mismatch between the actual removed snaps "
+				<< actual_removed_snaps << " and pool.cached_removed_snaps "
+				<< " pool.cached_removed_snaps " << pool.cached_removed_snaps
+				<< dendl;
+		}
+		assert(actual_removed_snaps == pool.cached_removed_snaps);
+	}
+
+	AdvMap evt(
+		osdmap, lastmap, newup, up_primary,
+		newacting, acting_primary);
+
+	recovery_state.handle_event(evt, rctx);
+
+	if (pool.info.last_change == osdmap_ref->get_epoch())
+		on_pool_change();
+}
+
+boost::statechart::result PG::RecoveryState::Reset::react(const AdvMap& advmap)
+{
+  PG *pg = context< RecoveryMachine >().pg;
+  dout(10) << "Reset advmap" << dendl;
+
+  // make sure we have past_intervals filled in.  hopefully this will happen
+  // _before_ we are active.
+  pg->generate_past_intervals();
+
+  pg->check_full_transition(advmap.lastmap, advmap.osdmap);
+
+  if (pg->should_restart_peering(
+	advmap.up_primary,
+	advmap.acting_primary,
+	advmap.newup,
+	advmap.newacting,
+	advmap.lastmap,
+	advmap.osdmap)) {
+    dout(10) << "should restart peering, calling start_peering_interval again"
+	     << dendl;
+    pg->start_peering_interval(
+      advmap.lastmap,
+      advmap.newup, advmap.up_primary,
+      advmap.newacting, advmap.acting_primary,
+      context< RecoveryMachine >().get_cur_transaction());
+  }
+  pg->remove_down_peer_info(advmap.osdmap);
+  return discard_event();
+}
+{% endhighlight %}
+在完成PG osdmap的追赶后，OSD::advance_pg()函数会返回true，之后处理该PG的第一个事件是Reset NullEvt，再接着的事件可能就是Reset AdvMap，之后可能就是Reset ActMap从而进入Started状态。
+
+关于在PG::RecoveryState::react()中对AdvMap事件的处理，其中计算past_interval的过程，我们后面会再进行详细的介绍。
+
+
 
 
 
