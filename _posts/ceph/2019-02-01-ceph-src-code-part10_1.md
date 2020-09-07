@@ -278,7 +278,7 @@ boost::statechart::result PG::RecoveryState::Primary::react(const ActMap&)
 }
 {% endhighlight %}
 
-* 在用户的自定义函数里，调用函数forward_event()可以把当前事件继续投递给状态机
+* 在用户的自定义函数里，调用函数forward_event()可以把当前事件继续投递给```父状态机```进行处理
 {% highlight string %}
 boost::statechart::result PG::RecoveryState::WaitUpThru::react(const ActMap& am)
 {
@@ -522,6 +522,7 @@ PG::RecoveryState::Start::Start(my_context ctx)
 
 1. [Ceph源码解析：PG peering](https://www.cnblogs.com/chenxianpao/p/5565286.html)
 
+2. [boost官网文档](https://www.boost.org/doc/libs/)
 
 <br />
 <br />
