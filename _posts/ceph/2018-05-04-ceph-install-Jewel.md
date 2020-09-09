@@ -1075,7 +1075,7 @@ type 11 osd-domain
 type 12 host-domain
 type 13 replica-domain
 type 14 failure-domain
-# 将crush map中所有的 alg straw2 修改为 alg starw
+# 将crush map中所有的 alg straw 修改为 alg starw2
 </pre>
 
 修改后重新设置到ceph集群中：
