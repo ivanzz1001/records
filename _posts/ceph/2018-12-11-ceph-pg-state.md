@@ -184,7 +184,7 @@ PG ID由三个部分组成： 存储池ID(pool number)、period(.)、pg ID(十�
 
 假如某一个OSD处于down状态，并且PG处于*degraded*状态一直持续的话，ceph就可能将该down状态的OSD移出集群，标记为out状态。
 
-假如某一个OSD下线(处于down状态)，那么相关的PG会处于*degraded*状态，在该状态持续一段时间之后（通常是300s），ceph就有可能将该down状态的OSD标记为out状态，指示该OSD已经移出集群， 然后开始将该down OSD上面的数据remap到另一个OSD。一个OSD从down状态变为out状态的时间由*mon osd down out interval*来控制，默认值为600s。
+假如某一个OSD下线(处于down状态)，那么相关的PG会处于*degraded*状态，在该状态持续一段时间之后（通常是300s），ceph就有可能将该down状态的OSD标记为out状态，指示该OSD已经移出集群， 然后开始将该down OSD上面的数据remap到另一个OSD。一个OSD从down状态变为out状态的时间由*mon osd down out interval*来控制，默认值为300s。
 
 此外，如果ceph在某一个PG中找不到对应的object的话，ceph也可能会将该pg标记为*degraded*状态。对于unfound的对象，将不能够进行读写，但是你仍然可以访问处于*degraded*状态下PG中的其他对象。
 
@@ -202,7 +202,7 @@ ceph提供了许多的配置参数来平衡相应的资源，使得在数据恢�
 
 *backfill_toofull*状态有可能只是暂时性的，因为当PG中相关的数据有可能会被移除，这样后面就又有可用的存储空间了。*backfill_toofull*状态类似于*backfill_wait*，只要后续相关的条件满足之后backfill就可以成功完成。
 
-ceph提供了一系列的设置用于管理由于PG重新映射(特别是重新映射到一个新的OSD)导致的高负载。默认情况下，*osd_max_backfills*设置一个OSD可以同时进行的backfill数(包括backfill to与backfill from)为1。*backfill full ratio*用于设置一个OSD 在backfill时硬盘容量达到full ratio时就会解决相关的backfill请求，我们可以通过*osd set-backfillfull-ratio*命令来更改相关的值；假如某一个OSD拒绝了一个backfill请求，* osd backfill retry interval*使得一个OSD会在其指定的时间之后再次发起backfill请求。OSD也可以通过设置*osd backfill scan min*以及*osd backfill scan max*来管理扫描周期（默认情况下值分别为64/512）。
+ceph提供了一系列的设置用于管理由于PG重新映射(特别是重新映射到一个新的OSD)导致的高负载。默认情况下，*osd_max_backfills*设置一个OSD可以同时进行的backfill数(包括backfill to与backfill from)为1。*backfill full ratio*用于设置一个OSD 在backfill时硬盘容量达到full ratio时就会解决相关的backfill请求，我们可以通过*osd set-backfillfull-ratio*命令来更改相关的值；假如某一个OSD拒绝了一个backfill请求，*osd backfill retry interval*使得一个OSD会在其指定的时间之后再次发起backfill请求。OSD也可以通过设置*osd backfill scan min*以及*osd backfill scan max*来管理扫描周期（默认情况下值分别为64/512）。
 
 
 ###### 8) REMAPPED
