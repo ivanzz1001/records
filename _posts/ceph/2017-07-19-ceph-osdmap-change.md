@@ -1138,6 +1138,235 @@ pg_stat  up   up_primary acting acting_primary                  pg_stat  up   up
 {% endhighlight %}
 可以看到，在```osd.0``` out之后，PG进行了重新的映射。
 
+## 5. 过程分析
+
+下面我们结合上面抓取到的osd3_watch.txt、monitor日志及上面的osdmap、pgmap信息，来分析一下osd0从```in+active```到```in+down```再到```out+down```这一过程当中，ceph集群究竟执行了哪些操作，从而窥探出ceph的整体工作原理。
+
+###### 5.1 in+down状态下osdmap中出现的pg_temp
+在上面```in+down```状态下，我们通过对比osdmap，发现出现了139个pg_temp， 对于这一点我们感觉到十分疑惑。这里我们先来看一下网上相关文章对```临时PG```的说明：
+
+>假设一个PG的acting set为[0,1,2]列表。此时如果osd0出现故障，导致CRUSH算法重新分配该PG的acting set为[3,1,2]。此时osd3为该PG的主OSD，但是osd3为新加入的OSD，并不能负担该PG上的读操作。所以PG向Monitor申请一个临时的PG，osd1为临时的主OSD，这时up set变为[1,3,2]，acting set依然为[3,1,2]，导致acting set和up set不同。当osd3完成Backfill过程之后，临时PG被取消，该PG的up set修复为acting set，此时acting set和up set都为[3,1,2]列表。
+
+通过上面的描述，我们可以认为```acting set```是实际进行服务的一个映射，但是假如说该映射的primary osd当前并不能正常提供服务的话，那么此时就需要申请一个```临时PG```。查询Ceph源代码，发现如下函数会申请pg_temp:
+{% highlight string %}
+bool PG::choose_acting(pg_shard_t &auth_log_shard_id,
+		       bool restrict_to_up_acting,
+		       bool *history_les_bound);
+{% endhighlight %}
+
+choose_acting()函数会在两个地方被调用：
+
+* PG::RecoveryState::GetLog::GetLog(): 在PG进行peering获取权威日志时，GetLog()被调用
+
+* PG::RecoveryState::Recovered::Recovered(): 在数据恢复完成时，Recovered()被调用
+
+因为这里我们的PG的副本数设置的是两副本，因此对于那些映射为[0,3]或[3,0]的PG，在osd0停止后的```in+down```阶段，只有可能是osd3申请了临时PG，所以我们这里跟踪osd3_watch.txt日志信息。通过仔细跟踪osd3_watch.txt日志信息，并未发现osd3使用choose_acting()函数对所有与osd0、osd3相关的PG进行```临时PG```申请。
+
+另一方面，由于osd0被我们使用```systemctl stop ceph-osd@0```命令停止，按理说处于degraded状态下的139个PG中，只有68个PG的主OSD是osd0，因而在acting set不能正常提供服务的情况下，最多也只有68个PG会申请pg temp。
+
+
+那在```in+down```状态下osdmap中的139个pg_temp是如何而来的呢？如下是我们结合Monitor日志分析结果：
+
+1） **osd0端**
+
+osd0接收到关闭信号，后调用shutdown()函数：
+{% highlight string %}
+int OSD::shutdown()
+{
+	if (!service.prepare_to_stop())
+		return 0; // already shutting down
+
+	....
+}
+{% endhighlight %}
+在shutdown()函数中调用prepare_to_stop()函数向Monitor发送```MOSDMarkMeDown```消息：
+{% highlight string %}
+bool OSDService::prepare_to_stop()
+{
+	Mutex::Locker l(is_stopping_lock);
+	if (get_state() != NOT_STOPPING)
+		return false;
+	
+	OSDMapRef osdmap = get_osdmap();
+	if (osdmap && osdmap->is_up(whoami)) {
+		dout(0) << __func__ << " telling mon we are shutting down" << dendl;
+		set_state(PREPARING_TO_STOP);
+		monc->send_mon_message(new MOSDMarkMeDown(monc->get_fsid(),
+			osdmap->get_inst(whoami),
+			osdmap->get_epoch(),
+			true  // request ack
+			));
+		utime_t now = ceph_clock_now(cct);
+		utime_t timeout;
+		timeout.set_from_double(now + cct->_conf->osd_mon_shutdown_timeout);
+		while ((ceph_clock_now(cct) < timeout) &&
+		  (get_state() != STOPPING)) {
+			is_stopping_cond.WaitUntil(is_stopping_lock, timeout);
+		}
+	}
+	dout(0) << __func__ << " starting shutdown" << dendl;
+	set_state(STOPPING);
+	return true;
+}
+{% endhighlight %}
+
+2) **Monitor端**
+
+在Monitor端(src/mon/Monitor.cc)，Monitor类继承自Dispatcher，因此可以分发消息：
+{% highlight string %}
+void Monitor::_ms_dispatch(Message *m){
+	...
+
+	if ((is_synchronizing() || (s->global_id == 0 && !exited_quorum.is_zero())) &&
+	   !src_is_mon && m->get_type() != CEPH_MSG_PING) {
+		waitlist_or_zap_client(op);
+	} else {
+		dispatch_op(op);
+	}
+}
+
+
+void Monitor::dispatch_op(MonOpRequestRef op){
+	...
+
+	switch (op->get_req()->get_type()) {
+	
+		// OSDs
+		case CEPH_MSG_MON_GET_OSDMAP:
+		case MSG_OSD_MARK_ME_DOWN:
+		case MSG_OSD_FAILURE:
+		case MSG_OSD_BOOT:
+		case MSG_OSD_ALIVE:
+		case MSG_OSD_PGTEMP:
+		case MSG_REMOVE_SNAPS:
+			paxos_service[PAXOS_OSDMAP]->dispatch(op);
+			break;
+
+		...
+	}
+
+	...
+}
+{% endhighlight %}
+这里来自OSD的消息会调用OSDMonitor的dispatch来进行处理：
+{% highlight string %}
+bool PaxosService::dispatch(MonOpRequestRef op){
+	....
+
+	// update
+	if (prepare_update(op)) {
+		double delay = 0.0;
+		if (should_propose(delay)) {
+			if (delay == 0.0) {
+				propose_pending();
+			} else {
+				// delay a bit
+				if (!proposal_timer) {
+					/**
+					* Callback class used to propose the pending value once the proposal_timer
+					* fires up.
+					*/
+					proposal_timer = new C_MonContext(mon, [this](int r) {
+						proposal_timer = 0;
+						if (r >= 0)
+							propose_pending();
+						else if (r == -ECANCELED || r == -EAGAIN)
+							return;
+						else
+							assert(0 == "bad return value for proposal_timer");
+					});
+					dout(10) << " setting proposal_timer " << proposal_timer << " with delay of " << delay << dendl;
+					mon->timer.add_event_after(delay, proposal_timer);
+				} else { 
+					dout(10) << " proposal_timer already set" << dendl;
+				}
+			}
+
+		} else {
+			dout(10) << " not proposing" << dendl;
+		}
+	}   
+
+	return true;  
+}
+{% endhighlight %}
+之后调用prepare_update()来进行处理：
+{% highlight string %}
+bool OSDMonitor::prepare_update(MonOpRequestRef op)
+{
+	...
+
+	switch (m->get_type()) {
+		// damp updates
+		case MSG_OSD_MARK_ME_DOWN:
+			return prepare_mark_me_down(op);
+		....
+	}
+	
+	return false;
+}
+{% endhighlight %}
+
+这里我们看到了实际的对于MOSDMarkMeDown消息的处理函数prepare_mark_me_down()函数：
+{% highlight string %}
+bool OSDMonitor::prepare_mark_me_down(MonOpRequestRef op)
+{
+	op->mark_osdmon_event(__func__);
+	MOSDMarkMeDown *m = static_cast<MOSDMarkMeDown*>(op->get_req());
+	int target_osd = m->get_target().name.num();
+	
+	assert(osdmap.is_up(target_osd));
+	assert(osdmap.get_addr(target_osd) == m->get_target().addr);
+	
+	mon->clog->info() << "osd." << target_osd << " marked itself down\n";
+	pending_inc.new_state[target_osd] = CEPH_OSD_UP;
+	if (m->request_ack)
+		wait_for_finished_proposal(op, new C_AckMarkedDown(this, op));
+	return true;
+}
+{% endhighlight %}
+如上，在函数中构造了一个proposal: C_AckMarkedDown，然后插入到waiting_for_finished_proposal列表中，准备对提议进行表决。因为Paxos需要对每一个提议进行持久化，因此这里会调用：
+{% highlight string %}
+void OSDMonitor::encode_pending(MonitorDBStore::TransactionRef t){
+	...
+
+	if (g_conf->mon_osd_prime_pg_temp)
+		maybe_prime_pg_temp();
+
+	...
+}
+{% endhighlight %}
+跟踪到这里，我们发现osdmap中的pg_temp原来是由maybe_prime_pg_temp()来生成的：
+{% highlight string %}
+void OSDMonitor::maybe_prime_pg_temp(){
+	...
+
+	if(all){
+		...
+	}else{
+		dout(10) << __func__ << " " << osds.size() << " interesting osds" << dendl;
+		for (set<int>::iterator p = osds.begin(); p != osds.end(); ++p) {
+			n -= prime_pg_temp(next, pg_map, *p);
+			if (--n <= 0) {
+				n = chunk;
+				if (ceph_clock_now(NULL) > stop) {
+					dout(10) << __func__ << " consumed more than "
+						<< g_conf->mon_osd_prime_pg_temp_max_time
+						<< " seconds, stopping"
+						<< dendl;
+					break;
+				}
+			}
+		}
+	}
+}
+{% endhighlight %}
+上面调用prime_pg_temp()来完成osdmap中的pg_temp的构建。
+
+
+
+
+
 
 
 
