@@ -56,15 +56,15 @@ ID  WEIGHT  TYPE NAME                                UP/DOWN REWEIGHT PRIMARY-AF
     cluster 5341b139-15dc-4c68-925a-179797d894d3
      health HEALTH_OK
      monmap e3: 3 mons at {node7-1=10.17.155.113:6789/0,node7-2=10.17.155.114:6789/0,node7-3=10.17.155.115:6789/0}
-            election epoch 24434, quorum 0,1,2 node7-1,node7-2,node7-3
-     osdmap e2211: 9 osds: 9 up, 9 in
+            election epoch 24440, quorum 0,1,2 node7-1,node7-2,node7-3
+     osdmap e2222: 9 osds: 9 up, 9 in
             flags sortbitwise,require_jewel_osds
-      pgmap v5838358: 632 pgs, 15 pools, 206 GB data, 5860 objects
-            76127 MB used, 225 GB / 299 GB avail
+      pgmap v5839062: 632 pgs, 15 pools, 206 GB data, 5860 objects
+            76122 MB used, 225 GB / 299 GB avail
                  632 active+clean
 
 </pre>
-集群的初始状态为```active+clean```状态，PG的个数有632个。当前osdmap的版本为```e2211```，pgmap的版本为```v5838358```。
+集群的初始状态为```active+clean```状态，PG的个数有632个。当前osdmap的版本为```e2222```，pgmap的版本为```v5839062```。
 
 
 另外所采用的crush如下：
@@ -242,10 +242,10 @@ rule replicated_rule-5 {
 {% highlight string %}
 # ceph osd dump > osdmap_active_clean.txt
 # cat osdmap_active_clean.txt 
-epoch 2211
+epoch 2222
 fsid 5341b139-15dc-4c68-925a-179797d894d3
 created 2018-05-11 16:11:51.479785
-modified 2020-09-11 11:14:45.084454
+modified 2020-09-11 12:13:01.076048
 flags sortbitwise,require_jewel_osds
 pool 11 '.rgw.root' replicated size 2 min_size 1 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 170 flags hashpspool stripe_width 0
 pool 12 'default.rgw.control' replicated size 2 min_size 1 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 172 flags hashpspool stripe_width 0
@@ -263,17 +263,17 @@ pool 23 'default.rgw.buckets.data' replicated size 2 min_size 1 crush_ruleset 5 
 pool 24 'default.rgw.meta' replicated size 2 min_size 1 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 197 flags hashpspool stripe_width 0
 pool 25 'default.rgw.buckets.non-ec' replicated size 2 min_size 1 crush_ruleset 5 object_hash rjenkins pg_num 8 pgp_num 8 last_change 200 flags hashpspool stripe_width 0
 max_osd 10
-osd.0 up   in  weight 1 up_from 2206 up_thru 2210 down_at 2199 last_clean_interval [2196,2198) 10.17.155.113:6800/25969 10.17.155.113:6801/25969 10.17.155.113:6802/25969 10.17.155.113:6803/25969 exists,up 67990973-0316-4f57-b721-ce61d886572c
-osd.1 up   in  weight 1 up_from 2119 up_thru 2206 down_at 2114 last_clean_interval [2045,2113) 10.17.155.113:6808/5393 10.17.155.113:6809/5393 10.17.155.113:6810/5393 10.17.155.113:6811/5393 exists,up e6c55932-820c-474d-aff7-0ed4081f2a33
-osd.2 up   in  weight 1 up_from 2118 up_thru 2206 down_at 2093 last_clean_interval [2045,2092) 10.17.155.113:6804/5391 10.17.155.113:6805/5391 10.17.155.113:6806/5391 10.17.155.113:6807/5391 exists,up dfe500d8-5778-4379-9c48-1f1390fa8f0a
-osd.3 up   in  weight 1 up_from 2123 up_thru 2208 down_at 2095 last_clean_interval [2041,2093) 10.17.155.114:6800/894 10.17.155.114:6801/894 10.17.155.114:6802/894 10.17.155.114:6803/894 exists,up e00c8fe5-d49e-42d1-9bfb-4965b9ab75b3
-osd.4 up   in  weight 1 up_from 2125 up_thru 2207 down_at 2121 last_clean_interval [2042,2120) 10.17.155.114:6804/6327 10.17.155.114:6805/6327 10.17.155.114:6806/6327 10.17.155.114:6807/6327 exists,up dede8fcc-0b34-4296-83e2-a48966b22c36
-osd.5 up   in  weight 1 up_from 2127 up_thru 2207 down_at 2121 last_clean_interval [2042,2120) 10.17.155.114:6808/6391 10.17.155.114:6809/6391 10.17.155.114:6810/6391 10.17.155.114:6811/6391 exists,up c2cde97e-c27a-4560-a46c-68695be79ff1
-osd.6 up   in  weight 1 up_from 2040 up_thru 2207 down_at 2039 last_clean_interval [2020,2038) 10.17.155.115:6800/820 10.17.155.115:6801/820 10.17.155.115:6802/820 10.17.155.115:6803/820 exists,up d12f28d8-8fff-4a77-b344-d5d0b3e6949c
-osd.7 up   in  weight 1 up_from 2072 up_thru 2207 down_at 2051 last_clean_interval [2015,2038) 10.17.155.115:6804/26346 10.17.155.115:6805/26346 10.17.155.115:6806/26346 10.17.155.115:6807/26346 exists,up 26035aa5-6759-4856-8bdb-1507f5b052e6
-osd.8 up   in  weight 1 up_from 2087 up_thru 2207 down_at 2085 last_clean_interval [2074,2086) 10.17.155.115:6808/26484 10.17.155.115:6812/1026484 10.17.155.115:6813/1026484 10.17.155.115:6814/1026484 exists,up bca13e21-d64c-433f-87e4-4d5ea309f28a
+osd.0 up   in  weight 1 up_from 2220 up_thru 2221 down_at 2212 last_clean_interval [2206,2211) 10.17.155.113:6800/29412 10.17.155.113:6801/29412 10.17.155.113:6802/29412 10.17.155.113:6803/29412 exists,up 67990973-0316-4f57-b721-ce61d886572c
+osd.1 up   in  weight 1 up_from 2119 up_thru 2220 down_at 2114 last_clean_interval [2045,2113) 10.17.155.113:6808/5393 10.17.155.113:6809/5393 10.17.155.113:6810/5393 10.17.155.113:6811/5393 exists,up e6c55932-820c-474d-aff7-0ed4081f2a33
+osd.2 up   in  weight 1 up_from 2118 up_thru 2220 down_at 2093 last_clean_interval [2045,2092) 10.17.155.113:6804/5391 10.17.155.113:6805/5391 10.17.155.113:6806/5391 10.17.155.113:6807/5391 exists,up dfe500d8-5778-4379-9c48-1f1390fa8f0a
+osd.3 up   in  weight 1 up_from 2123 up_thru 2221 down_at 2095 last_clean_interval [2041,2093) 10.17.155.114:6800/894 10.17.155.114:6801/894 10.17.155.114:6802/894 10.17.155.114:6803/894 exists,up e00c8fe5-d49e-42d1-9bfb-4965b9ab75b3
+osd.4 up   in  weight 1 up_from 2125 up_thru 2221 down_at 2121 last_clean_interval [2042,2120) 10.17.155.114:6804/6327 10.17.155.114:6805/6327 10.17.155.114:6806/6327 10.17.155.114:6807/6327 exists,up dede8fcc-0b34-4296-83e2-a48966b22c36
+osd.5 up   in  weight 1 up_from 2127 up_thru 2221 down_at 2121 last_clean_interval [2042,2120) 10.17.155.114:6808/6391 10.17.155.114:6809/6391 10.17.155.114:6810/6391 10.17.155.114:6811/6391 exists,up c2cde97e-c27a-4560-a46c-68695be79ff1
+osd.6 up   in  weight 1 up_from 2040 up_thru 2221 down_at 2039 last_clean_interval [2020,2038) 10.17.155.115:6800/820 10.17.155.115:6801/820 10.17.155.115:6802/820 10.17.155.115:6803/820 exists,up d12f28d8-8fff-4a77-b344-d5d0b3e6949c
+osd.7 up   in  weight 1 up_from 2072 up_thru 2221 down_at 2051 last_clean_interval [2015,2038) 10.17.155.115:6804/26346 10.17.155.115:6805/26346 10.17.155.115:6806/26346 10.17.155.115:6807/26346 exists,up 26035aa5-6759-4856-8bdb-1507f5b052e6
+osd.8 up   in  weight 1 up_from 2087 up_thru 2221 down_at 2085 last_clean_interval [2074,2086) 10.17.155.115:6808/26484 10.17.155.115:6812/1026484 10.17.155.115:6813/1026484 10.17.155.115:6814/1026484 exists,up bca13e21-d64c-433f-87e4-4d5ea309f28a
 {% endhighlight %}
-上面看到当前的osdmap的版本号为```2211```，总共有9个osd，都处于```up + in```状态。
+上面看到当前的osdmap的版本号为```2222```，总共有9个osd，都处于```up + in```状态。
 
 2) **获取初始状态下的pgmap**
 
@@ -281,28 +281,31 @@ osd.8 up   in  weight 1 up_from 2087 up_thru 2207 down_at 2085 last_clean_interv
 {% highlight string %}
 # ceph pg dump > pgmap_active_clean.txt
 # cat pgmap_active_clean.txt 
-version 5838392
-stamp 2020-09-11 11:34:18.170843
-last_osdmap_epoch 2211
-last_pg_scan 2211
+version 5839062
+stamp 2020-09-11 13:57:11.859797
+last_osdmap_epoch 2222
+last_pg_scan 2222
 full_ratio 0.95
 nearfull_ratio 0.85
 pg_stat objects mip     degr    misp    unf     bytes   log     disklog state   state_stamp     v       reported        up      up_primary      acting  acting_primary  last_scrub      scrub_stamp     last_deep_scrub deep_scrub_stamp
-23.67   10      0       0       0       0       1095624955      56      56      active+clean    2020-09-11 04:33:30.434795      1956'56 2206:359        [1,7]   1       [1,7]   1       1956'56 2020-09-11 04:33:30.434723      1956'56 2020-09-09 18:30:40.201407
-22.66   0       0       0       0       0       0       0       0       active+clean    2020-09-11 04:27:20.276408      0'0     2206:911        [8,2]   8       [8,2]   8       0'0     2020-09-11 04:27:20.276336      0'0     2020-09-06 09:41:03.238164
-23.64   24      0       0       0       0       2194721422      99      99      active+clean    2020-09-10 16:23:37.876876      1962'99 2206:225        [3,2]   3       [3,2]   3       1962'99 2020-09-10 16:23:37.876778      1962'99 2020-09-10 16:23:37.876778
-22.65   0       0       0       0       0       0       0       0       active+clean    2020-09-11 11:12:43.694068      0'0     2208:303        [0,8]   0       [0,8]   0       0'0     2020-09-10 08:49:02.107556      0'0     2020-09-05 09:58:02.887318
-23.65   23      0       0       0       0       59042501        100     100     active+clean    2020-09-10 06:11:37.649942      1956'100        2206:2211       [4,7]   4       [4,7]   4       1956'100        2020-09-10 06:11:37.649843      1956'100       2020-09-06 16:56:41.273324
-22.64   1       0       0       0       0       0       3000    3000    active+clean    2020-09-10 18:52:08.198539      972'4247        2206:5851       [2,3]   2       [2,3]   2       972'4247        2020-09-10 18:52:08.198492      972'4247      2020-09-10 18:52:08.198492
-23.62   19      0       0       0       0       24117248        68      68      active+clean    2020-09-10 19:26:25.938796      1956'68 2206:312        [3,1]   3       [3,1]   3       1956'68 2020-09-10 19:26:25.938730      1956'68 2020-09-09 17:38:24.900539
-22.63   1       0       0       0       0       0       2       2       active+clean    2020-09-11 08:56:04.770887      515'2   2206:290        [5,8]   5       [5,8]   5       515'2   2020-09-11 08:56:04.770809      515'2   2020-09-08 02:11:32.447972
-23.63   15      0       0       0       0       27802844        57      57      active+clean    2020-09-11 09:53:32.145516      1956'57 2206:249        [3,7]   3       [3,7]   3       1956'57 2020-09-11 09:53:32.145446      1956'57 2020-09-10 08:38:25.599452
-22.62   1       0       0       0       0       0       2       2       active+clean    2020-09-11 10:36:05.768238      201'2   2206:2436       [5,1]   5       [5,1]   5       201'2   2020-09-11 10:36:05.768173      201'2   2020-09-11 10:36:05.768173
-23.60   28      0       0       0       0       3267227406      107     107     active+clean    2020-09-10 06:04:01.345274      1956'107        2206:314        [2,4]   2       [2,4]   2       1956'107        2020-09-10 06:04:01.345229      1956'107       2020-09-10 06:04:01.345229
-22.61   0       0       0       0       0       0       0       0       active+clean    2020-09-10 20:25:28.624057      0'0     2206:903        [6,3]   6       [6,3]   6       0'0     2020-09-10 20:25:28.623983      0'0     2020-09-10 20:25:28.623983
+23.67   10      0       0       0       0       1095624955      56      56      active+clean    2020-09-11 04:33:30.434795      1956'56 2214:361        [1,7]   1       [1,7]   1       1956'56 2020-09-11 04:33:30.434723      1956'56 2020-09-09 18:30:40.201407
+22.66   0       0       0       0       0       0       0       0       active+clean    2020-09-11 04:27:20.276408      0'0     2214:913        [8,2]   8       [8,2]   8       0'0     2020-09-11 04:27:20.276336      0'0     2020-09-06 09:41:03.238164
+23.64   24      0       0       0       0       2194721422      99      99      active+clean    2020-09-10 16:23:37.876876      1962'99 2214:227        [3,2]   3       [3,2]   3       1962'99 2020-09-10 16:23:37.876778      1962'99 2020-09-10 16:23:37.876778
+22.65   0       0       0       0       0       0       0       0       active+clean    2020-09-11 12:13:01.285076      0'0     2222:311        [0,8]   0       [0,8]   0       0'0     2020-09-10 08:49:02.107556      0'0     2020-09-05 09:58:02.887318
+23.65   23      0       0       0       0       59042501        100     100     active+clean    2020-09-10 06:11:37.649942      1956'100        2214:2213       [4,7]   4       [4,7]   4       1956'100        2020-09-10 06:11:37.649843      1956'100 2020-09-06 16:56:41.273324
+22.64   1       0       0       0       0       0       3000    3000    active+clean    2020-09-10 18:52:08.198539      972'4247        2214:5853       [2,3]   2       [2,3]   2       972'4247        2020-09-10 18:52:08.198492      972'4247        2020-09-10 18:52:08.198492
+23.62   19      0       0       0       0       24117248        68      68      active+clean    2020-09-10 19:26:25.938796      1956'68 2214:314        [3,1]   3       [3,1]   3       1956'68 2020-09-10 19:26:25.938730      1956'68 2020-09-09 17:38:24.900539
+22.63   1       0       0       0       0       0       2       2       active+clean    2020-09-11 08:56:04.770887      515'2   2214:292        [5,8]   5       [5,8]   5       515'2   2020-09-11 08:56:04.770809      515'2   2020-09-08 02:11:32.447972
+23.63   15      0       0       0       0       27802844        57      57      active+clean    2020-09-11 09:53:32.145516      1956'57 2214:251        [3,7]   3       [3,7]   3       1956'57 2020-09-11 09:53:32.145446      1956'57 2020-09-10 08:38:25.599452
+22.62   1       0       0       0       0       0       2       2       active+clean    2020-09-11 10:36:05.768238      201'2   2214:2438       [5,1]   5       [5,1]   5       201'2   2020-09-11 10:36:05.768173      201'2   2020-09-11 10:36:05.768173
+23.60   28      0       0       0       0       3267227406      107     107     active+clean    2020-09-10 06:04:01.345274      1956'107        2214:316        [2,4]   2       [2,4]   2       1956'107        2020-09-10 06:04:01.345229      1956'107 2020-09-10 06:04:01.345229
+22.61   0       0       0       0       0       0       0       0       active+clean    2020-09-10 20:25:28.624057      0'0     2214:905        [6,3]   6       [6,3]   6       0'0     2020-09-10 20:25:28.623983      0'0     2020-09-10 20:25:28.623983
+23.61   25      0       0       0       0       31142253        67      67      active+clean    2020-09-11 12:13:29.734713      1956'67 2222:590        [0,4]   0       [0,4]   0       1956'67 2020-09-11 09:58:39.802565      1956'67 2020-09-11 09:58:39.802565
+22.60   0       0       0       0       0       0       0       0       active+clean    2020-09-10 23:03:35.867956      0'0     2214:271        [7,5]   7       [7,5]   7       0'0     2020-09-10 23:03:35.867741      0'0     2020-09-08 12:41:53.131348
+23.5e   21      0       0       0       0       1085440156      82      82      active+clean    2020-09-10 18:02:11.253557      1956'82 2214:322        [6,4]   6       [6,4]   6       1956'82 2020-09-10 18:02:11.253467      1956'82 2020-09-09 12:43:46.534538
 ....
 {% endhighlight %}
-上面pgmap的版本号变为了```5838392```，pgmap版本号变化很快，在我们当前集群未有明显变动的情况下，pg版本号也增长了很多。
+上面pgmap的版本号为```5839062```。
 
 
 接着通过如下命令获得```osd.0```上的PG个数（结果为139）：
@@ -352,10 +355,6 @@ pg_stat objects mip     degr    misp    unf     bytes   log     disklog state   
 </pre>
 可以看到当前已经修改成功。我们再检查一下osd.3的日志，以确保日志级别已经修改成功。
 
-修改成功后，我们将osd.3的日志重定向到一个新的文件中(osd3_watch.txt):
-{% highlight string %}
-# tail -f /var/log/ceph/ceph-osd.3.log > ./osd3_watch.txt
-{% endhighlight %}
 
 4） **修改osd0的日志打印级别**
 
@@ -399,12 +398,32 @@ pg_stat objects mip     degr    misp    unf     bytes   log     disklog state   
 </pre>
 可以看到当前已经修改成功。我们再检查一下mon.node7-1的日志，以确保日志级别已经修改成功。
 
-修改成功后，我们将mon.node7-1的日志重定向到一个新的文件中(mon-node7-1.txt):
+
+## 2. 准备阶段
+在我们完成上面的日志级别的调整后，我们重定向相关日志：
+
+1） **重定向osd.0日志**
+
+我们将osd.0的日志重定向到一个新文件中(osd0_watch.txt):
+{% highlight string %}
+# tail -f /var/log/ceph/ceph-osd.0.log > ./osd0_watch.txt
+{% endhighlight %}
+
+2) **重定向osd.3日志**
+
+我们将osd.3的日志重定向到一个新的文件中(osd3_watch.txt):
+{% highlight string %}
+# tail -f /var/log/ceph/ceph-osd.3.log > ./osd3_watch.txt
+{% endhighlight %}
+
+3) **重定向mon.node7-1日志**
+
+我们将mon.node7-1的日志重定向到一个新的文件中(mon-node7-1.txt):
 {% highlight string %}
 # tail -f /var/log/ceph/ceph-mon.node7-1.log > ./mon-node7-1.txt
 {% endhighlight %}
 
-## 2. osd.0处于(in+down)状态
+## 3. osd.0处于(in+down)状态
 1) **关闭osd.0，并观察集群状态**
 
 执行如下命令手动关闭```osd.0```，并观察集群状态：
@@ -413,25 +432,25 @@ pg_stat objects mip     degr    misp    unf     bytes   log     disklog state   
 # ceph -s
     cluster 5341b139-15dc-4c68-925a-179797d894d3
      health HEALTH_ERR
-            40 pgs are stuck inactive for more than 300 seconds
-            99 pgs degraded
-            40 pgs peering
-            40 pgs stuck inactive
-            138 pgs stuck unclean
-            99 pgs undersized
-            recovery 918/11720 objects degraded (7.833%)
+            17 pgs are stuck inactive for more than 300 seconds
+            119 pgs degraded
+            20 pgs peering
+            17 pgs stuck inactive
+            133 pgs stuck unclean
+            119 pgs undersized
+            recovery 1169/11720 objects degraded (9.974%)
             1/9 in osds are down
      monmap e3: 3 mons at {node7-1=10.17.155.113:6789/0,node7-2=10.17.155.114:6789/0,node7-3=10.17.155.115:6789/0}
-            election epoch 24424, quorum 0,1,2 node7-1,node7-2,node7-3
-     osdmap e2160: 9 osds: 8 up, 9 in; 139 remapped pgs
+            election epoch 24440, quorum 0,1,2 node7-1,node7-2,node7-3
+     osdmap e2225: 9 osds: 8 up, 9 in; 139 remapped pgs
             flags sortbitwise,require_jewel_osds
-      pgmap v5819798: 632 pgs, 15 pools, 206 GB data, 5860 objects
-            76110 MB used, 225 GB / 299 GB avail
-            918/11720 objects degraded (7.833%)
+      pgmap v5839107: 632 pgs, 15 pools, 206 GB data, 5860 objects
+            76124 MB used, 225 GB / 299 GB avail
+            1169/11720 objects degraded (9.974%)
                  493 active+clean
-                  99 active+undersized+degraded
-                  40 peering
-recovery io 0 B/s, 17 keys/s, 0 objects/s
+                 119 active+undersized+degraded
+                  20 peering
+recovery io 0 B/s, 5 keys/s, 0 objects/s
 </pre>
 可以看到停止osd.0之后，集群马上出现```HEALTH_ERR```状态。接着再执行```ceph -s```命令：
 <pre>
@@ -439,25 +458,23 @@ recovery io 0 B/s, 17 keys/s, 0 objects/s
     cluster 5341b139-15dc-4c68-925a-179797d894d3
      health HEALTH_WARN
             139 pgs degraded
-            139 pgs stuck unclean
+            133 pgs stuck unclean
             139 pgs undersized
             recovery 1301/11720 objects degraded (11.101%)
             1/9 in osds are down
      monmap e3: 3 mons at {node7-1=10.17.155.113:6789/0,node7-2=10.17.155.114:6789/0,node7-3=10.17.155.115:6789/0}
-            election epoch 24424, quorum 0,1,2 node7-1,node7-2,node7-3
-     osdmap e2160: 9 osds: 8 up, 9 in; 139 remapped pgs
+            election epoch 24440, quorum 0,1,2 node7-1,node7-2,node7-3
+     osdmap e2225: 9 osds: 8 up, 9 in; 139 remapped pgs
             flags sortbitwise,require_jewel_osds
-      pgmap v5819806: 632 pgs, 15 pools, 206 GB data, 5860 objects
-            76110 MB used, 225 GB / 299 GB avail
+      pgmap v5839112: 632 pgs, 15 pools, 206 GB data, 5860 objects
+            76124 MB used, 225 GB / 299 GB avail
             1301/11720 objects degraded (11.101%)
                  493 active+clean
                  139 active+undersized+degraded
 
-2020-09-08 19:32:41.953782 mon.0 [INF] pgmap v5819806: 632 pgs: 139 active+undersized+degraded, 493 active+clean; 206 GB data, 76110 MB used, 225 GB / 299 GB avail; 1301/11720 objects degraded (11.101%)
-2020-09-08 19:33:19.620972 mon.0 [INF] pgmap v5819807: 632 pgs: 139 active+undersized+degraded, 493 active+clean; 206 GB data, 76110 MB used, 225 GB / 299 GB avail; 1301/11720 objects degraded (11.101%)
-2020-09-08 19:33:25.531104 mon.0 [INF] HEALTH_WARN; 139 pgs degraded; 139 pgs stuck unclean; 139 pgs undersized; recovery 1301/11720 objects degraded (11.101%); 1/9 in osds are down
-2020-09-08 19:34:00.393548 mon.0 [INF] pgmap v5819808: 632 pgs: 139 active+undersized+degraded, 493 active+clean; 206 GB data, 76110 MB used, 225 GB / 299 GB avail; 1301/11720 objects degraded (11.101%)
-2020-09-08 19:34:17.323444 mon.0 [INF] pgmap v5819809: 632 pgs: 139 active+undersized+degraded, 493 active+clean; 206 GB data, 76110 MB used, 225 GB / 299 GB avail; 1301/11720 objects degraded (11.101%)
+2020-09-11 14:05:32.824053 mon.0 [INF] pgmap v5839112: 632 pgs: 139 active+undersized+degraded, 493 active+clean; 206 GB data, 76124 MB used, 225 GB / 299 GB avail; 1301/11720 objects degraded (11.101%)
+2020-09-11 14:05:37.849532 mon.0 [INF] HEALTH_WARN; 139 pgs degraded; 133 pgs stuck unclean; 139 pgs undersized; recovery 1301/11720 objects degraded (11.101%); 1/9 in osds are down
+2020-09-11 14:06:37.850136 mon.0 [INF] HEALTH_WARN; 139 pgs degraded; 135 pgs stuck unclean; 139 pgs undersized; recovery 1301/11720 objects degraded (11.101%); 1/9 in osds are down
 </pre>
 可以看到这个时候集群状态变为```HEALTH_WARN```状态，其中处于```degraded```状态的PG个数是139，这刚好就是osd.0上PG的个数。
 
@@ -479,28 +496,46 @@ dumped all in format plain
 # ceph -w
     cluster 5341b139-15dc-4c68-925a-179797d894d3
      health HEALTH_WARN
-            72 pgs degraded
-            3 pgs recovering
-            69 pgs recovery_wait
-            72 pgs stuck unclean
-            recovery 2564/11720 objects degraded (21.877%)
+            1 pgs backfill_wait
+            76 pgs degraded
+            5 pgs recovering
+            70 pgs recovery_wait
+            76 pgs stuck unclean
+            1 pgs undersized
+            recovery 2462/11720 objects degraded (21.007%)
      monmap e3: 3 mons at {node7-1=10.17.155.113:6789/0,node7-2=10.17.155.114:6789/0,node7-3=10.17.155.115:6789/0}
-            election epoch 24424, quorum 0,1,2 node7-1,node7-2,node7-3
-     osdmap e2167: 9 osds: 8 up, 8 in
+            election epoch 24440, quorum 0,1,2 node7-1,node7-2,node7-3
+     osdmap e2231: 9 osds: 8 up, 8 in; 1 remapped pgs
             flags sortbitwise,require_jewel_osds
-      pgmap v5819849: 632 pgs, 15 pools, 206 GB data, 5860 objects
-            71995 MB used, 196 GB / 266 GB avail
-            2564/11720 objects degraded (21.877%)
-                 560 active+clean
-                  69 active+recovery_wait+degraded
-                   3 active+recovering+degraded
-recovery io 18252 kB/s, 9 objects/s
-  client io 7386 B/s rd, 0 B/s wr, 7 op/s rd, 4 op/s wr
+      pgmap v5839147: 632 pgs, 15 pools, 206 GB data, 5860 objects
+            72034 MB used, 196 GB / 266 GB avail
+            2462/11720 objects degraded (21.007%)
+                 556 active+clean
+                  70 active+recovery_wait+degraded
+                   5 active+recovering+degraded
+                   1 active+undersized+degraded+remapped+wait_backfill
+recovery io 25022 kB/s, 25 objects/s
 
-2020-09-08 19:37:53.132802 mon.0 [INF] pgmap v5819848: 632 pgs: 3 active+recovering+degraded, 69 active+recovery_wait+degraded, 560 active+clean; 206 GB data, 71931 MB used, 196 GB / 266 GB avail; 4379 B/s rd, 0 B/s wr, 7 op/s; 2564/11720 objects degraded (21.877%); 18034 kB/s, 9 objects/s recovering
-2020-09-08 19:37:54.149839 mon.0 [INF] pgmap v5819849: 632 pgs: 3 active+recovering+degraded, 69 active+recovery_wait+degraded, 560 active+clean; 206 GB data, 71995 MB used, 196 GB / 266 GB avail; 7386 B/s rd, 0 B/s wr, 12 op/s; 2564/11720 objects degraded (21.877%); 18252 kB/s, 9 objects/s recovering
-2020-09-08 19:37:55.208008 mon.0 [INF] pgmap v5819850: 632 pgs: 3 active+recovering+degraded, 69 active+recovery_wait+degraded, 560 active+clean; 206 GB data, 71969 MB used, 196 GB / 266 GB avail; 16261 B/s rd, 0 B/s wr, 26 op/s; 2564/11720 objects degraded (21.877%)
-2020-09-08 19:37:56.238560 mon.0 [INF] pgmap v5819851: 632 pgs: 3 active+recovering+degraded, 69 active+recovery_wait+degraded, 560 active+clean; 206 GB data, 72505 MB used, 196 GB / 266 GB avail; 8882 B/s rd, 0 B/s wr, 14 op/s; 2564/11720 objects degraded (21.877%)
+2020-09-11 14:10:18.902675 mon.0 [INF] osd.0 out (down for 300.095972)
+2020-09-11 14:10:18.942928 mon.0 [INF] osdmap e2226: 9 osds: 8 up, 8 in
+2020-09-11 14:10:18.961850 mon.0 [INF] pgmap v5839131: 632 pgs: 139 active+undersized+degraded, 493 active+clean; 206 GB data, 70540 MB used, 197 GB / 266 GB avail; 1301/11720 objects degraded (11.101%)
+2020-09-11 14:10:19.967084 mon.0 [INF] osdmap e2227: 9 osds: 8 up, 8 in
+2020-09-11 14:10:19.973245 osd.7 [INF] 17.0 starting backfill to osd.2 from (0'0,0'0] MAX to 1745'17827
+2020-09-11 14:10:19.988115 mon.0 [INF] pgmap v5839132: 632 pgs: 139 active+undersized+degraded, 493 active+clean; 206 GB data, 70540 MB used, 197 GB / 266 GB avail; 1301/11720 objects degraded (11.101%)
+2020-09-11 14:10:21.004820 mon.0 [INF] osdmap e2228: 9 osds: 8 up, 8 in
+2020-09-11 14:10:21.042746 mon.0 [INF] pgmap v5839134: 632 pgs: 1 active+undersized+degraded+remapped+wait_backfill, 2 active+undersized+remapped, 2 active+undersized+degraded+remapped+backfilling, 60 peering, 74 active+undersized+degraded, 493 active+clean; 206 GB data, 70540 MB used, 197 GB / 266 GB avail; 743/11720 objects degraded (6.340%); 0 B/s, 1603 keys/s, 43 objects/s recovering
+2020-09-11 14:10:19.971030 osd.8 [INF] 14.5 starting backfill to osd.2 from (0'0,0'0] MAX to 2222'235208
+2020-09-11 14:10:22.047015 mon.0 [INF] osdmap e2229: 9 osds: 8 up, 8 in
+2020-09-11 14:10:22.099375 mon.0 [INF] pgmap v5839136: 632 pgs: 4 active+recovery_wait+degraded, 2 active+recovering+degraded, 15 activating, 1 active+undersized+degraded+remapped+wait_backfill, 1 active+undersized+remapped, 3 active+undersized+degraded+remapped+backfilling, 61 peering, 17 active+undersized+degraded, 31 activating+degraded, 497 active+clean; 206 GB data, 70541 MB used, 197 GB / 266 GB avail; 351/11720 objects degraded (2.995%)
+2020-09-11 14:10:19.967348 osd.5 [INF] 14.3 starting backfill to osd.2 from (0'0,0'0] MAX to 2222'417838
+2020-09-11 14:10:19.975356 osd.5 [INF] 14.d starting backfill to osd.2 from (0'0,0'0] MAX to 2222'321710
+2020-09-11 14:10:19.975419 osd.5 [INF] 14.8 starting backfill to osd.3 from (0'0,0'0] MAX to 2222'230561
+2020-09-11 14:10:19.976943 osd.5 [INF] 14.8 starting backfill to osd.7 from (0'0,0'0] MAX to 2222'230561
+2020-09-11 14:10:20.025833 osd.3 [INF] 15.5 starting backfill to osd.1 from (0'0,0'0] MAX to 2225'9330365
+2020-09-11 14:10:23.142904 mon.0 [INF] osdmap e2230: 9 osds: 8 up, 8 in
+2020-09-11 14:10:23.201075 mon.0 [INF] pgmap v5839138: 632 pgs: 5 active+recovery_wait+degraded, 3 active+recovering+degraded, 21 activating, 1 active+undersized+degraded+remapped+wait_backfill, 1 active+undersized+remapped, 3 active+undersized+degraded+remapped+backfilling, 61 peering, 39 activating+degraded, 498 active+clean; 206 GB data, 70541 MB used, 197 GB / 266 GB avail; 311/11720 objects degraded (2.654%)
+2020-09-11 14:10:24.173223 mon.0 [INF] osdmap e2231: 9 osds: 8 up, 8 in
+2020-09-11 14:10:24.192977 mon.0 [INF] pgmap v5839139: 632 pgs: 5 active+recovery_wait+degraded, 3 active+recovering+degraded, 21 activating, 1 active+undersized+degraded+remapped+wait_backfill, 1 active+undersized+remapped, 3 active+undersized+degraded+remapped+backfilling, 61 peering, 39 activating+degraded, 498 active+clean; 206 GB data, 70541 MB used, 197 GB / 266 GB avail; 311/11720 objects degraded (2.654%)
 </pre>
 这个过期时间可以通过如下命令查出:
 <pre>
@@ -563,15 +598,15 @@ dumped all in format plain
 1） **```active+clean```状态与```in+down```状态osdmap对比**
 {% highlight string %}
 # diff osdmap_active_clean.txt osdmap_in_down.txt -y --suppress-common-lines
-epoch 2158                                                    | epoch 2160
-modified 2020-09-08 16:12:03.446719                           | modified 2020-09-08 19:32:30.271816
-osd.0 up   in  weight 1 up_from 2153 up_thru 2156 down_at 214 | osd.0 down in  weight 1 up_from 2153 up_thru 2156 down_at 215
-osd.3 up   in  weight 1 up_from 2123 up_thru 2154 down_at 209 | osd.3 up   in  weight 1 up_from 2123 up_thru 2159 down_at 209
-osd.4 up   in  weight 1 up_from 2125 up_thru 2154 down_at 212 | osd.4 up   in  weight 1 up_from 2125 up_thru 2159 down_at 212
-osd.5 up   in  weight 1 up_from 2127 up_thru 2154 down_at 212 | osd.5 up   in  weight 1 up_from 2127 up_thru 2159 down_at 212
-osd.6 up   in  weight 1 up_from 2040 up_thru 2154 down_at 203 | osd.6 up   in  weight 1 up_from 2040 up_thru 2159 down_at 203
-osd.7 up   in  weight 1 up_from 2072 up_thru 2154 down_at 205 | osd.7 up   in  weight 1 up_from 2072 up_thru 2159 down_at 205
-osd.8 up   in  weight 1 up_from 2087 up_thru 2154 down_at 208 | osd.8 up   in  weight 1 up_from 2087 up_thru 2159 down_at 208
+epoch 2222                                                    | epoch 2225
+modified 2020-09-11 12:13:01.076048                           | modified 2020-09-11 14:05:20.831242
+osd.0 up   in  weight 1 up_from 2220 up_thru 2221 down_at 221 | osd.0 down in  weight 1 up_from 2220 up_thru 2221 down_at 222
+osd.3 up   in  weight 1 up_from 2123 up_thru 2221 down_at 209 | osd.3 up   in  weight 1 up_from 2123 up_thru 2223 down_at 209
+osd.4 up   in  weight 1 up_from 2125 up_thru 2221 down_at 212 | osd.4 up   in  weight 1 up_from 2125 up_thru 2223 down_at 212
+osd.5 up   in  weight 1 up_from 2127 up_thru 2221 down_at 212 | osd.5 up   in  weight 1 up_from 2127 up_thru 2224 down_at 212
+osd.6 up   in  weight 1 up_from 2040 up_thru 2221 down_at 203 | osd.6 up   in  weight 1 up_from 2040 up_thru 2223 down_at 203
+osd.7 up   in  weight 1 up_from 2072 up_thru 2221 down_at 205 | osd.7 up   in  weight 1 up_from 2072 up_thru 2223 down_at 205
+osd.8 up   in  weight 1 up_from 2087 up_thru 2221 down_at 208 | osd.8 up   in  weight 1 up_from 2087 up_thru 2223 down_at 208
                                                               > pg_temp 11.0 [6,0]
                                                               > pg_temp 11.4 [0,3]
                                                               > pg_temp 11.6 [3,0]
@@ -713,22 +748,22 @@ osd.8 up   in  weight 1 up_from 2087 up_thru 2154 down_at 208 | osd.8 up   in  w
                                                               > pg_temp 25.5 [3,0]
 
 {% endhighlight %}
-从上面我们可以看到首先是osdmap的epoch值发生了变动，由```2158```变成了```2160```。然后再是osdmap显示```osd.0```上的139个PG产生了pg_temp。
+从上面我们可以看到首先是osdmap的epoch值发生了变动，由```2222```变成了```2225```。然后再是osdmap显示```osd.0```上的139个PG产生了pg_temp。
 
 2） **```in+down```状态与```out+down```状态osdmap对比**
 {% highlight string %}
 # diff osdmap_in_down.txt osdmap_out_down.txt -y --suppress-common-lines
-epoch 2160                                                    | epoch 2167
-modified 2020-09-08 19:32:30.271816                           | modified 2020-09-08 19:37:39.203158
-osd.0 down in  weight 1 up_from 2153 up_thru 2156 down_at 215 | osd.0 down out weight 0 up_from 2153 up_thru 2156 down_at 215
-osd.1 up   in  weight 1 up_from 2119 up_thru 2153 down_at 211 | osd.1 up   in  weight 1 up_from 2119 up_thru 2162 down_at 211
-osd.2 up   in  weight 1 up_from 2118 up_thru 2153 down_at 209 | osd.2 up   in  weight 1 up_from 2118 up_thru 2164 down_at 209
-osd.3 up   in  weight 1 up_from 2123 up_thru 2159 down_at 209 | osd.3 up   in  weight 1 up_from 2123 up_thru 2166 down_at 209
-osd.4 up   in  weight 1 up_from 2125 up_thru 2159 down_at 212 | osd.4 up   in  weight 1 up_from 2125 up_thru 2162 down_at 212
-osd.5 up   in  weight 1 up_from 2127 up_thru 2159 down_at 212 | osd.5 up   in  weight 1 up_from 2127 up_thru 2164 down_at 212
-osd.6 up   in  weight 1 up_from 2040 up_thru 2159 down_at 203 | osd.6 up   in  weight 1 up_from 2040 up_thru 2162 down_at 203
-osd.7 up   in  weight 1 up_from 2072 up_thru 2159 down_at 205 | osd.7 up   in  weight 1 up_from 2072 up_thru 2163 down_at 205
-osd.8 up   in  weight 1 up_from 2087 up_thru 2159 down_at 208 | osd.8 up   in  weight 1 up_from 2087 up_thru 2162 down_at 208
+epoch 2225                                                    | epoch 2231
+modified 2020-09-11 14:05:20.831242                           | modified 2020-09-11 14:10:24.139331
+osd.0 down in  weight 1 up_from 2220 up_thru 2221 down_at 222 | osd.0 down out weight 0 up_from 2220 up_thru 2221 down_at 222
+osd.1 up   in  weight 1 up_from 2119 up_thru 2220 down_at 211 | osd.1 up   in  weight 1 up_from 2119 up_thru 2227 down_at 211
+osd.2 up   in  weight 1 up_from 2118 up_thru 2220 down_at 209 | osd.2 up   in  weight 1 up_from 2118 up_thru 2230 down_at 209
+osd.3 up   in  weight 1 up_from 2123 up_thru 2223 down_at 209 | osd.3 up   in  weight 1 up_from 2123 up_thru 2228 down_at 209
+osd.4 up   in  weight 1 up_from 2125 up_thru 2223 down_at 212 | osd.4 up   in  weight 1 up_from 2125 up_thru 2227 down_at 212
+osd.5 up   in  weight 1 up_from 2127 up_thru 2224 down_at 212 | osd.5 up   in  weight 1 up_from 2127 up_thru 2227 down_at 212
+osd.6 up   in  weight 1 up_from 2040 up_thru 2223 down_at 203 | osd.6 up   in  weight 1 up_from 2040 up_thru 2227 down_at 203
+osd.7 up   in  weight 1 up_from 2072 up_thru 2223 down_at 205 | osd.7 up   in  weight 1 up_from 2072 up_thru 2229 down_at 205
+osd.8 up   in  weight 1 up_from 2087 up_thru 2223 down_at 208 | osd.8 up   in  weight 1 up_from 2087 up_thru 2229 down_at 208
 pg_temp 11.0 [6,0]                                            <
 pg_temp 11.4 [0,3]                                            <
 pg_temp 11.6 [3,0]                                            <
@@ -740,7 +775,6 @@ pg_temp 13.d [0,7]                                            <
 pg_temp 14.3 [0,5]                                            <
 pg_temp 14.5 [0,8]                                            <
 pg_temp 14.8 [0,5]                                            <
-pg_temp 14.d [0,5]                                            <
 pg_temp 15.5 [3,0]                                            <
 pg_temp 16.2 [8,0]                                            <
 pg_temp 17.0 [7,0]                                            <
@@ -869,9 +903,9 @@ pg_temp 24.4 [3,0]                                            <
 pg_temp 24.5 [0,8]                                            <
 pg_temp 25.5 [3,0]                                            <
 {% endhighlight %}
-从上面我们可以看到首先是osdmap的epoch值发生了变动，由```2160```变成了```2167```，并且此时pg_temp已经消失。
+从上面我们可以看到首先是osdmap的epoch值发生了变动，由```2225```变成了```2231```，并且此时pg_temp已经消失。
 
-## 4. pgmap对比分析
+## 5. pgmap对比分析
 这里我们主要是对pgmap立面的```pg_stat```、```up```、```up_primary```、```acting```、```acting_primary```这几列比较感兴趣，下面我们分别对前面保存的pgmap_active_clean.txt、pgmap_in_down.txt、pgmap_out_down.txt做如下处理：
 {% highlight string %}
 # cat pgmap_active_clean.txt | awk '{print $1 "\t" $15 "\t" $16 "\t" $17 "\t" $18}' > pgmap_active_clean_fix.txt
@@ -1028,6 +1062,7 @@ pg_stat  up   up_primary acting acting_primary                  pg_stat  up   up
 2) **```in+down```状态与```out+down```状态pgmap对比**
 {% highlight string %}
 # diff pgmap_in_down_fix.txt pgmap_out_down_fix.txt -y --suppress-common-lines
+pg_stat  up   up_primary acting acting_primary                  pg_stat  up   up_primary acting acting_primary
 22.65   [8]     8       [8]     8                             | 22.65   [8,2]   8       [8,2]   8
 23.61   [4]     4       [4]     4                             | 23.61   [3,2]   3       [3,2]   3
 22.54   [8]     8       [8]     8                             | 22.54   [8,5]   8       [8,5]   8
@@ -1050,7 +1085,7 @@ pg_stat  up   up_primary acting acting_primary                  pg_stat  up   up
 23.26   [6]     6       [6]     6                             | 23.26   [1,6]   1       [1,6]   1
 22.24   [7]     7       [7]     7                             | 22.24   [7,5]   7       [7,5]   7
 22.21   [7]     7       [7]     7                             | 22.21   [8,1]   8       [8,1]   8
-14.d    [5]     5       [5]     5                             | 14.d    [2,5]   2       [2,5]   2
+14.d    [5]     5       [5]     5                             | 14.d    [2,5]   2       [5]     5
 13.d    [7]     7       [7]     7                             | 13.d    [1,7]   1       [1,7]   1
 13.c    [4]     4       [4]     4                             | 13.c    [4,7]   4       [4,7]   4
 14.8    [5]     5       [5]     5                             | 14.8    [3,7]   3       [3,7]   3
@@ -1170,11 +1205,11 @@ pg_stat  up   up_primary acting acting_primary                  pg_stat  up   up
 {% endhighlight %}
 可以看到，在```osd.0``` out之后，PG进行了重新的映射。
 
-## 5. 过程分析
+## 6. 过程分析
 
 下面我们结合上面抓取到的osd3_watch.txt、monitor日志及上面的osdmap、pgmap信息，来分析一下osd0从```in+active```到```in+down```再到```out+down```这一过程当中，ceph集群究竟执行了哪些操作，从而窥探出ceph的整体工作原理。
 
-###### 5.1 in+down状态下osdmap中出现的pg_temp
+###### 6.1 in+down状态下osdmap中出现的pg_temp
 在上面```in+down```状态下，我们通过对比osdmap，发现出现了139个pg_temp， 对于这一点我们感觉到十分疑惑。这里我们先来看一下网上相关文章对```临时PG```的说明：
 
 >假设一个PG的acting set为[0,1,2]列表。此时如果osd0出现故障，导致CRUSH算法重新分配该PG的acting set为[3,1,2]。此时osd3为该PG的主OSD，但是osd3为新加入的OSD，并不能负担该PG上的读操作。所以PG向Monitor申请一个临时的PG，osd1为临时的主OSD，这时up set变为[1,3,2]，acting set依然为[3,1,2]，导致acting set和up set不同。当osd3完成Backfill过程之后，临时PG被取消，该PG的up set修复为acting set，此时acting set和up set都为[3,1,2]列表。
@@ -1395,6 +1430,123 @@ void OSDMonitor::maybe_prime_pg_temp(){
 {% endhighlight %}
 上面调用prime_pg_temp()来完成osdmap中的pg_temp的构建。
 
+###### 6.2 osdmap从```active+clean```时的e2222变成```in+down```时的e2225
+在```active+clean```状态时，我们查看到osdmap的版本号为e2222，但是到了```in+down```状态时，我们查看到osdmap的版本号变为了e2225。这中间到底发生了一个什么样的过程呢？ 下面我们结合在Monitor上面抓取到的日志```mon-node7-1.txt```来进行分析。
+
+
+1） **osdmap从e2222变为e2223**
+
+osd0在接收到关闭信号后，在OSDService::prepare_to_stop()函数中向OSDMonitor发送MOSDMarkMeDown消息。在OSDMonitor接收到MOSDMarkDown消息后，生成一个proposal来进行表决，其中proposal的内容为: e2223版本的osdmap。在该proposal表决通过之后，就形成了一个权威的```e2223```版本的osdmap，并正式标记osd0处于DOWN状态(此时此时我们查询ceph集群状态则为HEALTH_WARN)，然后OSDMonitor正式对外发布该版本的osdmap。
+
+>注： osdmap发生变化，也同时会触发对pgmap的检查，导致pgmap也发生改变，接着触发检查是否需要创建新的PG等操作。
+
+
+在上面osdmap e2223成功发布后，OSD、PGMonitor等接收到新版本的osdmap，就会触发相应的动作。这里我们介绍一下PGMonitor的大概执行路径。PGMonitor会逐个检查集群中的各个OSD，看是否需要向其发送创建pg的请求；接着检查那些处于down状态的PG，并更新对应PG的状态为stale，形成新的PGmap版本：
+<pre>
+2020-09-11 14:05:19.834895 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103 check_down_pgs last_osdmap_epoch 2223
+2020-09-11 14:05:19.835145 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.65 stale (acting_primary 0)
+2020-09-11 14:05:19.835167 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.61 stale (acting_primary 0)
+2020-09-11 14:05:19.835192 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.4a stale (acting_primary 0)
+2020-09-11 14:05:19.835203 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.44 stale (acting_primary 0)
+2020-09-11 14:05:19.835216 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.3a stale (acting_primary 0)
+2020-09-11 14:05:19.835222 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.38 stale (acting_primary 0)
+2020-09-11 14:05:19.835228 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.37 stale (acting_primary 0)
+2020-09-11 14:05:19.835237 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.30 stale (acting_primary 0)
+2020-09-11 14:05:19.835244 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.2c stale (acting_primary 0)
+2020-09-11 14:05:19.835253 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.26 stale (acting_primary 0)
+2020-09-11 14:05:19.835261 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.21 stale (acting_primary 0)
+2020-09-11 14:05:19.835270 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 14.d stale (acting_primary 0)
+2020-09-11 14:05:19.835276 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 13.d stale (acting_primary 0)
+2020-09-11 14:05:19.835284 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 14.8 stale (acting_primary 0)
+2020-09-11 14:05:19.835313 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 13.9 stale (acting_primary 0)
+2020-09-11 14:05:19.835336 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 14.3 stale (acting_primary 0)
+2020-09-11 14:05:19.835347 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 11.4 stale (acting_primary 0)
+2020-09-11 14:05:19.835358 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 13.4 stale (acting_primary 0)
+2020-09-11 14:05:19.835363 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.1e stale (acting_primary 0)
+2020-09-11 14:05:19.835371 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 14.5 stale (acting_primary 0)
+2020-09-11 14:05:19.835381 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 18.2 stale (acting_primary 0)
+2020-09-11 14:05:19.835389 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 19.2 stale (acting_primary 0)
+2020-09-11 14:05:19.835401 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 21.1 stale (acting_primary 0)
+2020-09-11 14:05:19.835411 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 18.4 stale (acting_primary 0)
+2020-09-11 14:05:19.835419 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 20.3 stale (acting_primary 0)
+2020-09-11 14:05:19.835428 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.6b stale (acting_primary 0)
+2020-09-11 14:05:19.835437 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.72 stale (acting_primary 0)
+2020-09-11 14:05:19.835441 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.73 stale (acting_primary 0)
+2020-09-11 14:05:19.835446 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.75 stale (acting_primary 0)
+2020-09-11 14:05:19.835452 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.76 stale (acting_primary 0)
+2020-09-11 14:05:19.835456 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.79 stale (acting_primary 0)
+2020-09-11 14:05:19.835461 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.79 stale (acting_primary 0)
+2020-09-11 14:05:19.835465 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.7b stale (acting_primary 0)
+2020-09-11 14:05:19.835470 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.7a stale (acting_primary 0)
+2020-09-11 14:05:19.835476 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.7e stale (acting_primary 0)
+2020-09-11 14:05:19.835489 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.89 stale (acting_primary 0)
+2020-09-11 14:05:19.835501 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.92 stale (acting_primary 0)
+2020-09-11 14:05:19.835508 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.96 stale (acting_primary 0)
+2020-09-11 14:05:19.835512 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.96 stale (acting_primary 0)
+2020-09-11 14:05:19.835524 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.b stale (acting_primary 0)
+2020-09-11 14:05:19.835529 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.a1 stale (acting_primary 0)
+2020-09-11 14:05:19.835535 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.a2 stale (acting_primary 0)
+2020-09-11 14:05:19.835541 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.a4 stale (acting_primary 0)
+2020-09-11 14:05:19.835546 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.a7 stale (acting_primary 0)
+2020-09-11 14:05:19.835551 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.a7 stale (acting_primary 0)
+2020-09-11 14:05:19.835560 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.ae stale (acting_primary 0)
+2020-09-11 14:05:19.835565 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 24.5 stale (acting_primary 0)
+2020-09-11 14:05:19.835577 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.bb stale (acting_primary 0)
+2020-09-11 14:05:19.835586 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.be stale (acting_primary 0)
+2020-09-11 14:05:19.835592 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.d stale (acting_primary 0)
+2020-09-11 14:05:19.835600 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.c4 stale (acting_primary 0)
+2020-09-11 14:05:19.835608 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.cb stale (acting_primary 0)
+2020-09-11 14:05:19.835613 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.ca stale (acting_primary 0)
+2020-09-11 14:05:19.835618 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.cb stale (acting_primary 0)
+2020-09-11 14:05:19.835622 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.cf stale (acting_primary 0)
+2020-09-11 14:05:19.835627 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.ce stale (acting_primary 0)
+2020-09-11 14:05:19.835636 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.d2 stale (acting_primary 0)
+2020-09-11 14:05:19.835642 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.d7 stale (acting_primary 0)
+2020-09-11 14:05:19.835647 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.d6 stale (acting_primary 0)
+2020-09-11 14:05:19.835652 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.d7 stale (acting_primary 0)
+2020-09-11 14:05:19.835663 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.e stale (acting_primary 0)
+2020-09-11 14:05:19.835669 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.e0 stale (acting_primary 0)
+2020-09-11 14:05:19.835675 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.e2 stale (acting_primary 0)
+2020-09-11 14:05:19.835696 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.e4 stale (acting_primary 0)
+2020-09-11 14:05:19.835705 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.ea stale (acting_primary 0)
+2020-09-11 14:05:19.835711 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.ec stale (acting_primary 0)
+2020-09-11 14:05:19.835720 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 22.f1 stale (acting_primary 0)
+2020-09-11 14:05:19.835731 7f8f9533c700 10 mon.node7-1@0(leader).pg v5839103  marking pg 23.fa stale (acting_primary 0)
+</pre>
+上面刚好是所有以osd0作为主OSD的PG。
+
+
+2） **osdmap从e2223变为e2224**
+
+由于在上面e2223版本osdmap中对与osd0相关的PG都创建了pg_temp，因此这里会创建一个pending proposal，以去掉那些冗余的、无效的临时PG：
+{% highlight string %}
+void OSDMonitor::create_pending()
+{
+  pending_inc = OSDMap::Incremental(osdmap.epoch+1);
+  pending_inc.fsid = mon->monmap->fsid;
+
+  dout(10) << "create_pending e " << pending_inc.epoch << dendl;
+
+  // drop any redundant pg_temp entries
+  OSDMap::remove_redundant_temporaries(g_ceph_context, osdmap, &pending_inc);
+
+  // drop any pg or primary_temp entries with no up entries
+  OSDMap::remove_down_temps(g_ceph_context, osdmap, &pending_inc);
+}
+{% endhighlight %}
+
+在proposal表决通过后，形成正式的```e2224```版本的osdmap并对外发布。
+
+3） **osdmap从e2224变为e2225**
+
+暂时未知为何又会触发创建新的pending proposal。
+
+###### 6.3 
+
+
+
+
+
 
 
 
@@ -1407,5 +1559,3 @@ void OSDMonitor::maybe_prime_pg_temp(){
 <br />
 <br />
 <br />
-
-
