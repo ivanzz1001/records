@@ -452,7 +452,7 @@ pg_stat objects mip     degr    misp    unf     bytes   log     disklog state   
                   20 peering
 recovery io 0 B/s, 5 keys/s, 0 objects/s
 </pre>
-可以看到停止osd.0之后，集群马上出现```HEALTH_ERR```状态。接着再执行```ceph -s```命令：
+可以看到停止osd.0之后，集群马上出现```HEALTH_ERR```状态。接着再执行```ceph -w```命令：
 <pre>
 # ceph -w
     cluster 5341b139-15dc-4c68-925a-179797d894d3
@@ -1541,8 +1541,16 @@ void OSDMonitor::create_pending()
 
 暂时未知为何又会触发创建新的pending proposal。
 
-###### 6.3 
+###### 6.3 osd端工作流程
 
+这里我们通过osd3的日志```osd3_watch.txt```来分析一下OSD端的工作流程。
+
+OSD3通过OSD::ms_dispatch()函数接收到OSDMonitor发送过来的新版本的osdmap(e2223)，触发调用OSD::handle_osd_map()调用：
+{% highlight string %}
+void OSD::handle_osd_map(MOSDMap *m)
+{
+}
+{% endhighlight %}
 
 
 
