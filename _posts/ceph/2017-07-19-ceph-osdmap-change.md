@@ -322,7 +322,76 @@ pg_stat objects mip     degr    misp    unf     bytes   log     disklog state   
 
 然后我们再获取以```osd.0```作为主OSD的PG个数(结果为68)：
 <pre>
-# ceph pg ls-by-primary 0
+# ceph pg ls-by-primary 0 | awk '{print $1}'
+pg_stat
+11.4
+13.4
+13.9
+13.d
+14.3
+14.5
+14.8
+14.d
+18.2
+18.4
+19.2
+20.3
+21.1
+22.e
+22.21
+22.2c
+22.3a
+22.44
+22.4a
+22.65
+22.6b
+22.73
+22.79
+22.92
+22.96
+22.a2
+22.a4
+22.a7
+22.c4
+22.ca
+22.cb
+22.ce
+22.d7
+22.e2
+22.ec
+22.f1
+23.b
+23.d
+23.1e
+23.26
+23.30
+23.37
+23.38
+23.61
+23.72
+23.75
+23.76
+23.79
+23.7a
+23.7b
+23.7e
+23.89
+23.96
+23.a1
+23.a7
+23.ae
+23.bb
+23.be
+23.cb
+23.cf
+23.d2
+23.d6
+23.d7
+23.e0
+23.e4
+23.ea
+23.fa
+24.5
 </pre>
 
 
@@ -1549,17 +1618,270 @@ OSD3通过OSD::ms_dispatch()函数接收到OSDMonitor发送过来的新版本的
 {% highlight string %}
 void OSD::handle_osd_map(MOSDMap *m)
 {
+	....
+
+	// superblock and commit
+	write_superblock(t);
+	store->queue_transaction(
+		service.meta_osr.get(),
+		std::move(t),
+		new C_OnMapApply(&service, pinned_maps, last),
+		new C_OnMapCommit(this, start, last, m), 0);
+
+
+	service.publish_superblock(superblock);
+}
+{% endhighlight %}
+在osdmap成功保存到硬盘之后，回调C_OnMapCommit()函数：
+{% highlight string %}
+struct C_OnMapCommit : public Context {
+  OSD *osd;
+  epoch_t first, last;
+  MOSDMap *msg;
+  C_OnMapCommit(OSD *o, epoch_t f, epoch_t l, MOSDMap *m)
+    : osd(o), first(f), last(l), msg(m) {}
+  void finish(int r) {
+    osd->_committed_osd_maps(first, last, msg);
+    msg->put();
+  }
+};
+
+void OSD::_committed_osd_maps(epoch_t first, epoch_t last, MOSDMap *m){
+
+	...
+	
+	// yay!
+	consume_map();
+	
+	....
+}
+{% endhighlight %}
+在_committed_osd_maps()中consume_map()是一个关键的核心函数，起到触发相关PG的Peering过程。通常会在如下两种情况下触发PG的peering过程：
+
+* OSD启动时，加载所有PG，对于Primary是本OSD的PG，通过MakePrimary()进入Primary状态，然后默认直接进入Peering过程；
+
+* 集群正常启动后，处于active+clean状态，接着某个OSD出现故障，引起osdmap发生改变，触发PG的peering过程
+
+关于第一种情况，我们在《OSD启动流程》相关文章中已有说明，这里我们主要介绍一下第二种情形。
+
+1） **consume_map()函数**
+{% highlight string %}
+void OSD::consume_map()
+{
+	...
+
+	// scan pg's
+	{
+		RWLock::RLocker l(pg_map_lock);
+		for (ceph::unordered_map<spg_t,PG*>::iterator it = pg_map.begin(); it != pg_map.end();++it) {
+			PG *pg = it->second;
+			pg->lock();
+			pg->queue_null(osdmap->get_epoch(), osdmap->get_epoch());
+			pg->unlock();
+		}
+	
+		logger->set(l_osd_pg, pg_map.size());
+	}
+}
+{% endhighlight %}
+consume_map()会向所有PG发送一个NullEvt事件，接着将自己(PG)添加到对应OSD的```peering_wq```中。
+
+2） **process_peering_events()函数**
+
+OSD对应的```osd_tp```会检查peering_wq是否为空，如果不为空，触发调用process_peering_events():
+{% highlight string %}
+void OSD::process_peering_events(
+  const list<PG*> &pgs,
+  ThreadPool::TPHandle &handle
+  )
+{
+	...
+
+	if (!advance_pg(curmap->get_epoch(), pg, handle, &rctx, &split_pgs)) {
+		// we need to requeue the PG explicitly since we didn't actually
+		// handle an event
+		peering_wq.queue(pg);
+	} else {
+		assert(!pg->peering_queue.empty());
+		PG::CephPeeringEvtRef evt = pg->peering_queue.front();
+		pg->peering_queue.pop_front();
+		pg->handle_peering_event(evt, &rctx);
+	}
+	....
+}
+{% endhighlight %}
+在process_peering_events()函数中调用advance_pg()完成PG OSDMap的追赶。
+
+3） **advance_pg()函数**
+{% highlight string %}
+bool OSD::advance_pg(
+  epoch_t osd_epoch, PG *pg,
+  ThreadPool::TPHandle &handle,
+  PG::RecoveryCtx *rctx,
+  set<boost::intrusive_ptr<PG> > *new_pgs)
+{
+	....
+
+	for (;
+		next_epoch <= osd_epoch && next_epoch <= max;
+		++next_epoch) {
+	
+		vector<int> newup, newacting;
+		int up_primary, acting_primary;
+		
+		nextmap->pg_to_up_acting_osds(
+			pg->info.pgid.pgid,
+			&newup, &up_primary,
+			&newacting, &acting_primary);
+		
+		pg->handle_advance_map(
+			nextmap, lastmap, newup, up_primary,
+			newacting, acting_primary, rctx);
+
+		...
+
+	}
+	....
+
+	pg->handle_activate_map(rctx);
+	if (next_epoch <= osd_epoch) {
+		dout(10) << __func__ << " advanced to max " << max
+			<< " past min epoch " << min_epoch
+			<< " ... will requeue " << *pg << dendl;
+		return false;
+	}
+	return true;
+}
+{% endhighlight %}
+在advance_pg()中，for循环逐步完成PG对osdmap的追赶。里面涉及到的两个比较关键的函数是pg->handle_advance_map()以及pg->handle_activate_map()，下面我们分别介绍。
+
+4） **handle_advance_map()函数**
+{% highlight string %}
+void PG::handle_advance_map(
+  OSDMapRef osdmap, OSDMapRef lastmap,
+  vector<int>& newup, int up_primary,
+  vector<int>& newacting, int acting_primary,
+  RecoveryCtx *rctx)
+{
+	....
+	AdvMap evt(
+		osdmap, lastmap, newup, up_primary,
+		newacting, acting_primary);
+
+	recovery_state.handle_event(evt, rctx);
+	...
+}
+{% endhighlight %}
+在handle_advance_map()函数中会发起一个AdvMap事件，并调用recovery_state来进行处理。我们搜索AdvMap事件，发现在如下状态下都可接受该事件：
+
+* Reset状态
+
+* Started状态
+
+* WaitActingChange状态
+
+* Peering状态
+
+* Active状态
+
+* GetLog状态
+
+* Incomplete状态
+
+之后我们在查看各个状态的react()处理函数，发现基本上都是会触发Peering操作。例如：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Active::react(const AdvMap& advmap){
+	...
+
+	return forward_event();
+}
+{% endhighlight %}
+Active状态下收到AdvMap事件后，先进行一些其他的前置操作，之后调用forward_event()将事件交由父状态机处理。结合状态机转换图，Active状态机的父状态机为Started：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Started::react(const AdvMap& advmap)
+{
+	dout(10) << "Started advmap" << dendl;
+	PG *pg = context< RecoveryMachine >().pg;
+	pg->check_full_transition(advmap.lastmap, advmap.osdmap);
+	if (pg->should_restart_peering(
+		advmap.up_primary,
+		advmap.acting_primary,
+		advmap.newup,
+		advmap.newacting,
+		advmap.lastmap,
+		advmap.osdmap)) {
+		dout(10) << "should_restart_peering, transitioning to Reset" << dendl;
+		post_event(advmap);
+		return transit< Reset >();
+	}
+
+	pg->remove_down_peer_info(advmap.osdmap);
+	return discard_event();
+}
+{% endhighlight %}
+上面我们可以看到，如果需要重启进行Peering的话，那么就会转到Reset状态。
+
+5） **handle_activate_map()函数**
+{% highlight string %}
+void PG::handle_activate_map(RecoveryCtx *rctx)
+{
+	dout(10) << "handle_activate_map " << dendl;
+	ActMap evt;
+	recovery_state.handle_event(evt, rctx);
+	if (osdmap_ref->get_epoch() - last_persisted_osdmap_ref->get_epoch() >
+		cct->_conf->osd_pg_epoch_persisted_max_stale) {
+		dout(20) << __func__ << ": Dirtying info: last_persisted is "
+			<< last_persisted_osdmap_ref->get_epoch()
+			<< " while current is " << osdmap_ref->get_epoch() << dendl;
+		dirty_info = true;
+	} else {
+		dout(20) << __func__ << ": Not dirtying info: last_persisted is "
+			<< last_persisted_osdmap_ref->get_epoch()
+			<< " while current is " << osdmap_ref->get_epoch() << dendl;
+	}
+	if (osdmap_ref->check_new_blacklist_entries()) check_blacklisted_watchers();
 }
 {% endhighlight %}
 
+handle_activate_map()函数会向recovery_state投递一个ActMap事件，并进行处理。我们搜索ActMap事件，发现在如下状态下都可接受该事件：
 
+* Reset状态
 
+* Primary状态
 
+* Active状态
 
+* ReplicaActive状态
 
+* Stray状态
 
+* WaitUpThru状态
 
+之后我们在查看各个状态的react()处理函数，发现基本上都是调用pg->take_waiters()向OSD投递一些因peering而延后的事件，即这些事件需要等待peering完成之后来处理。例如：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Active::react(const ActMap&)
+{
+	...
 
+	return forward_event();
+}
+{% endhighlight %}
+Active状态下收到ActMap事件后，检查PG是否处于clean状态，如果不是，则将自己加入到recovery队列等待恢复（注： peering完成后，PG并不一定处于clean状态）。之后再调用forward_event()将事件交由父状态机处理。结合状态机转换图，Active状态的父状态为Primary:
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Primary::react(const ActMap&)
+{
+	dout(7) << "handle ActMap primary" << dendl;
+	PG *pg = context< RecoveryMachine >().pg;
+	pg->publish_stats_to_osd();
+	pg->take_waiters();
+	return discard_event();
+}
+{% endhighlight %}
+在Primary::react()中对于ActMap主要是处理一些Peering完成后的事件。
+
+>实际上，有上面4）、5）的分析，我们发现，```AdvMap```主要用于触发Peering过程；而```ActMap```主要用于触发处理Peering完成后的一些事件。
+
+到这里，整个Peering的触发过程，我们基本上有了一个比较清晰的了解，而关于Peering的一些细节问题，我们会在后续相关的章节中继续讲解。
 
 
 
