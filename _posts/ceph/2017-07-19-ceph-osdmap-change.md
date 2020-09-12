@@ -1686,6 +1686,18 @@ void OSD::consume_map()
 {% endhighlight %}
 consume_map()会向所有PG发送一个NullEvt事件，接着将自己(PG)添加到对应OSD的```peering_wq```中。
 
+>注：在osd3_watch.txt日志中，有大量类似于如下的打印信息
+>
+>2020-09-11 14:05:19.127331 7fba49ec6700  7 osd.3 2223 consume_map version 2223
+>
+>2020-09-11 14:05:19.129777 7fba49ec6700 30 osd.3 pg_epoch: 2222 pg[22.2c( empty local-les=2222 n=0 ec=155 les/c/f 2222/2222/0 2220/2221/2221) [0,3] r=1 lpr=2222 pi=2207-2220/5 crt=0'0 active] lock
+>
+>2020-09-11 14:05:19.129793 7fba49ec6700 10 osd.3 pg_epoch: 2222 pg[22.2c( empty local-les=2222 n=0 ec=155 les/c/f 2222/2222/0 2220/2221/2221) [0,3] r=1 lpr=2222 pi=2207-2220/5 crt=0'0 active] null
+>
+> 这些打印信息就是来自于上面的pg->lock()
+
+
+
 2） **process_peering_events()函数**
 
 OSD对应的```osd_tp```会检查peering_wq是否为空，如果不为空，触发调用process_peering_events():
