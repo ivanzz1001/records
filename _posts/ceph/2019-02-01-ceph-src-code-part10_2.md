@@ -422,22 +422,23 @@ PG::RecoveryState::GetInfo::GetInfo(my_context ctx)
   : my_base(ctx),
     NamedState(context< RecoveryMachine >().pg->cct, "Started/Primary/Peering/GetInfo")
 {
-  context< RecoveryMachine >().log_enter(state_name);
+	context< RecoveryMachine >().log_enter(state_name);
+	
+	PG *pg = context< RecoveryMachine >().pg;
+	pg->generate_past_intervals();
+	unique_ptr<PriorSet> &prior_set = context< Peering >().prior_set;
+	
+	assert(pg->blocked_by.empty());
+	
+	if (!prior_set.get())
+		pg->build_prior(prior_set);
+	
+	pg->reset_min_peer_features();
+	get_infos();
 
-  PG *pg = context< RecoveryMachine >().pg;
-  pg->generate_past_intervals();
-  unique_ptr<PriorSet> &prior_set = context< Peering >().prior_set;
-
-  assert(pg->blocked_by.empty());
-
-  if (!prior_set.get())
-    pg->build_prior(prior_set);
-
-  pg->reset_min_peer_features();
-  get_infos();
-  if (peer_info_requested.empty() && !prior_set->pg_down) {
-    post_event(GotInfo());
-  }
+	if (peer_info_requested.empty() && !prior_set->pg_down) {
+		post_event(GotInfo());
+	}
 }
 {% endhighlight %}
 在构造函数GetInfo里，完成了核心的功能，实现过程如下：
@@ -627,32 +628,36 @@ pg->blocked_by.insert(peer.osd);
 数据结构pg_notify_t定义了获取pg_info的ACK信息：
 {% highlight string %}
 struct pg_notify_t {
-  epoch_t query_epoch;         //查询时请求消息的epoch
-  epoch_t epoch_sent;          //发送时响应消息的epoch
-  pg_info_t info;              //pg_info的信息
-  shard_id_t to;               //目标OSD
-  shard_id_t from;             //源OSD
+	epoch_t query_epoch;         //查询时请求消息的epoch
+	epoch_t epoch_sent;          //发送时响应消息的epoch
+	pg_info_t info;              //pg_info的信息
+	shard_id_t to;               //目标OSD
+	shard_id_t from;             //源OSD
 };
 
 boost::statechart::result PG::RecoveryState::Stray::react(const MQuery& query)
 {
-  PG *pg = context< RecoveryMachine >().pg;
-  if (query.query.type == pg_query_t::INFO) {
-    pair<pg_shard_t, pg_info_t> notify_info;
-    pg->update_history_from_master(query.query.history);
-    pg->fulfill_info(query.from, query.query, notify_info);
-    context< RecoveryMachine >().send_notify(
-      notify_info.first,
-      pg_notify_t(
-	notify_info.first.shard, pg->pg_whoami.shard,
-	query.query_epoch,
-	pg->get_osdmap()->get_epoch(),
-	notify_info.second),
-      pg->past_intervals);
-  } else {
-    pg->fulfill_log(query.from, query.query, query.query_epoch);
-  }
-  return discard_event();
+	PG *pg = context< RecoveryMachine >().pg;
+	if (query.query.type == pg_query_t::INFO) {
+
+		pair<pg_shard_t, pg_info_t> notify_info;
+		pg->update_history_from_master(query.query.history);
+		pg->fulfill_info(query.from, query.query, notify_info);
+
+		context< RecoveryMachine >().send_notify(
+			notify_info.first,
+			pg_notify_t(
+				notify_info.first.shard, pg->pg_whoami.shard,
+				query.query_epoch,
+				pg->get_osdmap()->get_epoch(),
+				notify_info.second),
+			pg->past_intervals);
+
+	} else {
+		pg->fulfill_log(query.from, query.query, query.query_epoch);
+	}
+
+	return discard_event();
 }
 {% endhighlight %}
 
@@ -662,41 +667,41 @@ boost::statechart::result PG::RecoveryState::Stray::react(const MQuery& query)
 {% highlight string %}
 void OSD::dispatch_op(OpRequestRef op)
 {
-  switch (op->get_req()->get_type()) {
-
-  case MSG_OSD_PG_CREATE:
-    handle_pg_create(op);
-    break;
-  case MSG_OSD_PG_NOTIFY:
-    handle_pg_notify(op);
-    break;
-  case MSG_OSD_PG_QUERY:
-    handle_pg_query(op);
-    break;
-  case MSG_OSD_PG_LOG:
-    handle_pg_log(op);
-    break;
-  case MSG_OSD_PG_REMOVE:
-    handle_pg_remove(op);
-    break;
-  case MSG_OSD_PG_INFO:
-    handle_pg_info(op);
-    break;
-  case MSG_OSD_PG_TRIM:
-    handle_pg_trim(op);
-    break;
-  case MSG_OSD_PG_MISSING:
-    assert(0 ==
-	   "received MOSDPGMissing; this message is supposed to be unused!?!");
-    break;
-
-  case MSG_OSD_BACKFILL_RESERVE:
-    handle_pg_backfill_reserve(op);
-    break;
-  case MSG_OSD_RECOVERY_RESERVE:
-    handle_pg_recovery_reserve(op);
-    break;
-  }
+	switch (op->get_req()->get_type()) {
+	
+	case MSG_OSD_PG_CREATE:
+		handle_pg_create(op);
+		break;
+	case MSG_OSD_PG_NOTIFY:
+		handle_pg_notify(op);
+		break;
+	case MSG_OSD_PG_QUERY:
+		handle_pg_query(op);
+		break;
+	case MSG_OSD_PG_LOG:
+		handle_pg_log(op);
+		break;
+	case MSG_OSD_PG_REMOVE:
+		handle_pg_remove(op);
+		break;
+	case MSG_OSD_PG_INFO:
+		handle_pg_info(op);
+		break;
+	case MSG_OSD_PG_TRIM:
+		handle_pg_trim(op);
+		break;
+	case MSG_OSD_PG_MISSING:
+		assert(0 ==
+	   		"received MOSDPGMissing; this message is supposed to be unused!?!");
+		break;
+	
+	case MSG_OSD_BACKFILL_RESERVE:
+		handle_pg_backfill_reserve(op);
+		break;
+	case MSG_OSD_RECOVERY_RESERVE:
+		handle_pg_recovery_reserve(op);
+		break;
+	}
 }
 
 void OSD::handle_pg_notify(OpRequestRef op){
