@@ -351,11 +351,20 @@ folog.log.insert(folog.log.begin(), olog.log.begin(), pp);
 下面我们会介绍这三个主要步骤。
 
 ## 4. pg_info数据结构
-数据结构pg_info_t保存了PG在OSD上的一些描述信息。该数据结构在Peering的过程中，以及后续的数据修复中都发挥了重要的作用，理解该数据结构的各个关节字段的含义可以更好地理解相关的过程。pg_info_t数据结构如下：
+数据结构pg_info_t保存了PG在OSD上的一些描述信息。该数据结构在Peering的过程中，以及后续的数据修复中都发挥了重要的作用，理解该数据结构的各个关节字段的含义可以更好地理解相关的过程。pg_info_t数据结构如下(src/osd/osd_types.h)：
 {% highlight string %}
+/**
+ * pg_info_t - summary of PG statistics.
+ *
+ * some notes: 
+ *  - last_complete implies we have all objects that existed as of that
+ *    stamp, OR a newer object, OR have already applied a later delete.
+ *  - if last_complete >= log.bottom, then we know pg contents thru log.head.
+ *    otherwise, we have no idea what the pg is supposed to contain.
+ */
 struct pg_info_t {
 	spg_t pgid;                             //PG的id
-	eversion_t last_update;                 //PG最后一次更新的版本
+	eversion_t last_update;                 //< last object version applied to store
 	eversion_t last_complete;               //last version pg was complete through.
 	epoch_t last_epoch_started;             //last epoch at which this pg started on this osd
 	
@@ -377,6 +386,84 @@ struct pg_info_t {
 };
 {% endhighlight %}
 
+>注：另外还请参看[ceph中PGLog处理流程](https://ivanzz1001.github.io/records/post/ceph/2019/01/05/ceph-src-code-part6_3)
+
+
+
+###### 4.1 last_update介绍
+
+表示该PG所存储的最后一个object的版本号。一个object的版本号包括两个部分，我们来看一下eversion_t结构的定义：
+{% highlight string %}
+class eversion_t {
+public:
+	version_t version;
+	epoch_t epoch;
+};
+{% endhighlight %} 
+关于一个对象version的设置，是在ReplicatedPG::execute_ctx()通过如下代码来设置的：
+{% highlight string %}
+void ReplicatedPG::execute_ctx(OpContext *ctx)
+{
+	...
+
+	// version
+	ctx->at_version = get_next_version();
+	ctx->mtime = m->get_mtime();
+
+	...
+}
+
+eversion_t get_next_version() const {
+	eversion_t at_version(get_osdmap()->get_epoch(),
+		pg_log.get_head().version+1);
+
+	assert(at_version > info.last_update);
+	assert(at_version > pg_log.get_head());
+
+	return at_version;
+}
+{% endhighlight %}
+可以看到一个对象的eversion包括：
+
+* epoch： 该对象在进行写入操作时的osdmap版本号。注： 由于对象的写入是由PG的主OSD发起的，主OSD将写入操作封装成transaction，然后发送给自己及其他副本OSD，因此这里的epoch是指打包事务操作时该PG对应主OSD的osdmap对应的epoch。
+
+* version: pg_log内部所指定的一个版本号，该版本号是一个单调递增的整数值，PG每存储一个object，对应的内部version值就增加1。
+
+###### 4.2 last_complete介绍
+
+表示该PG确定已经完成的最后一个对象的版本号，在该指针之前的版本都已经在所有的OSD上完成更新（只表示内存更新完成）。 这意味着在last_complete时刻：
+
+* all objects that existed as of that stamp
+
+* OR a newer object
+
+* OR have already applied a later delete
+
+通常情况下(pg处于clean状态）last_complete等于last_update，其更新也会通过如下跟随last_update一起递进：
+{% highlight string %}
+void PG::add_log_entry(const pg_log_entry_t& e)
+{
+	// raise last_complete only if we were previously up to date
+	if (info.last_complete == info.last_update)
+		info.last_complete = e.version;
+	
+	// raise last_update.
+	assert(e.version > info.last_update);
+	info.last_update = e.version;
+	
+	// raise user_version, if it increased (it may have not get bumped
+	// by all logged updates)
+	if (e.user_version > info.last_user_version)
+		info.last_user_version = e.user_version;
+	
+	// log mutation
+	pg_log.add(e);
+	dout(10) << "add_log_entry " << e << dendl;
+}
+{% endhighlight %}
+但是假如PG出现异常，则会出现last_complete落后于last_update的情况，此时就需要通过recovering等操作来使last_complete逐渐追赶上last_update。
+
+
 结构pg_history_t保存了PG的一些历史信息：
 {% highlight string %}
 struct pg_history_t {
@@ -388,10 +475,37 @@ struct pg_history_t {
 	...
 };
 {% endhighlight %}
-###### 4.1 last_epoch_started介绍
+
+###### 4.3 last_epoch_started介绍
 last_epoch_started字段有两个地方出现，一个是pg_info_t结构里的last_epoch_started，代表最后一次Peering成功后的epoch值，是本地PG完成Peering后就设置的。另一个是pg_history_t结构体里的last_epoch_started，是PG里所有的OSD都完成Peering后设置的epoch值。
 
-###### 4.2 last_complete和last_backfill的区别
+
+###### 4.4 last_user_version介绍
+通常是由librados所指定的一个对象的版本编号。在进行对象的修改操作时，rados通常会事先查询是否有该对象，如果有的话，则每一次修改对应的对象版本号就会加1。参看：
+{% highlight string %}
+void ReplicatedPG::do_op(OpRequestRef& op){
+	...
+
+	ObjectContextRef obc;
+
+
+	int r = find_object_context(
+		oid, &obc, can_create,
+		m->has_flag(CEPH_OSD_FLAG_MAP_SNAP_CLONE),
+		&missing_oid);
+	...
+}
+int ReplicatedPG::find_object_context(const hobject_t& oid,
+				      ObjectContextRef *pobc,
+				      bool can_create,
+				      bool map_snapid_to_clone,
+				      hobject_t *pmissing)
+{
+	
+}
+{% endhighlight %}
+
+###### 4.5 last_complete和last_backfill的区别
 在这里特别指出last_update和last_complete、last_backfill之间的区别。下面通过一个例子来讲解，同时也可以大概了解PG数据恢复的流程。在数据恢复过程中先进行Recovery过程，再进行Backfill过程（可以参考第11章的详细介绍）。
 
 **情况1：** 在PG处于clean状态时，last_complete就等于last_update的值，并且等于PG日志中的head版本。它们都同步更新，此时没有区别。last_backfill设置为MAX值。例如，下面的PG日志里有三条日志记录。此时last_update和last_complete以及pg_log.head都指向版本(1,2)。由于没有缺失的对象，不需要恢复，last_backfill设置为MAX值。示例如下图所示：

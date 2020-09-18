@@ -1171,6 +1171,14 @@ void PG::RecoveryState::GetInfo::get_infos()
 	
 	pg->publish_stats_to_osd();
 }
+
+
+//位于src/osd/pg.h的RecoveryMachine中
+void send_query(pg_shard_t to, const pg_query_t &query) {
+	assert(state->rctx);
+	assert(state->rctx->query_map);
+	(*state->rctx->query_map)[to.osd][spg_t(pg->info.pgid.pgid, to.shard)] = query;
+}
 {% endhighlight %}
 这里由上面构造的PriorSet为：
 {% highlight string %}
@@ -1234,6 +1242,232 @@ struct pg_info_t {
 };
 {% endhighlight %}
 
+上面send_query()函数将要查询的pg_query_t::INFO放入RecoveryMachine的state中，然后会由OSD::process_peering_events()中的dispatch_context()来将消息发送出去：
+{% highlight string %}
+void OSD::process_peering_events(
+  const list<PG*> &pgs,
+  ThreadPool::TPHandle &handle
+  )
+{
+	...
+	
+	dispatch_context(rctx, 0, curmap, &handle);
+
+	...
+}
+
+void OSD::dispatch_context(PG::RecoveryCtx &ctx, PG *pg, OSDMapRef curmap,
+                           ThreadPool::TPHandle *handle)
+{
+	if (service.get_osdmap()->is_up(whoami) && is_active()) {
+
+		do_notifies(*ctx.notify_list, curmap);
+		do_queries(*ctx.query_map, curmap);
+		do_infos(*ctx.info_map, curmap);
+
+	}
+}
+
+/** do_queries
+ * send out pending queries for info | summaries
+ */
+void OSD::do_queries(map<int, map<spg_t,pg_query_t> >& query_map,
+		     OSDMapRef curmap)
+{
+	for (map<int, map<spg_t,pg_query_t> >::iterator pit = query_map.begin();pit != query_map.end();++pit) {
+		if (!curmap->is_up(pit->first)) {
+			dout(20) << __func__ << " skipping down osd." << pit->first << dendl;
+			continue;
+		}
+		int who = pit->first;
+		ConnectionRef con = service.get_con_osd_cluster(who, curmap->get_epoch());
+
+		if (!con) {
+			dout(20) << __func__ << " skipping osd." << who
+				<< " (NULL con)" << dendl;
+			continue;
+		}
+		service.share_map_peer(who, con.get(), curmap);
+		dout(7) << __func__ << " querying osd." << who
+			<< " on " << pit->second.size() << " PGs" << dendl;
+
+		MOSDPGQuery *m = new MOSDPGQuery(curmap->get_epoch(), pit->second);
+		con->send_message(m);
+	}
+}
+{% endhighlight %}
+
+
+----------
+
+接着在从OSD接收到MSG_OSD_PG_QUERY消息后：
+{% highlight string %}
+void OSD::dispatch_op(OpRequestRef op)
+{
+	switch (op->get_req()->get_type()) {
+	
+		case MSG_OSD_PG_CREATE:
+			handle_pg_create(op);
+			break;
+		case MSG_OSD_PG_NOTIFY:
+			handle_pg_notify(op);
+			break;
+		case MSG_OSD_PG_QUERY:
+			handle_pg_query(op);
+			break;
+		
+		...
+	}
+}
+
+/** PGQuery
+ * from primary to replica | stray
+ * NOTE: called with opqueue active.
+ */
+void OSD::handle_pg_query(OpRequestRef op)
+{
+	....
+
+	map< int, vector<pair<pg_notify_t, pg_interval_map_t> > > notify_list;
+
+	for (map<spg_t,pg_query_t>::iterator it = m->pg_list.begin();it != m->pg_list.end();++it) {
+	
+		...
+		
+		if (it->second.type == pg_query_t::LOG ||it->second.type == pg_query_t::FULLLOG) {
+			
+			....			
+
+		} else {
+			notify_list[from].push_back(
+			make_pair(
+				pg_notify_t(
+					it->second.from, it->second.to,
+					it->second.epoch_sent,
+					osdmap->get_epoch(),
+					empty),
+				pg_interval_map_t()));
+		}
+	}
+
+	do_notifies(notify_list, osdmap);
+}
+
+/** do_notifies
+ * Send an MOSDPGNotify to a primary, with a list of PGs that I have
+ * content for, and they are primary for.
+ */
+
+void OSD::do_notifies(
+  map<int,vector<pair<pg_notify_t,pg_interval_map_t> > >& notify_list,
+  OSDMapRef curmap)
+{
+	for (map<int,vector<pair<pg_notify_t,pg_interval_map_t> > >::iterator it = notify_list.begin();it != notify_list.end();++it) {
+	
+		MOSDPGNotify *m = new MOSDPGNotify(curmap->get_epoch(),it->second);
+		con->send_message(m);
+	}
+}
+{% endhighlight %}
+从上面我们可以看到查询pg_query_t::INFO时返回的是一个pg_notify_t类型的包装，其封装了pg_info_t数据结构。
+
+>注： 从上面OSD::handle_pg_query()的注释可看出，handle_pg_query()用于Primary OSD向replica/stray发送查询信息
+
+
+----------
+之后，PG主OSD接收到pg_query_t::INFO的响应信息(MSG_OSD_PG_NOTIFY)：
+{% highlight string %}
+void OSD::dispatch_op(OpRequestRef op)
+{
+	switch (op->get_req()->get_type()) {
+	
+		case MSG_OSD_PG_CREATE:
+			handle_pg_create(op);
+			break;
+		case MSG_OSD_PG_NOTIFY:
+			handle_pg_notify(op);
+			break;
+		case MSG_OSD_PG_QUERY:
+			handle_pg_query(op);
+			break;
+		
+		...
+	}
+}
+
+/** PGNotify
+ * from non-primary to primary
+ * includes pg_info_t.
+ * NOTE: called with opqueue active.
+ */
+void OSD::handle_pg_notify(OpRequestRef op)
+{
+	for (vector<pair<pg_notify_t, pg_interval_map_t> >::iterator it = m->get_pg_list().begin();it != m->get_pg_list().end();++it) {
+		
+		if (it->first.info.pgid.preferred() >= 0) {
+			dout(20) << "ignoring localized pg " << it->first.info.pgid << dendl;
+			continue;
+		}
+		
+		handle_pg_peering_evt(
+			spg_t(it->first.info.pgid.pgid, it->first.to),
+			it->first.info.history, it->second,
+			it->first.query_epoch,
+			PG::CephPeeringEvtRef(
+				new PG::CephPeeringEvt(
+					it->first.epoch_sent, it->first.query_epoch,
+					PG::MNotifyRec(pg_shard_t(from, it->first.from), it->first,
+					op->get_req()->get_connection()->get_features())))
+		);
+	}
+}
+
+/*
+ * look up a pg.  if we have it, great.  if not, consider creating it IF the pg mapping
+ * hasn't changed since the given epoch and we are the primary.
+ */
+void OSD::handle_pg_peering_evt(
+  spg_t pgid,
+  const pg_history_t& orig_history,
+  pg_interval_map_t& pi,
+  epoch_t epoch,
+  PG::CephPeeringEvtRef evt)
+{
+}
+
+boost::statechart::result PG::RecoveryState::GetInfo::react(const MNotifyRec& infoevt) 
+{
+	
+}
+{% endhighlight %}
+上面获取到PG info之后交由GetInfo::react(const MNotifyRec&)进行处理。到此为止，GetInfo()流程执行完毕。
+
+
+
+###### 1.3.8 进入Started/Primary/Peering/GetLog状态
+
+对于我们当前```PG11.4```而言，由于其不存在副本OSD了，因此其并没有走完整个GetInfo()，而是直接在GetInfo()构造函数中构造了一个GotInfo()事件，就直接进入GetLog()状态：
+{% highlight string %}
+PG::RecoveryState::GetInfo::GetInfo(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Started/Primary/Peering/GetInfo")
+{
+	...
+
+	if (peer_info_requested.empty() && !prior_set->pg_down) {
+		post_event(GotInfo());
+	}
+}
+
+PG::RecoveryState::GetLog::GetLog(my_context ctx)
+  : my_base(ctx),
+    NamedState(
+      context< RecoveryMachine >().pg->cct, "Started/Primary/Peering/GetLog"),
+    msg(0)
+{
+	...
+}
+{% endhighlight %}
 
 
 <br />

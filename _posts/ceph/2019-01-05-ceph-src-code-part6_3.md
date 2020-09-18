@@ -185,6 +185,43 @@ struct pg_info_t {
 
 ###### 2.1.2 PGLog序列化到transaction
 
+* 在ReplicatedPG::do_op()中创建了一个对象修改操作的上下文OpContext，然后在ReplicatedPG::execute_ctx()中完成PGLog日志版本等的设置：
+{% highlight string %}
+void ReplicatedPG::do_op(OpRequestRef& op)
+{
+	...
+
+	OpContext *ctx = new OpContext(op, m->get_reqid(), m->ops, obc, this);
+
+	...
+
+	execute_ctx(ctx);
+
+	...
+}
+
+void ReplicatedPG::execute_ctx(OpContext *ctx){
+	....
+	
+	// version
+	ctx->at_version = get_next_version();
+	ctx->mtime = m->get_mtime();
+
+	...
+
+	int result = prepare_transaction(ctx);
+
+	...
+
+	RepGather *repop = new_repop(ctx, obc, rep_tid);
+	
+	issue_repop(repop, ctx);
+	eval_repop(repop);
+
+	....
+}
+{% endhighlight %}
+
 * 在ReplicatedPG::prepare_transaction()里调用ReplicatedPG::finish_ctx，然后finish_ctx函数里就会调用ctx->log.push_back()，在此就会构造pg_log_entry_t插入到vector log里；
 {% highlight string %}
 int ReplicatedPG::prepare_transaction(OpContext *ctx)

@@ -1284,9 +1284,19 @@ rbd rm rbd-01/test-image
 
 ## 4. 构建RGW
 
-这里我们构建一个```multi-site```类型RGW。下面我们以realm为```oss```, master zone group为```cn```，  master zone为```cn-oss```的例子来说明：
+### 4.1 基本概念
+* zone：包含多个RGW实例的一个逻辑概念。zone不能跨集群。同一个zone的数据保存在同一组pool中。      
 
-### 4.1 配置一个master zone
+* zonegroup：一个zonegroup如果包含1个或多个zone。如果一个zonegroup包含多个zone，必须指定 一个zone作为master zone，用来处理bucket和用户的创建。一个集群可以创建多个zonegroup，一个zonegroup也可以跨多个集群。      
+
+* realm：一个realm包含1个或多个zonegroup。如果realm包含多个zonegroup，必须指定一个zonegroup为master zonegroup， 用来处理系统操作。一个系统中可以包含多个realm，多个realm之间资源完全隔离。      
+
+RGW多活方式是在同一zonegroup的多个zone之间进行，即同一zonegroup中多个zone之间的数据是完全一致的，用户可以通过任意zone读写同一份数据。 但是，对元数据的操作，比如创建桶、创建用户，仍然只能在master zone进行。对数据的操作，比如创建桶中的对象，访问对象等，可以在任意zone中 处理。
+
+
+
+### 4.2 配置一个master zone
+这里我们构建一个```multi-site```类型RGW。下面我们以realm为```oss```, master zone group为```cn```，  master zone为```cn-oss```的例子来说明：
 1) 创建REALM
 <pre>
 # radosgw-admin realm create --rgw-realm=oss --default
@@ -2085,6 +2095,8 @@ ceph-10.2.3-0.el7.x86_64
 10. [Ceph Multisite](https://www.jianshu.com/p/31a6f8df9a8f)
 
 11. [Ceph多区域网关](https://www.cnblogs.com/zyxnhr/p/10599990.html#_label1_1)
+
+12. [分布式存储ceph 对象存储配置zone 同步](https://my.oschina.net/ytqvip/blog/1601669)
 
 <br />
 <br />
