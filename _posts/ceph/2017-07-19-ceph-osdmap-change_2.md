@@ -1469,6 +1469,99 @@ PG::RecoveryState::GetLog::GetLog(my_context ctx)
 }
 {% endhighlight %}
 
+因为Peering完成之后，我们是想通过接受一个```Activate```事件，从而进入Active状态(注： 进入Active状态，就意味着我们可以重新进行数据的读写操作了），因此这里我们搜索```Activate```关键字，看在哪些情况下会产生该事件：
+
+* Primary状态下产生Activate事件的情形
+
+    * 在Started/Primary/Peering/GetMissing构造函数中，如果满足相应的条件会产生Activate事件
+
+    * 在Started/Primary/Peering/GetMissing状态下，接收到MLogRec事件后在其对应的react()函数中会触发产生Activate事件
+
+    * 在Started/Primary/Peering/WaitUpThru状态下，接收到ActMap事件后在其对应的react()函数中会触发产生Activate事件
+
+* Stray状态下产生Activate事件的情形
+
+    * 在Started/Stray状态下，接收到MLogRec事件后在其对应的react()函数中会触发产生Activate事件，从而触发进入ReplicaActive状态
+
+    * 在Started/Stray状态下，接收到MInfoRec事件后在其对应的react()函数中会触发产生Activate事件，从而触发进入ReplicaActive状态
+
+
+这里我们先不理会在Stray状态下产生Activate事件，从而进入ReplicaActive状态的情形，我们主要关注在Peering状态下接收到Activate事件，从而进入Active状态的情形。因此在当前GetLog()状态下，结合状态转换图，我们主要需要了解如何先进入GetMissing状态以及WaitUpThru状态。
+
+>注：GetMissing、WaitUpThru状态接收到Activate事件，都是会调用其父状态Peering对Activate事件的处理。在Peering中，接收到Activate事件，是会直接进入到Active状态的。
+
+如下我们再来看GetLog构造函数：
+{% highlight string %}
+PG::RecoveryState::GetLog::GetLog(my_context ctx)
+  : my_base(ctx),
+    NamedState(
+      context< RecoveryMachine >().pg->cct, "Started/Primary/Peering/GetLog"),
+    msg(0)
+{
+	context< RecoveryMachine >().log_enter(state_name);
+	
+	PG *pg = context< RecoveryMachine >().pg;
+	
+	// adjust acting?
+	if (!pg->choose_acting(auth_log_shard, false,&context< Peering >().history_les_bound)) {
+		if (!pg->want_acting.empty()) {
+			post_event(NeedActingChange());
+		} else {
+			post_event(IsIncomplete());
+		}
+		return;
+	}
+	
+	// am i the best?
+	if (auth_log_shard == pg->pg_whoami) {
+		post_event(GotLog());
+		return;
+	}
+	
+	const pg_info_t& best = pg->peer_info[auth_log_shard];
+	
+	// am i broken?
+	if (pg->info.last_update < best.log_tail) {
+		dout(10) << " not contiguous with osd." << auth_log_shard << ", down" << dendl;
+		post_event(IsIncomplete());
+		return;
+	}
+
+	// how much log to request?
+	eversion_t request_log_from = pg->info.last_update;
+	assert(!pg->actingbackfill.empty());
+	for (set<pg_shard_t>::iterator p = pg->actingbackfill.begin();p != pg->actingbackfill.end();++p) {
+		if (*p == pg->pg_whoami) continue;
+		pg_info_t& ri = pg->peer_info[*p];
+
+		if (ri.last_update >= best.log_tail && ri.last_update < request_log_from)
+			request_log_from = ri.last_update;
+	}
+	
+	// how much?
+	dout(10) << " requesting log from osd." << auth_log_shard << dendl;
+	context<RecoveryMachine>().send_query(
+		auth_log_shard,
+		pg_query_t(
+			pg_query_t::LOG,
+			auth_log_shard.shard, pg->pg_whoami.shard,
+			request_log_from, pg->info.history,
+			pg->get_osdmap()->get_epoch()));
+	
+	assert(pg->blocked_by.empty());
+	pg->blocked_by.insert(auth_log_shard.osd);
+	pg->publish_stats_to_osd();
+}
+{% endhighlight %}
+这里结合```osd3_watch_pg11.4.txt```日志类分析一下：
+
+1） 调用函数pg->choose_acting()来选择出拥有权威日志的OSD，并计算出```acting_backfill```和```backfill_targets```两个OSD列表。选择出来的权威OSD通过auth_log_shard参数返回；
+
+2） 如果选择失败，并且want_acting不为空，就抛出NeedActingChange事件，状态机转移到Primary/WaitActingChange状态，等待申请临时PG返回结果；如果want_acting为空，就抛出IsIncomplete事件，PG的状态机转移到Primary/Peering/Incomplete状态，表明失败，PG就处于InComplete状态。
+
+
+
+
 
 <br />
 <br />
