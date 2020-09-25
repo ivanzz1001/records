@@ -220,7 +220,36 @@ void ReplicatedPG::execute_ctx(OpContext *ctx){
 
 	....
 }
+
+void ReplicatedPG::issue_repop(RepGather *repop, OpContext *ctx)
+{
+	...
+	Context *on_all_commit = new C_OSD_RepopCommit(this, repop);
+	Context *on_all_applied = new C_OSD_RepopApplied(this, repop);
+	Context *onapplied_sync = new C_OSD_OndiskWriteUnlock(
+		ctx->obc,
+		ctx->clone_obc,
+		unlock_snapset_obc ? ctx->snapset_obc : ObjectContextRef());
+
+	pgbackend->submit_transaction(
+		soid,
+		ctx->at_version,
+		std::move(ctx->op_t),
+		pg_trim_to,
+		min_last_complete_ondisk,
+		ctx->log,
+		ctx->updated_hset_history,
+		onapplied_sync,
+		on_all_applied,
+		on_all_commit,
+		repop->rep_tid,
+		ctx->reqid,
+		ctx->op);
+}
+
 {% endhighlight %}
+上面我们看到submit_transaction()的第三个参数传递的就是ctx->opt_t，在prepare_transaction()中我们已经将要修改的对象数据打包放入了该transaction。
+
 
 * 在ReplicatedPG::prepare_transaction()里调用ReplicatedPG::finish_ctx，然后finish_ctx函数里就会调用ctx->log.push_back()，在此就会构造pg_log_entry_t插入到vector log里；
 {% highlight string %}
@@ -263,6 +292,11 @@ void ReplicatedBackend::submit_transaction(
   osd_reqid_t reqid,
   OpRequestRef orig_op)
 {
+	std::unique_ptr<RPGTransaction> t(
+		static_cast<RPGTransaction*>(_t.release()));
+	assert(t);
+	ObjectStore::Transaction op_t = t->get_transaction();
+
 	...
 	parent->log_operation(
 		log_entries,
@@ -300,7 +334,11 @@ void PG::append_log(
 }
 {% endhighlight %}
 
-* 主要序列化到transaction里的内容包括： pg_info_t，pg_log_entry_t，这两种数据结构都是以map的形式encode到transaction的bufferlist里。其中不同的map的value对应的就是pg_info和pg_log_entry的bufferlist，而map的key就是epoch+version构成的字符串```“epoch.version”```。另外需要注意的是这些map是附带上op和oid作为对象的omap（Object的属性会利用文件的xattr属性存取， 因为有些文件系统对xattr的长度有限制，因此超出长度的Metadata会被存储在DBObjectMap里。而Object的omap则直接利用DBObjectMap实现。）来序列到transaction里
+上面我们注意到对于PGLog的处理，PGLog所对应的Transaction与实际的对象数据对应的Transaction是相同的。
+
+* 序列化ctx->log中的日志
+
+在ReplicatedPG::prepare_transaction()中我们构造了pg_log_entry_t对象放入了ctx->log中。接着在如下函数中将会把这些与PGLog相关的信息序列化到ctx->op_t这一transaction中：
 {% highlight string %}
 void PG::append_log(
   const vector<pg_log_entry_t>& logv,
@@ -309,21 +347,184 @@ void PG::append_log(
   ObjectStore::Transaction &t,
   bool transaction_applied)
 {
-	...
+	/* The primary has sent an info updating the history, but it may not
+	* have arrived yet.  We want to make sure that we cannot remember this
+	* write without remembering that it happened in an interval which went
+	* active in epoch history.last_epoch_started.
+	*/
+	if (info.last_epoch_started != info.history.last_epoch_started) {
+		info.history.last_epoch_started = info.last_epoch_started;
+	}
+	dout(10) << "append_log " << pg_log.get_log() << " " << logv << dendl;
+	
+	for (vector<pg_log_entry_t>::const_iterator p = logv.begin();p != logv.end();++p) {
+		add_log_entry(*p);
+	}
+
+	
+	// update the local pg, pg log
+	dirty_info = true;
 	write_if_dirty(t);
 }
 
-void PG::write_if_dirty(ObjectStore::Transaction& t)
+void PG::add_log_entry(const pg_log_entry_t& e)
 {
-  map<string,bufferlist> km;
-  if (dirty_big_info || dirty_info)
-    prepare_write_info(&km);
-  pg_log.write_log(t, &km, coll, pgmeta_oid, pool.info.require_rollback());
-  if (!km.empty())
-    t.omap_setkeys(coll, pgmeta_oid, km);
+	// raise last_complete only if we were previously up to date
+	if (info.last_complete == info.last_update)
+		info.last_complete = e.version;
+	
+	// raise last_update.
+	assert(e.version > info.last_update);
+	info.last_update = e.version;
+	
+	// raise user_version, if it increased (it may have not get bumped
+	// by all logged updates)
+	if (e.user_version > info.last_user_version)
+		info.last_user_version = e.user_version;
+	
+	// log mutation
+	pg_log.add(e);
+	dout(10) << "add_log_entry " << e << dendl;
 }
 {% endhighlight %}
-上面write_if_dirty()中prepare_write_info()进行pg_info的写入；而pg_log.write_log()进行pt_log_entry的写入。
+ 
+在上面PG::append_log()函数中，首先调用PG::add_log_entry()将PGLog添加到```pg_log```中进行缓存，以方便查询。之后再调用write_if_dirty()：
+{% highlight string %}
+void PG::write_if_dirty(ObjectStore::Transaction& t)
+{
+	map<string,bufferlist> km;
+	if (dirty_big_info || dirty_info)
+		prepare_write_info(&km);
+
+	pg_log.write_log(t, &km, coll, pgmeta_oid, pool.info.require_rollback());
+	if (!km.empty())
+		t.omap_setkeys(coll, pgmeta_oid, km);
+}
+
+{% endhighlight %}
+在PG::write_if_dirty()中，由于在PG::append_log()时将dirty_info设置为了true，因此肯定先调用prepare_write_info()函数，该函数可能会将当前的epoch信息、pg_info信息打包放入```km```中；之后调用pg_log.write_log():
+{% highlight string %}
+void PGLog::write_log(
+  ObjectStore::Transaction& t,
+  map<string,bufferlist> *km,
+  const coll_t& coll, const ghobject_t &log_oid,
+  bool require_rollback)
+{
+	if (is_dirty()) {
+		dout(5) << "write_log with: "
+			<< "dirty_to: " << dirty_to
+			<< ", dirty_from: " << dirty_from
+			<< ", dirty_divergent_priors: "
+			<< (dirty_divergent_priors ? "true" : "false")
+			<< ", divergent_priors: " << divergent_priors.size()
+			<< ", writeout_from: " << writeout_from
+			<< ", trimmed: " << trimmed
+			<< dendl;
+
+		_write_log(
+			t, km, log, coll, log_oid, divergent_priors,
+			dirty_to,
+			dirty_from,
+			writeout_from,
+			trimmed,
+			dirty_divergent_priors,
+			!touched_log,
+			require_rollback,
+			(pg_log_debug ? &log_keys_debug : 0));
+
+		undirty();
+	} else {
+		dout(10) << "log is not dirty" << dendl;
+	}
+}
+
+void PGLog::_write_log(
+  ObjectStore::Transaction& t,
+  map<string,bufferlist> *km,
+  pg_log_t &log,
+  const coll_t& coll, const ghobject_t &log_oid,
+  map<eversion_t, hobject_t> &divergent_priors,
+  eversion_t dirty_to,
+  eversion_t dirty_from,
+  eversion_t writeout_from,
+  const set<eversion_t> &trimmed,
+  bool dirty_divergent_priors,
+  bool touch_log,
+  bool require_rollback,
+  set<string> *log_keys_debug
+  )
+{
+	...
+	for (list<pg_log_entry_t>::iterator p = log.log.begin();p != log.log.end() && p->version <= dirty_to; ++p) {
+		bufferlist bl(sizeof(*p) * 2);
+		p->encode_with_checksum(bl);
+		(*km)[p->get_key_name()].claim(bl);
+	}
+	
+	for (list<pg_log_entry_t>::reverse_iterator p = log.log.rbegin();
+		p != log.log.rend() &&(p->version >= dirty_from || p->version >= writeout_from) &&p->version >= dirty_to; ++p) {
+
+		bufferlist bl(sizeof(*p) * 2);
+		p->encode_with_checksum(bl);
+		(*km)[p->get_key_name()].claim(bl);
+	}
+
+	...
+}
+void pg_log_entry_t::encode_with_checksum(bufferlist& bl) const
+{
+	bufferlist ebl(sizeof(*this)*2);
+	encode(ebl);
+	__u32 crc = ebl.crc32c(0);
+	::encode(ebl, bl);
+	::encode(crc, bl);
+}
+{% endhighlight %}
+通过上面，我们可以看到在PGLog::_write_log()函数中将pg_log_entry_t数据放入了```km```对应的bufferlist中，然后PG::write_if_dirty()的最后将这些bufferlist打包进transaction中。
+
+>注： 这里PGLog所在的transaction与实际的object对象数据所在的transaction是同一个
+
+* 完成PGLog日志数据、object对象数据的写入
+{% highlight string %}
+void ReplicatedBackend::submit_transaction(
+  const hobject_t &soid,
+  const eversion_t &at_version,
+  PGTransactionUPtr &&_t,
+  const eversion_t &trim_to,
+  const eversion_t &trim_rollback_to,
+  const vector<pg_log_entry_t> &log_entries,
+  boost::optional<pg_hit_set_history_t> &hset_history,
+  Context *on_local_applied_sync,
+  Context *on_all_acked,
+  Context *on_all_commit,
+  ceph_tid_t tid,
+  osd_reqid_t reqid,
+  OpRequestRef orig_op)
+{
+	...
+
+	op_t.register_on_applied_sync(on_local_applied_sync);
+	op_t.register_on_applied(
+		parent->bless_context(
+			new C_OSD_OnOpApplied(this, &op)));
+
+	op_t.register_on_commit(
+		parent->bless_context(
+			new C_OSD_OnOpCommit(this, &op)));
+	
+	vector<ObjectStore::Transaction> tls;
+	tls.push_back(std::move(op_t));
+	
+	parent->queue_transactions(tls, op.op);
+}
+
+void ReplicatedPG::queue_transactions(vector<ObjectStore::Transaction>& tls, OpRequestRef op) {
+	osd->store->queue_transactions(osr.get(), tls, 0, 0, 0, op, NULL);
+}
+{% endhighlight %}
+在前面的步骤中完成了Transaction的构建，在这里调用ReplicatedPG::queue_transactions()来写入到ObjectStore中。
+
+
 
 ###### 2.1.3 Trim Log
 前面说到PGLog的记录数是有限制的，正常情况下默认是3000条（由参数osd_min_pg_log_entries控制），PG降级情况下默认增加到10000条(由参数osd_max_pg_log_entries)。当达到限制时，就会trim log进行截断。
@@ -340,7 +541,7 @@ void ReplicatedPG::execute_ctx(OpContext *ctx){
 }
 
 
-ReplicatedPG::void log_operation(
+void ReplicatedPG::log_operation(
     const vector<pg_log_entry_t> &logv,
     boost::optional<pg_hit_set_history_t> &hset_history,
     const eversion_t &trim_to,
@@ -433,11 +634,11 @@ int ObjectStore::queue_transactions(Sequencer *osr, vector<Transaction>& tls,
 		 Context *onreadable_sync=0,
 		 TrackedOpRef op = TrackedOpRef(),
 		 ThreadPool::TPHandle *handle = NULL) {
-assert(!tls.empty());
-tls.back().register_on_applied(onreadable);
-tls.back().register_on_commit(ondisk);
-tls.back().register_on_applied_sync(onreadable_sync);
-return queue_transactions(osr, tls, op, handle);
+	assert(!tls.empty());
+	tls.back().register_on_applied(onreadable);
+	tls.back().register_on_commit(ondisk);
+	tls.back().register_on_applied_sync(onreadable_sync);
+	return queue_transactions(osr, tls, op, handle);
 }
 
 int FileStore::queue_transactions(Sequencer *posr, vector<Transaction>& tls,
@@ -458,6 +659,7 @@ int FileStore::queue_transactions(Sequencer *posr, vector<Transaction>& tls,
 * 接着在FileJournal::prepare_entry()中遍历vector &tls，将ObjectStore::Transaction encode到一个bufferlist里（记为tbl)
 {% highlight string %}
 int FileJournal::prepare_entry(vector<ObjectStore::Transaction>& tls, bufferlist* tbl) {
+	
 }
 {% endhighlight %}
 
@@ -519,33 +721,37 @@ void FileJournal::write_thread_entry()
 {% endhighlight %}
 
 ###### 2.1.5 PGLog写入leveldb
+在上面完成了journal盘的写操作之后，接着就会有另外的线程异步的将这些日志数据写成实际的object对象、pglog等。如下我们主要关注对pglog的持久化操作：
+
 在《OSD读写流程》里描述到是在FileStore::_do_op()里进行写数据到本地缓存的操作。将pglog写入到leveldb里的操作也是从这里出发的，会根据不同的op类型来进行不同的操作。
 {% highlight string %}
 void FileStore::_do_op(OpSequencer *osr, ThreadPool::TPHandle &handle)
 {
-  if (!m_disable_wbthrottle) {
-    wbthrottle.throttle();
-  }
-  // inject a stall?
-  if (g_conf->filestore_inject_stall) {
-    int orig = g_conf->filestore_inject_stall;
-    dout(5) << "_do_op filestore_inject_stall " << orig << ", sleeping" << dendl;
-    for (int n = 0; n < g_conf->filestore_inject_stall; n++)
-      sleep(1);
-    g_conf->set_val("filestore_inject_stall", "0");
-    dout(5) << "_do_op done stalling" << dendl;
-  }
+	if (!m_disable_wbthrottle) {
+		wbthrottle.throttle();
+	}
+	// inject a stall?
+	if (g_conf->filestore_inject_stall) {
+		int orig = g_conf->filestore_inject_stall;
+		dout(5) << "_do_op filestore_inject_stall " << orig << ", sleeping" << dendl;
 
-  osr->apply_lock.Lock();
-  Op *o = osr->peek_queue();
-  apply_manager.op_apply_start(o->op);
-  dout(5) << "_do_op " << o << " seq " << o->op << " " << *osr << "/" << osr->parent << " start" << dendl;
-  int r = _do_transactions(o->tls, o->op, &handle);
-  apply_manager.op_apply_finish(o->op);
-  dout(10) << "_do_op " << o << " seq " << o->op << " r = " << r
-	   << ", finisher " << o->onreadable << " " << o->onreadable_sync << dendl;
+		for (int n = 0; n < g_conf->filestore_inject_stall; n++)
+			sleep(1);
 
-  o->tls.clear();
+		g_conf->set_val("filestore_inject_stall", "0");
+		dout(5) << "_do_op done stalling" << dendl;
+	}
+	
+	osr->apply_lock.Lock();
+	Op *o = osr->peek_queue();
+	apply_manager.op_apply_start(o->op);
+	dout(5) << "_do_op " << o << " seq " << o->op << " " << *osr << "/" << osr->parent << " start" << dendl;
+
+	int r = _do_transactions(o->tls, o->op, &handle);
+	apply_manager.op_apply_finish(o->op);
+	dout(10) << "_do_op " << o << " seq " << o->op << " r = " << r << ", finisher " << o->onreadable << " " << o->onreadable_sync << dendl;
+	
+	o->tls.clear();
 
 }
 
@@ -558,7 +764,7 @@ int FileStore::_do_transactions(
 {% endhighlight %}
 
 
-1) 比如OP_OMAP_SETKEYS(PGLog写入leveldb就是根据这个key)
+1) 比如```OP_OMAP_SETKEYS```(PGLog写入leveldb就是根据这个key)
 {% highlight string %}
 void FileStore::_do_transaction(
   Transaction& t, uint64_t op_seq, int trans_num,
@@ -569,9 +775,11 @@ void FileStore::_do_transaction(
 			coll_t cid = i.get_cid(op->cid);
 			ghobject_t oid = i.get_oid(op->oid);
 			_kludge_temp_object_collection(cid, oid);
+
 			map<string, bufferlist> aset;
 			i.decode_attrset(aset);
 			tracepoint(objectstore, omap_setkeys_enter, osr_name);
+
 			r = _omap_setkeys(cid, oid, aset, spos);
 			tracepoint(objectstore, omap_setkeys_exit, r);
 		}
@@ -596,18 +804,19 @@ int DBObjectMap::set_keys(const ghobject_t &oid,
 
 int LevelDBStore::submit_transaction(KeyValueDB::Transaction t)
 {
-  utime_t start = ceph_clock_now(g_ceph_context);
-  LevelDBTransactionImpl * _t =
-    static_cast<LevelDBTransactionImpl *>(t.get());
-  leveldb::Status s = db->Write(leveldb::WriteOptions(), &(_t->bat));
-  utime_t lat = ceph_clock_now(g_ceph_context) - start;
-  logger->inc(l_leveldb_txns);
-  logger->tinc(l_leveldb_submit_latency, lat);
-  return s.ok() ? 0 : -1;
+	utime_t start = ceph_clock_now(g_ceph_context);
+	LevelDBTransactionImpl * _t =static_cast<LevelDBTransactionImpl *>(t.get());
+	leveldb::Status s = db->Write(leveldb::WriteOptions(), &(_t->bat));
+	utime_t lat = ceph_clock_now(g_ceph_context) - start;
+
+
+	logger->inc(l_leveldb_txns);
+	logger->tinc(l_leveldb_submit_latency, lat);
+	return s.ok() ? 0 : -1;
 }
 {% endhighlight %}
 
-2) 再比如OP_OMAP_RMKEYS(trim pglog的时候就是用到了这个key)
+2) 再比如```OP_OMAP_RMKEYS```(trim pglog的时候就是用到了这个key)
 {% highlight string %}
 //前面流程同上
 
@@ -615,7 +824,7 @@ int DBObjectMap::rm_keys(const ghobject_t &oid,
 			 const set<string> &to_clear,
 			 const SequencerPosition *spos)
 {
-	 t->rmkeys(user_prefix(header), to_clear);
+	t->rmkeys(user_prefix(header), to_clear);
 	db->submit_transaction(t);
 }
 {% endhighlight %}

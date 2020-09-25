@@ -721,12 +721,34 @@ int ReplicatedPG::prepare_transaction(OpContext *ctx);
 
 2） 调用函数do_osd_ops()打包请求到ctx->op_t的transaction中
 {% highlight string %}
-// prepare the actual mutation
-int result = do_osd_ops(ctx, ctx->ops);
-if (result < 0)
-	return result;
+int ReplicatedPG::prepare_transaction(OpContext *ctx){
+
+	....	
+
+	// prepare the actual mutation
+	int result = do_osd_ops(ctx, ctx->ops);
+	if (result < 0)
+		return result;
+	
+	...
+}
+int ReplicatedPG::do_osd_ops(OpContext *ctx, vector<OSDOp>& ops)
+{
+	...
+	PGBackend::PGTransaction* t = ctx->op_t.get();
+
+	for (vector<OSDOp>::iterator p = ops.begin(); p != ops.end(); ++p, ctx->current_osd_subop_num++) {
+		...
+
+		switch(op.op){
+			...
+			case CEPH_OSD_OP_WRITE:
+
+		}
+	}
+}
 {% endhighlight %}
-do_osd_ops()函数CEPH_OSD_OP_WRITE实现对写请求的封装。
+do_osd_ops()函数```CEPH_OSD_OP_WRITE```实现对写请求的封装。这里我们看到是将要写入的对象数据封装到了```ctx->opt_t```这样一个Transaction中了。
 
 3） 如果事务为空，或者没有修改操作，就直接返回result
 {% highlight string %}
@@ -767,7 +789,80 @@ if (soid.snap == CEPH_NOSNAP)
 	make_writeable(ctx);
 {% endhighlight %}
 
-6) 调用函数finish_ctx来完成后续处理，该函数主要完成了快照相关的处理。如果head对象存在，就删除snapdir对象；如果不存在，就创建snapdir对象，用来保存快照相关的信息。后文会进一步介绍。
+6) 调用函数finish_ctx来完成后续处理，该函数主要完成了快照相关的处理。如果head对象存在，就删除snapdir对象；如果不存在，就创建snapdir对象，用来保存快照相关的信息。此外，这里很重要的一个步骤是涉及到PGLog的处理：
+{% highlight string %}
+int ReplicatedPG::prepare_transaction(OpContext *ctx)
+{
+	finish_ctx(ctx,
+		ctx->new_obs.exists ? pg_log_entry_t::MODIFY :
+		pg_log_entry_t::DELETE);
+}
+void ReplicatedPG::finish_ctx(OpContext *ctx, int log_op_type, bool maintain_ssc,
+			      bool scrub_ok){
+	...
+	// append to log
+	ctx->log.push_back(pg_log_entry_t(log_op_type, soid, ctx->at_version,
+		ctx->obs->oi.version,
+		ctx->user_at_version, ctx->reqid,
+		ctx->mtime));
+
+	if (soid.snap < CEPH_NOSNAP) {
+		switch (log_op_type) {
+		case pg_log_entry_t::MODIFY:
+		case pg_log_entry_t::PROMOTE:
+		case pg_log_entry_t::CLEAN:
+			dout(20) << __func__ << " encoding snaps " << ctx->new_obs.oi.snaps << dendl;
+			::encode(ctx->new_obs.oi.snaps, ctx->log.back().snaps);
+			break;
+		default:
+			break;
+		}
+	}
+	...
+}
+
+//src/osd/osd_types.h
+struct pg_log_entry_t {
+	enum {
+		MODIFY = 1,       // some unspecified modification (but not *all* modifications)
+		CLONE = 2,        // cloned object from head
+		DELETE = 3,      // deleted object
+		BACKLOG = 4,     // event invented by generate_backlog [deprecated]
+		LOST_REVERT = 5, // lost new version, revert to an older version.
+		LOST_DELETE = 6, // lost new version, revert to no object (deleted).
+		LOST_MARK = 7,   // lost new version, now EIO
+		PROMOTE = 8,     // promoted object from another tier
+		CLEAN = 9,       // mark an object clean
+	};
+
+	// describes state for a locally-rollbackable entry
+	ObjectModDesc mod_desc;
+	bufferlist snaps;                                        // only for clone entries
+	hobject_t  soid;
+	osd_reqid_t reqid;                                       // caller+tid to uniquely identify request
+	vector<pair<osd_reqid_t, version_t> > extra_reqids;
+	eversion_t version, prior_version, reverting_to;
+	version_t user_version;                                 // the user version for this entry
+	utime_t     mtime;                                      // this is the _user_ mtime, mind you
+	
+	__s32      op;
+	bool invalid_hash;                                     // only when decoding sobject_t based entries
+	bool invalid_pool;                                     // only when decoding pool-less hobject based entries
+
+	pg_log_entry_t()
+		: user_version(0), op(0),
+		invalid_hash(false), invalid_pool(false) {}
+
+	pg_log_entry_t(int _op, const hobject_t& _soid,
+		const eversion_t& v, const eversion_t& pv,
+		version_t uv,
+		const osd_reqid_t& rid, const utime_t& mt)
+		: soid(_soid), reqid(rid), version(v), prior_version(pv), user_version(uv),
+		mtime(mt), op(_op), invalid_hash(false), invalid_pool(false)
+		{}
+};
+{% endhighlight %}
+PGLog在ceph的数据一致性方面非常重要。从上面可以看到，对于每一次的数据写操作，均会构造一个pg_log_entry_t对象将其放入ctx->log中。后续在ReplicatedBackend::submit_transaction()中，实际上会向ctx->log这一vector中的日志打包放入ctx->opt_t中的。注意： 这里PGLog与实际的对象数据是存在于同一个transaction中的。
 
 ###### 10. issue_repop()
 {% highlight string %}
