@@ -479,6 +479,23 @@ struct pg_history_t {
 ###### 4.3 last_epoch_started介绍
 last_epoch_started字段有两个地方出现，一个是pg_info_t结构里的last_epoch_started，代表最后一次Peering成功后的epoch值，是本地PG完成Peering后就设置的。另一个是pg_history_t结构体里的last_epoch_started，是PG里所有的OSD都完成Peering后设置的epoch值。
 
+此外，关于last_epoch_started，在doc/dev/osd_internals/last_epoch_started.rst中也有介绍，我们来看一下：
+
+info.last_epoch_started记录了PG在```interval i```完成Peering时的epoch值，在i(包括i)之前的interval提交的所有写操作均会反映到local info/log中，而对于i之后的interval所提交的写操作将不会在当前local info/log中得到体现。由于提交的写操作不可能出现分歧(注：peering已经完成)，因此即使用一个更旧的info.last_epoch_started来获取权威log/info信息，也不可能会影响到当前的info.last_epoch_started。
+
+
+info.history.last_epoch_started记录了最近一个interval中，PG作为一个整体完成peering操作后设置的epoch值。由于提交的所有写操作都是由acting set中的OSD提交的，任何无歧义的write操作都会确保acting set中每一个OSD都记录了history.last_epoch_started。在Peering过程中，一旦获取到了一个OSD的history.last_epoch_started，那么其将会是最后一个执行写操作的Interval。
+
+关于last_epoch_started的更新，请参看如下一段描述：
+<pre>
+We update info.last_epoch_started with the intial activation message,
+but we only update history.last_epoch_started after the new
+info.last_epoch_started is persisted (possibly along with the first
+write).  This ensures that we do not require an osd with the most
+recent info.last_epoch_started until all acting set osds have recorded
+it.
+</pre>
+
 
 ###### 4.4 last_user_version介绍
 通常是由librados所指定的一个对象的版本编号。在进行对象的修改操作时，rados通常会事先查询是否有该对象，如果有的话，则每一次修改对应的对象版本号就会加1。参看：

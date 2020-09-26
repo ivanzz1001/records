@@ -1532,6 +1532,7 @@ PG::RecoveryState::GetLog::GetLog(my_context ctx)
 	assert(!pg->actingbackfill.empty());
 	for (set<pg_shard_t>::iterator p = pg->actingbackfill.begin();p != pg->actingbackfill.end();++p) {
 		if (*p == pg->pg_whoami) continue;
+
 		pg_info_t& ri = pg->peer_info[*p];
 
 		if (ri.last_update >= best.log_tail && ri.last_update < request_log_from)
@@ -1559,6 +1560,12 @@ PG::RecoveryState::GetLog::GetLog(my_context ctx)
 
 2） 如果选择失败，并且want_acting不为空，就抛出NeedActingChange事件，状态机转移到Primary/WaitActingChange状态，等待申请临时PG返回结果；如果want_acting为空，就抛出IsIncomplete事件，PG的状态机转移到Primary/Peering/Incomplete状态，表明失败，PG就处于InComplete状态。
 
+3) 如果auth_log_shard等于pg->pg_whoami，也就是选出的拥有权威日志的OSD为当前主OSD，直接抛出GotLog()完成GetLog过程；
+
+4） 如果pg->info.last_update小于best.log_tail，也就是本OSD的日志和权威日志不重叠，那么本OSD无法恢复，抛出IsInComplete事件。经过函数choose_acting()的选择后，主OSD必须是可恢复的。如果主OSD不可恢复，必须申请临时PG，选择拥有权威日志的OSD为临时主OSD；
+
+5）如果自己不是权威日志的OSD，则需要去拥有权威日志的OSD上去拉取权威日志，并与本地合并。发送pg_query_t::LOG请求的过程与pg_query_t::INFO的过程是一样的，这里不再赘述。
+
 
 
 
@@ -1566,3 +1573,5 @@ PG::RecoveryState::GetLog::GetLog(my_context ctx)
 <br />
 <br />
 <br />
+
+1. [ceph存储 PG的状态机和peering过程](https://blog.csdn.net/skdkjzz/article/details/51579903)
