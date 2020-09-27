@@ -1567,6 +1567,228 @@ PG::RecoveryState::GetLog::GetLog(my_context ctx)
 5）如果自己不是权威日志的OSD，则需要去拥有权威日志的OSD上去拉取权威日志，并与本地合并。发送pg_query_t::LOG请求的过程与pg_query_t::INFO的过程是一样的，这里不再赘述。
 
 
+----------
+
+
+接下来我们再来看看其中的几个函数的实现：
+
+**1.3.8.1 PG::choose_acting()**
+
+函数choose_acting()用来计算PG的acting_backfill和backfill_targets两个OSD列表。acting_backfill保存了当前PG的acting列表，包括需要进行Backfill操作的OSD列表；backfill_targets列表保存了需要进行Backfill的OSD列表。
+{% highlight string %}
+bool PG::choose_acting(pg_shard_t &auth_log_shard_id,
+		       bool restrict_to_up_acting,
+		       bool *history_les_bound)
+{
+	...
+	map<pg_shard_t, pg_info_t>::const_iterator auth_log_shard =
+	   find_best_info(all_info, restrict_to_up_acting, history_les_bound);
+	
+	if (auth_log_shard == all_info.end()) {
+		if (up != acting) {
+			dout(10) << "choose_acting no suitable info found (incomplete backfills?)," << " reverting to up" << dendl;
+			want_acting = up;
+			vector<int> empty;
+			osd->queue_want_pg_temp(info.pgid.pgid, empty);
+		} else {
+			dout(10) << "choose_acting failed" << dendl;
+			assert(want_acting.empty());
+		}
+
+		return false;
+	}
+
+	....
+
+}
+{% endhighlight %}
+
+
+1) 首先调用函数PG::find_best_info()来选举出一个拥有权威日志的OSD，保存在变量auth_log_shard里；
+
+2） 如果没有选举出拥有权威日志的OSD，则进入如下流程：
+
+  a) 如果up不等于acting，申请临时PG，返回false值；
+
+  b) 否则确保want_acting列表为空，返回false值；
+
+>注： 在osdmap发生变化时，OSD::advance_pg()中会计算acting以及up，最终调用到OSDMap::_pg_to_up_acting_osds()来进行计算；
+
+3） 计算是否是compat_mode模式，检查是，如果所有的OSD都支持纠删码，就设置compat_mode值为true；
+
+4） 根据PG的不同类型，调用不同的函数。对应ReplicatedPG调用函数calc_replicated_acting()来计算PG需要的列表
+{% highlight string %}
+//want_backfill为该PG需要进行Backfill的pg_shard
+//want_acting_backfill: 包括进行acting和Backfill的pg_shard
+set<pg_shard_t> want_backfill, want_acting_backfill;
+
+//主OSD
+vector<int> want;
+
+//在compat_mode模式下，和want_acting_backfill相同
+pg_shard_t want_primary;
+{% endhighlight %}
+
+5) 下面是对PG做一些检查：
+  
+&nbsp; a) 计算num_want_acting数量，检查如果小于min_size，进行如下操作：
+
+   * 如果对于EC，清空want_acting，返回false;
+
+   * 对于ReplicatedPG，如果该PG不允许小于min_size的恢复，清空want_acting，返回false值；
+
+&nbsp; b) 调用IsPGRecoverablePredicate来判断PG现有的OSD列表是否可以恢复，如果不能恢复，清空want_acting，返回false值    
+
+6） 检查如果want不等于acting，设置want_acting为want:
+
+&nbsp; a) 如果want_acting等于up，申请empty为pg_temp的OSD列表；
+
+&nbsp;  b) 否则申请want为pg_temp的OSD列表；
+
+7) 最后设置PG的actingbackfill为want_acting_backfill，设置backfill_targets为want_backfill，并检查backfill_targets里的pg_shard应该不在stray_set里面；
+
+8） 最终返回true；
+
+
+下面举例说明需要申请pg_temp的场景：
+
+1） 当前```PG1.0```，其acting列表和up列表都为[0,1,2]，PG处于clean状态；
+
+2） 此时，OSD0崩溃，导致该PG经过CRUSH算法重新获得acting和up列表都为[3, 1, 2]；
+
+3） 选择出拥有权威日志的OSD为1，经过PG::calc_replicated_acting()算法，want列表为[1, 3, 2]，acting_backfill为[1,3,2]，want_backfill为[3]。特别注意want列表第一个为主OSD，如果up_primary无法恢复，就选择权威日志的OSD为主OSD；
+
+4） want[1,3,2]不等于acting[3,1,2]，并且不等于up[3,1,2]，需要向monitor申请pg_temp为want；
+
+5） 申请成功pg_temp以后，acting为[3,1,2]，up为[1,3,2]，osd1作为临时的主OSD，处理读写请求。当PG恢复到clean状态时，pg_temp取消，acting和up都恢复为[3,1,2]。
+
+
+**1.3.8.2 PG::find_best_info()**
+
+函数find_best_info()用于选取一个拥有权威日志的OSD。根据last_epoch_clean到目前为止，各个past_interval期间参与该PG的所有目前还处于up状态的OSD上的```pg_info_t```信息，来选取一个拥有权威日志的OSD，选择的优先顺序如下：
+
+1） 具有最新的last_update的OSD；
+
+2） 如果条件1相同，选择日志更长的OSD；
+
+3） 如果1，2条件相同，选择当前的主OSD；
+
+{% highlight string %}
+/**
+ * find_best_info
+ *
+ * Returns an iterator to the best info in infos sorted by:
+ *  1) Prefer newer last_update
+ *  2) Prefer longer tail if it brings another info into contiguity
+ *  3) Prefer current primary
+ */
+map<pg_shard_t, pg_info_t>::const_iterator PG::find_best_info(
+  const map<pg_shard_t, pg_info_t> &infos,
+  bool restrict_to_up_acting,
+  bool *history_les_bound) const
+{
+	assert(history_les_bound);
+	/* See doc/dev/osd_internals/last_epoch_started.rst before attempting
+	* to make changes to this process.  Also, make sure to update it
+	* when you find bugs! */
+	* 
+	eversion_t min_last_update_acceptable = eversion_t::max();
+	epoch_t max_last_epoch_started_found = 0;
+	for (map<pg_shard_t, pg_info_t>::const_iterator i = infos.begin();i != infos.end();++i) {
+		if (!cct->_conf->osd_find_best_info_ignore_history_les && max_last_epoch_started_found < i->second.history.last_epoch_started) {
+			*history_les_bound = true;
+			max_last_epoch_started_found = i->second.history.last_epoch_started;
+		}
+	
+		if (!i->second.is_incomplete() && max_last_epoch_started_found < i->second.last_epoch_started) {
+			max_last_epoch_started_found = i->second.last_epoch_started;
+		}
+	}
+
+	for (map<pg_shard_t, pg_info_t>::const_iterator i = infos.begin(); i != infos.end(); ++i) {
+		if (max_last_epoch_started_found <= i->second.last_epoch_started) {
+			if (min_last_update_acceptable > i->second.last_update)
+				min_last_update_acceptable = i->second.last_update;
+		}
+	}
+
+	if (min_last_update_acceptable == eversion_t::max())
+		return infos.end();
+	
+	map<pg_shard_t, pg_info_t>::const_iterator best = infos.end();
+
+	// find osd with newest last_update (oldest for ec_pool).
+	// if there are multiples, prefer
+	//  - a longer tail, if it brings another peer into log contiguity
+	//  - the current primary
+	for (map<pg_shard_t, pg_info_t>::const_iterator p = infos.begin();p != infos.end();++p) {
+		if (restrict_to_up_acting && !is_up(p->first) && !is_acting(p->first))
+     		 continue;
+
+		// Only consider peers with last_update >= min_last_update_acceptable
+		if (p->second.last_update < min_last_update_acceptable)
+			continue;
+
+		// disqualify anyone with a too old last_epoch_started
+		if (p->second.last_epoch_started < max_last_epoch_started_found)
+			continue;
+
+		// Disquality anyone who is incomplete (not fully backfilled)
+		if (p->second.is_incomplete())
+			continue;
+
+		if (best == infos.end()) {
+			best = p;
+			continue;
+		}
+
+		// Prefer newer last_update
+		if (pool.info.require_rollback()) {
+			if (p->second.last_update > best->second.last_update)
+			continue;
+	
+			if (p->second.last_update < best->second.last_update) {
+				best = p;
+				continue;
+			}
+		} else {
+			if (p->second.last_update < best->second.last_update)
+				continue;
+			if (p->second.last_update > best->second.last_update) {
+				best = p;
+				continue;
+			}
+		}
+	
+		// Prefer longer tail
+		if (p->second.log_tail > best->second.log_tail) {
+			continue;
+		} else if (p->second.log_tail < best->second.log_tail) {
+			best = p;
+			continue;
+		}
+	
+		// prefer current primary (usually the caller), all things being equal
+		if (p->first == pg_whoami) {
+			dout(10) << "calc_acting prefer osd." << p->first << " because it is current primary" << dendl;
+			best = p;
+			continue;
+		}
+	}
+	return best;
+}
+{% endhighlight %}
+
+1) 首先在所有OSD中计算max_last_epoch_started，然后在拥有最大的last_epoch_started的OSD中计算min_last_update_acceptable的值；
+
+2） 如果min_last_update_acceptable为eversion_t::max()，返回infos.end()，选取失败；
+
+3） 根据以下条件选择一个OSD：
+
+&nbsp; a) 
+
+
+
 
 
 
