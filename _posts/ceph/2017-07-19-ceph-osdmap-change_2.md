@@ -53,6 +53,7 @@ dr-xr-x---. 8 root root     4096 9月  11 11:32 ..
 {% endhighlight %}
 
 下面我们就针对这4种场景分别来分析。
+
 <!-- more --> 
 
 ## 1. PG 11.4分析
@@ -1649,6 +1650,18 @@ pg_shard_t want_primary;
 
 8） 最终返回true；
 
+>注： PG的acting set的设置主要会是在如下几个地方
+>
+> 1) OSD::load_pgs()函数中进行初始化时设置acting set
+>
+> 2) OSD::advance_pg()函数中，通过调用pg->handle_advance_map()产生AdvMap事件，从而引发PG进入Reset，在Reset的react(AdvMap)函数中start_peering_interval()，然后接着调用init_primary_up_acting()触发
+>
+> 3) OSD::handle_pg_peering_evt()函数中恢复一个正在删除的PG(do we need to resurrect a deleting pg?)
+> 
+> 4) PG分裂
+>
+> 关于PG中的acting set、up set、want等我们可以这样理解： acting set是根据osdmap pg_temp的存在情况来确定的，反应的是当前阶段所希望达成的状态； want是当前实际能够工作的一个排列；up set初始是根据osdmap算出来的一个排列，但是假如当前acting不能满足需求的情况下，就会将up set设置为want。
+
 
 下面举例说明需要申请pg_temp的场景：
 
@@ -1661,6 +1674,8 @@ pg_shard_t want_primary;
 4） want[1,3,2]不等于acting[3,1,2]，并且不等于up[3,1,2]，需要向monitor申请pg_temp为want；
 
 5） 申请成功pg_temp以后，acting为[3,1,2]，up为[1,3,2]，osd1作为临时的主OSD，处理读写请求。当PG恢复到clean状态时，pg_temp取消，acting和up都恢复为[3,1,2]。
+
+
 
 
 **1.3.8.2 PG::find_best_info()**
@@ -1785,11 +1800,129 @@ map<pg_shard_t, pg_info_t>::const_iterator PG::find_best_info(
 
 3） 根据以下条件选择一个OSD：
 
-&nbsp; a) 
+&nbsp; a) 首先过滤掉last_update小于min_last_update_acceptable，或者last_epoch_started小于max_last_epoch_started_found，或者incomplete的OSD；
+
+&nbsp; b) 如果PG类型是EC，选择最小的last_update；如果PG类型是副本，选择最大的last_update的OSD；
+
+&nbsp; c) 如果上述条件相同，选择log_tail最小的，也就是日志最长的OSD；
+
+&nbsp; d) 如果上述条件都相同，选择当前的主OSD；
+
+综上的选择过程可知，拥有权威日志的OSD特征如下：必须是非incomplete的OSD；必须有最大的last_epoch_started；last_update有可能是最大，但至少是min_last_update_acceptable，有可能是日志最长的OSD，有可能是主OSD。
 
 
 
+**1.3.8.3 PG::calc_replicated_acting**
 
+本函数用于计算本PG相关的OSD列表：
+{% highlight string %}
+/**
+ * calculate the desired acting set.
+ *
+ * Choose an appropriate acting set.  Prefer up[0], unless it is
+ * incomplete, or another osd has a longer tail that allows us to
+ * bring other up nodes up to date.
+ */
+void PG::calc_replicated_acting(
+  map<pg_shard_t, pg_info_t>::const_iterator auth_log_shard,
+  unsigned size,
+  const vector<int> &acting,
+  pg_shard_t acting_primary,
+  const vector<int> &up,
+  pg_shard_t up_primary,
+  const map<pg_shard_t, pg_info_t> &all_info,
+  bool compat_mode,
+  bool restrict_to_up_acting,
+  vector<int> *want,
+  set<pg_shard_t> *backfill,
+  set<pg_shard_t> *acting_backfill,
+  pg_shard_t *want_primary,
+  ostream &ss)
+{
+	...
+
+	pg_shard_t auth_log_shard_id = auth_log_shard->first;
+  
+	// select primary
+	map<pg_shard_t,pg_info_t>::const_iterator primary;
+	if (up.size() && !all_info.find(up_primary)->second.is_incomplete() &&
+	  all_info.find(up_primary)->second.last_update >= auth_log_shard->second.log_tail) {
+
+		ss << "up_primary: " << up_primary << ") selected as primary" << std::endl;
+		primary = all_info.find(up_primary); // prefer up[0], all thing being equal
+	} else {
+
+		assert(!auth_log_shard->second.is_incomplete());
+		ss << "up[0] needs backfill, osd." << auth_log_shard_id << " selected as primary instead" << std::endl;
+		primary = auth_log_shard;
+	}
+
+	
+	...
+
+	// select replicas that have log contiguity with primary.
+	// prefer up, then acting, then any peer_info osds 
+	for (vector<int>::const_iterator i = up.begin();i != up.end();++i) {
+		...
+	}
+
+	// This no longer has backfill OSDs, but they are covered above.
+	for (vector<int>::const_iterator i = acting.begin();i != acting.end(); ++i) {
+		...
+	}
+
+	for (map<pg_shard_t,pg_info_t>::const_iterator i = all_info.begin();i != all_info.end();++i) {
+		...
+	}
+
+}
+{% endhighlight %}
+* want_primary: 主OSD，如果它不是up_primary，就需要申请pg_temp；
+
+* backfill: 需要进行Backfill操作的OSD；
+
+* acting_backfill: 所有进行acting和Backfill的OSD的集合；
+
+* want和acting_backfill的OSD相同，前者类型是pg_shard_t，后者是int类型；
+
+具体处理过程如下：
+
+1） 首先选择want_primary:
+
+&nbsp; a) 如果up_primary处于非incomplete状态，并且last_update大于等于权威日志的log_tail，说明up_primary的日志和权威日志有重叠，可通过日志记录恢复，优先选择up_primary为主OSD；
+
+&nbsp; b) 否则选择auth_log_shard，也就是拥有权威日志的OSD为主OSD；
+
+&nbsp; c) 把主OSD加入到want和acting_backfill列表中；
+
+2） 函数的输入参数size为要选择的副本数，依次从up、acting、all_info里选择size个副本OSD：
+
+&nbsp; a) 如果该OSD上的PG处于incomplete的状态，或者cur_info.last_update小于主OSD和auth_log_shard的最小值，则该PG副本无法通过日志修复，只能通过Backfill操作来进行修复。把该OSD分别加入backfill和acting_backfill集合中；
+
+&nbsp; b) 否则就可以根据PG日志来恢复，只加入acting_backfill集合和want列表中，不用加入到Backfill列表中；
+
+
+**1.3.8.3 GetLog阶段日志分析**
+
+下面我们就结合```PG 11.4```在这一阶段的日志来进行分析：
+{% highlight string %}
+3593:2020-09-11 14:05:19.135595 7fba3d124700  5 osd.3 pg_epoch: 2223 pg[11.4( v 201'1 (0'0,201'1] local-les=2222 n=1 ec=132 les/c/f 2222/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 peering] enter Started/Primary/Peering/GetLog
+3596:2020-09-11 14:05:19.135609 7fba3d124700 10 osd.3 pg_epoch: 2223 pg[11.4( v 201'1 (0'0,201'1] local-les=2222 n=1 ec=132 les/c/f 2222/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 peering] calc_acting osd.3 11.4( v 201'1 (0'0,201'1] local-les=2222 n=1 ec=132 les/c/f 2222/2222/0 2223/2223/2223)
+3599:2020-09-11 14:05:19.135632 7fba3d124700 10 osd.3 pg_epoch: 2223 pg[11.4( v 201'1 (0'0,201'1] local-les=2222 n=1 ec=132 les/c/f 2222/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 peering] calc_acting newest update on osd.3 with 11.4( v 201'1 (0'0,201'1] local-les=2222 n=1 ec=132 les/c/f 2222/2222/0 2223/2223/2223)
+3601:calc_acting primary is osd.3 with 11.4( v 201'1 (0'0,201'1] local-les=2222 n=1 ec=132 les/c/f 2222/2222/0 2223/2223/2223)
+3603:2020-09-11 14:05:19.135659 7fba3d124700 10 osd.3 pg_epoch: 2223 pg[11.4( v 201'1 (0'0,201'1] local-les=2222 n=1 ec=132 les/c/f 2222/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 peering] actingbackfill is 3
+3605:2020-09-11 14:05:19.135668 7fba3d124700 10 osd.3 pg_epoch: 2223 pg[11.4( v 201'1 (0'0,201'1] local-les=2222 n=1 ec=132 les/c/f 2222/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 peering] choose_acting want [3] (== acting) backfill_targets 
+3607:2020-09-11 14:05:19.135684 7fba3d124700 10 osd.3 pg_epoch: 2223 pg[11.4( v 201'1 (0'0,201'1] local-les=2222 n=1 ec=132 les/c/f 2222/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 peering] state<Started/Primary/Peering/GetLog>: leaving GetLog
+3609:2020-09-11 14:05:19.135698 7fba3d124700  5 osd.3 pg_epoch: 2223 pg[11.4( v 201'1 (0'0,201'1] local-les=2222 n=1 ec=132 les/c/f 2222/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 peering] exit Started/Primary/Peering/GetLog 0.000102 0 0.000000
+3611:2020-09-11 14:05:19.135712 7fba3d124700 15 osd.3 pg_epoch: 2223 pg[11.4( v 201'1 (0'0,201'1] local-les=2222 n=1 ec=132 les/c/f 2222/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 peering] publish_stats_to_osd 2223: no change since 2020-09-11 14:05:19.135569
+{% endhighlight %}
+在上面3593行开始进入GetLog阶段，之后在PG::choose_acting()中打印出获取到的所有pg_info信息（此时只有osd.3上具有PG 11.4的信息了），对于PG 11.4的主OSD3来说Peering尚未完成，因此其pg_info.last_epoch_started为e2222(当前osdmap的epoch为e2223)，pg_info.history.last_epoch_started的值也为e2222。
+
+>注： 上面les是last_epoch_started的缩写， c是last_epoch_clean的缩写， f是last_epoch_marked_full的缩写
+
+在PG::calc_replicated_acting()函数中计算出来的actingbackfill值为[3]，want值也为[3]。此外，由于acting的值也为[3](注： 在osdmap发生变化时已经计算过了），因此want等于acting，不必申请pg_temp。
+
+###### 1.3.9 收到
 
 
 <br />

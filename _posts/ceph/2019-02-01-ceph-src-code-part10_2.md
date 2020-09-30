@@ -477,24 +477,119 @@ struct pg_history_t {
 {% endhighlight %}
 
 ###### 4.3 last_epoch_started介绍
-last_epoch_started字段有两个地方出现，一个是pg_info_t结构里的last_epoch_started，代表最后一次Peering成功后的epoch值，是本地PG完成Peering后就设置的。另一个是pg_history_t结构体里的last_epoch_started，是PG里所有的OSD都完成Peering后设置的epoch值。
+last_epoch_started字段有两个地方出现，一个是pg_info_t结构里的last_epoch_started，代表最后一次Peering成功后的epoch值，是本地PG完成Peering后就设置的。另一个是pg_history_t结构体里的last_epoch_started，是PG里所有的OSD都完成Peering后设置的epoch值。如下图所示：
+
+![last-epoch-started](https://ivanzz1001.github.io/records/assets/img/ceph/sca/last_epoch_started.jpg)
+
 
 此外，关于last_epoch_started，在doc/dev/osd_internals/last_epoch_started.rst中也有介绍，我们来看一下：
 
-info.last_epoch_started记录了PG在```interval i```完成Peering时的epoch值，在i(包括i)之前的interval提交的所有写操作均会反映到local info/log中，而对于i之后的interval所提交的写操作将不会在当前local info/log中得到体现。由于提交的写操作不可能出现分歧(注：peering已经完成)，因此即使用一个更旧的info.last_epoch_started来获取权威log/info信息，也不可能会影响到当前的info.last_epoch_started。
+**info.last_epoch_started**: 记录了PG在```interval i```完成Peering时的epoch值，在i(包括i)之前的interval提交的所有写操作均会反映到local info/log中，而对于i之后的interval所提交的写操作将不会在当前local info/log中得到体现。由于提交的写操作不可能出现分歧(注：peering已经完成)，因此即使用一个更旧的info.last_epoch_started来获取权威log/info信息，也不可能会影响到当前的info.last_epoch_started。
 
 
-info.history.last_epoch_started记录了最近一个interval中，PG作为一个整体完成peering操作后设置的epoch值。由于提交的所有写操作都是由acting set中的OSD提交的，任何无歧义的write操作都会确保acting set中每一个OSD都记录了history.last_epoch_started。在Peering过程中，一旦获取到了一个OSD的history.last_epoch_started，那么其将会是最后一个执行写操作的Interval。
+**info.history.last_epoch_started**: 记录了最近一个interval中，PG作为一个整体完成peering操作后设置的epoch值。由于提交的所有写操作都是由acting set中的OSD提交的，任何无歧义的write操作都会确保acting set中每一个OSD都记录了history.last_epoch_started。
 
-关于last_epoch_started的更新，请参看如下一段描述：
-<pre>
-We update info.last_epoch_started with the intial activation message,
-but we only update history.last_epoch_started after the new
-info.last_epoch_started is persisted (possibly along with the first
-write).  This ensures that we do not require an osd with the most
-recent info.last_epoch_started until all acting set osds have recorded
-it.
-</pre>
+如下我们介绍一下last_epoch_started的更新操作：
+
+1） info.last_epoch_started: PG在本OSD上完成Peering操作，就会马上更新其对应的last_epoch_started的值。参看PG::activate()函数
+
+2） info.history.last_epoch_started： 对于本字段的更新操作，情况较为复杂。对于PG副本OSD上的info.history.last_epoch_started字段的更新会在Peering完成后马上进行，参看PG::activate()；对于PG主OSD上的info.history.last_epoch_started的更新，可以分为如下两种情况（假设有PG 1.0[0,1,2])：
+
+* 主动触发更新： 此种情况为在主OSD完成peering之前，所有的副本OSD就已经完成了Peering，此时会主动触发更新history.last_epoch_started
+{% highlight string %}
+void PG::activate(ObjectStore::Transaction& t,
+		  epoch_t activation_epoch,
+		  list<Context*>& tfin,
+		  map<int, map<spg_t,pg_query_t> >& query_map,
+		  map<int,
+		      vector<
+			pair<pg_notify_t,
+			     pg_interval_map_t> > > *activator_map,
+                  RecoveryCtx *ctx)
+{
+	...
+
+	// find out when we commit
+	t.register_on_complete(
+		new C_PG_ActivateCommitted(
+			this,
+			get_osdmap()->get_epoch(),
+			activation_epoch));
+
+	...
+}
+
+void PG::_activate_committed(epoch_t epoch, epoch_t activation_epoch)
+{
+	if (pg_has_reset_since(epoch)) {
+		...
+	} else if (is_primary()) {
+		...
+		if (peer_activated.size() == actingbackfill.size())
+			all_activated_and_committed();
+	}
+	...
+}
+
+void PG::all_activated_and_committed()
+{
+	...
+	queue_peering_event(
+		CephPeeringEvtRef(
+			std::make_shared<CephPeeringEvt>(
+			get_osdmap()->get_epoch(),
+			get_osdmap()->get_epoch(),
+			AllReplicasActivated())));
+}
+
+boost::statechart::result PG::RecoveryState::Active::react(const AllReplicasActivated &evt){
+	...
+
+	// info.last_epoch_started is set during activate()
+	pg->info.history.last_epoch_started = pg->info.last_epoch_started;
+
+	...
+}
+{% endhighlight %}
+
+* 被动触发更新： 此种情况为主OSD完成peering时，还有副本OSD没有完成Peering(没有收到副本OSD完成Peering的通知消息)，此时主OSD先进入Active阶段，然后再后续收到副本OSD发送来的通知消息时，触发更新history.last_epoch_started的值
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Active::react(const MInfoRec& infoevt){
+	...
+
+	if (pg->is_actingbackfill(infoevt.from)) {
+		dout(10) << " peer osd." << infoevt.from << " activated and committed" << dendl;
+		pg->peer_activated.insert(infoevt.from);
+		pg->blocked_by.erase(infoevt.from.shard);
+		pg->publish_stats_to_osd();
+
+		if (pg->peer_activated.size() == pg->actingbackfill.size()) {
+			pg->all_activated_and_committed();
+		}
+	}
+
+	...
+}
+void PG::all_activated_and_committed()
+{
+	...
+	queue_peering_event(
+		CephPeeringEvtRef(
+			std::make_shared<CephPeeringEvt>(
+			get_osdmap()->get_epoch(),
+			get_osdmap()->get_epoch(),
+			AllReplicasActivated())));
+}
+
+boost::statechart::result PG::RecoveryState::Active::react(const AllReplicasActivated &evt){
+	...
+
+	// info.last_epoch_started is set during activate()
+	pg->info.history.last_epoch_started = pg->info.last_epoch_started;
+
+	...
+}
+{% endhighlight %}
 
 
 ###### 4.4 last_user_version介绍
