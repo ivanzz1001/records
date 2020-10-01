@@ -1334,24 +1334,86 @@ void OSD::handle_pg_query(OpRequestRef op)
 	for (map<spg_t,pg_query_t>::iterator it = m->pg_list.begin();it != m->pg_list.end();++it) {
 	
 		...
-		
-		if (it->second.type == pg_query_t::LOG ||it->second.type == pg_query_t::FULLLOG) {
-			
-			....			
 
-		} else {
-			notify_list[from].push_back(
-			make_pair(
-				pg_notify_t(
-					it->second.from, it->second.to,
-					it->second.epoch_sent,
-					osdmap->get_epoch(),
-					empty),
-				pg_interval_map_t()));
+		
+		//处理在pg_map中找到了的PG的query请求		
+		{
+			RWLock::RLocker l(pg_map_lock);
+			if (pg_map.count(pgid)) {
+				PG *pg = 0;
+				pg = _lookup_lock_pg_with_map_lock_held(pgid);
+				pg->queue_query(
+					it->second.epoch_sent, it->second.epoch_sent,
+					pg_shard_t(from, it->second.from), it->second);
+				pg->unlock();
+				continue;
+			}
 		}
+
+		//处理在PG_map中未找到的PG的query请求
 	}
 
 	do_notifies(notify_list, osdmap);
+}
+
+void PG::queue_query(epoch_t msg_epoch,
+		     epoch_t query_epoch,
+		     pg_shard_t from, const pg_query_t& q)
+{
+	dout(10) << "handle_query " << q << " from replica " << from << dendl;
+	queue_peering_event(
+      CephPeeringEvtRef(std::make_shared<CephPeeringEvt>(msg_epoch, query_epoch,
+					 MQuery(from, q, query_epoch))));
+}
+
+void OSD::process_peering_events(
+  const list<PG*> &pgs,
+  ThreadPool::TPHandle &handle
+  )	
+{
+	...
+
+	PG::CephPeeringEvtRef evt = pg->peering_queue.front();
+	pg->peering_queue.pop_front();
+	pg->handle_peering_event(evt, &rctx);
+
+	...
+}
+
+void PG::handle_peering_event(CephPeeringEvtRef evt, RecoveryCtx *rctx)
+{
+	dout(10) << "handle_peering_event: " << evt->get_desc() << dendl;
+	if (!have_same_or_newer_map(evt->get_epoch_sent())) {
+		dout(10) << "deferring event " << evt->get_desc() << dendl;
+		peering_waiters.push_back(evt);
+		return;
+	}
+
+	if (old_peering_evt(evt))
+		return;
+	recovery_state.handle_event(evt, rctx);
+}
+
+
+boost::statechart::result PG::RecoveryState::Stray::react(const MQuery& query)
+{
+	PG *pg = context< RecoveryMachine >().pg;
+	if (query.query.type == pg_query_t::INFO) {
+		pair<pg_shard_t, pg_info_t> notify_info;
+		pg->update_history_from_master(query.query.history);
+		pg->fulfill_info(query.from, query.query, notify_info);
+
+		context< RecoveryMachine >().send_notify(
+			notify_info.first,
+			pg_notify_t(
+			  notify_info.first.shard, pg->pg_whoami.shard,
+			  query.query_epoch,
+			  pg->get_osdmap()->get_epoch(),
+			  notify_info.second),
+			  pg->past_intervals);
+	}
+
+	...
 }
 
 /** do_notifies
@@ -1363,8 +1425,19 @@ void OSD::do_notifies(
   map<int,vector<pair<pg_notify_t,pg_interval_map_t> > >& notify_list,
   OSDMapRef curmap)
 {
-	for (map<int,vector<pair<pg_notify_t,pg_interval_map_t> > >::iterator it = notify_list.begin();it != notify_list.end();++it) {
-	
+	for (map<int,vector<pair<pg_notify_t,pg_interval_map_t> > >::iterator it =notify_list.begin();it != notify_list.end();++it) {
+		if (!curmap->is_up(it->first)) {
+			dout(20) << __func__ << " skipping down osd." << it->first << dendl;
+			continue;
+		}
+
+		ConnectionRef con = service.get_con_osd_cluster(it->first, curmap->get_epoch());
+		if (!con) {
+			dout(20) << __func__ << " skipping osd." << it->first<< " (NULL con)" << dendl;
+			continue;
+		}
+		service.share_map_peer(it->first, con.get(), curmap);
+		dout(7) << __func__ << " osd " << it->first << " on " << it->second.size() << " PGs" << dendl;
 		MOSDPGNotify *m = new MOSDPGNotify(curmap->get_epoch(),it->second);
 		con->send_message(m);
 	}
@@ -1565,7 +1638,125 @@ PG::RecoveryState::GetLog::GetLog(my_context ctx)
 
 4） 如果pg->info.last_update小于best.log_tail，也就是本OSD的日志和权威日志不重叠，那么本OSD无法恢复，抛出IsInComplete事件。经过函数choose_acting()的选择后，主OSD必须是可恢复的。如果主OSD不可恢复，必须申请临时PG，选择拥有权威日志的OSD为临时主OSD；
 
-5）如果自己不是权威日志的OSD，则需要去拥有权威日志的OSD上去拉取权威日志，并与本地合并。发送pg_query_t::LOG请求的过程与pg_query_t::INFO的过程是一样的，这里不再赘述。
+5）如果自己不是权威日志的OSD，则需要去拥有权威日志的OSD上去拉取权威日志，并与本地合并。发送pg_query_t::LOG请求的过程与pg_query_t::INFO的过程是一样的:
+{% highlight string %}
+/** PGQuery
+ * from primary to replica | stray
+ * NOTE: called with opqueue active.
+ */
+void OSD::handle_pg_query(OpRequestRef op)
+{
+	....
+
+	map< int, vector<pair<pg_notify_t, pg_interval_map_t> > > notify_list;
+
+	for (map<spg_t,pg_query_t>::iterator it = m->pg_list.begin();it != m->pg_list.end();++it) {
+	
+		...
+
+		
+		//处理在pg_map中找到了的PG的query请求		
+		{
+			RWLock::RLocker l(pg_map_lock);
+			if (pg_map.count(pgid)) {
+				PG *pg = 0;
+				pg = _lookup_lock_pg_with_map_lock_held(pgid);
+				pg->queue_query(
+					it->second.epoch_sent, it->second.epoch_sent,
+					pg_shard_t(from, it->second.from), it->second);
+				pg->unlock();
+				continue;
+			}
+		}
+
+		//处理在PG_map中未找到的PG的query请求
+	}
+
+	do_notifies(notify_list, osdmap);
+}
+void PG::queue_query(epoch_t msg_epoch,
+		     epoch_t query_epoch,
+		     pg_shard_t from, const pg_query_t& q)
+{
+	dout(10) << "handle_query " << q << " from replica " << from << dendl;
+	queue_peering_event(
+      CephPeeringEvtRef(std::make_shared<CephPeeringEvt>(msg_epoch, query_epoch,
+					 MQuery(from, q, query_epoch))));
+}
+
+void OSD::process_peering_events(
+  const list<PG*> &pgs,
+  ThreadPool::TPHandle &handle
+  )	
+{
+	...
+
+	PG::CephPeeringEvtRef evt = pg->peering_queue.front();
+	pg->peering_queue.pop_front();
+	pg->handle_peering_event(evt, &rctx);
+
+	...
+}
+
+void PG::handle_peering_event(CephPeeringEvtRef evt, RecoveryCtx *rctx)
+{
+	dout(10) << "handle_peering_event: " << evt->get_desc() << dendl;
+	if (!have_same_or_newer_map(evt->get_epoch_sent())) {
+		dout(10) << "deferring event " << evt->get_desc() << dendl;
+		peering_waiters.push_back(evt);
+		return;
+	}
+
+	if (old_peering_evt(evt))
+		return;
+	recovery_state.handle_event(evt, rctx);
+}
+boost::statechart::result PG::RecoveryState::Stray::react(const MQuery& query)
+{
+	...
+	pg->fulfill_log(query.from, query.query, query.query_epoch);
+	...
+}
+
+void PG::fulfill_log(
+  pg_shard_t from, const pg_query_t &query, epoch_t query_epoch)
+{
+	...
+
+	MOSDPGLog *mlog = new MOSDPGLog(
+		from.shard, pg_whoami.shard,
+		get_osdmap()->get_epoch(),
+		info, query_epoch);
+	mlog->missing = pg_log.get_missing();
+
+	// primary -> other, when building master log
+	if (query.type == pg_query_t::LOG) {
+		dout(10) << " sending info+missing+log since " << query.since << dendl;
+		if (query.since != eversion_t() && query.since < pg_log.get_tail()) {
+			osd->clog->error() << info.pgid << " got broken pg_query_t::LOG since " << query.since<< " when my log.tail is " << pg_log.get_tail() << ", sending full log instead\n";
+
+			mlog->log = pg_log.get_log();           // primary should not have requested this!!
+		} else
+			mlog->log.copy_after(pg_log.get_log(), query.since);
+	}
+	else if (query.type == pg_query_t::FULLLOG) {
+		dout(10) << " sending info+missing+full log" << dendl;
+		mlog->log = pg_log.get_log();
+	}
+	
+	dout(10) << " sending " << mlog->log << " " << mlog->missing << dendl;
+	
+	ConnectionRef con = osd->get_con_osd_cluster(
+	from.osd, get_osdmap()->get_epoch());
+	if (con) {
+		osd->share_map_peer(from.osd, con.get(), get_osdmap());
+		osd->send_message_osd_cluster(mlog, con.get());
+	} else {
+		mlog->put();
+	}
+}
+
+{% endhighlight %}
 
 
 ----------
@@ -1922,7 +2113,504 @@ void PG::calc_replicated_acting(
 
 在PG::calc_replicated_acting()函数中计算出来的actingbackfill值为[3]，want值也为[3]。此外，由于acting的值也为[3](注： 在osdmap发生变化时已经计算过了），因此want等于acting，不必申请pg_temp。
 
-###### 1.3.9 收到
+###### 1.3.9 收到缺失的权威日志
+如果主OSD不是拥有权威日志的OSD，就需要去拥有权威日志的OSD上拉取权威日志。当收到权威日志后的处理流程如下：
+{% highlight string %}
+void OSD::dispatch_op(OpRequestRef op)
+{
+	switch (op->get_req()->get_type()) {
+	
+	...
+
+	case MSG_OSD_PG_LOG:
+		handle_pg_log(op);
+		break;
+
+	...
+	}
+}
+
+void OSD::handle_pg_log(OpRequestRef op)
+{
+	MOSDPGLog *m = (MOSDPGLog*) op->get_req();
+	assert(m->get_type() == MSG_OSD_PG_LOG);
+	dout(7) << "handle_pg_log " << *m << " from " << m->get_source() << dendl;
+	
+	if (!require_osd_peer(op->get_req()))
+		return;
+	
+	int from = m->get_source().num();
+	if (!require_same_or_newer_map(op, m->get_epoch(), false))
+		return;
+	
+	if (m->info.pgid.preferred() >= 0) {
+		dout(10) << "ignoring localized pg " << m->info.pgid << dendl;
+		return;
+	}
+	
+	op->mark_started();
+	handle_pg_peering_evt(
+		spg_t(m->info.pgid.pgid, m->to),
+		m->info.history, m->past_intervals, m->get_epoch(),
+		PG::CephPeeringEvtRef(
+		  new PG::CephPeeringEvt(
+		    m->get_epoch(), m->get_query_epoch(),
+	        PG::MLogRec(pg_shard_t(from, m->from), m)))
+	);
+}
+
+boost::statechart::result PG::RecoveryState::GetLog::react(const MLogRec& logevt)
+{
+	assert(!msg);
+	if (logevt.from != auth_log_shard) {
+		dout(10) << "GetLog: discarding log from "<< "non-auth_log_shard osd." << logevt.from << dendl;
+		return discard_event();
+	}
+
+	dout(10) << "GetLog: received master log from osd"<< logevt.from << dendl;
+
+	msg = logevt.msg;
+	post_event(GotLog());
+	return discard_event();
+}
+{% endhighlight %}
+上面将logevt.msg赋值给msg(注：msg的类型为MLogRec)并抛出GotLog()事件。本函数就用于处理该事件。它首先确认是从auth_log_shard端发送的消息，然后抛出GotLog()事件：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::GetLog::react(const GotLog&)
+{
+  dout(10) << "leaving GetLog" << dendl;
+  PG *pg = context< RecoveryMachine >().pg;
+  if (msg) {
+    dout(10) << "processing master log" << dendl;
+    pg->proc_master_log(*context<RecoveryMachine>().get_cur_transaction(),
+			msg->info, msg->log, msg->missing, 
+			auth_log_shard);
+  }
+  pg->start_flush(
+    context< RecoveryMachine >().get_cur_transaction(),
+    context< RecoveryMachine >().get_on_applied_context_list(),
+    context< RecoveryMachine >().get_on_safe_context_list());
+  return transit< GetMissing >();
+}
+{% endhighlight %}
+本函数捕获GotLog()事件，处理过程如下：
+
+1） 如果msg不为空，就调用函数PG::proc_master_log()合并自己缺失的权威日志，并更新自己的pg_info相关的信息。从此，作为主OSD，也是拥有权威日志的OSD。
+{% highlight string %}
+void PG::proc_master_log(
+  ObjectStore::Transaction& t, pg_info_t &oinfo,
+  pg_log_t &olog, pg_missing_t& omissing, pg_shard_t from)
+{
+	dout(10) << "proc_master_log for osd." << from << ": "<< olog << " " << omissing << dendl;
+	assert(!is_peered() && is_primary());
+	
+	// merge log into our own log to build master log.  no need to
+	// make any adjustments to their missing map; we are taking their
+	// log to be authoritative (i.e., their entries are by definitely
+	// non-divergent).
+	merge_log(t, oinfo, olog, from);
+	peer_info[from] = oinfo;
+	dout(10) << " peer osd." << from << " now " << oinfo << " " << omissing << dendl;
+	might_have_unfound.insert(from);
+	
+	// See doc/dev/osd_internals/last_epoch_started
+	if (oinfo.last_epoch_started > info.last_epoch_started) {
+		info.last_epoch_started = oinfo.last_epoch_started;
+		dirty_info = true;
+	}
+
+	if (info.history.merge(oinfo.history))
+		dirty_info = true;
+
+	assert(cct->_conf->osd_find_best_info_ignore_history_les ||
+	info.last_epoch_started >= info.history.last_epoch_started);
+	
+	peer_missing[from].swap(omissing);
+}
+    
+{% endhighlight %}
+
+2) 调用函数pg->start_flush()添加一个空操作；
+
+3) 状态转移到GetMissing状态；
+
+经过GetLog阶段的处理后，该PG的主OSD已经获取了权威日志，以及pg_info的权威信息。
+
+###### 1.3.10 Started/Primary/Peering/GetMissing状态
+在GetLog()状态中，如果Primary获取到了权威日志，在抛出的GotLog事件中调用PG::proc_master_log()处理了权威日志后，就会直接转换进入到GetMissing状态。
+
+GetMissing的处理过程为： 首先，拉取各个从OSD上的有效日志。其次，用主OSD上的权威日志与各个从OSD上的日志进行对比，从而计算出各个从OSD上不一致的对象并保存在对应的pg_missing_t结构中，作为后续数据修复的依据。
+
+
+主OSD的不一致的对象信息，已经在调用PG::proc_master_log()合并权威日志的过程中计算出来，所以这里只计算从OSD上不一致对象。
+
+**1.3.10.1 拉取从副本上的日志**
+
+在GetMissing()的构造函数里，通过对比主OSD上的权威pg_info信息，来获取从OSD上的日志信息：
+{% highlight string %}
+PG::RecoveryState::GetMissing::GetMissing(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Started/Primary/Peering/GetMissing")
+{
+	context< RecoveryMachine >().log_enter(state_name);
+	
+	PG *pg = context< RecoveryMachine >().pg;
+	assert(!pg->actingbackfill.empty());
+	for (set<pg_shard_t>::iterator i = pg->actingbackfill.begin();i != pg->actingbackfill.end();++i) {
+		if (*i == pg->get_primary()) continue;
+
+		const pg_info_t& pi = pg->peer_info[*i];
+		
+		if (pi.is_empty())
+			continue;                                // no pg data, nothing divergent
+		
+		if (pi.last_update < pg->pg_log.get_tail()) {
+			dout(10) << " osd." << *i << " is not contiguous, will restart backfill" << dendl;
+			pg->peer_missing[*i];
+			continue;
+		}
+	
+		if (pi.last_backfill == hobject_t()) {
+			dout(10) << " osd." << *i << " will fully backfill; can infer empty missing set" << dendl;
+			pg->peer_missing[*i];
+			continue;
+		}
+	
+		if (pi.last_update == pi.last_complete &&  // peer has no missing
+		   pi.last_update == pg->info.last_update) {  // peer is up to date
+			// replica has no missing and identical log as us.  no need to
+			// pull anything.
+			// FIXME: we can do better here.  if last_update==last_complete we
+			//        can infer the rest!
+	
+			dout(10) << " osd." << *i << " has no missing, identical log" << dendl;
+			pg->peer_missing[*i];
+			continue;
+		}
+	
+		// We pull the log from the peer's last_epoch_started to ensure we
+		// get enough log to detect divergent updates.
+		eversion_t since(pi.last_epoch_started, 0);
+		assert(pi.last_update >= pg->info.log_tail);  // or else choose_acting() did a bad thing
+		if (pi.log_tail <= since) {
+			dout(10) << " requesting log+missing since " << since << " from osd." << *i << dendl;
+			context< RecoveryMachine >().send_query(
+			  *i,
+			  pg_query_t(
+				pg_query_t::LOG,
+				i->shard, pg->pg_whoami.shard,
+				since, pg->info.history,
+				pg->get_osdmap()->get_epoch()));
+		} else {
+			dout(10) << " requesting fulllog+missing from osd." << *i<< " (want since " << since << " < log.tail " << pi.log_tail << ")"<< dendl;
+	
+			context< RecoveryMachine >().send_query(
+			  *i, pg_query_t(
+				pg_query_t::FULLLOG,
+				i->shard, pg->pg_whoami.shard,
+				pg->info.history, pg->get_osdmap()->get_epoch()));
+		}
+		peer_missing_requested.insert(*i);
+		pg->blocked_by.insert(i->osd);
+	}
+	
+	if (peer_missing_requested.empty()) {
+		if (pg->need_up_thru) {
+			dout(10) << " still need up_thru update before going active" << dendl;
+			post_event(NeedUpThru());
+			return;
+		}
+	
+		// all good!
+		post_event(Activate(pg->get_osdmap()->get_epoch()));
+	} else {
+		pg->publish_stats_to_osd();
+	}
+}
+
+{% endhighlight %}
+上述代码具体处理过程为遍历pg->actingbackfill的OSD列表，然后做如下的处理：
+
+1) 不需要获取PG日志的情况:
+
+&nbsp; a) pi.is_empty()为true，没有任何信息，需要Backfill过程来修复，不需要获取日志；
+
+&nbsp; b) pi.last_update小于pg->pg_log.get_tail()，该OSD的pg_info记录中，last_update小于权威日志的尾部，该OSD的日志和权威日志不重叠，该OSD操作已经远远落后于权威OSD，已经无法根据日志来修复，需要继续Backfill的过程；
+
+&nbsp; c) pi.last_backfill为hobject_t()，说明在past_interval期间，该OSD标记需要Backfill操作，实际并没开始Backfill的工作，需要继续Backfill过程；
+
+&nbsp; d) pi.last_update等于pi.last_complete，说明该PG没有丢失的对象，已经完成Recovery操作阶段，并且pi.last_update等于pg->info.last_update，说明日志和权威日志的最后更新一致，说明该PG数据完整，不需要恢复。
+
+2） 获取日志的情况：当pi.last_update大于等于pg->info.log_tail，说明该OSD的日志记录和权威日志记录重叠，可以通过日志来修复。变量since是从last_epoch_started开始的版本值：
+
+&nbsp; a) 如果该PG的日志记录pi.log_tail小于等于版本值since，那就发送消息pg_query_t::LOG，从since开始获取日志记录；
+
+&nbsp; b) 如果该PG的日志记录pi.log_tail大于版本值since，就发送消息pg_query_t::FULLLOG来获取该OSD的全部日志记录。
+
+3） 最后检查如果peer_missing_requested为空，说明所有获取日志的请求返回并处理完成。如果需要pg->need_up_thru，抛出post_event(NeedUpThru())；否则，直接调用post_event(Activate(pg->get_osdmap()->get_epoch()))进入```Activate```状态。
+
+下面举例说明获取日志的两种情况：
+
+![ceph-chapter10-21](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_21.jpg)
+
+当前last_epoch_started的值为10， since是last_epoch_started后的首个日志版本值。当前需要恢复的有效日志是经过since操作之后的日志，之前的日志已经没有了。
+
+对应OSD0，其日志log_tail大于since，全部拷贝osd0上的日志；对应osd1，其日志log_tail小于since，只拷贝从since开始的日志记录。
+
+**1.3.10.2 收到从副本上的日志记录处理**
+
+当一个PG的主OSD收到从OSD返回的获取日志ACK应答后，就把该消息封装成MLogRec事件。状态GetMissing接收到该事件后，在下列事件函数里处理该事件：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::GetMissing::react(const MLogRec& logevt)
+{
+	PG *pg = context< RecoveryMachine >().pg;
+	
+	peer_missing_requested.erase(logevt.from);
+	pg->proc_replica_log(*context<RecoveryMachine>().get_cur_transaction(),
+		logevt.msg->info, logevt.msg->log, logevt.msg->missing, logevt.from);
+	
+	if (peer_missing_requested.empty()) {
+		if (pg->need_up_thru) {
+			dout(10) << " still need up_thru update before going active" << dendl;
+			post_event(NeedUpThru());
+		} else {
+			dout(10) << "Got last missing, don't need missing " << "posting CheckRepops" << dendl;
+			post_event(Activate(pg->get_osdmap()->get_epoch()));
+		}
+	}
+	return discard_event();
+}
+{% endhighlight %}
+
+具体处理过程如下：
+
+1） 调用PG::proc_replica_log()处理日志。通过日志的对比，获取该OSD上处于missing状态的对象列表；
+
+2） 如果peering_missing_requested为空，即所有的获取日志请求返回并处理。如果需要pg->need_up_thru，抛出NeedUpThru()事件；否则，直接调用函数post_event(Activate(pg->get_osdmap()->get_epoch()))进入```Activate```状态。
+
+函数PG::proc_replica_log()处理各个从OSD上发过来的日志。它通过比较该OSD的日志和本地权威日志，来计算OSD上处于missing状态的对象列表。具体处理过程调用pg_log.proc_replica_log()来处理日志，输出为omissing，也就是OSD缺失的对象。
+
+### 1.4 Active操作
+由上可知，如果GetMissing()处理成功，就产生Activate()事件，该事件对于Primary OSD来说会跳转到Active状态：
+{% highlight string %}
+struct Peering : boost::statechart::state< Peering, Primary, GetInfo >, NamedState {
+	std::unique_ptr< PriorSet > prior_set;
+	bool history_les_bound;  //< need osd_find_best_info_ignore_history_les
+	
+	explicit Peering(my_context ctx);
+	void exit();
+	
+	typedef boost::mpl::list <
+	  boost::statechart::custom_reaction< QueryState >,
+	  boost::statechart::transition< Activate, Active >,
+	  boost::statechart::custom_reaction< AdvMap >
+	> reactions;
+	> 
+	boost::statechart::result react(const QueryState& q);
+	boost::statechart::result react(const AdvMap &advmap);
+};
+{% endhighlight %}
+其实到了本阶段为止，可以说peering主要工作已经完成，但还需要后续的处理，激活各个副本，如下所示：
+{% highlight string %}
+PG::RecoveryState::Active::Active(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Started/Primary/Active"),
+    remote_shards_to_reserve_recovery(
+      unique_osd_shard_set(
+	context< RecoveryMachine >().pg->pg_whoami,
+	context< RecoveryMachine >().pg->actingbackfill)),
+    remote_shards_to_reserve_backfill(
+      unique_osd_shard_set(
+	context< RecoveryMachine >().pg->pg_whoami,
+	context< RecoveryMachine >().pg->backfill_targets)),
+    all_replicas_activated(false)
+{
+	context< RecoveryMachine >().log_enter(state_name);
+	
+	PG *pg = context< RecoveryMachine >().pg;
+	
+	assert(!pg->backfill_reserving);
+	assert(!pg->backfill_reserved);
+	assert(pg->is_primary());
+
+	dout(10) << "In Active, about to call activate" << dendl;
+	pg->start_flush(
+	  context< RecoveryMachine >().get_cur_transaction(),
+	  context< RecoveryMachine >().get_on_applied_context_list(),
+	  context< RecoveryMachine >().get_on_safe_context_list());
+
+	pg->activate(*context< RecoveryMachine >().get_cur_transaction(),
+	  pg->get_osdmap()->get_epoch(),
+	  *context< RecoveryMachine >().get_on_safe_context_list(),
+	  *context< RecoveryMachine >().get_query_map(),
+	  context< RecoveryMachine >().get_info_map(),
+	  context< RecoveryMachine >().get_recovery_ctx());
+	
+	// everyone has to commit/ack before we are truly active
+	pg->blocked_by.clear();
+	for (set<pg_shard_t>::iterator p = pg->actingbackfill.begin();p != pg->actingbackfill.end();++p) {
+		if (p->shard != pg->pg_whoami.shard) {
+			pg->blocked_by.insert(p->shard);
+		}
+	}
+
+	pg->publish_stats_to_osd();
+	dout(10) << "Activate Finished" << dendl;
+}
+
+{% endhighlight %}
+状态Active的构造函数里处理过程如下：
+
+1） 在构造函数里初始化了remote_shards_to_reserve_recovery和remote_shards_to_reserve_backfill，需要Recovery操作和Backfill操作的OSD；
+
+2） 调用函数pg->start_flush()来完成相关数据的flush工作；
+
+3) 调用函数pg->activate()完成最后的激活工作。
+
+###### 1.4.1 MissingLoc
+在讲解pg->activate()之前，我们先介绍一下其中使用到的MissingLoc。类MIssingLoc用来记录处于missing状态对象的位置，也就是缺失对象的正确版本分别在哪些OSD上。恢复时就去这些OSD上去拉取正确对象的对象数据：
+{% highlight string %}
+ class MissingLoc {
+	//缺失的对象 ---> item(现在版本，缺失的版本)
+	map<hobject_t, pg_missing_t::item, hobject_t::BitwiseComparator> needs_recovery_map;
+
+	//缺失的对象 ---> 所在的OSD集合
+	map<hobject_t, set<pg_shard_t>, hobject_t::BitwiseComparator > missing_loc;
+
+	//所有缺失对象所在的OSD集合
+	set<pg_shard_t> missing_loc_sources;
+	PG *pg;
+	set<pg_shard_t> empty_set;
+};
+{% endhighlight %}
+
+下面介绍一些MissingLoc处理函数，作用是添加相应的missing对象列表。其对应两个函数：add_active_missing()函数和add_source_info()函数。
+
+* add_active_missing()函数： 用于把一个副本中的所有缺失对象添加到MissingLoc的needs_recovery_map结构里
+{% highlight string %}
+void add_active_missing(const pg_missing_t &missing) {
+	...
+}
+{% endhighlight %}
+
+* add_source_info()函数： 用于计算每个缺失对象是否在本OSD上
+{% highlight string %}
+/// Adds info about a possible recovery source
+bool add_source_info(
+	pg_shard_t source,               ///< [in] source
+	const pg_info_t &oinfo,         ///< [in] info
+	const pg_missing_t &omissing,   ///< [in] (optional) missing
+	bool sort_bitwise,             ///< [in] local sort bitwise (vs nibblewise)
+	ThreadPool::TPHandle* handle   ///< [in] ThreadPool handle
+	); 
+{% endhighlight %}
+
+具体实现如下：
+
+遍历needs_recovery_map里的所有对象，对每个对象做如下处理：
+
+1） 如果oinfo.last_update < need(所缺失的对象版本），就跳过；
+
+2） 如果该PG正常的last_backfill指针小于MAX值，说明还处于Backfill阶段，但是sort_bitwise不正确，跳过；
+
+3） 如果该对象大于last_backfill，显然该对象不存在，跳过；
+
+4） 如果该对象大于last_complete，说明该对象或者是上次Peering之后缺失的对象，还没有来得及修复；或者是新创建的对象。检查如果missing记录已存在，就是上次缺失的对象，直接跳过；否则就是新创建的对象，存在该OSD中；
+
+5）经过上述检查后，确认该对象在本OSD上，在missing_loc添加该对象的location为本OSD。
+
+###### 1.4.2 Active状态
+PG::activate()函数是Peering过程的最后一步：
+{% highlight string %}
+void PG::activate(ObjectStore::Transaction& t,
+		  epoch_t activation_epoch,
+		  list<Context*>& tfin,
+		  map<int, map<spg_t,pg_query_t> >& query_map,
+		  map<int,
+		      vector<
+			pair<pg_notify_t,
+			     pg_interval_map_t> > > *activator_map,
+                  RecoveryCtx *ctx)
+{
+	
+}
+{% endhighlight %}
+该函数完成以下功能：
+
+* 更新一些pg_info的参数信息
+
+* 给replica发消息，激活副本PG；
+
+* 计算MissingLoc，也就是缺失对象分布在哪些OSD上，用于后续的恢复；
+
+具体的处理过程如下：
+
+1） 如果需要客户回答，就把PG添加到replay_queue队列里；
+
+2） 更新info.last_epoch_started变量，info.last_epoch_started指的是本OSD在完成目前Peering进程后的更新，而info.history.last_epoch_started是PG的所有OSD都确认完成Peering的更新。
+
+3） 更新一些相关的字段；
+
+4） 注册C_PG_ActivateCommitted()回调函数，该函数最终完成activate的工作；
+
+5) 初始化snap_trimq快照相关的变量；
+
+6） 设置info.last_complete指针：
+
+* 如果missing.num_missing()等于0，表明处于clean状态。直接更新info.last_complete等于info.last_update，并调用pg_log.reset_recovery_pointers()调整log的complete_to指针；
+
+* 否则，如果有需要恢复的对象，就调用函数pg_log.activate_not_complete(info)，设置info.last_complete为缺失的第一个对象的前一个版本。
+
+7） 以下都是主OSD的操作，给每个从OSD发送MOSDPGLog类型的消息，激活该PG的从OSD上的副本。分别对应三种不同处理：
+{% highlight string %}
+void PG::activate(ObjectStore::Transaction& t,
+		  epoch_t activation_epoch,
+		  list<Context*>& tfin,
+		  map<int, map<spg_t,pg_query_t> >& query_map,
+		  map<int,
+		      vector<
+			pair<pg_notify_t,
+			     pg_interval_map_t> > > *activator_map,
+                  RecoveryCtx *ctx)
+{
+	...
+	for (set<pg_shard_t>::iterator i = actingbackfill.begin();i != actingbackfill.end();++i) {
+
+		...
+
+		if (pi.last_update == info.last_update && !force_restart_backfill){
+
+			...
+
+		}else if (pg_log.get_tail() > pi.last_update || pi.last_backfill == hobject_t() ||
+		force_restart_backfill || (backfill_targets.count(*i) && pi.last_backfill.is_max())) {	
+
+			...
+		}else{
+
+		}
+
+	}
+}
+{% endhighlight %}
+
+* 如果pi.last_update等于info.last_update，这种情况下，该OSD本身就是clean的，不需要给该OSD发送其他信息。添加到activator_map只发送pg_info来激活从OSD。其最终的执行在PeeringWQ的线程执行完状态机的事件处理后，在函数OSD::dispatch_context()里调用OSD::do_info()函数实现；
+
+* 需要Backfill操作的OSD，发送pg_info，以及osd_min_pg_log_entries数量的PG日志；
+
+* 需要Recovery操作的OSD，发送pg_info，以及从缺失的日志；
+
+8） 设置MissingLoc，也就是统计缺失的对象，以及缺失的对象所在的OSD，核心就是调用MissingLoc的add_source_info()函数，见MissingLoc的相关分析；
+
+9) 如果需要恢复，把该PG加入到osd->queue_for_recovery(this)的恢复队列中；
+
+10） 如果PG当前acting set的size小于该PG所在pool设置的副本size，也就是当前的OSD不够，就标记PG的状态为```PG_STATE_DEGRADED```和```PG_STATE_UNDERSIZED``` ，最后标记PG为```PG_STATE_ACTIVATING```状态；
+
+
+
+
+
+
 
 
 <br />

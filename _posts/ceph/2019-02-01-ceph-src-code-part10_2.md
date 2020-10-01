@@ -493,7 +493,33 @@ last_epoch_started字段有两个地方出现，一个是pg_info_t结构里的la
 
 1） info.last_epoch_started: PG在本OSD上完成Peering操作，就会马上更新其对应的last_epoch_started的值。参看PG::activate()函数
 
-2） info.history.last_epoch_started： 对于本字段的更新操作，情况较为复杂。对于PG副本OSD上的info.history.last_epoch_started字段的更新会在Peering完成后马上进行，参看PG::activate()；对于PG主OSD上的info.history.last_epoch_started的更新，可以分为如下两种情况（假设有PG 1.0[0,1,2])：
+2） info.history.last_epoch_started： 对于本字段的更新操作，情况较为复杂。
+
+对于PG副本OSD上的info.history.last_epoch_started字段的更新会在Peering完成后马上进行，参看PG::activate()；另外还会在Primary OSD向副本OSD发送pg_query_t::INFO时得到更新：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Stray::react(const MQuery& query){
+	if (query.query.type == pg_query_t::INFO) {
+		...
+
+		pg->update_history_from_master(query.query.history);
+		...
+	}
+}
+
+void PG::update_history_from_master(pg_history_t new_history)
+{
+	unreg_next_scrub();
+	if (info.history.merge(new_history))
+		dirty_info = true;
+	reg_next_scrub();
+}
+{% endhighlight %}
+在上面的merge函数中，其会将info.history.last_epoch_started更新为一个较大的值。如此确保了:
+{% highlight string %}
+replica.info.history.last_epoch_started >= primary.info.history.last_epoch_started
+{% endhighlight %}
+
+对于PG主OSD上的info.history.last_epoch_started的更新，可以分为如下两种情况（假设有PG 1.0[0,1,2])：
 
 * 主动触发更新： 此种情况为在主OSD完成peering之前，所有的副本OSD就已经完成了Peering，此时会主动触发更新history.last_epoch_started
 {% highlight string %}
@@ -586,6 +612,30 @@ boost::statechart::result PG::RecoveryState::Active::react(const AllReplicasActi
 
 	// info.last_epoch_started is set during activate()
 	pg->info.history.last_epoch_started = pg->info.last_epoch_started;
+
+	...
+}
+{% endhighlight %}
+
+* 获取到权威日志时触发更新
+{% highlight string %}
+void PG::proc_master_log(
+  ObjectStore::Transaction& t, pg_info_t &oinfo,
+  pg_log_t &olog, pg_missing_t& omissing, pg_shard_t from)
+{
+
+	...
+
+	// See doc/dev/osd_internals/last_epoch_started
+	if (oinfo.last_epoch_started > info.last_epoch_started) {
+		info.last_epoch_started = oinfo.last_epoch_started;
+		dirty_info = true;
+	}
+	if (info.history.merge(oinfo.history))
+		dirty_info = true;
+
+	assert(cct->_conf->osd_find_best_info_ignore_history_les ||
+	info.last_epoch_started >= info.history.last_epoch_started);
 
 	...
 }
@@ -1242,7 +1292,7 @@ PG::RecoveryState::GetMissing::GetMissing(my_context ctx);
 
 &emsp; c) pi.last_backfill为hobject_t()，说明在past_interval期间，该OSD标记需要Backfill操作，实际并没开始Backfill的工作，需要继续Backfill过程；
 
-&emsp; d) pi.last_update等于pi.last_complete，说明该PG没有丢失的对象，已经完成Recovery操作阶段，并且pi.last_update等于pg->info.last_update，说明日志和权威日志的最后更新一致，说明该PG数据完整，不需要回复。
+&emsp; d) pi.last_update等于pi.last_complete，说明该PG没有丢失的对象，已经完成Recovery操作阶段，并且pi.last_update等于pg->info.last_update，说明日志和权威日志的最后更新一致，说明该PG数据完整，不需要恢复。
 
 2） 获取日志的情况：当pi.last_update大于pg->info.log_tail，该OSD的日志记录和权威日志记录重叠，可以通过日志来修复。变量since是从last_epoch_started开始的版本值：
 
