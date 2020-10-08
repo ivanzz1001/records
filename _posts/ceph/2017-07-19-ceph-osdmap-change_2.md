@@ -2410,7 +2410,7 @@ struct Peering : boost::statechart::state< Peering, Primary, GetInfo >, NamedSta
 	boost::statechart::result react(const AdvMap &advmap);
 };
 {% endhighlight %}
-其实到了本阶段为止，可以说peering主要工作已经完成，但还需要后续的处理，激活各个副本，如下所示：
+其实到了本阶段为止，可以说peering主要工作已经完成，主OSD已经进入了Active状态。但还需要后续的处理，激活各个副本，如下所示：
 {% highlight string %}
 PG::RecoveryState::Active::Active(my_context ctx)
   : my_base(ctx),
@@ -2519,8 +2519,8 @@ bool add_source_info(
 
 5）经过上述检查后，确认该对象在本OSD上，在missing_loc添加该对象的location为本OSD。
 
-###### 1.4.2 Active状态
-PG::activate()函数是Peering过程的最后一步：
+###### 1.4.2 activate操作
+PG::activate()函数是主OSD进入Active状态后执行的第一步操作：
 {% highlight string %}
 void PG::activate(ObjectStore::Transaction& t,
 		  epoch_t activation_epoch,
@@ -2607,10 +2607,233 @@ void PG::activate(ObjectStore::Transaction& t,
 10） 如果PG当前acting set的size小于该PG所在pool设置的副本size，也就是当前的OSD不够，就标记PG的状态为```PG_STATE_DEGRADED```和```PG_STATE_UNDERSIZED``` ，最后标记PG为```PG_STATE_ACTIVATING```状态；
 
 
+###### 1.4.3 收到从OSD的MOSDPGLog的应答
+当收到从OSD发送的对MOSDPGLog的ACK消息后，触发MInfoRec事件，下面这个函数处理该事件：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Active::react(const MInfoRec& infoevt)
+{
+	PG *pg = context< RecoveryMachine >().pg;
+	assert(pg->is_primary());
+	
+	assert(!pg->actingbackfill.empty());
+	// don't update history (yet) if we are active and primary; the replica
+	// may be telling us they have activated (and committed) but we can't
+	// share that until _everyone_ does the same.
+	if (pg->is_actingbackfill(infoevt.from)) {
+		dout(10) << " peer osd." << infoevt.from << " activated and committed" << dendl;
+		pg->peer_activated.insert(infoevt.from);
+		pg->blocked_by.erase(infoevt.from.shard);
+		pg->publish_stats_to_osd();
+
+		if (pg->peer_activated.size() == pg->actingbackfill.size()) {
+			pg->all_activated_and_committed();
+		}
+	}
+
+	return discard_event();
+}
+{% endhighlight %}
+
+处理过程比较简单：检查该请求的源OSD在本PG的actingbackfill列表中，以及在等待列表中删除该OSD。最后检查，当收集到所有从OSD发送的ACK，就调用函数all_activated_and_committed():
+{% highlight string %}
+/*
+ * update info.history.last_epoch_started ONLY after we and all
+ * replicas have activated AND committed the activate transaction
+ * (i.e. the peering results are stable on disk).
+ */
+void PG::all_activated_and_committed()
+{
+  dout(10) << "all_activated_and_committed" << dendl;
+  assert(is_primary());
+  assert(peer_activated.size() == actingbackfill.size());
+  assert(!actingbackfill.empty());
+  assert(blocked_by.empty());
+
+  queue_peering_event(
+    CephPeeringEvtRef(
+      std::make_shared<CephPeeringEvt>(
+        get_osdmap()->get_epoch(),
+        get_osdmap()->get_epoch(),
+        AllReplicasActivated())));
+}
+{% endhighlight %}
+该函数产生一个AllReplicasActivated()事件。
+
+对应主OSD在事务的回调函数C_PG_ActivateCommitted()里实现，最终调用PG::_activate_committed()加入peer_activated集合里:
+{% highlight string %}
+void PG::_activate_committed(epoch_t epoch, epoch_t activation_epoch);
+{% endhighlight %}
+>注： Replica收到主OSD发送的MOSDPGLog消息，会进入ReplicaAcitve状态，然后也会调用PG::activate()函数，从而也会调用到PG::_activate_committed()函数，在该函数里向主OSD发出ACK响应。
+
+###### 1.4.4 AllReplicasActivated
+如下函数用于处理AllReplicasActivated事件：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Active::react(const AllReplicasActivated &evt)
+{
+	PG *pg = context< RecoveryMachine >().pg;
+	all_replicas_activated = true;
+	
+	pg->state_clear(PG_STATE_ACTIVATING);
+	pg->state_clear(PG_STATE_CREATING);
+	if (pg->acting.size() >= pg->pool.info.min_size) {
+		pg->state_set(PG_STATE_ACTIVE);
+	} else {
+		pg->state_set(PG_STATE_PEERED);
+	}
+	
+	// info.last_epoch_started is set during activate()
+	pg->info.history.last_epoch_started = pg->info.last_epoch_started;
+	pg->dirty_info = true;
+	
+	pg->share_pg_info();
+	pg->publish_stats_to_osd();
+	
+	pg->check_local();
+	
+	// waiters
+	if (pg->flushes_in_progress == 0) {
+		pg->requeue_ops(pg->waiting_for_peered);
+	}
+	
+	pg->on_activate();
+	
+	return discard_event();
+}
+{% endhighlight %}
+
+当所有的replica处于activated状态时，进行如下处理：
+
+1) 取消```PG_STATE_ACTIVATING```和```PG_STATE_CREATING```状态，如果该PG上acting状态的OSD数量大于等于pool的min_size，那么设置该PG为```PG_STATE_ACTIVE```状态，否则设置为```PG_STATE_PEERED```状态；
+
+2） 调用pg->share_pg_info()函数向actingbackfill列表中的Replicas发送最新的pg_info_t信息；
+
+3） 调用ReplicatedPG::check_local()检查本地的stray objects是否被删除；
+
+4） 如果有读写请求在等待peering操作完成，则把该请求添加到处理队列pg->requeue_ops(pg->waiting_for_peered);
+
+5） 调用函数ReplicatedPG::on_activate()，如果需要Recovery操作，触发DoRecovery事件；如果需要Backfill操作，触发RequestBackfill事件；否则，触发AllReplicasRecovered事件；
+
+6） 初始化Cache Tier需要的hit_set对象；
+
+7） 初始化Cache Tier需要的agent对象；
+
+>注： 在ReplicatedPG::do_request()函数中，如果发现当前PG没有peering成功，那么将会将相应的请求保存到waiting_for_peered队列中。详细请参看OSD的读写流程。
 
 
+### 1.5 副本端的状态转移
+当创建PG后，根据不同的角色，如果是主OSD，PG对应的状态机就进入Primary状态； 如果不是主OSD，就进入Stray状态。
+
+###### 1.5.1 Stray状态
+
+Stray状态有两种情况:
 
 
+----------
+
+
+**情况1：** 只接收到PGINFO的处理
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Stray::react(const MInfoRec& infoevt)
+{
+	PG *pg = context< RecoveryMachine >().pg;
+	dout(10) << "got info from osd." << infoevt.from << " " << infoevt.info << dendl;
+	
+	if (pg->info.last_update > infoevt.info.last_update) {
+		// rewind divergent log entries
+		ObjectStore::Transaction* t = context<RecoveryMachine>().get_cur_transaction();
+		pg->rewind_divergent_log(*t, infoevt.info.last_update);
+		pg->info.stats = infoevt.info.stats;
+		pg->info.hit_set = infoevt.info.hit_set;
+	}
+	
+	assert(infoevt.info.last_update == pg->info.last_update);
+	assert(pg->pg_log.get_head() == pg->info.last_update);
+	
+	post_event(Activate(infoevt.info.last_epoch_started));
+	return transit<ReplicaActive>();
+}
+{% endhighlight %}
+
+从PG接收到主PG发送的```MInfoRec```事件，也就是接收到主OSD发送的pg_info信息。其判断如果当前pg->info.last_update大于infoevt.info.last_update，说明当前的日志有```divergent```的日志，调用函数PG::rewind_divergent_log()清理日志即可。最后抛出Activate(infoevt.info.last_epoch_started)事件，进入ReplicaActive状态。
+
+
+----------
+
+**情况2：** 接收到MOSDPGLog消息
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Stray::react(const MLogRec& logevt)
+{
+	PG *pg = context< RecoveryMachine >().pg;
+	MOSDPGLog *msg = logevt.msg.get();
+	dout(10) << "got info+log from osd." << logevt.from << " " << msg->info << " " << msg->log << dendl;
+	
+	ObjectStore::Transaction* t = context<RecoveryMachine>().get_cur_transaction();
+	if (msg->info.last_backfill == hobject_t()) {
+		// restart backfill
+		pg->unreg_next_scrub();
+		pg->info = msg->info;
+		pg->reg_next_scrub();
+		pg->dirty_info = true;
+		pg->dirty_big_info = true;  // maybe.
+		
+		PGLogEntryHandler rollbacker;
+		pg->pg_log.claim_log_and_clear_rollback_info(msg->log, &rollbacker);
+		rollbacker.apply(pg, t);
+		
+		pg->pg_log.reset_backfill();
+	} else {
+		pg->merge_log(*t, msg->info, msg->log, logevt.from);
+	}
+	
+	assert(pg->pg_log.get_head() == pg->info.last_update);
+	
+	post_event(Activate(logevt.msg->info.last_epoch_started));
+	return transit<ReplicaActive>();
+}
+{% endhighlight %}
+当从PG接收到MLogRec事件，就对应着接收到主PG发送的MOSDPGLog消息，其通知PG处于activate状态，具体处理过程如下：
+
+1） 如果msg->info.last_backfill为hobject_t()，需要Backfill操作的OSD；
+
+2） 否则就是需要Recovery操作的OSD，调用merge_log()把主OSD发送过来的日志合并
+
+抛出Activate(logevt.msg->info.last_eopch_started)事件，使副本转移到ReplicaActive状态
+
+
+###### 1.5.2 ReplicaActive状态
+ReplicaActive状态如下：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::ReplicaActive::react(
+  const Activate& actevt) {
+  dout(10) << "In ReplicaActive, about to call activate" << dendl;
+  PG *pg = context< RecoveryMachine >().pg;
+  map<int, map<spg_t, pg_query_t> > query_map;
+  pg->activate(*context< RecoveryMachine >().get_cur_transaction(),
+	       actevt.activation_epoch,
+	       *context< RecoveryMachine >().get_on_safe_context_list(),
+	       query_map, NULL, NULL);
+  dout(10) << "Activate Finished" << dendl;
+  return discard_event();
+}
+{% endhighlight %}
+
+当处于ReplicaActive状态，接收到Activate事件，就调用PG::activate()函数。在函数PG::_activate_committed()中给主PG发送应答信息，告诉主OSD自己处于activate状态，设置PG为activate状态。
+
+
+## 3. 状态机异常处理
+在上面的流程介绍中，只介绍了正常状态机的转换流程。Ceph之所以用状态机来实现PG的状态转移，就是可以实现任何异常情况下的处理。下面介绍当OSD失效时，导致相关的PG重新Peering的机制。
+
+当一个OSD失效，Monitor会通过heartbeat检测到，导致osdmap发生了变化，Monitor会把最新的osdmap推送给OSD，导致OSD上受影响PG重新进行Peering操作。
+
+具体流程如下：
+
+1） 在函数OSD::handle_osd_map()处理osdmap的变化，该函数调用consume_map()，对每一个PG调用pg->queue_null()，把PG加入到peering_wq中；
+
+2） peering_wq的处理函数process_peering_events()调用OSD::advance_pg()函数，在该函数里调用PG::handle_advance_map()给PG的状态机RecoveryMachine发送AdvMap事件：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Started::react(const AdvMap& advmap);
+{% endhighlight %}
+当处于Started状态，接收到AdvMap事件，调用函数pg->should_restart_peering()检查，如果是new_interval，就跳转到Reset状态，重新开始一次Peering过程。
 
 
 <br />

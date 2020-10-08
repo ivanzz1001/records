@@ -1462,13 +1462,13 @@ void PG::activate(ObjectStore::Transaction& t,
 
 10） 如果PG的size小于act set的size，也就是当前的OSD不够，就标记PG的状态为```PG_STATE_DEGRADED```和```PG_STATE_UNDERSIZED```状态，最后标记PG为```PG_STATE_ACTIVATING```状态
 
-###### 8.3 收到从OSD的MOSDPGLog的应对
+###### 8.3 收到从OSD的MOSDPGLog的应答
 当收到从OSD发送的MOSDPGLog的ACK消息后，触发MInfoRec事件，下面这个函数处理该事件：
 {% highlight string %}
 boost::statechart::result PG::RecoveryState::Active::react(const MInfoRec& infoevt);
 {% endhighlight %}
 
-处理过程比较简单： 检查该请求的源OSD在本PG的actingbackfill列表中，以等待列表中删除该OSD。最后检查，当收集到所有从OSD发送的ACK，就调用函数all_activated_and_committed()触发AllReplicasActivated事件。
+处理过程比较简单： 检查该请求的源OSD在本PG的actingbackfill列表中，以及等待列表中删除该OSD。最后检查，当收集到所有从OSD发送的ACK，就调用函数all_activated_and_committed()触发AllReplicasActivated事件。
 
 对应主OSD在事务的回调函数C_PG_ActivateCommitted()里实现，最终调用_activate_committed()加入peer_activated集合里。
 
@@ -1516,7 +1516,7 @@ boost::statechart::result PG::RecoveryState::Stray::react(const MInfoRec& infoev
 {% highlight string %}
 boost::statechart::result PG::RecoveryState::Stray::react(const MLogRec& logevt);
 {% endhighlight %}
-当从PG接收到MLogRec事件，就对应这接收到主PG发送的MOSDPGLog消息，其通知PG处于activate状态，具体处理过程如下：
+当从PG接收到MLogRec事件，就对应着接收到主PG发送的MOSDPGLog消息，其通知PG处于activate状态，具体处理过程如下：
 
 1） 如果msg->info.last_backfill为hobject_t()，需要Backfill操作的OSD；
 
