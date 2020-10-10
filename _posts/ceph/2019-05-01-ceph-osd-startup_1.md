@@ -1377,8 +1377,36 @@ boost::statechart::result PG::RecoveryState::Reset::react(const AdvMap& advmap)
 关于在PG::RecoveryState::react()中对AdvMap事件的处理，其中计算past_interval的过程，我们后面会再进行详细的介绍。
 
 
+## 4. OSD中几个线程参数的设置
+通过如下命令查看OSD中其中一些有关线程数的设置：
+{% highlight string %}
+# ceph daemon osd.0 config show | grep threads
+    "xio_portal_threads": "2",
+    "async_compressor_threads": "2",
+    "ms_async_op_threads": "3",
+    "ms_async_max_op_threads": "5",
+    "osd_op_threads": "2",
+    "osd_disk_threads": "1",
+    "osd_recovery_threads": "1",
+    "osd_op_num_threads_per_shard": "2",
+    "bluestore_wal_threads": "4",
+    "filestore_op_threads": "5",
+    "filestore_ondisk_finisher_threads": "1",
+    "filestore_apply_finisher_threads": "1",
+    "rbd_op_threads": "1",
+    "rgw_enable_quota_threads": "true",
+    "rgw_enable_gc_threads": "true",
+    "rgw_num_async_rados_threads": "32",
+    "internal_safe_to_start_threads": "true",
 
+{% endhighlight %}
+下面我们对其中一些配置进行简要说明：
 
+* osd_op_threads: 处理peering等请求时的线程数，用于回调OSD::process_peering_events()
+
+* filestore_op_threads: 用于filestore层进行IO操作的线程数；
+
+* osd_disk_threads: 处理snap trim，replica trim及scrub等的线程数
 
 <br />
 <br />
