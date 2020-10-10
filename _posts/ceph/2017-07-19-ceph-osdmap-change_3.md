@@ -673,7 +673,57 @@ void OSDMap::_pg_to_up_acting_osds(const pg_t& pg, vector<int> *up, int *up_prim
                                    vector<int> *acting, int *acting_primary) const{
 }
 {% endhighlight %}
-函数OSDMap::pg_to_up_acting_osds()根据osdmap来计算指定PG所映射到的osd。这里针对
+函数OSDMap::pg_to_up_acting_osds()根据osdmap来计算指定PG所映射到的osd。这里针对```PG 11.4```而言，计算出的newup为[3,2]， newacting为[3].
+
+2） **函数handle_advance_map()**
+{% highlight string %}
+void PG::handle_advance_map(
+  OSDMapRef osdmap, OSDMapRef lastmap,
+  vector<int>& newup, int up_primary,
+  vector<int>& newacting, int acting_primary,
+  RecoveryCtx *rctx)
+{
+	dout(10) << "handle_advance_map "
+		<< newup << "/" << newacting
+		<< " -- " << up_primary << "/" << acting_primary
+		<< dendl;
+
+	...
+	
+	AdvMap evt(
+		osdmap, lastmap, newup, up_primary,
+		newacting, acting_primary);
+	recovery_state.handle_event(evt, rctx);
+	...
+}
+{% endhighlight %}
+这里```PG11.4```对应的up set为[3,2], acting set也为[3]，up_primary为3，acting_primary也为3。之后会产生一个AdvMap事件，交由recovery_state来进行处理，从而触发peering进程。
+
+3) **函数handle_activate_map()**
+{% highlight string %}
+void PG::handle_activate_map(RecoveryCtx *rctx)
+{
+	dout(10) << "handle_activate_map " << dendl;
+	ActMap evt;
+	recovery_state.handle_event(evt, rctx);
+	if (osdmap_ref->get_epoch() - last_persisted_osdmap_ref->get_epoch() > cct->_conf->osd_pg_epoch_persisted_max_stale) {
+		dout(20) << __func__ << ": Dirtying info: last_persisted is "<< last_persisted_osdmap_ref->get_epoch()
+			<< " while current is " << osdmap_ref->get_epoch() << dendl;
+		dirty_info = true;
+	} else {
+		dout(20) << __func__ << ": Not dirtying info: last_persisted is "<< last_persisted_osdmap_ref->get_epoch()
+			<< " while current is " << osdmap_ref->get_epoch() << dendl;
+	}
+
+	if (osdmap_ref->check_new_blacklist_entries()) check_blacklisted_watchers();
+}
+{% endhighlight %}
+函数handle_activate_map()用于激活
+
+### 2.1 Clean状态对AdvMap事件的处理
+由于在当前状态，PG 11.4已经处于clean状态，且osd3对于PG 11.4而言是主OSD，因此接收到AdvMap事件时，处理流程如下：
+{% highlight string %}
+{% endhighlight }
 
 
 <br />
