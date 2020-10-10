@@ -2390,7 +2390,31 @@ boost::statechart::result PG::RecoveryState::GetMissing::react(const MLogRec& lo
 
 函数PG::proc_replica_log()处理各个从OSD上发过来的日志。它通过比较该OSD的日志和本地权威日志，来计算OSD上处于missing状态的对象列表。具体处理过程调用pg_log.proc_replica_log()来处理日志，输出为omissing，也就是OSD缺失的对象。
 
-### 1.4 Active操作
+### 1.4 Started/Primary/Peering/WaitUpThru状态
+
+在前面Started/Primary/Peering/GetInfo状态时，我们通过调用PG::build_prior()已经判断出```PG 11.4```的need_up_thru值为true，因此会进入WaitUpThru状态：
+{% highlight string %}
+PG::RecoveryState::WaitUpThru::WaitUpThru(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Started/Primary/Peering/WaitUpThru")
+{
+  context< RecoveryMachine >().log_enter(state_name);
+}
+{% endhighlight %}
+之后获取到相应的UpThru之后，就会通过如下退出WaitUpThru状态：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::WaitUpThru::react(const ActMap& am)
+{
+  PG *pg = context< RecoveryMachine >().pg;
+  if (!pg->need_up_thru) {
+    post_event(Activate(pg->get_osdmap()->get_epoch()));
+  }
+  return forward_event();
+}
+{% endhighlight %}
+
+
+### 1.5 Active操作
 由上可知，如果GetMissing()处理成功，就产生Activate()事件，该事件对于Primary OSD来说会跳转到Active状态：
 {% highlight string %}
 struct Peering : boost::statechart::state< Peering, Primary, GetInfo >, NamedState {
@@ -2467,7 +2491,11 @@ PG::RecoveryState::Active::Active(my_context ctx)
 
 3) 调用函数pg->activate()完成最后的激活工作。
 
-###### 1.4.1 MissingLoc
+此时，由于```PG 11.4```当前的映射为[3]，因此显示的状态为active+undersized+degraded。
+
+>注： 进入Active状态后，默认进入其初始子状态Started/Primary/Active/Activating
+
+###### 1.5.1 MissingLoc
 在讲解pg->activate()之前，我们先介绍一下其中使用到的MissingLoc。类MIssingLoc用来记录处于missing状态对象的位置，也就是缺失对象的正确版本分别在哪些OSD上。恢复时就去这些OSD上去拉取正确对象的对象数据：
 {% highlight string %}
  class MissingLoc {
@@ -2519,7 +2547,7 @@ bool add_source_info(
 
 5）经过上述检查后，确认该对象在本OSD上，在missing_loc添加该对象的location为本OSD。
 
-###### 1.4.2 activate操作
+###### 1.5.2 activate操作
 PG::activate()函数是主OSD进入Active状态后执行的第一步操作：
 {% highlight string %}
 void PG::activate(ObjectStore::Transaction& t,
@@ -2607,7 +2635,7 @@ void PG::activate(ObjectStore::Transaction& t,
 10） 如果PG当前acting set的size小于该PG所在pool设置的副本size，也就是当前的OSD不够，就标记PG的状态为```PG_STATE_DEGRADED```和```PG_STATE_UNDERSIZED``` ，最后标记PG为```PG_STATE_ACTIVATING```状态；
 
 
-###### 1.4.3 收到从OSD的MOSDPGLog的应答
+###### 1.5.3 收到从OSD的MOSDPGLog的应答
 当收到从OSD发送的对MOSDPGLog的ACK消息后，触发MInfoRec事件，下面这个函数处理该事件：
 {% highlight string %}
 boost::statechart::result PG::RecoveryState::Active::react(const MInfoRec& infoevt)
@@ -2665,7 +2693,7 @@ void PG::_activate_committed(epoch_t epoch, epoch_t activation_epoch);
 {% endhighlight %}
 >注： Replica收到主OSD发送的MOSDPGLog消息，会进入ReplicaAcitve状态，然后也会调用PG::activate()函数，从而也会调用到PG::_activate_committed()函数，在该函数里向主OSD发出ACK响应。
 
-###### 1.4.4 AllReplicasActivated
+###### 1.5.4 AllReplicasActivated
 如下函数用于处理AllReplicasActivated事件：
 {% highlight string %}
 boost::statechart::result PG::RecoveryState::Active::react(const AllReplicasActivated &evt)
@@ -2711,7 +2739,7 @@ boost::statechart::result PG::RecoveryState::Active::react(const AllReplicasActi
 
 4） 如果有读写请求在等待peering操作完成，则把该请求添加到处理队列pg->requeue_ops(pg->waiting_for_peered);
 
-5） 调用函数ReplicatedPG::on_activate()，如果需要Recovery操作，触发DoRecovery事件；如果需要Backfill操作，触发RequestBackfill事件；否则，触发AllReplicasRecovered事件；
+5） 调用函数ReplicatedPG::on_activate()，如果需要Recovery操作，触发DoRecovery事件；如果需要Backfill操作，触发RequestBackfill事件；否则，触发AllReplicasRecovered事件。
 
 6） 初始化Cache Tier需要的hit_set对象；
 
@@ -2719,11 +2747,76 @@ boost::statechart::result PG::RecoveryState::Active::react(const AllReplicasActi
 
 >注： 在ReplicatedPG::do_request()函数中，如果发现当前PG没有peering成功，那么将会将相应的请求保存到waiting_for_peered队列中。详细请参看OSD的读写流程。
 
+在本例子PG 11.4中，我们不需要进行Recovery操作，也不需要进行Backfill操作，因此触发AllReplicasRecovered事件进入```Recovered```状态：
+{% highlight string %}
+9724:2020-09-11 14:05:19.902727 7fba3d124700 10 osd.3 pg_epoch: 2224 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 active+undersized+degraded] needs_recovery is recovered
+9727:2020-09-11 14:05:19.902736 7fba3d124700 10 osd.3 pg_epoch: 2224 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 active+undersized+degraded] needs_backfill does not need backfill
+9730:2020-09-11 14:05:19.902745 7fba3d124700 10 osd.3 pg_epoch: 2224 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 active+undersized+degraded] activate all replicas clean, no recovery
+9734:2020-09-11 14:05:19.902757 7fba3d124700 15 osd.3 pg_epoch: 2224 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 active+undersized+degraded] publish_stats_to_osd 2224: no change since 2020-09-11 14:05:19.902708
+9736:2020-09-11 14:05:19.902765 7fba3d124700 20 osd.3 pg_epoch: 2224 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 active+undersized+degraded] hit_set_clear
+9738:2020-09-11 14:05:19.902772 7fba3d124700 20 osd.3 pg_epoch: 2224 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 active+undersized+degraded] agent_stop
+9747:2020-09-11 14:05:19.902799 7fba3d124700 30 osd.3 pg_epoch: 2224 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 active+undersized+degraded] lock
+9750:2020-09-11 14:05:19.902808 7fba3d124700 10 osd.3 pg_epoch: 2224 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 active+undersized+degraded] handle_peering_event: epoch_sent: 2224 epoch_requested: 2224 FlushedEvt
+9753:2020-09-11 14:05:19.902817 7fba3d124700 15 osd.3 pg_epoch: 2224 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 active+undersized+degraded]  requeue_ops 
+10071:2020-09-11 14:05:19.904183 7fba3d124700 30 osd.3 pg_epoch: 2224 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 active+undersized+degraded] lock
+10072:2020-09-11 14:05:19.904190 7fba3d124700 10 osd.3 pg_epoch: 2224 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 active+undersized+degraded] handle_peering_event: epoch_sent: 2224 epoch_requested: 2224 AllReplicasRecovered
+10073:2020-09-11 14:05:19.904198 7fba3d124700  5 osd.3 pg_epoch: 2224 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 active+undersized+degraded] exit Started/Primary/Active/Activating 0.036851 4 0.000283
+10076:2020-09-11 14:05:19.904207 7fba3d124700  5 osd.3 pg_epoch: 2224 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 active+undersized+degraded] enter Started/Primary/Active/Recovered
+10078:2020-09-11 14:05:19.904216 7fba3d124700 10 osd.3 pg_epoch: 2224 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 active+undersized+degraded] needs_recovery is recovered
+10080:2020-09-11 14:05:19.904225 7fba3d124700  5 osd.3 pg_epoch: 2224 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 active+undersized+degraded] exit Started/Primary/Active/Recovered 0.000018 0 0.000000
+10082:2020-09-11 14:05:19.904234 7fba3d124700  5 osd.3 pg_epoch: 2224 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2222/0 2223/2223/2223) [3] r=0 lpr=2223 pi=2215-2222/3 crt=201'1 lcod 0'0 mlcod 0'0 active+undersized+degraded] enter Started/Primary/Active/Clean
+{% endhighlight %}
+参看如下代码：
+{% highlight string %}
+PG::RecoveryState::Recovered::Recovered(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Started/Primary/Active/Recovered")
+{
+	pg_shard_t auth_log_shard;
+	
+	context< RecoveryMachine >().log_enter(state_name);
+	
+	PG *pg = context< RecoveryMachine >().pg;
+	pg->osd->local_reserver.cancel_reservation(pg->info.pgid);
+	
+	assert(!pg->needs_recovery());
+	
+	// if we finished backfill, all acting are active; recheck if
+	// DEGRADED | UNDERSIZED is appropriate.
+	assert(!pg->actingbackfill.empty());
+	if (pg->get_osdmap()->get_pg_size(pg->info.pgid.pgid) <=
+	  pg->actingbackfill.size()) {
 
-### 1.5 副本端的状态转移
+		pg->state_clear(PG_STATE_DEGRADED);
+		pg->publish_stats_to_osd();
+	}
+	
+	// adjust acting set?  (e.g. because backfill completed...)
+	bool history_les_bound = false;
+	if (pg->acting != pg->up && !pg->choose_acting(auth_log_shard,
+			 true, &history_les_bound))
+	assert(pg->want_acting.size());
+	
+	if (context< Active >().all_replicas_activated)
+		post_event(GoClean());
+}
+{% endhighlight %}
+进入Started/Primary/Active/Recovered状态后，调用OSDMap::get_pg_size()来计算PG的副本个数：
+{% highlight string %}
+unsigned get_pg_size(pg_t pg) const {
+	map<int64_t,pg_pool_t>::const_iterator p = pools.find(pg.pool());
+	assert(p != pools.end());
+	return p->second.get_size();
+}
+{% endhighlight %}
+从上面可以看到其实是计算该PG所在pool的副本数。在这里PG 11.4所在的pool的副本数为2，而当前pg->actingbackfill.size()为1，因此仍处于```DEGRADED```状态。
+
+最后判断all_replicas_activated变量，如果所有副本均已激活，那么进入Clean状态。
+
+### 1.6 副本端的状态转移
 当创建PG后，根据不同的角色，如果是主OSD，PG对应的状态机就进入Primary状态； 如果不是主OSD，就进入Stray状态。
 
-###### 1.5.1 Stray状态
+###### 1.6.1 Stray状态
 
 Stray状态有两种情况:
 
@@ -2800,7 +2893,7 @@ boost::statechart::result PG::RecoveryState::Stray::react(const MLogRec& logevt)
 抛出Activate(logevt.msg->info.last_eopch_started)事件，使副本转移到ReplicaActive状态
 
 
-###### 1.5.2 ReplicaActive状态
+###### 1.6.2 ReplicaActive状态
 ReplicaActive状态如下：
 {% highlight string %}
 boost::statechart::result PG::RecoveryState::ReplicaActive::react(
@@ -2820,7 +2913,8 @@ boost::statechart::result PG::RecoveryState::ReplicaActive::react(
 当处于ReplicaActive状态，接收到Activate事件，就调用PG::activate()函数。在函数PG::_activate_committed()中给主PG发送应答信息，告诉主OSD自己处于activate状态，设置PG为activate状态。
 
 
-## 3. 状态机异常处理
+
+## 4. 状态机异常处理
 在上面的流程介绍中，只介绍了正常状态机的转换流程。Ceph之所以用状态机来实现PG的状态转移，就是可以实现任何异常情况下的处理。下面介绍当OSD失效时，导致相关的PG重新Peering的机制。
 
 当一个OSD失效，Monitor会通过heartbeat检测到，导致osdmap发生了变化，Monitor会把最新的osdmap推送给OSD，导致OSD上受影响PG重新进行Peering操作。
