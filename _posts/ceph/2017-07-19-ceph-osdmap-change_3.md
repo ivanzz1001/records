@@ -756,7 +756,7 @@ boost::statechart::result PG::RecoveryState::Started::react(const AdvMap& advmap
   pg->remove_down_peer_info(advmap.osdmap);
   return discard_event();
 }
-{% endhighlight }
+{% endhighlight %}
 从以上代码可以看出，其最终会调用pg->should_restart_peering()来检查是否需要触发新的peering操作。通过以前的代码分析，我们知道只要满足如下条件之一即需要重新peering:
 
 * PG的acting primary发生了改变；
