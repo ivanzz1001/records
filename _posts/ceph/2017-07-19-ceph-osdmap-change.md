@@ -1891,7 +1891,7 @@ boost::statechart::result PG::RecoveryState::Primary::react(const ActMap&)
 {% endhighlight %}
 在Primary::react()中对于ActMap主要是处理一些Peering完成后的事件。
 
->实际上，有上面4）、5）的分析，我们发现，```AdvMap```主要用于触发Peering过程；而```ActMap```主要用于触发处理Peering完成后的一些事件。AdvMap是Advance OSDMap的缩写，而ActMap是Activate OSDMap的缩写，在处理actmap事件时都会调用pg->take_waiters()来等待相关的请求处理完成。
+>实际上，有上面4）、5）的分析，我们发现，```AdvMap```主要用于触发Peering过程，通常到PG::start_peering_interval()就结束；而```ActMap```主要用于触发处理Peering完成后的一些事件。AdvMap是Advance OSDMap的缩写，而ActMap是Activate OSDMap的缩写，在处理actmap事件时都会调用pg->take_waiters()来等待相关的请求处理完成。A
 
 到这里，整个Peering的触发过程，我们基本上有了一个比较清晰的了解，而关于Peering的一些细节问题，我们会在后续相关的章节中继续讲解。
 

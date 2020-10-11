@@ -688,6 +688,8 @@ void PG::handle_advance_map(
 		<< " -- " << up_primary << "/" << acting_primary
 		<< dendl;
 
+	update_osdmap_ref(osdmap);
+
 	...
 	
 	AdvMap evt(
@@ -697,7 +699,10 @@ void PG::handle_advance_map(
 	...
 }
 {% endhighlight %}
-这里```PG11.4```对应的up set为[3,2], acting set也为[3]，up_primary为3，acting_primary也为3。之后会产生一个AdvMap事件，交由recovery_state来进行处理，从而触发peering进程。
+通过上面第一行的打印信息，我们了解到：```PG11.4```对应的up set为[3,2], acting set也为[3]，up_primary为3，acting_primary也为3。
+
+之后会调用PG::update_osdmap_ref()将PG当前的osdmap进行更新；最后产生一个AdvMap事件，交由recovery_state来进行处理，从而触发peering进程。
+
 
 3) **函数handle_activate_map()**
 {% highlight string %}
@@ -718,12 +723,393 @@ void PG::handle_activate_map(RecoveryCtx *rctx)
 	if (osdmap_ref->check_new_blacklist_entries()) check_blacklisted_watchers();
 }
 {% endhighlight %}
-函数handle_activate_map()用于激活
+函数handle_activate_map()用于激活当前阶段的osdmap，通常是用于触发向Replica发送通知消息，以推动Peering的进程。
+
+>注： 通常来说，AdvMap是同步完成的，而ActMap是异步完成的。
 
 ### 2.1 Clean状态对AdvMap事件的处理
 由于在当前状态，PG 11.4已经处于clean状态，且osd3对于PG 11.4而言是主OSD，因此接收到AdvMap事件时，处理流程如下：
 {% highlight string %}
+boost::statechart::result PG::RecoveryState::Active::react(const AdvMap& advmap)
+{
+	...
+
+	return forward_event();
+}
+
+boost::statechart::result PG::RecoveryState::Started::react(const AdvMap& advmap)
+{
+  dout(10) << "Started advmap" << dendl;
+  PG *pg = context< RecoveryMachine >().pg;
+  pg->check_full_transition(advmap.lastmap, advmap.osdmap);
+  if (pg->should_restart_peering(
+	advmap.up_primary,
+	advmap.acting_primary,
+	advmap.newup,
+	advmap.newacting,
+	advmap.lastmap,
+	advmap.osdmap)) {
+    dout(10) << "should_restart_peering, transitioning to Reset" << dendl;
+    post_event(advmap);
+    return transit< Reset >();
+  }
+  pg->remove_down_peer_info(advmap.osdmap);
+  return discard_event();
+}
 {% endhighlight }
+从以上代码可以看出，其最终会调用pg->should_restart_peering()来检查是否需要触发新的peering操作。通过以前的代码分析，我们知道只要满足如下条件之一即需要重新peering:
+
+* PG的acting primary发生了改变；
+
+* PG的acting set发生了改变；
+
+* PG的up primary发生了改变；
+
+* PG的up set发生了改变；
+
+* PG的min_size发生了改变（通常是调整了rule规则）；
+
+* PG的副本size值发生了改变；
+
+* PG进行了分裂
+
+* PG的sort bitwise发生了改变
+
+这里针对PG 11.4，其up set发生了变化，因此会触发新的peering状态。此时state_machine进入Reset状态。
+
+### 2.2 进入Reset状态
+###### 2.2.1 Reset构造函数
+{% highlight string %}
+PG::RecoveryState::Reset::Reset(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Reset")
+{
+	context< RecoveryMachine >().log_enter(state_name);
+	PG *pg = context< RecoveryMachine >().pg;
+	
+	pg->flushes_in_progress = 0;
+	pg->set_last_peering_reset();
+}
+void PG::set_last_peering_reset()
+{
+  dout(20) << "set_last_peering_reset " << get_osdmap()->get_epoch() << dendl;
+  if (last_peering_reset != get_osdmap()->get_epoch()) {
+    last_peering_reset = get_osdmap()->get_epoch();
+    reset_interval_flush();
+  }
+}
+{% endhighlight %}
+在Reset构造函数中，调用pg->set_last_peering_reset将last_peering_reset设置为e2226.
+
+###### 2.2.2 处理Adv事件
+在进入Reset状态之前，我们通过post_event()向Reset投递了AdvMap事件，这里我们来看对该事件的处理：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Reset::react(const AdvMap& advmap)
+{
+	PG *pg = context< RecoveryMachine >().pg;
+	dout(10) << "Reset advmap" << dendl;
+	
+	// make sure we have past_intervals filled in.  hopefully this will happen
+	// _before_ we are active.
+	pg->generate_past_intervals();
+	
+	pg->check_full_transition(advmap.lastmap, advmap.osdmap);
+	
+	if (pg->should_restart_peering(
+	  advmap.up_primary,
+	  advmap.acting_primary,
+	  advmap.newup,
+	  advmap.newacting,
+	  advmap.lastmap,
+	  advmap.osdmap)) {
+		dout(10) << "should restart peering, calling start_peering_interval again"<< dendl;
+		pg->start_peering_interval(
+		advmap.lastmap,
+		advmap.newup, advmap.up_primary,
+		advmap.newacting, advmap.acting_primary,
+		context< RecoveryMachine >().get_cur_transaction());
+	}
+
+	pg->remove_down_peer_info(advmap.osdmap);
+	return discard_event();
+}
+{% endhighlight %}
+上面调用pg->should_restart_peering()再一次检查是否需要重新peering。然后再调用pg->start_peering_interval()来启动peering流程。
+
+1) **函数generate_past_intervals()**
+{% highlight string %}
+void PG::generate_past_intervals(){
+	....
+
+	if (!_calc_past_interval_range(&cur_epoch, &end_epoch,
+		osd->get_superblock().oldest_map)) {
+		if (info.history.same_interval_since == 0) {
+			info.history.same_interval_since = end_epoch;
+			dirty_info = true;
+		}
+		return;
+	}
+
+	...
+}
+bool PG::_calc_past_interval_range(epoch_t *start, epoch_t *end, epoch_t oldest_map)
+{
+	if (info.history.same_interval_since) {
+		*end = info.history.same_interval_since;
+	} else {
+		// PG must be imported, so let's calculate the whole range.
+		*end = osdmap_ref->get_epoch();
+	}
+	
+	// Do we already have the intervals we want?
+	map<epoch_t,pg_interval_t>::const_iterator pif = past_intervals.begin();
+	if (pif != past_intervals.end()) {
+		if (pif->first <= info.history.last_epoch_clean) {
+			dout(10) << __func__ << ": already have past intervals back to "<< info.history.last_epoch_clean << dendl;
+			return false;
+		}
+		*end = past_intervals.begin()->first;
+	}
+	
+	*start = MAX(MAX(info.history.epoch_created,
+		info.history.last_epoch_clean),
+		oldest_map);
+	if (*start >= *end) {
+		dout(10) << __func__ << " start epoch " << *start << " >= end epoch " << *end<< ", nothing to do" << dendl;
+		return false;
+	}
+	
+	return true;
+}
+
+{% endhighlight %}
+函数_calc_past_interval_range()用于计算一个past_interval的范围。所谓一个past_interval，是指一个连续的epoch段[epoch_start, epoch_end]，在该epoch段内：
+
+* PG的acting primary保持不变；
+
+* PG的acting set保持不变；
+
+* PG的up primary保持不变；
+
+* PG的up set保持不变；
+
+* PG的min_size保持不变；
+
+* PG的副本size值保持不变；
+
+* PG没有进行分裂；
+
+* PG的sort bitwise保持不变；
+
+函数_calc_past_interval_range()如果返回true，表示成功计算到一个past_interval；如果返回false，则表示该interval已经计算过，不必再计算，或者不是一个有效的past_interval。
+
+结合当前的打印日志消息：
+{% highlight string %}
+42238:2020-09-11 14:10:18.974114 7fba3d925700 10 osd.3 pg_epoch: 2226 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2224/0 2223/2223/2223) [3] r=0 lpr=2226 luod=0'0 crt=201'1 lcod 0'0 mlcod 0'0 active] _calc_past_interval_range start epoch 2224 >= end epoch 2223, nothing to do
+{% endhighlight %}
+当前info.history.same_interval_since的值为e2223，而info.history.last_epoch_clean的值为e2224，因此函数_calc_past_interval_range()的返回值为false，表明不是一个有效的past_interval。
+
+2） **函数start_peering_interval()**
+{% highlight string %}
+void PG::start_peering_interval(
+  const OSDMapRef lastmap,
+  const vector<int>& newup, int new_up_primary,
+  const vector<int>& newacting, int new_acting_primary,
+  ObjectStore::Transaction *t)
+{
+	...
+
+	set_last_peering_reset();
+
+	...
+
+	init_primary_up_acting(
+		newup,
+		newacting,
+		new_up_primary,
+		new_acting_primary);
+
+	....
+	if(!lastmap){
+		
+	}else{
+		...
+		pg_interval_t::check_new_interval(....);
+
+		dout(10) << __func__ << ": check_new_interval output: "
+			<< debug.str() << dendl;
+		if (new_interval) {
+			dout(10) << " noting past " << past_intervals.rbegin()->second << dendl;
+			dirty_info = true;
+			dirty_big_info = true;
+			info.history.same_interval_since = osdmap->get_epoch();
+		}
+	}
+
+	...
+
+	dout(10) << " up " << oldup << " -> " << up 
+		<< ", acting " << oldacting << " -> " << acting 
+		<< ", acting_primary " << old_acting_primary << " -> " << new_acting_primary
+		<< ", up_primary " << old_up_primary << " -> " << new_up_primary
+		<< ", role " << oldrole << " -> " << role
+		<< ", features acting " << acting_features
+		<< " upacting " << upacting_features
+		<< dendl;
+	
+	// deactivate.
+	state_clear(PG_STATE_ACTIVE);
+	state_clear(PG_STATE_PEERED);
+	state_clear(PG_STATE_DOWN);
+	state_clear(PG_STATE_RECOVERY_WAIT);
+	state_clear(PG_STATE_RECOVERING);
+	
+	peer_purged.clear();
+	actingbackfill.clear();
+	snap_trim_queued = false;
+	scrub_queued = false;
+	
+	// reset primary state?
+	if (was_old_primary || is_primary()) {
+		osd->remove_want_pg_temp(info.pgid.pgid);
+	}
+	clear_primary_state();
+
+	// pg->on_*
+	on_change(t);
+
+	assert(!deleting);
+	
+	// should we tell the primary we are here?
+	send_notify = !is_primary();
+	
+	if (role != oldrole || was_old_primary != is_primary()) {
+		// did primary change?
+		if (was_old_primary != is_primary()) {
+			state_clear(PG_STATE_CLEAN);
+			clear_publish_stats();
+	
+			// take replay queue waiters
+			list<OpRequestRef> ls;
+
+			for (map<eversion_t,OpRequestRef>::iterator it = replay_queue.begin();it != replay_queue.end();++it)
+				ls.push_back(it->second);
+
+			replay_queue.clear();
+			requeue_ops(ls);
+		}
+	
+		on_role_change();
+	
+		// take active waiters
+		requeue_ops(waiting_for_peered);
+	
+	} else {
+		....
+	}
+
+	cancel_recovery();
+	....
+}
+{% endhighlight %}
+在收到新的osdmap，调用advance_map()，然后触发新的Peering之前，会调用PG::start_peering_interval()，完成相关状态的重新设置。
+
+* set_last_peering_reset()用于清空上一次的peering数据；
+
+* init_primary_up_acting()用于设置当前新的acting set以及up set
+
+* 设置info.stats的up set、acting set的值
+
+* 将当前PG的状态设置为REMAPPED
+{% highlight string %}
+// This will now be remapped during a backfill in cases
+// that it would not have been before.
+if (up != acting)
+	state_set(PG_STATE_REMAPPED);
+else
+	state_clear(PG_STATE_REMAPPED);
+{% endhighlight %}
+由于当前PG的up set的值为[3,2]，acting set的值为[3]，因此这里设置PG的状态为```REMAPPED```
+
+* 计算PG 11.4中OSD3的角色
+{% highlight string %}
+int OSDMap::calc_pg_rank(int osd, const vector<int>& acting, int nrep)
+{
+	if (!nrep)
+		nrep = acting.size();
+	for (int i=0; i<nrep; i++) 
+		if (acting[i] == osd)
+			return i;
+	return -1;
+}
+
+int OSDMap::calc_pg_role(int osd, const vector<int>& acting, int nrep)
+{
+	if (!nrep)
+		nrep = acting.size();
+	return calc_pg_rank(osd, acting, nrep);
+}
+{% endhighlight %}
+这里osd3的角色是primary。
+
+* check_new_interval(): 用于检查是否是一个新的interval。如果是新interval，则计算出该新的past_interval：
+
+> 42242:2020-09-11 14:10:18.974135 7fba3d925700 10 osd.3 pg_epoch: 2226 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2224/0 2223/2223/2223) [3,2]/[3] r=0 lpr=2226 pi=2223-2225/1 luod=0'0 crt=201'1 lcod 0'0 mlcod 0'0 active+remapped] start_peering_interval: check_new_interval output: generate_past_intervals interval(2223-2225 up [3](3) acting [3](3)): not rw, up_thru 2223 up_from 2123 last_epoch_clean 2224
+
+当前的PG osdmap的epoch为e2226，当前的up set为[3,2], acting set为[3]，计算出的一个past interval为[e2223,e2225]，在此一interval期间，up set为[3], acting set也为[3]，up_thru为e2223, up_from为e2123, last_epoch_clean为e2224.
+
+* 清除PG的相关状态。关于PG的状态是由一个```unsigned```类型的整数来表示的
+{% highlight string %}
+/*
+ * pg states
+ */
+#define PG_STATE_CREATING     (1<<0)  				// creating
+#define PG_STATE_ACTIVE       (1<<1)  				// i am active.  (primary: replicas too)
+#define PG_STATE_CLEAN        (1<<2)  				// peers are complete, clean of stray replicas.
+#define PG_STATE_DOWN         (1<<4) 				 // a needed replica is down, PG offline
+#define PG_STATE_REPLAY       (1<<5) 				 // crashed, waiting for replay
+//#define PG_STATE_STRAY      (1<<6)  				// i must notify the primary i exist.
+#define PG_STATE_SPLITTING    (1<<7)  				// i am splitting
+#define PG_STATE_SCRUBBING    (1<<8)  				// scrubbing
+#define PG_STATE_SCRUBQ       (1<<9)  				// queued for scrub
+#define PG_STATE_DEGRADED     (1<<10) 				// pg contains objects with reduced redundancy
+#define PG_STATE_INCONSISTENT (1<<11) 				// pg replicas are inconsistent (but shouldn't be)
+#define PG_STATE_PEERING      (1<<12)				// pg is (re)peering
+#define PG_STATE_REPAIR       (1<<13) 				// pg should repair on next scrub
+#define PG_STATE_RECOVERING   (1<<14) 				// pg is recovering/migrating objects
+#define PG_STATE_BACKFILL_WAIT     (1<<15) 			// [active] reserving backfill
+#define PG_STATE_INCOMPLETE   (1<<16) 				// incomplete content, peering failed.
+#define PG_STATE_STALE        (1<<17) 				// our state for this pg is stale, unknown.
+#define PG_STATE_REMAPPED     (1<<18) 				// pg is explicitly remapped to different OSDs than CRUSH
+#define PG_STATE_DEEP_SCRUB   (1<<19) 				// deep scrub: check CRC32 on files
+#define PG_STATE_BACKFILL  (1<<20) 					// [active] backfilling pg content
+#define PG_STATE_BACKFILL_TOOFULL (1<<21) 			// backfill can't proceed: too full
+#define PG_STATE_RECOVERY_WAIT (1<<22) 				// waiting for recovery reservations
+#define PG_STATE_UNDERSIZED    (1<<23) 				// pg acting < pool size
+#define PG_STATE_ACTIVATING   (1<<24) 				// pg is peered but not yet active
+#define PG_STATE_PEERED        (1<<25) 				// peered, cannot go active, can recover
+#define PG_STATE_SNAPTRIM      (1<<26) 				// trimming snaps
+#define PG_STATE_SNAPTRIM_WAIT (1<<27) 				// queued to trim snaps
+{% endhighlight %}
+这里将```active```状态清除了，因此变为```inactive```状态。
+
+* 情况primary的peering状态
+{% highlight string %}
+if (was_old_primary || is_primary()) {
+	osd->remove_want_pg_temp(info.pgid.pgid);
+}
+clear_primary_state();
+{% endhighlight %}
+
+* PG 11.4所在OSD3的角色未发生变化，仍然为primary，因此有如下输出
+{% highlight string %}
+42263:2020-09-11 14:10:18.974231 7fba3d925700 10 osd.3 pg_epoch: 2226 pg[11.4( v 201'1 (0'0,201'1] local-les=2224 n=1 ec=132 les/c/f 2224/2224/0 2226/2226/2223) [3,2]/[3] r=0 lpr=2226 pi=2223-2225/1 crt=201'1 lcod 0'0 mlcod 0'0 remapped] [3] -> [3], replicas changed
+{% endhighlight %}
+
+
+* cancel_recovery(): 取消PG当前正在进行中的recovery动作；
+
+到此为止，由OSD::advance_pg()函数中pg->handle_advance_map()所触发的AdvMap事件就已经处理完成。
 
 
 <br />
@@ -731,3 +1117,5 @@ void PG::handle_activate_map(RecoveryCtx *rctx)
 <br />
 
 1. [ceph存储 PG的状态机和peering过程](https://blog.csdn.net/skdkjzz/article/details/51579903)
+
+2. [Ceph OSDMap 机制浅析](https://www.jianshu.com/p/8ecd6028f5ff?utm_campaign=maleskine&utm_content=note&utm_medium=seo_notes&utm_source=recommendation)
