@@ -962,8 +962,11 @@ boost::statechart::result PG::RecoveryState::Reset::react(const ActMap&)
 	
 	return transit< Started >();
 }
+
 {% endhighlight %}
 通常在osdmap发送变动，从而引发PG的acting set、up set发生变动，对于一个PG的副本OSD通常会发送一个通知消息到PG的Primary OSD。这里由于osd3已经是PG11.4的primary OSD，因此这里不需要发送通知消息。
+
+>注： 关于send_notify变量的设置，是在Initial::react(const Load&)函数中。
 
 PG的Primary OSD会与Replica OSDs保持心跳，并且这个心跳是由Primary OSD来主动发出并维护的。这里调用pg->update_heartbeat_peers()来更新心跳信息。
 

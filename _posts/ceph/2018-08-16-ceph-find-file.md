@@ -163,6 +163,9 @@ osdmap e17117 pool 'oss-uat.rgw.buckets.index' (188) object '.dir.135882fc-2865-
 135882fc-2865-43ab-9f71-7dd4b2095406.20037185.269__multipart_批量上传走joss文件 -003-KZyxg.docx.EWUZWI7AcDJkCOX7Tau3FMio6vjP2NJ.102
 ...
 </pre>
+
+其实执行上面的命令很费时，我们注意到查询出来的前一部分```135882fc-2865-43ab-9f71-7dd4b2095406.20037185.269```正好是bucket的id，因此我们可以直接拼接来获取该对象在ceph中的名称。
+
 接着使用如下命令找出该分片在osd上存放的实际位置：
 {% highlight string %}
 # ceph osd map oss-uat.rgw.buckets.data 135882fc-2865-43ab-9f71-7dd4b2095406.20037185.269__multipart_批量上传走joss文件 -003-KZyxg.docx.VLRHO5x1l3nV4-v5W4r6YA2Fkqlfwj3.107
