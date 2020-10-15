@@ -3961,8 +3961,237 @@ PG::RecoveryState::WaitRemoteRecoveryReserved::WaitRemoteRecoveryReserved(my_con
 {% endhighlight %}
 构造函数中产生一个RemoteRecoveryReserved()事件。
 
-1） ****
+1） **RemoteRecoveryReserved事件处理**
+{% highlight string %}
+boost::statechart::result
+PG::RecoveryState::WaitRemoteRecoveryReserved::react(const RemoteRecoveryReserved &evt) {
+	PG *pg = context< RecoveryMachine >().pg;
+	
+	if (remote_recovery_reservation_it != context< Active >().remote_shards_to_reserve_recovery.end()) {
+		assert(*remote_recovery_reservation_it != pg->pg_whoami);
+		ConnectionRef con = pg->osd->get_con_osd_cluster(
+		remote_recovery_reservation_it->osd, pg->get_osdmap()->get_epoch());
+		if (con) {
+			pg->osd->send_message_osd_cluster(
+			new MRecoveryReserve(
+			  MRecoveryReserve::REQUEST,
+			  spg_t(pg->info.pgid.pgid, remote_recovery_reservation_it->shard),
+			  pg->get_osdmap()->get_epoch()),
+			con.get());
+		}
+		++remote_recovery_reservation_it;
+	} else {
+		post_event(AllRemotesReserved());
+	}
+	return discard_event();
+}
 
+PG::RecoveryState::Active::Active(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Started/Primary/Active"),
+    remote_shards_to_reserve_recovery(
+      unique_osd_shard_set(
+	context< RecoveryMachine >().pg->pg_whoami,
+	context< RecoveryMachine >().pg->actingbackfill)),
+    remote_shards_to_reserve_backfill(
+      unique_osd_shard_set(
+	context< RecoveryMachine >().pg->pg_whoami,
+	context< RecoveryMachine >().pg->backfill_targets)),
+    all_replicas_activated(false)
+{
+	...
+}
+{% endhighlight %}
+在我们进入Active状态的时候（参看Active构造函数），就把需要进行Recovery操作的添加到了Active::remote_shards_to_reserve_recovery中了。这里对于PG 11.4而言，需要向osd.2发送MRecoveryReserve::REQUEST，以获取Recovery所需要的资源。
+
+2) **对MRecoveryReserve::REQUEST请求的处理**
+
+对于PG 11.4而言，osd2接收到MRecoveryReserve::REQUEST后，处理流程如下：
+{% highlight string %}
+void OSD::dispatch_op(OpRequestRef op){
+	switch (op->get_req()->get_type()) {
+
+		...
+
+		case MSG_OSD_RECOVERY_RESERVE:
+   		  handle_pg_recovery_reserve(op);
+   		  break;
+	}
+}
+
+void OSD::handle_pg_recovery_reserve(OpRequestRef op)
+{
+	MRecoveryReserve *m = static_cast<MRecoveryReserve*>(op->get_req());
+	assert(m->get_type() == MSG_OSD_RECOVERY_RESERVE);
+	
+	if (!require_osd_peer(op->get_req()))
+		return;
+	if (!require_same_or_newer_map(op, m->query_epoch, false))
+		return;
+	
+	PG::CephPeeringEvtRef evt;
+	if (m->type == MRecoveryReserve::REQUEST) {
+		evt = PG::CephPeeringEvtRef(
+			new PG::CephPeeringEvt(
+			  m->query_epoch,
+			  m->query_epoch,
+			  PG::RequestRecovery()));
+	} else if (m->type == MRecoveryReserve::GRANT) {
+		evt = PG::CephPeeringEvtRef(
+			new PG::CephPeeringEvt(
+			  m->query_epoch,
+			  m->query_epoch,
+			  PG::RemoteRecoveryReserved()));
+	} else if (m->type == MRecoveryReserve::RELEASE) {
+		evt = PG::CephPeeringEvtRef(
+			new PG::CephPeeringEvt(
+			  m->query_epoch,
+			  m->query_epoch,
+			  PG::RecoveryDone()));
+	} else {
+		assert(0);
+	}
+	
+	if (service.splitting(m->pgid)) {
+		peering_wait_for_split[m->pgid].push_back(evt);
+		return;
+	}
+	
+	PG *pg = _lookup_lock_pg(m->pgid);
+	if (!pg) {
+		dout(10) << " don't have pg " << m->pgid << dendl;
+		return;
+	}
+	
+	pg->queue_peering_event(evt);
+	pg->unlock();
+}
+{% endhighlight %}
+handle_pg_recovery_reserve()函数产生RequestRecovery()事件。
+
+对于PG 11.4的osd2而言，在进入ReplicaActive状态后默认会进入其子状态RepNotRecovering，因此这里是RepNotRecovering处理RequestRecovery事件：
+{% highlight string %}
+struct RepNotRecovering : boost::statechart::state< RepNotRecovering, ReplicaActive>, NamedState {
+	typedef boost::mpl::list<
+		boost::statechart::custom_reaction< RequestBackfillPrio >,
+		boost::statechart::transition< RequestRecovery, RepWaitRecoveryReserved >,
+		boost::statechart::transition< RecoveryDone, RepNotRecovering >  // for compat with pre-reservation peers
+	> reactions;
+	> 
+	explicit RepNotRecovering(my_context ctx);
+	boost::statechart::result react(const RequestBackfillPrio &evt);
+	void exit();
+};
+
+{% endhighlight %}
+RepNotRecovering接收到```RequestRecovery```事件直接进入RepWaitRecoveryReserved状态：
+{% highlight string %}
+/*---RepWaitRecoveryReserved--*/
+PG::RecoveryState::RepWaitRecoveryReserved::RepWaitRecoveryReserved(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Started/ReplicaActive/RepWaitRecoveryReserved")
+{
+	context< RecoveryMachine >().log_enter(state_name);
+	PG *pg = context< RecoveryMachine >().pg;
+	
+	pg->osd->remote_reserver.request_reservation(
+		pg->info.pgid,
+		new QueuePeeringEvt<RemoteRecoveryReserved>(
+		  pg, pg->get_osdmap()->get_epoch(),
+		  RemoteRecoveryReserved()),
+		pg->get_recovery_priority());
+}
+void request_reservation(
+  T item,                   ///< [in] reservation key
+  Context *on_reserved,     ///< [in] callback to be called on reservation
+  unsigned prio
+) {
+	Mutex::Locker l(lock);
+	assert(!queue_pointers.count(item) &&
+		!in_progress.count(item));
+
+	queues[prio].push_back(make_pair(item, on_reserved));
+	queue_pointers.insert(make_pair(item, make_pair(prio,--(queues[prio]).end())));
+	do_queues();
+}
+{% endhighlight %}
+在RepWaitRecoveryReserved构造函数中调用request_reservation()预约Recovery资源，预约成功会回调QueuePeeringEvt，产生RemoteRecoveryReserved事件。
+
+如下是对RemoteRecoveryReserved事件的处理：
+{% highlight string %}
+boost::statechart::result
+PG::RecoveryState::RepWaitRecoveryReserved::react(const RemoteRecoveryReserved &evt)
+{
+	PG *pg = context< RecoveryMachine >().pg;
+	pg->osd->send_message_osd_cluster(
+		pg->primary.osd,
+		new MRecoveryReserve(
+		  MRecoveryReserve::GRANT,
+		  spg_t(pg->info.pgid.pgid, pg->primary.shard),
+		  pg->get_osdmap()->get_epoch()),
+		pg->get_osdmap()->get_epoch());
+
+	return transit<RepRecovering>();
+}
+{% endhighlight %}
+上面函数中会向主OSD（对于PG 11.4而言其主OSD为osd3)发送MRecoveryReserve::GRANT，然后自己直接进入RepRecovering状态。
+
+3) **主OSD对MRecoveryReserve::GRANT的处理**
+{% highlight string %}
+void OSD::dispatch_op(OpRequestRef op){
+	switch (op->get_req()->get_type()) {
+
+		...
+
+		case MSG_OSD_RECOVERY_RESERVE:
+   		  handle_pg_recovery_reserve(op);
+   		  break;
+	}
+}
+
+void OSD::handle_pg_recovery_reserve(OpRequestRef op)
+{
+	MRecoveryReserve *m = static_cast<MRecoveryReserve*>(op->get_req());
+	assert(m->get_type() == MSG_OSD_RECOVERY_RESERVE);
+	
+	...
+	else if (m->type == MRecoveryReserve::GRANT) {
+		evt = PG::CephPeeringEvtRef(
+			new PG::CephPeeringEvt(
+			  m->query_epoch,
+			  m->query_epoch,
+			  PG::RemoteRecoveryReserved()));
+	}
+	...
+}
+{% endhighlight %}
+主OSD收到响应后，构造一个```RemoteRecoveryReserved```事件。如下是对该事件的处理：
+{% highlight string %}
+boost::statechart::result
+PG::RecoveryState::WaitRemoteRecoveryReserved::react(const RemoteRecoveryReserved &evt) {
+	PG *pg = context< RecoveryMachine >().pg;
+	
+	if (remote_recovery_reservation_it != context< Active >().remote_shards_to_reserve_recovery.end()) {
+		assert(*remote_recovery_reservation_it != pg->pg_whoami);
+		ConnectionRef con = pg->osd->get_con_osd_cluster(
+		remote_recovery_reservation_it->osd, pg->get_osdmap()->get_epoch());
+		if (con) {
+			pg->osd->send_message_osd_cluster(
+			new MRecoveryReserve(
+			  MRecoveryReserve::REQUEST,
+			  spg_t(pg->info.pgid.pgid, remote_recovery_reservation_it->shard),
+			  pg->get_osdmap()->get_epoch()),
+			con.get());
+		}
+		++remote_recovery_reservation_it;
+	} else {
+		post_event(AllRemotesReserved());
+	}
+	return discard_event();
+}
+
+{% endhighlight %}
+可以看到，这里如果所有Remote资源都预约成功，则会产生一个AllRemotesReserved事件，从而进入Recovering状态。
 
 
 
