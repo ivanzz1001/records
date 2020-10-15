@@ -180,7 +180,7 @@ description: nginx源代码编译安装
 --http-proxy-temp-path=/var/tmp/nginx/proxy/ \
 --http-fastcgi-temp-path=/var/tmp/nginx/fastcgi/ \
 --http-uwsgi-temp-path=/var/tmp/nginx/uwsgi \
---http-scgi-temp-path=/vartmp/nginx/scgi \
+--http-scgi-temp-path=/var/tmp/nginx/scgi \
 
 --with-http_ssl_module \
 --with-pcre=../pcre-8.40 \
