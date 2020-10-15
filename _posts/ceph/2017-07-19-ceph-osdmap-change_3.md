@@ -3884,7 +3884,7 @@ PG::RecoveryState::WaitLocalRecoveryReserved::WaitLocalRecoveryReserved(my_conte
 >注1： 每一次PG状态发生改变，都会调用pg::publish_stats_to_osd()来告知osd。
 
 >注2： 上面的日志片段中又出现了多次的handle_advance_map()，可能的原因是其他PG申请pg_temp引起的，这里对于PG 11.4仅仅只会在OSD::advance_pg()中影响pg_epoch，我们可以暂时忽略
-% highlight string %}
+{% highlight string %}
 bool OSD::advance_pg(
   epoch_t osd_epoch, PG *pg,
   ThreadPool::TPHandle &handle,
