@@ -59,7 +59,6 @@ dr-xr-x---. 8 root root     4096 9月  11 11:32 ..
 ## 1. 进入Recovering状态
 在上一篇文章中，我们最后讲述到了PG 11.4进入到了Recovering状态。如下是此一阶段的一个日志片段：
 {% highlight string %}
-
 94073:2020-09-11 14:13:14.601894 7fba3d124700  5 osd.3 pg_epoch: 2231 pg[11.4( v 201'1 (0'0,201'1] local-les=2228 n=1 ec=132 les/c/f 2228/2224/0 2226/2227/2223) [3,2] r=0 lpr=2227 pi=2223-2226/2 crt=201'1 lcod 0'0 mlcod 0'0 active+recovery_wait+degraded] enter Started/Primary/Active/Recovering
 94074:2020-09-11 14:13:14.601916 7fba3d124700 15 osd.3 pg_epoch: 2231 pg[11.4( v 201'1 (0'0,201'1] local-les=2228 n=1 ec=132 les/c/f 2228/2224/0 2226/2227/2223) [3,2] r=0 lpr=2227 pi=2223-2226/2 crt=201'1 lcod 0'0 mlcod 0'0 active+recovering+degraded] publish_stats_to_osd 2231:1343
 94075:2020-09-11 14:13:14.601948 7fba3d124700 10 osd.3 2231 queue_for_recovery queued pg[11.4( v 201'1 (0'0,201'1] local-les=2228 n=1 ec=132 les/c/f 2228/2224/0 2226/2227/2223) [3,2] r=0 lpr=2227 pi=2223-2226/2 crt=201'1 lcod 0'0 mlcod 0'0 active+recovering+degraded]
@@ -263,7 +262,6 @@ void OSD::do_recovery(PG *pg, ThreadPool::TPHandle &handle)
 
 如下是相应日志片段：
 {% highlight string %}
-
 94079:2020-09-11 14:13:14.601984 7fba37919700 10 osd.3 2231 do_recovery starting 1 pg[11.4( v 201'1 (0'0,201'1] local-les=2228 n=1 ec=132 les/c/f 2228/2224/0 2226/2227/2223) [3,2] r=0 lpr=2227 pi=2223-2226/2 crt=201'1 lcod 0'0 mlcod 0'0 active+recovering+degraded]
 94080:2020-09-11 14:13:14.601992 7fba37919700 10 osd.3 pg_epoch: 2231 pg[11.4( v 201'1 (0'0,201'1] local-les=2228 n=1 ec=132 les/c/f 2228/2224/0 2226/2227/2223) [3,2] r=0 lpr=2227 pi=2223-2226/2 crt=201'1 lcod 0'0 mlcod 0'0 active+recovering+degraded] recover_replicas(1)
 94081:2020-09-11 14:13:14.601999 7fba37919700 10 osd.3 pg_epoch: 2231 pg[11.4( v 201'1 (0'0,201'1] local-les=2228 n=1 ec=132 les/c/f 2228/2224/0 2226/2227/2223) [3,2] r=0 lpr=2227 pi=2223-2226/2 crt=201'1 lcod 0'0 mlcod 0'0 active+recovering+degraded]  peer osd.2 missing 1 objects.
