@@ -106,9 +106,147 @@ osd.1挂了之后，整个集群反应如下：
 
 osd.1挂了后，或者osd.1主动上报，或是其他osd向mon上报osd.1挂了，此时mon已经感知到osd.1挂了。
 
-* 
+* mon更新osdmap
 
+monitor将osdmap中osd.1标记为down状态，并将新的osdmap发送给osd.2
 
+* osd.2收到新的osdmap(第一次）
+
+osd.2收到新的osdmap后，相关PG开始peering，若PG发现需要向mon申请更新up_thru信息，那么PG状态变为WaitUpThru。
+{% highlight string %}
+void PG::build_prior(std::unique_ptr<PriorSet> &prior_set)
+{
+	if (1) {
+		// sanity check
+		for (map<pg_shard_t,pg_info_t>::iterator it = peer_info.begin();it != peer_info.end();++it) {
+			assert(info.history.last_epoch_started >= it->second.history.last_epoch_started);
+		}
+	}
+	prior_set.reset(
+		new PriorSet(
+		  pool.info.ec_pool(),
+		  get_pgbackend()->get_is_recoverable_predicate(),
+		  *get_osdmap(),
+		  past_intervals,
+		  up,
+		  acting,
+		  info,
+		  this));
+	PriorSet &prior(*prior_set.get());
+	
+	if (prior.pg_down) {
+		state_set(PG_STATE_DOWN);
+	}
+	
+	if (get_osdmap()->get_up_thru(osd->whoami) < info.history.same_interval_since) {
+		dout(10) << "up_thru " << get_osdmap()->get_up_thru(osd->whoami)<< " < same_since " << info.history.same_interval_since<< ", must notify monitor" << dendl;
+		need_up_thru = true;
+	} else {
+		dout(10) << "up_thru " << get_osdmap()->get_up_thru(osd->whoami)<< " >= same_since " << info.history.same_interval_since<< ", all is well" << dendl;
+		need_up_thru = false;
+	}
+
+	set_probe_targets(prior_set->probe);
+}
+
+PG::RecoveryState::GetMissing::GetMissing(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Started/Primary/Peering/GetMissing")
+{
+	...
+	if (peer_missing_requested.empty()) {
+		if (pg->need_up_thru) {
+			dout(10) << " still need up_thru update before going active" << dendl;
+			post_event(NeedUpThru());
+			return;
+		}
+	
+		// all good!
+		post_event(Activate(pg->get_osdmap()->get_epoch()));
+
+	} else {
+		pg->publish_stats_to_osd();
+	}
+}
+{% endhighlight %}
+
+osd.2判断是否需要向mon申请更新up_thru消息，若需要，则向mon发送该消息。
+{% highlight string %}
+void OSD::process_peering_events(
+  const list<PG*> &pgs,
+  ThreadPool::TPHandle &handle
+  )
+{
+	...
+	if (need_up_thru)
+    	queue_want_up_thru(same_interval_since);
+}
+void OSD::queue_want_up_thru(epoch_t want)
+{
+	map_lock.get_read();
+	epoch_t cur = osdmap->get_up_thru(whoami);
+	Mutex::Locker l(mon_report_lock);
+	if (want > up_thru_wanted) {
+		dout(10) << "queue_want_up_thru now " << want << " (was " << up_thru_wanted << ")"<< ", currently " << cur<< dendl;
+		up_thru_wanted = want;
+		send_alive();
+	} else {
+		dout(10) << "queue_want_up_thru want " << want << " <= queued " << up_thru_wanted<< ", currently " << cur<< dendl;
+	}
+	map_lock.put_read();
+}
+
+void OSD::send_alive()
+{
+	assert(mon_report_lock.is_locked());
+	if (!osdmap->exists(whoami))
+		return;
+	epoch_t up_thru = osdmap->get_up_thru(whoami);
+	dout(10) << "send_alive up_thru currently " << up_thru << " want " << up_thru_wanted << dendl;
+
+	if (up_thru_wanted > up_thru) {
+		dout(10) << "send_alive want " << up_thru_wanted << dendl;
+		monc->send_mon_message(new MOSDAlive(osdmap->get_epoch(), up_thru_wanted));
+	}
+}
+{% endhighlight %}
+
+* mon更新osdmap
+
+mon收到消息后，更新osdmap里面osd.2的up_thru信息，并将新的osdmap发送给osd.2
+
+* osd.2收到新的osdmap(第二次)
+
+osd.2接收到新的osdmap后，相关PG开始peering，相关PG状态由WaitUpThru变为Active，可以开始服务业务io。
+
+###### 具体的up_thru更新相关流程如下
+以下是osd.2收到新的osdmap(第一次）后相关操作：
+
+1） PG判断其对应的主osd是否需要更新up_thru
+
+pg开始peering，以下是peering相关函数：
+{% highlight string %}
+PG::build_prior(std::unique_ptr<PriorSet> &prior_set) 
+{
+
+    /* 这里需要引入一个概念past_interval:
+    past_interval是osdmap版本号epoch 的一个序列。在该序列内一个PG的 acting set 和 up set不会变化。
+
+    如果osd.1挂了，那么pg的up set肯定发生变化了，也即产生了一个新的past_interval，那么此时会更新info.history.same_interval_since为新的osdmap版本号
+    因为same_interval_since表示的是最近一个past_interval的第一个osdmap的版本号
+
+    所以如果osd.1挂了后，此时这个条件肯定满足
+    */
+    if (get_osdmap()->get_up_thru(osd->whoami) < info.history.same_interval_since) 
+    {
+        need_up_thru = true;
+    } else {
+        need_up_thru = false;
+    }
+}
+{% endhighlight %}
+
+2)
 
 
 <br />
