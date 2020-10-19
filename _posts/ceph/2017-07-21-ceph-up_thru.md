@@ -245,8 +245,582 @@ PG::build_prior(std::unique_ptr<PriorSet> &prior_set)
     }
 }
 {% endhighlight %}
+对于info.history.same_interval_since等于0的情况，一般表明该PG才刚刚导入，其值可能会在多个地方被更新，我们这里暂时不介绍。通常情况下，info.history.same_interval_since的值不为0， 其更新一般发生在PG::start_peering_interval()函数中：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Reset::react(const AdvMap& advmap)
+{
+	PG *pg = context< RecoveryMachine >().pg;
+	dout(10) << "Reset advmap" << dendl;
+	
+	// make sure we have past_intervals filled in.  hopefully this will happen
+	// _before_ we are active.
+	pg->generate_past_intervals();
+	
+	pg->check_full_transition(advmap.lastmap, advmap.osdmap);
+	
+	if (pg->should_restart_peering(
+	  advmap.up_primary,
+	  advmap.acting_primary,
+	  advmap.newup,
+	  advmap.newacting,
+	  advmap.lastmap,
+	  advmap.osdmap)) {
+		dout(10) << "should restart peering, calling start_peering_interval again"<< dendl;
+		pg->start_peering_interval(
+			advmap.lastmap,
+			advmap.newup, advmap.up_primary,
+			advmap.newacting, advmap.acting_primary,
+			context< RecoveryMachine >().get_cur_transaction());
+	}
 
-2)
+	pg->remove_down_peer_info(advmap.osdmap);
+	return discard_event();
+}
+
+/* Called before initializing peering during advance_map */
+void PG::start_peering_interval(
+  const OSDMapRef lastmap,
+  const vector<int>& newup, int new_up_primary,
+  const vector<int>& newacting, int new_acting_primary,
+  ObjectStore::Transaction *t)
+{
+	...
+
+	// did acting, up, primary|acker change?
+	if (!lastmap) {
+		dout(10) << " no lastmap" << dendl;
+		dirty_info = true;
+		dirty_big_info = true;
+		info.history.same_interval_since = osdmap->get_epoch();
+	} else {
+		std::stringstream debug;
+		assert(info.history.same_interval_since != 0);
+		boost::scoped_ptr<IsPGRecoverablePredicate> recoverable(
+		get_is_recoverable_predicate());
+
+		bool new_interval = pg_interval_t::check_new_interval(
+			old_acting_primary.osd,
+			new_acting_primary,
+			oldacting, newacting,
+			old_up_primary.osd,
+			new_up_primary,
+			oldup, newup,
+			info.history.same_interval_since,
+			info.history.last_epoch_clean,
+			osdmap,
+			lastmap,
+			info.pgid.pgid,
+			recoverable.get(),
+			&past_intervals,
+			&debug);
+
+		dout(10) << __func__ << ": check_new_interval output: "<< debug.str() << dendl;
+		if (new_interval) {
+			dout(10) << " noting past " << past_intervals.rbegin()->second << dendl;
+			dirty_info = true;
+			dirty_big_info = true;
+			info.history.same_interval_since = osdmap->get_epoch();
+		}
+	}
+	
+	if (old_up_primary != up_primary ||	oldup != up) {
+		info.history.same_up_since = osdmap->get_epoch();
+	}
+	// this comparison includes primary rank via pg_shard_t
+	if (old_acting_primary != get_primary()) {
+		info.history.same_primary_since = osdmap->get_epoch();
+	}
+
+	....
+}
+{% endhighlight %}
+由上可见，当产生一个新的interval时，pg->info.history.same_interval_since通常会被赋值为当前的osdmap版本。
+
+
+2) osd判断其本次做peering的所有PG中是否有需要申请up_thru的。若有，该osd向monitor申请up_thru
+{% highlight string %}
+OSD::process_peering_events(  
+    const list<PG*> &pgs, //本次peering的所有PG
+    ThreadPool::TPHandle &handle)
+{
+    bool need_up_thru = false;
+    epoch_t same_interval_since = 0;
+    for (list<PG*>::const_iterator i = pgs.begin();i != pgs.end();++i) 
+    {
+        ......
+        need_up_thru = pg->need_up_thru || need_up_thru;
+        //获得所有PG中最大的info.history.same_interval_since
+        same_interval_since = MAX(pg->info.history.same_interval_since,same_interval_since);
+    }
+
+    if (need_up_thru) //只要有一个PG需要申请up_thru,则申请
+        queue_want_up_thru(same_interval_since); 
+}
+
+OSD::queue_want_up_thru(epoch_t want) 
+{
+    epoch_t cur = osdmap->get_up_thru(whoami); //获得当前osdmap中该osd对应的osdmap版本
+    if (want > up_thru_wanted)  //如果所有PG中最大的info.history.same_interval_since大于当前的，说明该osd需要申请up_thru
+    {
+        up_thru_wanted = want;
+        send_alive();
+    }
+}
+
+OSD::send_alive()
+{
+    // 向mon发送更新up_thru的消息
+    monc->send_mon_message(new MOSDAlive(osdmap->get_epoch(), up_thru_wanted));   
+}
+{% endhighlight %}
+
+3) monitor接受osd的申请
+{% highlight string %}
+OSDMonitor::preprocess_alive(MonOpRequestRef op)
+{
+    //如果最新的osdmap中该osd的up_thru大于等于osd想要申请的。那么monitor不需要决议了，只需要把osd中缺失的所有osdmap发送给它
+    if (osdmap.get_up_thru(from) >= m->want) 
+    {
+        _reply_map(op, m->version);
+        return true; 
+    }
+    return false; //返回false，monitor还需要继续决议
+}
+
+// 若monitor还需要继续决议，则继续往下走
+OSDMonitor::prepare_alive(MonOpRequestRef op)
+{
+
+    update_up_thru(from, m->version);
+    //决议完成后调用回调C_ReplyMap。把新的osdmap发给osd.2        
+    wait_for_finished_proposal(op, new C_ReplyMap(this, op, m->version));
+}
+
+OSDMonitor::update_up_thru(int from, epoch_t up_thru)
+{
+    pending_inc.new_up_thru[from] = up_thru;
+}
+
+// monitor决议完之后，最终会调用下面的函数进行应用，更新OSDMap
+OSDMap::apply_incremental(const Incremental &inc)
+{
+    //更新osdmap中该osd对应的up_thru字段
+    for (map<int32_t,epoch_t>::const_iterator i = inc.new_up_thru.begin();i != inc.new_up_thru.end();
+    {
+        osd_info[i->first].up_thru = i->second;
+    }
+}
+{% endhighlight %}
+
+### 2.2 PG状态的转变
+osd.2收到新的osdmap(```第一次```）后，PG进入peering后如果需要mon更新up_thru，其会先进入NeedUpThru状态：
+{% highlight string %}
+PG::RecoveryState::GetMissing::GetMissing（）
+{
+    if (pg->need_up_thru)  //如果该PG的need_up_thru标志被置位。这是在上文的build_prior函数中操作的
+    {
+        post_event(NeedUpThru()); //pg进入WaitUpThru状态
+        return;
+    }
+}
+{% endhighlight %}
+等到osd.2收到新的osdmap(```第二次```)后，该osdmap也即为更新了up_thru后的新osdmap，PG当前正处于WaitUpThru状态。当正处于WaitUpThru状态的PG收到osdmap，会把PG->need_up_thru置为false，如下：
+{% highlight string %}
+PG::RecoveryState::Peering::react(const AdvMap& advmap) 
+{
+    /*
+    当本身已经处于peering时，收到Advmap,会先看下是否会对prio有影响，只有有的情况下，才会进入reset
+    像本身已经处于wait_up_thru状态的PG则不会进入reset，它会执行下面的adjust_need_up_thru，然后把PG->need_up_thru标记设置为false。
+    */
+    if (prior_set.get()->affected_by_map(advmap.osdmap, pg)) 
+    {
+        post_event(advmap);
+        return transit< Reset >();
+    }
+    // 把PG->need_up_thru标记设置为false
+    pg->adjust_need_up_thru(advmap.osdmap);
+    return forward_event();
+}
+bool PG::adjust_need_up_thru(const OSDMapRef osdmap)
+{
+    epoch_t up_thru = get_osdmap()->get_up_thru(osd->whoami);
+    if (need_up_thru && up_thru >= info.history.same_interval_since) {
+        dout(10) << "adjust_need_up_thru now " << up_thru << ", need_up_thru now false" << dendl;
+        need_up_thru = false;
+        return true;
+    }
+
+    return false;
+}
+{% endhighlight %}
+
+wait_up_thru状态的PG收到ActMap事件后，由于need_up_thru标记已经被设置为false了，所以开始进入active状态。进入active状态后，也就可以开始io服务了：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::WaitUpThru::react(const ActMap& am)
+{
+	PG *pg = context< RecoveryMachine >().pg;
+	if (!pg->need_up_thru) {
+		post_event(Activate(pg->get_osdmap()->get_epoch()));
+	}
+	return forward_event();
+}
+{% endhighlight %}
+
+
+## 2. up_thru应用
+上文描述了当osd.1挂掉后，整个集群的响应，其中包括up_thru的更新。本节描述一下up_thru的应用，也即本文最开始的那个例子：当osd.1再次up后，其是否能提供服务？
+
+### 2.1 场景说明
+假设初始时刻，也即osd.1、osd.2都健康，对应PG都是active+clean状态时osdmap的版本号epoch是80，此时osd.1以及osd.2的up_thru必然都```小于```80。
+
+1） **不能提供IO服务的场景**
+
+osd.1 down掉，osdmap版本号epoch变为81；
+
+如果osd.2向mon申请更新up_thru成功，此时osdmap版本号epoch为82(osd.2的up_thru变为81)，由于osd.2收到新的osdmap后，PG的状态就可以变为active，也即可以提供IO服务了，所以如果up_thru更新成功了，可以判断osd.2有新的写入了（当然，可能存在虽然up_thru更新了，但是osd.2进入到active之前就挂了，那也是没有数据更新的）；
+
+osd.2 down掉，osdmap版本号epoch变为83；
+
+osd.1进程up，osdmap版本号epoch变为84；
+
+2） **能提供IO服务的场景**
+
+osd.1 down掉，osdmap版本号epoch变为81；
+
+osd B没有peering成功，没有向monitor上报其up_thru，没有更新操作。
+
+如果osd.2向mon申请更新up_thru失败，比如上报之前就挂了；
+
+osd.2 down掉， osdmap版本号变为82；
+
+osd.1进程up，osdmap版本号变为83；
+
+### 2.2 io是否能服务的代码判断逻辑
+通过如下流程判断对应PG是否能提供io服务：
+
+* **生成past_interval**
+
+在peering阶段会调用如下函数生成past_interval（osd启动时也会从底层读到相关信息进而生成past_interval):
+
+{% highlight string %}
+bool pg_interval_t::check_new_interval(
+  int old_acting_primary,
+  int new_acting_primary,
+  const vector<int> &old_acting,
+  const vector<int> &new_acting,
+  int old_up_primary,
+  int new_up_primary,
+  const vector<int> &old_up,
+  const vector<int> &new_up,
+  epoch_t same_interval_since,
+  epoch_t last_epoch_clean,
+  OSDMapRef osdmap,
+  OSDMapRef lastmap,
+  pg_t pgid,
+  IsPGRecoverablePredicate *could_have_gone_active,
+  map<epoch_t, pg_interval_t> *past_intervals,
+  std::ostream *out)
+{
+	// remember past interval
+	//  NOTE: a change in the up set primary triggers an interval
+	//  change, even though the interval members in the pg_interval_t
+	//  do not change.
+	if (is_new_interval(
+	  old_acting_primary,
+	  new_acting_primary,
+	  old_acting,
+	  new_acting,
+	  old_up_primary,
+	  new_up_primary,
+	  old_up,
+	  new_up,
+	  osdmap,
+	  lastmap,
+	  pgid)) {
+
+		//此处产生新的interval
+		pg_interval_t& i = (*past_intervals)[same_interval_since];
+		i.first = same_interval_since;
+		i.last = osdmap->get_epoch() - 1;
+		assert(i.first <= i.last);
+		i.acting = old_acting;
+		i.up = old_up;
+		i.primary = old_acting_primary;
+		i.up_primary = old_up_primary;
+	
+		unsigned num_acting = 0;
+		for (vector<int>::const_iterator p = i.acting.begin(); p != i.acting.end();++p)
+			if (*p != CRUSH_ITEM_NONE)
+			++num_acting;
+	
+		const pg_pool_t& old_pg_pool = lastmap->get_pools().find(pgid.pool())->second;
+		set<pg_shard_t> old_acting_shards;
+		old_pg_pool.convert_to_pg_shards(old_acting, &old_acting_shards);
+	
+		if (num_acting && i.primary != -1 && num_acting >= old_pg_pool.min_size && (*could_have_gone_active)(old_acting_shards)) {
+			if (out)
+				*out << "generate_past_intervals " << i<< ": not rw,"<< " up_thru " << lastmap->get_up_thru(i.primary) << " up_from " << lastmap->get_up_from(i.primary)
+			       << " last_epoch_clean " << last_epoch_clean<< std::endl;
+
+			/*
+			 * 本past_interval的最后一个osdmap中主osd的up_thru版本号大于等于本past_interval的第一个osdmap的版本，
+			 * 也即本past_interval阶段，osd更新过up_thru
+			 */
+			if (lastmap->get_up_thru(i.primary) >= i.first && lastmap->get_up_from(i.primary) <= i.first) {
+				i.maybe_went_rw = true;
+
+				if (out)
+					*out << "generate_past_intervals " << i << " : primary up " << lastmap->get_up_from(i.primary)<< "-" << lastmap->get_up_thru(i.primary)
+					  << " includes interval"<< std::endl;
+
+			} else if (last_epoch_clean >= i.first && last_epoch_clean <= i.last) {
+				// If the last_epoch_clean is included in this interval, then
+				// the pg must have been rw (for recovery to have completed).
+				// This is important because we won't know the _real_
+				// first_epoch because we stop at last_epoch_clean, and we
+				// don't want the oldest interval to randomly have
+				// maybe_went_rw false depending on the relative up_thru vs
+				// last_epoch_clean timing.
+
+				i.maybe_went_rw = true;
+
+				if (out)
+					*out << "generate_past_intervals " << i << " : includes last_epoch_clean " << last_epoch_clean << " and presumed to have been rw" << std::endl;
+			} else {
+				i.maybe_went_rw = false;
+				if (out)
+					*out << "generate_past_intervals " << i<< " : primary up " << lastmap->get_up_from(i.primary)<< "-" << lastmap->get_up_thru(i.primary)
+					  << " does not include interval"<< std::endl;
+			}
+		} else {
+			i.maybe_went_rw = false;
+			if (out)
+				*out << "generate_past_intervals " << i << " : acting set is too small" << std::endl;
+		}
+
+		return true;
+
+	} else {
+		return false;
+	}
+}
+{% endhighlight %}
+这里还是以上述两种场景来描述past_interval的更新：
+
+1） 不能提供io服务的场景
+
+如上所述，osdmap版本号epoch分别是80、84，这几个osdmap版本号会对应如下4个past_interval:[-, 80], [81,82], [83,83], [84, +]
+
+并且在[81,82]这个past_interval中，maybe_went_rw会被设置为true（因为满足上面的条件lastmap->get_up_thru(i.primary) >= i.first)，因为在osdmap版本号为82时，osd.2对应的up_thru为81，等于本past_interval的第一个osdmap的版本号81。
+
+2） 能提供io服务的场景
+
+如上所述，osdmap的版本号epoch分别是80--83，这几个osdmap版本号会对应如下4个past_interval: [-, 80], [81], [82], [83,+]。
+
+
+* **根据past_interval判断io是否能提供服务**
+
+这里以不能服务io的场景为例，如下：
+{% highlight string %}
+void PG::build_prior(std::unique_ptr<PriorSet> &prior_set)
+{
+	if (1) {
+		// sanity check
+		for (map<pg_shard_t,pg_info_t>::iterator it = peer_info.begin();it != peer_info.end();++it) {
+			assert(info.history.last_epoch_started >= it->second.history.last_epoch_started);
+		}
+	}
+	prior_set.reset(
+		new PriorSet(
+		  pool.info.ec_pool(),
+		  get_pgbackend()->get_is_recoverable_predicate(),
+		  *get_osdmap(),
+		  past_intervals,
+		  up,
+		  acting,
+		  info,
+		  this));
+	PriorSet &prior(*prior_set.get());
+	
+	// 如果prior.pg_down为true，pg状态被设置为down，此时pg状态为down+peering
+	if (prior.pg_down) {
+		state_set(PG_STATE_DOWN);
+	}
+	
+	if (get_osdmap()->get_up_thru(osd->whoami) < info.history.same_interval_since) {
+		dout(10) << "up_thru " << get_osdmap()->get_up_thru(osd->whoami) << " < same_since " << info.history.same_interval_since << ", must notify monitor" << dendl;
+		need_up_thru = true;
+	} else {
+		dout(10) << "up_thru " << get_osdmap()->get_up_thru(osd->whoami)<< " >= same_since " << info.history.same_interval_since << ", all is well" << dendl;
+		need_up_thru = false;
+	}
+	set_probe_targets(prior_set->probe);
+}
+
+PG::PriorSet::PriorSet(bool ec_pool,
+		       IsPGRecoverablePredicate *c,
+		       const OSDMap &osdmap,
+		       const map<epoch_t, pg_interval_t> &past_intervals,
+		       const vector<int> &up,
+		       const vector<int> &acting,
+		       const pg_info_t &info,
+		       const PG *debug_pg)
+  : ec_pool(ec_pool), pg_down(false), pcontdec(c)
+{
+	// Include current acting and up nodes... not because they may
+	// contain old data (this interval hasn't gone active, obviously),
+	// but because we want their pg_info to inform choose_acting(), and
+	// so that we know what they do/do not have explicitly before
+	// sending them any new info/logs/whatever.
+	for (unsigned i=0; i<acting.size(); i++) {
+		if (acting[i] != CRUSH_ITEM_NONE)
+			probe.insert(pg_shard_t(acting[i], ec_pool ? shard_id_t(i) : shard_id_t::NO_SHARD));
+	}
+
+	// It may be possible to exlude the up nodes, but let's keep them in
+	// there for now.
+	for (unsigned i=0; i<up.size(); i++) {
+		if (up[i] != CRUSH_ITEM_NONE)
+			probe.insert(pg_shard_t(up[i], ec_pool ? shard_id_t(i) : shard_id_t::NO_SHARD));
+	}
+	
+
+	//遍历所有的past_intervals{80},{81,82},{83},{84}
+	for (map<epoch_t,pg_interval_t>::const_reverse_iterator p = past_intervals.rbegin();p != past_intervals.rend();++p) {
+
+		const pg_interval_t &interval = p->second;              //取得pg_interval_t
+
+		dout(10) << "build_prior " << interval << dendl;
+	
+		if (interval.last < info.history.last_epoch_started)
+			break;  // we don't care
+	
+		if (interval.acting.empty())
+			continue;
+	
+		//还是上面的例子，当这里运行到{81,82}这个interval时，由于maybe_went_rw为true了，故而无法continue退出，还要继续走
+		if (!interval.maybe_went_rw)
+			continue;
+	
+		// look at candidate osds during this interval.  each falls into
+		// one of three categories: up, down (but potentially
+		// interesting), or lost (down, but we won't wait for it).
+		set<pg_shard_t> up_now;
+		bool any_down_now = false;  // any candidates down now (that might have useful data)
+	
+		// consider ACTING osds
+		for (unsigned i=0; i<interval.acting.size(); i++) {
+			int o = interval.acting[i];
+			if (o == CRUSH_ITEM_NONE)
+				continue;
+
+			pg_shard_t so(o, ec_pool ? shard_id_t(i) : shard_id_t::NO_SHARD);
+	
+			const osd_info_t *pinfo = 0;
+			if (osdmap.exists(o))
+				pinfo = &osdmap.get_info(o);
+	
+			//如果该OSD处于up状态，就加入到up_now列表中，同时加到probe列表。用于获取权威日志以及后续数据恢复
+			if (osdmap.is_up(o)) {
+				// include past acting osds if they are up.
+				probe.insert(so);
+				up_now.insert(so);
+			} else if (!pinfo) {
+ 				//该列表保存了所有down列表
+
+				dout(10) << "build_prior  prior osd." << o << " no longer exists" << dendl;
+				down.insert(o);
+			} else if (pinfo->lost_at > interval.first) {
+				dout(10) << "build_prior  prior osd." << o << " is down, but lost_at " << pinfo->lost_at << dendl;
+				up_now.insert(so);
+				down.insert(o);
+			} else {
+				// 该列表保存了所有down列表
+				// 当这里运行到{81,82}这个interval时，
+				// 由于这个past_interval中的osd.2此时(注： 这里的此时为84) down了，所以会走到这里
+
+				dout(10) << "build_prior  prior osd." << o << " is down" << dendl;
+				down.insert(o);
+				any_down_now = true;
+			}
+		}
+	
+	
+		// peering由于在线的osd不足，所以不能够继续进行。母函数会根据这个值从而把PG状态设置为DOWN 
+		// 当这里运行到{81,82}这个interval时，由于这个past_interval中的唯一的一个osd.2此时down了，所以pg_down肯定会被置为true)
+		if (!(*pcontdec)(up_now) && any_down_now) {
+			// fixme: how do we identify a "clean" shutdown anyway?
+
+			dout(10) << "build_prior  possibly went active+rw, insufficient up;"<< " including down osds" << dendl;
+
+			for (vector<int>::const_iterator i = interval.acting.begin();i != interval.acting.end();++i) {
+				if (osdmap.exists(*i) &&   // if it doesn't exist, we already consider it lost.
+				  osdmap.is_down(*i)) {
+					pg_down = true;
+	
+					// make note of when any down osd in the cur set was lost, so that
+					// we can notice changes in prior_set_affected.
+					blocked_by[*i] = osdmap.get_info(*i).lost_at;
+				}
+			}
+		}
+	}
+	
+	dout(10) << "build_prior final: probe " << probe<< " down " << down<< " blocked_by " << blocked_by<< (pg_down ? " pg_down":"")<< dendl;
+}
+{% endhighlight %}
+
+综上所述，当osd.1再次up后，最终到{84}这个interval时，根据上面一系列函数调用，此时的PG状态最终会变为peering+down，此时便无法响应服务io了。
+
+## 3. 总结
+在文章开头我们提出了一个疑问，即Ceph集群中有1个osd down了，那么osdmap会发生什么变化？ osdmap会更新几次？
+
+答案是： 不一定，主要是分以下两种情况：
+
+* 该挂掉的osd与其他osd无共同承载的PG
+
+此时osdmap只会更新1次，变化便是osdmap中osd的状态从up更新为down。因为都不存在相关PG，也就不存在peering，也就没有up_thru的更新了，所以osdmap变化1次。
+
+* 该挂掉的osd与其他osd有共同承载的PG
+
+此时osdmap会至少更新两次，其中第1次是更新osdmap中osd的状态，第2次便是更新相关osd的up_thru。
+
+
+这里我们通过实例说明osdmap变化情况：
+
+1） 集群初始状态信息如下
+{% highlight string %}
+# ceph osd tree
+ID CLASS WEIGHT  TYPE NAME                       STATUS REWEIGHT PRI-AFF
+-1       1.74658 root default
+-5       0.87329     host pubt2-ceph1-dg-163-org
+ 0   ssd 0.87329         osd.0                       up  1.00000 1.00000
+-3       0.87329     host pubt2-ceph2-dg-163-org
+ 1   ssd 0.87329         osd.1                       up  1.00000 1.00000
+
+# ceph osd dump | grep epoch
+epoch 416  // osdmap版本号
+{% endhighlight %}
+
+2) down掉osd.0后集群信息如下
+{% highlight string %}
+# ceph osd tree 
+ID CLASS WEIGHT  TYPE NAME                       STATUS REWEIGHT PRI-AFF
+-1       1.74658 root default
+-5       0.87329     host pubt2-ceph1-dg-163-org
+ 0   ssd 0.87329         osd.0                     down  1.00000 1.00000
+-3       0.87329     host pubt2-ceph2-dg-163-org
+ 1   ssd 0.87329         osd.1                       up  1.00000 1.00000
+# ceph osd dump | grep epoch
+epoch 418  // osdmap版本号
+{% endhighlight %}
+如上所示，当down掉osd.0之后，osdmap版本号增加了2个。那我们分别看看这两个osdmap有啥变化，可以通过命令```ceph osd dump epoch```把相应osdmap打印出来：
+<pre>
+# ceph osd dump 416
+# ceph osd dump 417
+# ceph osd dump 418
+</pre>
+可以看到osdmap.416与osdmap.417的差别就是osd.0的状态变化；osdmap.417与osdmap.418的差别就是更新了osd.1的up_thru。
 
 
 <br />
