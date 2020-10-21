@@ -823,6 +823,46 @@ epoch 418  // osdmap版本号
 可以看到osdmap.416与osdmap.417的差别就是osd.0的状态变化；osdmap.417与osdmap.418的差别就是更新了osd.1的up_thru。
 
 
+## 4. 补充
+其实在OSDMonitor端，还有一种情况可能会触发引起up_thru的变更：
+{% highlight string %}
+bool OSDMonitor::prepare_pgtemp(MonOpRequestRef op)
+{
+	op->mark_osdmon_event(__func__);
+	MOSDPGTemp *m = static_cast<MOSDPGTemp*>(op->get_req());
+	int from = m->get_orig_source().num();
+	dout(7) << "prepare_pgtemp e" << m->map_epoch << " from " << m->get_orig_source_inst() << dendl;
+
+	for (map<pg_t,vector<int32_t> >::iterator p = m->pg_temp.begin(); p != m->pg_temp.end(); ++p) {
+		uint64_t pool = p->first.pool();
+		if (pending_inc.old_pools.count(pool)) {
+			dout(10) << __func__ << " ignore " << p->first << " -> " << p->second<< ": pool pending removal" << dendl;
+			continue;
+		}
+		if (!osdmap.have_pg_pool(pool)) {
+			dout(10) << __func__ << " ignore " << p->first << " -> " << p->second<< ": pool has been removed" << dendl;
+			continue;
+		}
+
+		pending_inc.new_pg_temp[p->first] = p->second;
+	
+		// unconditionally clear pg_primary (until this message can encode
+		// a change for that, too.. at which point we need to also fix
+		// preprocess_pg_temp)
+		if (osdmap.primary_temp->count(p->first) ||
+		  pending_inc.new_primary_temp.count(p->first))
+			pending_inc.new_primary_temp[p->first] = -1;
+	}
+	
+	// set up_thru too, so the osd doesn't have to ask again
+	update_up_thru(from, m->map_epoch);
+	
+	wait_for_finished_proposal(op, new C_ReplyMap(this, op, m->map_epoch));
+	return true;
+}
+{% endhighlight %}
+由如上代码，对应的OSD请求pg_temp时，触发更新该OSD的up_thru
+
 <br />
 <br />
 

@@ -1931,6 +1931,234 @@ osd.8 up   in  weight 1 up_from 2087 up_thru 2221 down_at 208 | osd.8 up   in  w
 上面我们看到，osdmap的变化也是up_thru发生了更改。
 
 
+###### 6.2 osdmap从```in+down```时的e2225变成```active+clean```时的e2231
+在e2225时，osd0处于down状态已经达到了5分钟，然后OSDMonitor自动将osd0标记为out状态，触发新的peering操作。这里我们将这一过程中的osdmap dump出来：
+{% highlight string %}
+# ceph osd dump 2226 >> osdmap_2226.txt
+# ceph osd dump 2227 >> osdmap_2227.txt
+# ceph osd dump 2228 >> osdmap_2228.txt
+# ceph osd dump 2229 >> osdmap_2229.txt
+# ceph osd dump 2230 >> osdmap_2230.txt
+# ceph osd dump 2231 >> osdmap_2231.txt
+{% endhighlight %}
+
+1） **osdmap从e2225变为e2226**
+
+执行如下命令对比这两个版本的osdmap:
+{% highlight string %}
+# diff osdmap_2225.txt osdmap_2226.txt -y --suppress-common-lines
+epoch 2225                                                    | epoch 2226
+modified 2020-09-11 14:05:20.831242                           | modified 2020-09-11 14:10:18.902836
+osd.0 down in  weight 1 up_from 2220 up_thru 2221 down_at 222 | osd.0 down out weight 0 up_from 2220 up_thru 2221 down_at 222
+{% endhighlight %}
+可以看到，osdmap的变化仅仅是osd.0的状态由down+in变为down+out。
+
+2） **osdmap从e2226变为e2227**
+
+执行如下命令对比这两个版本的osdmap:
+{% highlight string %}
+# diff osdmap_2226.txt osdmap_2227.txt -y --suppress-common-lines
+epoch 2226                                                    | epoch 2227
+modified 2020-09-11 14:10:18.902836                           | modified 2020-09-11 14:10:19.937451
+osd.3 up   in  weight 1 up_from 2123 up_thru 2223 down_at 209 | osd.3 up   in  weight 1 up_from 2123 up_thru 2226 down_at 209
+osd.4 up   in  weight 1 up_from 2125 up_thru 2223 down_at 212 | osd.4 up   in  weight 1 up_from 2125 up_thru 2226 down_at 212
+osd.5 up   in  weight 1 up_from 2127 up_thru 2224 down_at 212 | osd.5 up   in  weight 1 up_from 2127 up_thru 2226 down_at 212
+osd.6 up   in  weight 1 up_from 2040 up_thru 2223 down_at 203 | osd.6 up   in  weight 1 up_from 2040 up_thru 2226 down_at 203
+osd.7 up   in  weight 1 up_from 2072 up_thru 2223 down_at 205 | osd.7 up   in  weight 1 up_from 2072 up_thru 2226 down_at 205
+osd.8 up   in  weight 1 up_from 2087 up_thru 2223 down_at 208 | osd.8 up   in  weight 1 up_from 2087 up_thru 2226 down_at 208
+pg_temp 11.0 [6,0]                                            <
+pg_temp 11.4 [0,3]                                            <
+pg_temp 11.6 [3,0]                                            <
+pg_temp 13.1 [8,0]                                            <
+pg_temp 13.4 [0,6]                                            <
+pg_temp 13.9 [0,4]                                            <
+pg_temp 13.c [4,0]                                            <
+pg_temp 13.d [0,7]                                            <
+pg_temp 16.2 [8,0]                                            <
+pg_temp 17.4 [6,0]                                            <
+pg_temp 18.1 [8,0]                                            <
+pg_temp 18.2 [0,4]                                            <
+pg_temp 18.3 [4,0]                                            <
+pg_temp 18.4 [0,6]                                            <
+pg_temp 19.1 [3,0]                                            <
+pg_temp 19.2 [0,4]                                            <
+pg_temp 20.3 [0,7]                                            <
+pg_temp 20.5 [5,0]                                            <
+pg_temp 21.1 [0,4]                                            <
+pg_temp 21.3 [8,0]                                            <
+pg_temp 21.6 [5,0]                                            <
+pg_temp 22.0 [3,0]                                            <
+pg_temp 22.e [0,3]                                            <
+pg_temp 22.19 [5,0]                                           <
+pg_temp 22.1e [4,0]                                           <
+pg_temp 22.21 [0,7]                                           <
+pg_temp 22.24 [7,0]                                           <
+pg_temp 22.2a [3,0]                                           <
+pg_temp 22.2c [0,3]                                           <
+pg_temp 22.2f [8,0]                                           <
+pg_temp 22.37 [7,0]                                           <
+pg_temp 22.3a [0,5]                                           <
+pg_temp 22.3b [4,0]                                           <
+pg_temp 22.44 [0,3]                                           <
+pg_temp 22.49 [8,0]                                           <
+pg_temp 22.4a [0,4]                                           <
+pg_temp 22.4b [7,0]                                           <
+pg_temp 22.4e [8,0]                                           <
+pg_temp 22.54 [8,0]                                           <
+pg_temp 22.65 [0,8]                                           <
+pg_temp 22.6b [0,8]                                           <
+pg_temp 22.73 [0,8]                                           <
+pg_temp 22.79 [0,8]                                           <
+pg_temp 22.7a [5,0]                                           <
+pg_temp 22.7f [8,0]                                           <
+pg_temp 22.85 [5,0]                                           <
+pg_temp 22.87 [6,0]                                           <
+pg_temp 22.8b [3,0]                                           <
+pg_temp 22.92 [0,7]                                           <
+pg_temp 22.96 [0,4]                                           <
+pg_temp 22.9a [7,0]                                           <
+pg_temp 22.a2 [0,8]                                           <
+pg_temp 22.a4 [0,3]                                           <
+pg_temp 22.a7 [0,6]                                           <
+pg_temp 22.b0 [6,0]                                           <
+pg_temp 22.b5 [3,0]                                           <
+pg_temp 22.b8 [6,0]                                           <
+pg_temp 22.b9 [5,0]                                           <
+pg_temp 22.bf [6,0]                                           <
+pg_temp 22.c0 [5,0]                                           <
+pg_temp 22.c4 [0,5]                                           <
+pg_temp 22.c8 [6,0]                                           <
+pg_temp 22.ca [0,3]                                           <
+pg_temp 22.cb [0,7]                                           <
+pg_temp 22.ce [0,4]                                           <
+pg_temp 22.d0 [3,0]                                           <
+pg_temp 22.d5 [4,0]                                           <
+pg_temp 22.d7 [0,8]                                           <
+pg_temp 22.df [7,0]                                           <
+pg_temp 22.e2 [0,8]                                           <
+pg_temp 22.ec [0,3]                                           <
+pg_temp 22.f1 [0,8]                                           <
+pg_temp 22.f5 [3,0]                                           <
+pg_temp 22.fa [5,0]                                           <
+pg_temp 23.2 [4,0]                                            <
+pg_temp 23.b [0,3]                                            <
+pg_temp 23.d [0,3]                                            <
+pg_temp 23.f [3,0]                                            <
+pg_temp 23.13 [3,0]                                           <
+pg_temp 23.1e [0,5]                                           <
+pg_temp 23.26 [0,6]                                           <
+pg_temp 23.30 [0,3]                                           <
+pg_temp 23.37 [0,8]                                           <
+pg_temp 23.38 [0,4]                                           <
+pg_temp 23.4b [5,0]                                           <
+pg_temp 23.4f [8,0]                                           <
+pg_temp 23.61 [0,4]                                           <
+pg_temp 23.6d [3,0]                                           <
+pg_temp 23.72 [0,7]                                           <
+pg_temp 23.73 [5,0]                                           <
+pg_temp 23.75 [0,7]                                           <
+pg_temp 23.76 [0,4]                                           <
+pg_temp 23.79 [0,8]                                           <
+pg_temp 23.7a [0,4]                                           <
+pg_temp 23.7b [0,7]                                           <
+pg_temp 23.7e [0,6]                                           <
+pg_temp 23.7f [6,0]                                           <
+pg_temp 23.83 [4,0]                                           <
+pg_temp 23.87 [7,0]                                           <
+pg_temp 23.89 [0,7]                                           <
+pg_temp 23.95 [4,0]                                           <
+pg_temp 23.96 [0,5]                                           <
+pg_temp 23.97 [6,0]                                           <
+pg_temp 23.9d [8,0]                                           <
+pg_temp 23.a1 [0,6]                                           <
+pg_temp 23.a4 [7,0]                                           <
+pg_temp 23.a7 [0,4]                                           <
+pg_temp 23.ad [4,0]                                           <
+pg_temp 23.ae [0,4]                                           <
+pg_temp 23.bb [0,3]                                           <
+pg_temp 23.bc [6,0]                                           <
+pg_temp 23.be [0,5]                                           <
+pg_temp 23.c1 [5,0]                                           <
+pg_temp 23.cb [0,7]                                           <
+pg_temp 23.cf [0,6]                                           <
+pg_temp 23.d2 [0,7]                                           <
+pg_temp 23.d5 [6,0]                                           <
+pg_temp 23.d6 [0,8]                                           <
+pg_temp 23.d7 [0,4]                                           <
+pg_temp 23.dc [6,0]                                           <
+pg_temp 23.de [4,0]                                           <
+pg_temp 23.df [5,0]                                           <
+pg_temp 23.e0 [0,4]                                           <
+pg_temp 23.e4 [0,6]                                           <
+pg_temp 23.e9 [3,0]                                           <
+pg_temp 23.ea [0,8]                                           <
+pg_temp 23.ef [4,0]                                           <
+pg_temp 23.f3 [8,0]                                           <
+pg_temp 23.fa [0,6]                                           <
+pg_temp 23.fc [3,0]                                           <
+pg_temp 24.4 [3,0]                                            <
+pg_temp 24.5 [0,8]                                            <
+pg_temp 25.5 [3,0]                                            <
+{% endhighlight %}
+从上面我们可以看到，osd3、osd4、osd5、osd6、osd7、osd8的up_thru都发生了改变，同时删除了与osd0相关的pg_temp。
+
+3） **osdmap从e2227变为e2228**
+
+执行如下命令对比这两个版本的osdmap:
+{% highlight string %}
+# diff osdmap_2227.txt osdmap_2228.txt -y --suppress-common-lines
+epoch 2227                                                    | epoch 2228
+modified 2020-09-11 14:10:19.937451                           | modified 2020-09-11 14:10:20.962661
+osd.1 up   in  weight 1 up_from 2119 up_thru 2220 down_at 211 | osd.1 up   in  weight 1 up_from 2119 up_thru 2227 down_at 211
+osd.2 up   in  weight 1 up_from 2118 up_thru 2220 down_at 209 | osd.2 up   in  weight 1 up_from 2118 up_thru 2227 down_at 209
+osd.3 up   in  weight 1 up_from 2123 up_thru 2226 down_at 209 | osd.3 up   in  weight 1 up_from 2123 up_thru 2227 down_at 209
+osd.4 up   in  weight 1 up_from 2125 up_thru 2226 down_at 212 | osd.4 up   in  weight 1 up_from 2125 up_thru 2227 down_at 212
+osd.5 up   in  weight 1 up_from 2127 up_thru 2226 down_at 212 | osd.5 up   in  weight 1 up_from 2127 up_thru 2227 down_at 212
+osd.6 up   in  weight 1 up_from 2040 up_thru 2226 down_at 203 | osd.6 up   in  weight 1 up_from 2040 up_thru 2227 down_at 203
+osd.7 up   in  weight 1 up_from 2072 up_thru 2226 down_at 205 | osd.7 up   in  weight 1 up_from 2072 up_thru 2227 down_at 205
+osd.8 up   in  weight 1 up_from 2087 up_thru 2226 down_at 208 | osd.8 up   in  weight 1 up_from 2087 up_thru 2227 down_at 208
+pg_temp 14.3 [0,5]                                            <
+pg_temp 14.8 [0,5]                                            <
+pg_temp 15.5 [3,0]                                            < 
+{% endhighlight %}
+从上面我们可以看到，osd.1~osd.8的up_thru都发生了改变，同时剩下的3个pg_temp也进行了删除。
+
+4） **osdmap从e2228到e2229**
+
+执行如下命令对比这两个版本的osdmap:
+{% highlight string %}
+# diff osdmap_2228.txt osdmap_2229.txt -y --suppress-common-lines
+epoch 2228                                                    | epoch 2229
+modified 2020-09-11 14:10:20.962661                           | modified 2020-09-11 14:10:22.008209
+osd.2 up   in  weight 1 up_from 2118 up_thru 2227 down_at 209 | osd.2 up   in  weight 1 up_from 2118 up_thru 2228 down_at 209
+osd.3 up   in  weight 1 up_from 2123 up_thru 2227 down_at 209 | osd.3 up   in  weight 1 up_from 2123 up_thru 2228 down_at 209
+osd.7 up   in  weight 1 up_from 2072 up_thru 2227 down_at 205 | osd.7 up   in  weight 1 up_from 2072 up_thru 2228 down_at 205
+pg_temp 17.0 [7,0] 
+{% endhighlight %}
+
+5) **osdmap从e2229到e2230**
+
+执行如下命令对比这两个版本的osdmap:
+{% highlight string %}
+# diff osdmap_2229.txt osdmap_2230.txt -y --suppress-common-lines
+epoch 2229                                                    | epoch 2230
+modified 2020-09-11 14:10:22.008209                           | modified 2020-09-11 14:10:23.079014
+osd.7 up   in  weight 1 up_from 2072 up_thru 2228 down_at 205 | osd.7 up   in  weight 1 up_from 2072 up_thru 2229 down_at 205
+osd.8 up   in  weight 1 up_from 2087 up_thru 2227 down_at 208 | osd.8 up   in  weight 1 up_from 2087 up_thru 2229 down_at 208
+pg_temp 14.5 [0,8] 
+{% endhighlight %}
+
+6) **osdmap从e2230到e2231**
+
+执行如下命令对比这两个版本的osdmap:
+{% highlight string %}
+# diff osdmap_2230.txt osdmap_2231.txt -y --suppress-common-lines
+epoch 2230                                                    | epoch 2231
+modified 2020-09-11 14:10:23.079014                           | modified 2020-09-11 14:10:24.139331
+osd.2 up   in  weight 1 up_from 2118 up_thru 2228 down_at 209 | osd.2 up   in  weight 1 up_from 2118 up_thru 2230 down_at 209
+{% endhighlight %}
+
+
 ###### 6.3 osd端工作流程
 
 这里我们通过osd3的日志```osd3_watch.txt```来分析一下OSD端的工作流程。
