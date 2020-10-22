@@ -314,17 +314,20 @@ table_options
 
 下面给出一些示例，假如我们通过如下语句创建了表```t1```:
 {% highlight string %}
-CREATE TABLE t1 (a INTEGER, b CHAR(10));
+CREATE TABLE `t1` (
+	`a` INTERGER,
+	`b` CHAR(10)
+);
 {% endhighlight %}
 
 * 将表从```t1```命名为```t2```
 {% highlight string %}
-ALTER TABLE t1 RENAME t2;
+ALTER TABLE `t1` RENAME `t2```;
 {% endhighlight %}
 
 * 将列```a```从```INTEGER```类型转换为```TINYINT NOT NULL```类型，并且将列```b```从```CHAR(10```类型转换为```CHAR(20)```类型，且将列```b```的名称由b更改为```c```
 {% highlight string %}
-ALTER TABLE t2 MODIFY a TINYINT NOT NULL, CHANGE b c CHAR(20);
+ALTER TABLE `t2` MODIFY a TINYINT NOT NULL, CHANGE `b` `c` CHAR(20);
 {% endhighlight %}
 
 * 添加一个新的```TIMESTAMP```类型的列```d```
@@ -340,6 +343,45 @@ ALTER TABLE t2 ADD INDEX (d), ADD UNIQUE (a);
 * 移除列```c```
 {% highlight string %}
 ALTER TABLE t2 DROP COLUMN c;
+{% endhighlight %}
+
+* 将一列插入到指定的位置
+{% highlight string %}
+CREATE TABLE `t_part_info` (
+  `appid` varchar(64) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
+  `bucket` varchar(64) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
+  `object` varchar(512) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
+  `uploadid` varchar(64) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
+  `seqid` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `create_time` bigint(20) NOT NULL,
+  `modify_time` bigint(20) NOT NULL,
+  PRIMARY KEY (`seqid`),
+  KEY `key_uploadid` (`uploadid`)
+) ENGINE=InnoDB AUTO_INCREMENT=1391219 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+
+ALTER TABLE `t_part_info` MODIFY `seqid` bigint(20) unsigned PRIMARY KEY AUTO_INCREMENT COMMENT 'change column order' first;
+ALTER TABLE `t_part_info` ADD `failure_cnt` tinyint UNSIGNED NOT NULL DEFAULT 0 COMMENT 'add failure count column';
+
+ALTER TABLE `t_part_info` MODIFY `seqid` bigint(20) unsigned AUTO_INCREMENT COMMENT 'change column order' first, ADD `failure_cnt` tinyint UNSIGNED NOT NULL DEFAULT 0 COMMENT 'add failure count column';
+
+ALTER TABLE `t_part_info` ADD `author` varchar(64) NOT NULL DEFAULT 'un-named' COMMENT '分片上传者' AFTER `seqid`;
+{% endhighlight %}
+
+* 修改列的名称
+{% highlight string %}
+CREATE TABLE `t_part_info` (
+  `appid` varchar(64) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
+  `bucket` varchar(64) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
+  `object` varchar(512) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
+  `uploadid` varchar(64) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
+  `seqid` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `create_time` bigint(20) NOT NULL,
+  `modify_time` bigint(20) NOT NULL,
+  PRIMARY KEY (`seqid`),
+  KEY `key_uploadid` (`uploadid`)
+) ENGINE=InnoDB AUTO_INCREMENT=1391219 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+
+ALTER TABLE `t_part_info` CHANGE `create_time` `create_ts` bigint(20) NOT NULL COMMENT '创建时间';
 {% endhighlight %}
 
 ## 3. 视图操作
