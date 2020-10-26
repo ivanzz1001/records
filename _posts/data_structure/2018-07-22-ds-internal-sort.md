@@ -123,7 +123,7 @@ void BWInsertSort(SqList *L, SqList *D)
 	len = L->length;
 	D->r[1] = L->r[1];
 	
-	for(i = 1; i <= L->length; i++){
+	for(i = 2; i <= L->length; i++){
 		if(L->r[i] < D->r[1]){
 			low = first;
 			high = 1;
