@@ -83,7 +83,7 @@ void InsertSort(SqList *L)
 {% highlight string %}
 void BInsertSort(SqList *L)
 {
-	for(i = 2;i<=L->length;i++)
+	for(i=2;i<=L->length;i++)
 	{
 		L.r[0] = L.r[i];
 		
