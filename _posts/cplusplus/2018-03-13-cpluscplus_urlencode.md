@@ -339,6 +339,30 @@ int main(int argc,char *argv[])
 值得指出的是，实际上在对URL进行urlencode的时候（例如: http://127.0.0.1:8000/file/测试/只用于测试.txt?username=小明)，不能简单的调用上面的URLEncode()函数，否则可能把```:```、```/```这样的字符也进行编码，而实际上
 一个对如```http://```这样的部分是不需要进行修正的。
 
+## 5. Go语言中的一个urlencode
+{% highlight string %}
+package main
+
+import (
+	"fmt"
+	"net/url"
+)
+
+func main(){
+	urlStr  := "http://127.0.0.1:17480/userDownload/F6678E6FD4054150BA37521FBA8A67A6/tsp_test_file/批量上传走joss文件 -003-KZyxg.docx?certification=v1645f22bf4084cc7cf38092cd1b52ef6e3e"
+	urlObj, err := url.Parse(urlStr)
+	if err != nil{
+		fmt.Printf("part url failure: %s\n", err.Error())
+		return
+	}
+	fmt.Println(urlObj.String())
+}
+{% endhighlight %}
+编译运行：
+<pre>
+http://127.0.0.1:17480/userDownload/F6678E6FD4054150BA37521FBA8A67A6/tsp_test_file/%E6%89%B9%E9%87%8F%E4%B8%8A%E4%BC%A0%E8%B5%B0joss%E6%96%87%E4%BB%B6%20-003-KZyxg.docx?certification=v1645f22bf4084cc7cf38092cd1b52ef6e3e
+</pre>
+
 <br />
 <br />
 
