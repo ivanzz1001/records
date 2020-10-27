@@ -222,7 +222,7 @@ void ListInsertSort(SLinkListType list)
 
 另一方面，表插入排序的结果只是求得一个有序链表，则只能对其进行顺序查找，不能进行随机查找，为了能实现有序表的折半查找，尚需对记录进行重新排列。
 
-重排的做法是： 顺序扫描有序链表，将链表中第```i```个节点移动至数组的第```i```个分量中。例如有如下图：
+重排的做法是： 顺序扫描有序链表(6->7->2->1->8->3->5->4)，将链表中第```i```个节点移动至数组的第```i```个分量中。例如有如下图：
 
 ![ds-list-arrange](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_list_arrange.jpg)
 
