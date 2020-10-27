@@ -197,7 +197,7 @@ typedef struct{
 
 
 {% highlight string %}
-void ListInsertSort(SLinkListType list)
+void ListInsertSort(SLinkListType &list)
 {
 	list.r[1].next = 0;
 
@@ -231,7 +231,7 @@ void ListInsertSort(SLinkListType list)
 如下算法描述了上述重排记录的过程。
 {% highlight string %}
 //根据静态链表SL中各节点的指针值调整记录位置，使得SL中记录按关键字非递减有序顺序排列
-void Arrange(SLinkListType SL)
+void Arrange(SLinkListType &SL)
 {
 	p = SL.r[0].next;
 
@@ -280,7 +280,7 @@ void Arrange(SLinkListType SL)
 //对顺序表L作一趟希尔插入排序。本算法是和一趟直接插入排序相比，作了以下修改：
 // 1) 前后记录位置的增量是dk,而不是1；
 // 2) r[0]只是暂存单元，不是哨兵。当j<=0时，插入位置已找到
-void ShellInsert(SqList L, int dk)
+void ShellInsert(SqList &L, int dk)
 {
 	for(i = dk+1; i<=L.length;i++)
 	{
@@ -300,7 +300,7 @@ void ShellInsert(SqList L, int dk)
 下面是希尔排序算法：
 {% highlight string %}
 //按增量dlta[0..t-1]对顺序表L作希尔排序
-void ShellSort(SqList L, int dlta[], int t)
+void ShellSort(SqList &L, int dlta[], int t)
 {
 	for(k = 0;k<t;k++)
 		ShellInsert(L, dlta[k]);	//一趟增量为dlta[k]的插入排序
@@ -318,7 +318,7 @@ void ShellSort(SqList L, int dlta[], int t)
 //对顺序表L作一趟希尔插入排序。本算法是和一趟直接插入排序相比，作了以下修改：
 // 1) 前后记录位置的增量是dk,而不是1；
 // 2) r[0]只是暂存单元，不是哨兵。当j<=0时，插入位置已找到
-void ShellInsert(SqList L, int dk)
+void ShellInsert(SqList &L, int dk)
 {
 	for(i = 1; i < dk + 1; i++)
 	{
@@ -338,7 +338,7 @@ void ShellInsert(SqList L, int dk)
 }
 
 //按增量dlta[0..t-1]对顺序表L作希尔排序
-void ShellSort(SqList L, int dlta[], int t)
+void ShellSort(SqList &L, int dlta[], int t)
 {
 	for(k = 0;k<t;k++)
 		ShellInsert(L, dlta[k]);	//一趟增量为dlta[k]的插入排序
