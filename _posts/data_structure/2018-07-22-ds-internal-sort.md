@@ -307,7 +307,12 @@ void ShellSort(SqList L, int dlta[], int t)
 }
 {% endhighlight %}
 
-ShellSort排序的另一种写法如下：
+
+
+
+----------
+
+如下给出Shell排序的另一种写法：
 {% highlight string %}
 //对顺序表L作一趟希尔插入排序。本算法是和一趟直接插入排序相比，作了以下修改：
 // 1) 前后记录位置的增量是dk,而不是1；
@@ -323,10 +328,8 @@ void ShellInsert(SqList L, int dk)
 				L.r[0] = L.r[j];
 
 				for(z = j-dk; z >= 1 && LT(L.r[0], L.r[z]); z -= dk)
-				{
 					L.r[z+dk] = L.r[z];
-				}
-
+				
 				L.r[z+dk] = L.r[0];
 			}
 		}
