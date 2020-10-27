@@ -307,6 +307,41 @@ void ShellSort(SqList L, int dlta[], int t)
 }
 {% endhighlight %}
 
+ShellSort排序的另一种写法如下：
+{% highlight string %}
+//对顺序表L作一趟希尔插入排序。本算法是和一趟直接插入排序相比，作了以下修改：
+// 1) 前后记录位置的增量是dk,而不是1；
+// 2) r[0]只是暂存单元，不是哨兵。当j<=0时，插入位置已找到
+void ShellInsert(SqList L, int dk)
+{
+	for(i = 1; i < dk + 1; i++)
+	{
+		for(j = i + dk; j <= L.length; j += dk)
+		{
+			if(LT(L.r[j], L.r[j-dk]){
+				
+				L.r[0] = L.r[j];
+
+				for(z = j-dk; z >= 1; z -= dk)
+				{
+					L.r[z+dk] = L.r[z];
+				}
+
+				L.r[z+dk] = L.r[0];
+			}
+		}
+	}
+}
+
+//按增量dlta[0..t-1]对顺序表L作希尔排序
+void ShellSort(SqList L, int dlta[], int t)
+{
+	for(k = 0;k<t;k++)
+		ShellInsert(L, dlta[k]);	//一趟增量为dlta[k]的插入排序
+}
+{% endhighlight %}
+
+
 ### 3.2 希尔插入排序时间复杂度
 希尔插入排序的分析是一个复杂的问题，因为它的时间是所取```增量```序列的函数，这涉及一些数学上尚未解决的难题。因此，到目前为止尚未有人求得一种最好的增量序列， 但大量的研究已得出一些局部结论。如有人指出，当增量序列为```dlta=2^(t-k+1) -1```时，希尔排序的时间复杂度为```O(n^(3/2))```，其中t为排序趟数， 1 <= k <= t <= ⌊log2^(n+1)⌋。增量序列有各种取法，但需注意： 应使增量序列中的值没有除1之外的公因子，并且最后一个增量值必须等于1.
 
