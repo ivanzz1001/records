@@ -322,7 +322,7 @@ void ShellInsert(SqList L, int dk)
 				
 				L.r[0] = L.r[j];
 
-				for(z = j-dk; z >= 1; z -= dk)
+				for(z = j-dk; z >= 1 && LT(L.r[0], L.r[z]); z -= dk)
 				{
 					L.r[z+dk] = L.r[z];
 				}
