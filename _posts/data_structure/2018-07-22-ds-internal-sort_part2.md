@@ -71,10 +71,10 @@ int Partion(SqList L, int low, int high)
 
 	while(low < high)
 	{
-		while(low < high && L.r[high] >= pivotkey)	high--;
+		while(low < high && L.r[high].key >= pivotkey) high--;
 		L.r[low] = L.r[high];
 
-		while(low < high && L.r[low] <= pivotkey) low++;
+		while(low < high && L.r[low].key <= pivotkey) low++;
 		L.r[high] = L.r[low];
 	}
 
@@ -189,6 +189,70 @@ void QuickSort(SqList L)
 **4) 快速排序时间复杂度**
 
 快速排序的平均时间为```Tavg(n) = knlnn```, 其中n为待排序序列中记录的个数， k为某个常数，经验证明，在所有同数量级的此类（先进的）排序方法中，快速排序的常数因子k最小。因此，就平均时间而言，快速排序是目前被认为是最好的一种内部排序方法。但是，若初始记录序列按关键字有序或基本有序时，快速排序将蜕化为起泡排序，其时间复杂度为```O(n^2)```。为改进之，通常依```三者取中```的法则来选取枢轴记录，即比较L.r[s].key、L.r[t].key和L.r[(s+t)/2].key，取三者中其关键字取中值的记录为枢轴，只要将该记录和L.r[s]互换，算法可保持不变。经验证明，采用三者取中的规则可大大改善快速排序在最坏情况下的性能。然而，即使如此，也不能使快速排序在待排记录序列已按关键字有序的情况下达到```O(n）```的时间复杂度。为此，可如下所述修改```一次划分```算法： 在指针high减1和low增1的同时进行```起泡```操作，即在相邻的两个记录处于```逆序```时进行互换，同时在算法中附设两个布尔型变量分别指示low和high在从两端向中间的移动过程中是否进行交换过记录的操作，若指针low在从低端向中间的移动过程中没有进行交换记录的操作，则不再需要对低端子表进行排序； 类似地，若指针high在从高端向中间的移动过程中没有进行交换记录的操作，则不需要对高端子表进行排序。显然，如此```划分```将进一步改善快速排序的平均性能。
+
+如下我们给出相应的示例代码：
+{% highlight string %}
+int Partion(SqList L, int low, int high, int *lswapped, int *hswapped)
+{
+	L.r[0] = L.r[low];
+	pivotkey = L.r[low].key;
+	
+	*lswapped = *hswapped = 0;
+
+	while(low < high)
+	{
+		while(low < high && L.r[high].key >= pivotkey)
+		{
+			if (L.r[high].key < L.r[high-1]).key
+			{
+				L.r[high] <-> L.r[high-1];
+				*hswapped = 1;
+			}
+			high--;
+		}	
+		L.r[low] = L.r[high];
+
+		
+		while(low < high && L.r[low] <= pivotkey)
+		{
+			
+			if (L.r[low].key > L.r[low+1].key){
+				L.[low] <-> L.[row+1];
+				*lswapped = 1;
+			}
+			low++;
+		}
+		
+		L.r[high] = L.r[low];
+	}
+
+	L.r[low] = L.r[0];
+	return low;
+}
+
+void QSort(SqList L,int low, high)
+{
+	if(low < high)
+	{
+		int lswapped, hswapped;
+		
+		pivotloc = Partion(L, low, high, &lswapped, &hswapped);
+		
+		if (lswapped == 1)
+			QSort(L, low, pivotkey-1);
+			
+		if (hswapped == 1)
+			QSort(L, pivotloc+1, high);
+		
+	}
+}
+
+void QuickSort(SqList)
+{
+	QSort(sqList, 1, L.length);
+}
+
+{% endhighlight %}
 
 **5） 快速排序空间复杂度**
 
