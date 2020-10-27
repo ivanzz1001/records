@@ -120,7 +120,7 @@ void QSort(SqList L, int low, high)
 			pivotloc = Partion(L, low, high);
 			if(high - pivotloc >= pivotloc - low)
 			{
-				push_back(stack, pivotloc);
+				push_back(stack, pivotloc + 1);
 				push_back(stack, high)	
 
 				high = pivotloc-1;			
@@ -146,11 +146,51 @@ void QuickSort(SqList L)
 }
 {% endhighlight %}
 
-**3) 快速排序时间复杂度**
+**3） 迭代形式的另一种实现**
+{% highlight string %}
+void QSort(SqList L, int low, int high){
+
+	//计算机中整数的最大值用64bit来表示
+	int pl[64], ph[64], psize;
+	
+	psize = 0;
+	
+	while(low < high || psize){
+		
+		if low < high{
+			pivotloc = Partion(L, low, high);
+			if (high - pivotloc >= pivotloc - low){
+				pl[psize] = pivotloc + 1;
+				ph[psize] = high;
+				psize++;
+			
+				high = pivotloc - 1;
+			}else{
+				pl[psize] = low;
+				ph[psize] = pivotloc -1;
+				psize++;
+				
+				low = pivotloc + 1;
+			}
+		}else{
+			low = pl[psize];
+			high = ph[psize];
+			psize--;
+		}
+	}
+}
+
+void QuickSort(SqList L)
+{
+	QSort(L, 1, L.length);
+}
+{% endhighlight %}
+
+**4) 快速排序时间复杂度**
 
 快速排序的平均时间为```Tavg(n) = knlnn```, 其中n为待排序序列中记录的个数， k为某个常数，经验证明，在所有同数量级的此类（先进的）排序方法中，快速排序的常数因子k最小。因此，就平均时间而言，快速排序是目前被认为是最好的一种内部排序方法。但是，若初始记录序列按关键字有序或基本有序时，快速排序将蜕化为起泡排序，其时间复杂度为```O(n^2)```。为改进之，通常依```三者取中```的法则来选取枢轴记录，即比较L.r[s].key、L.r[t].key和L.r[(s+t)/2].key，取三者中其关键字取中值的记录为枢轴，只要将该记录和L.r[s]互换，算法可保持不变。经验证明，采用三者取中的规则可大大改善快速排序在最坏情况下的性能。然而，即使如此，也不能使快速排序在待排记录序列已按关键字有序的情况下达到```O(n）```的时间复杂度。为此，可如下所述修改```一次划分```算法： 在指针high减1和low增1的同时进行```起泡```操作，即在相邻的两个记录处于```逆序```时进行互换，同时在算法中附设两个布尔型变量分别指示low和high在从两端向中间的移动过程中是否进行交换过记录的操作，若指针low在从低端向中间的移动过程中没有进行交换记录的操作，则不再需要对低端子表进行排序； 类似地，若指针high在从高端向中间的移动过程中没有进行交换记录的操作，则不需要对高端子表进行排序。显然，如此```划分```将进一步改善快速排序的平均性能。
 
-**4） 快速排序空间复杂度**
+**5） 快速排序空间复杂度**
 
 由上面的讨论可知，从时间上看，快速排序的平均性能优于前面讨论的各种排序方法， 从空间上看，插入排序（除2-路插入排序外)需要一个记录的附加空间即可，但快速排序需要一个栈空间来实现递归。若每一趟排序都将记录序列均匀的分割成长度相接近的两个子序列，则栈的最大深度为```⌊log2^n⌋+1```（包括最外层参量进栈），但是，若每趟排序之后枢轴位置均偏向子序列的一端，则为最坏情况，栈的最大深度为n。我们可以适当改进算法，在一趟排序之后比较分割所得两部分长度，先对长度短的子序列中的记录进行快速排序，则栈的最大深度可降为```O(logn)```。
 
