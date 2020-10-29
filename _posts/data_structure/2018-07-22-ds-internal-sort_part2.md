@@ -45,7 +45,7 @@ void BubbleSort(int *a, int length)
 {% highlight string %}
 //交换顺序表L中子表L.r[low..high]的记录，是枢轴记录到位，并返回其所在的位置，此时
 //在它之前的记录不大于它，在它之后的记录不小于它
-int Partion(SqList L, int low, int high)
+int Partion(SqList &L, int low, int high)
 {
 	pivotkey = L.r[low].key;
 
@@ -64,7 +64,7 @@ int Partion(SqList L, int low, int high)
 
 在具体实现上述算法时，每交换一对记录需进行3次记录移动（赋值）操作。而实际上，在排序过程中对枢轴记录的赋值是多余的，因为只有在一趟排序结束时，即low=high的位置才是枢轴记录的最后位置。由此可以改写上述算法，先将枢轴记录暂存在r[0]的位置上，排序过程只做r[low]和r[high]的单向移动，直至一趟排序结束后再将枢轴记录移至正确位置上：
 {% highlight string %}
-int Partion(SqList L, int low, int high)
+int Partion(SqList &L, int low, int high)
 {
 	L.r[0] = L.r[low];
 	pivotkey = L.r[low].key;
@@ -87,7 +87,7 @@ int Partion(SqList L, int low, int high)
 
 递归形式快速排序算法如下所示：
 {% highlight string %}
-void QSort(SqList L,int low, high)
+void QSort(SqList &L,int low, high)
 {
 	if(low < high)
 	{
@@ -98,9 +98,9 @@ void QSort(SqList L,int low, high)
 	}
 }
 
-void QuickSort(SqList)
+void QuickSort(SqList &L)
 {
-	QSort(sqList, 1, L.length);
+	QSort(L, 1, L.length);
 }
 {% endhighlight %}
 
@@ -108,7 +108,7 @@ void QuickSort(SqList)
 
 **2) 迭代形式快速排序**
 {% highlight string %}
-void QSort(SqList L, int low, high)
+void QSort(SqList &L, int low, high)
 {
 	stack_init(&stack);
 
@@ -140,7 +140,7 @@ void QSort(SqList L, int low, high)
 	
 }
 
-void QuickSort(SqList L)
+void QuickSort(SqList &L)
 {
 	QSort(L, 1, L.length);
 }
@@ -148,7 +148,7 @@ void QuickSort(SqList L)
 
 **3） 迭代形式的另一种实现**
 {% highlight string %}
-void QSort(SqList L, int low, int high){
+void QSort(SqList &L, int low, int high){
 
 	//计算机中整数的最大值用64bit来表示
 	int pl[64], ph[64], psize;
@@ -180,7 +180,7 @@ void QSort(SqList L, int low, int high){
 	}
 }
 
-void QuickSort(SqList L)
+void QuickSort(SqList &L)
 {
 	QSort(L, 1, L.length);
 }
@@ -192,7 +192,7 @@ void QuickSort(SqList L)
 
 如下我们给出相应的示例代码：
 {% highlight string %}
-int Partion(SqList L, int low, int high, int *lswapped, int *hswapped)
+int Partion(SqList &L, int low, int high, int *lswapped, int *hswapped)
 {
 	L.r[0] = L.r[low];
 	pivotkey = L.r[low].key;
@@ -230,7 +230,7 @@ int Partion(SqList L, int low, int high, int *lswapped, int *hswapped)
 	return low;
 }
 
-void QSort(SqList L,int low, high)
+void QSort(SqList &L,int low, high)
 {
 	if(low < high)
 	{
@@ -247,9 +247,9 @@ void QSort(SqList L,int low, high)
 	}
 }
 
-void QuickSort(SqList)
+void QuickSort(SqList &L)
 {
-	QSort(sqList, 1, L.length);
+	QSort(L, 1, L.length);
 }
 
 {% endhighlight %}
@@ -268,7 +268,7 @@ void QuickSort(SqList)
 显然，对L.r[1..n]中记录进行简单选择排序的算法为： 令i从1至n-1， 进行n-1趟选择操作，算法如下所示。容易看出简单选择排序的过程中，所需进行记录移动的操作次数较少，其最小值为0， 最大值为3(n-1)。然而， 无论记录的初始排序如何，所需进行的关键字间的比较次数相同，均为```n(n-1)/2```。因此，总的时间复杂度为也是```O(n^2)```。
 
 {% highlight string %}
-void SelectSort(SqList L)
+void SelectSort(SqList &L)
 {
 	for(i = 1;i<L.length;i++)
 	{
