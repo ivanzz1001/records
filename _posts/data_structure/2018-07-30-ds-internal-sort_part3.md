@@ -49,7 +49,7 @@ void Merge(RcdType *SR, RcdType *TR, int i,int m, int n)
 //将SR[s..t]归并排序为TR1[s..t]
 void MSort(RcdType *SR, RcdType *TR1, int s,int t)
 {
-	if(s == n)
+	if(s == t)
 		TR1[s] = SR[s];
 	else{
 		//将SR[s..t]平分为SR[s..m]和SR[m+1,t]
