@@ -46,40 +46,49 @@ int Index(SString S, SString T, int pos)
 {% endhighlight %}
 在上面算法中，分别利用计数指针```i```和```j```指示主串S和模式串T中当前正待比较的字符位置。算法的基本思想是： 从主串S的第pos个字符起和模式的第一个字符比较之，若相等，则继续逐个比较后续字符； 否则从主串的下一个字符起再重新和模式的字符比较之。依次类推，直至模式T中的每个字符依次和主串S中的一个连续的字符序列相等，则称**匹配成功**，函数值为和模式T中第一个字符相等的字符在主串S中的序号；否则称**匹配不成功**，函数值为0。下图展示了模式T='abcac'和主串S的匹配过程(pos=1)。
 
-{% highlight string %}
-               ↓i=3
-第一趟匹配  a b a b c a b c a c b a b
-           a b c
-               ↑j=3
+{% highlight string %}    
+第一趟匹配:
+                ↓i=3
+            a b a b c a b c a c b a b
+            a b c
+                ↑j=3
 
-
+第二趟匹配:
              ↓i=2
-第二趟匹配  a b a b c a b c a c b a b
+           a b a b c a b c a c b a b
              a
              ↑j=1
 
 
+                      
+第三趟匹配:
                        ↓i=7
-第三趟匹配  a b a b c a b c a c b a b
+           a b a b c a b c a c b a b
                a b c a c
                        ↑j=5
 
 
 
+                
+第四趟匹配:
                  ↓i=4
-第四趟匹配  a b a b c a b c a c b a b
+           a b a b c a b c a c b a b
                  a 
                  ↑j=1
 
 
+                   
+第五趟匹配:
                    ↓i=5
-第五趟匹配  a b a b c a b c a c b a b
+           a b a b c a b c a c b a b
                    a 
                    ↑j=1
 
 
+                               
+第六趟匹配:
                                ↓i=11
-第六趟匹配  a b a b c a b c a c b a b
+           a b a b c a b c a c b a b
                      a b c a c
                                ↑j=6
 {% endhighlight %}
@@ -93,22 +102,26 @@ int Index(SString S, SString T, int pos)
 这种改进算法是D.E.Knuth与V.R.Pratt和J.H.Morris同时发现的，因此人们称它为克努特-莫里斯-普拉特操作（简称KMP算法）。此算法可以在O(n+m)的时间数量级上完成串的模式匹配操作。其改进在于： 每当一趟匹配过程中出现字符比较不等时，不需要回溯i指针，而是利用已经得到的```部分匹配```的结果将模式向右“滑动”尽可能远的一段距离后，继续进行比较。下面我们先从具体的例子看起。
 
 回顾我们```上一节```的匹配过程示例，在第三趟的匹配中，当i=7、j=5字符比较不等时，又从i=4、j=1重新开始比较。然后，经仔细观察可发现，在```i=4和j=1```, ```i=5和j=1```以及```i=6和j=1```这3次比较都是不必进行的。因为从第三趟部分匹配的结果就可得出，主串中第4、5和6个字符必然是'b'、'c'和'a'（即模式串中第2、3和4个字符）。因为模式中的第一个字符是a，因此它无需再和这3个字符进行比较，而仅需将模式向右滑动3个字符的位置继续进行i=7、j=2时的字符比较即可。同理，在第一趟匹配中出现字符不等时，仅需将模式向右移动两个字符的位置继续进行i=3,j=1时的字符比较。由此，在整个匹配过程中，i指针没有回溯。如下图所示为```改进算法的匹配过程示例```：
-{% highlight string %}
+{% highlight string %}              
+第一趟匹配:
                ↓i=3
-第一趟匹配  a b a b c a b c a c b a b
+           a b a b c a b c a c b a b
            a b c
                ↑j=3
 
-
+               
+第二趟匹配:
                ↓i ---> ↓i=7
-第二趟匹配  a b a b c a b c a c b a b
+           a b a b c a b c a c b a b
                a b c a c
                ↑ ----> ↑
                j=1     j=5
 
 
+                      
+第三趟匹配:
                        ↓i ---> ↓i=11
-第二趟匹配  a b a b c a b c a c b a b
+           a b a b c a b c a c b a b
                     (a)b c a c
                        ↑ ----> ↑
                        j=2     j=6
