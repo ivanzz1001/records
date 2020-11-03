@@ -18,7 +18,7 @@ description: 串的模式匹配算法
 #define MAXSTRLEN	255		//用户可在255以内定义最大串长
 typedef unsigned char SString[MAXSTRLEN+1];	//0号单元存放串的长度
 
-//返回子串T在主串S中第Pos个字符之后的位置。若不存在，则函数值为0
+//返回子串T在主串S中第pos个字符起的位置。若不存在，则函数值为0
 //其中，T非空， 1<=pos<=StrLen(S)
 int Index(SString S, SString T, int pos)
 {
