@@ -213,6 +213,16 @@ Radix Tree又称为基数树。基数树与字典树的区别在于基数树将�
 
 ![ds-rtree](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_rtree_sample.png)
 
+可以按如下方式来定义Radix Tree的结构：
+{% highlight string %}
+typedef struct radix_tree_s{
+	char value[STR_MAXLEN + 1];         //压缩的单词存放于value中
+	int bTerminate;
+	struct radix_tree_s *next[26];      //按压缩单词的首字母排序
+}radix_tree_t;
+{% endhighlight %}
+
+
 ### 2.3 Suffix Tree
 Suffix Tree又称为后缀树。单词 "BANANA" 的后缀树. 每个后缀以``` $ ```结尾。所有的后缀为A$、NA$、 ANA$、NANA$、ANANA$ and BANANA$。 叶子节点表示后缀的起始坐标. 世界上后缀树就是一个单词的所有后缀组成的字典树, 并且把字典树单词进行了压缩。
 
