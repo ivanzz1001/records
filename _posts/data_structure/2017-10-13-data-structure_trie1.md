@@ -154,7 +154,7 @@ int SearchTrie(TrieNode** pRoot,char *s)
 {% highlight string %}
 typedef struct TrieNode{
 	int bTerminated;              //本节点是否也作为一个终节点
-    int nCount;                   //本节点的所有非空孩子的个数
+	int nCount;                   //本节点的所有非空孩子的个数
 	struct TrieNode *next[MAX];
 }TrieNode;
 {% endhighlight %}
