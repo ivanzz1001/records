@@ -128,7 +128,7 @@ void InsertTrie(TrieNode **pRoot,char *s)
 }
  
 //查找
-int SearchTrie(TrieNode* *pRoot,char *s)
+int SearchTrie(TrieNode** pRoot,char *s)
 {
 	TrieNode *p;
 	int i,k;
@@ -148,6 +148,15 @@ int SearchTrie(TrieNode* *pRoot,char *s)
 	}
 	return p->nCount;
 }
+{% endhighlight %}
+
+此外，我们也可以按如下方式来定义Trie树的结点结构：
+{% highlight string %}
+typedef struct TrieNode{
+	int bTerminated;              //本节点是否也作为一个终节点
+    int nCount;                   //本节点的所有非空孩子的个数
+	struct TrieNode *next[MAX];
+}TrieNode;
 {% endhighlight %}
 
 ### 1.4 应用
