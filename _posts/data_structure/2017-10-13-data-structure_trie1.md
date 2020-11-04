@@ -135,7 +135,7 @@ int SearchTrie(TrieNode* *pRoot,char *s)
 	
 	if(!(p=*pRoot))
 	{
-		return0;
+		return 0;
 	}
 	
 	i=0;
