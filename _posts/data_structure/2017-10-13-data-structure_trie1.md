@@ -148,6 +148,7 @@ int SearchTrie(TrieNode** pRoot,char *s)
 	}
 	return p->nCount;
 }
+
 {% endhighlight %}
 
 此外，我们也可以按如下方式来定义Trie树的结点结构：
@@ -157,6 +158,32 @@ typedef struct TrieNode{
 	int nCount;                   //本节点的所有非空孩子的个数
 	struct TrieNode *next[MAX];
 }TrieNode;
+
+void Print(char *result, int start, int end)
+{
+	for(i=start;i<end;i++)
+		printf("%c", result[i]);
+	printf("\n");
+}
+
+void TraverseTrie(TrieNode *pRoot, char *result, int curPos)
+{
+	if (!pRoot)
+		return;
+
+	if(pRoot->bTerminated == 1)
+		Print(result, 0, curPos);
+
+	for(i = 0; i<MAX;i++){
+
+		if (pRoot->next[i]){
+			result[curPos++] = i + 'a';
+			TraverseTrie(pRoot->next[i], result, curPos);
+			curPos--;
+		}
+		
+	}
+}
 {% endhighlight %}
 
 ### 1.4 应用
