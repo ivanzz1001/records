@@ -388,51 +388,75 @@ void inorder_tranverse(struct BSTNode *root)
 }
 {% endhighlight %}
 
-下面我们再给出```后序```遍历的非递归算法的实现参考：
-{% highlight string %}
-void postorder_tranverse(struct BSTNode *root){
 
+1) **前序遍历非递归算法**
+
+如下是先序遍历的非递归算法实现：
+{% highlight string %}
+void preorder_tranverse(struct BSTNode *root){
 	Stack S;
-	struct BSTNode *p, *q;
-	int rBackOff;
+	struct BSTNode *p = root;
 	
 	InitStack(s);
+	Push(S, p);
+	
+	while(!StackEmpty(S)){
+		Pop(S, p);
+		
+		if(p){
+			print_node(p);
+			Push(p->right);
+			Push(p->left);
+		}
+	}
+	
+}
+{% endhighlight %}
+
+2) **后序遍历非递归算法**
+
+下面我们再给出```后序```遍历的非递归算法的实现参考：
+{% highlight string %}
+void postorder_tranverse(struct BSTNode *root)
+{
+	Stack S;
+	struct BSTNode *p, *q, *pRight;
+	
+	InitStack(S);
 	p = root;
 	
 	while(p || !StackEmpty(S))
 	{
-		
 		if(p){
 			Push(S, p);
 			p = p->left;
 		}else{
 			GetTop(S, p);
-			
-			if (p->right){
+			if(p->right){
 				p = p->right;
 			}else{
 				Pop(S, p);
 				print_node(p);
-				rBackOff = 0;
 				
-				while(!StackEmpty(S))
+				pRight =NULL;
+				while(!StackEmpty())
 				{
 					GetTop(S, q);
-					if (q->right == p){
+					
+					if(q->right == p){
 						Pop(S, q);
 						print_node(q);
 						p = q;
 					}else{
-						p = q->right;
-						rBackOff = 1;
+						pRight = q->right;
 						break;
 					}
-				}
-				if(!rBackOff){
-					p = NULL;
-				}
 				
+				}
 			}
+		
+			p = pRight;
+		
 		}
 	
 	}
