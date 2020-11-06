@@ -43,6 +43,8 @@ description: s3cmd的安装及使用
 
 11. [AWS S3桶CORS的配置是不是正确节省](http://www.it1352.com/72458.html)
 
+12. [s3cmd的使用](https://www.cnblogs.com/sunhongleibibi/p/11661123.html)
+
 <br />
 <br />
 <br />
