@@ -388,6 +388,58 @@ void inorder_tranverse(struct BSTNode *root)
 }
 {% endhighlight %}
 
+下面我们再给出```后序```遍历的非递归算法的实现参考：
+{% highlight string %}
+void postorder_tranverse(struct BSTNode *root){
+
+	Stack S;
+	struct BSTNode *p, *q;
+	int rBackOff;
+	
+	InitStack(s);
+	p = root;
+	
+	while(p || !StackEmpty(S))
+	{
+		
+		if(p){
+			Push(S, p);
+			p = p->left;
+		}else{
+			GetTop(S, p);
+			
+			if (p->right){
+				p = p->right;
+			}else{
+				Pop(S, p);
+				print_node(p);
+				rBackOff = 0;
+				
+				while(!StackEmpty(S))
+				{
+					GetTop(S, q);
+					if (q->right == p){
+						Pop(S, q);
+						print_node(q);
+						p = q;
+					}else{
+						p = q->right;
+						rBackOff = 1;
+						break;
+					}
+				}
+				if(!rBackOff){
+					p = NULL;
+				}
+				
+			}
+		}
+	
+	}
+
+}
+{% endhighlight %}
+
 
 <br />
 <br />
