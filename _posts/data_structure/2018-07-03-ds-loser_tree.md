@@ -120,7 +120,7 @@ typedef struct MSegment{
 	int offset;
 }m_segment_t;
 
-typedef struct LoserTree{
+typedef struct loster_tree_s{
 	int k;
 	
 	int *losers;               //losers[i]为-1，表示绝对最小值; losers[i]为-2，表示绝对最大值 
@@ -128,7 +128,8 @@ typedef struct LoserTree{
 }loser_tree_t;
 
 
-loser_tree_t * create_loser_tree(int k){
+loser_tree_t * create_loser_tree(int k)
+{
 	if(k <= 1)
 		return NULL;
 		
@@ -157,7 +158,8 @@ loser_tree_t * create_loser_tree(int k){
 		
 }
 
-void print_loser_tree(loser_tree_t *root){
+void print_loser_tree(loser_tree_t *root)
+{
 	
 	for(int i= 0;i<root->k;i++){
 		printf("第%d个归并段：", i);
@@ -170,10 +172,11 @@ void print_loser_tree(loser_tree_t *root){
 	
 }
 
-void adjust(loser_tree_t *root, int s){
+void adjust(loser_tree_t *root, int s)
+{
 	
 	//adjust the loser-tree from the leafs to the root
-	int t = ((root->k -1) + (s + 1)) >> 1;   //losers[t] is the parent of s
+	int t = (root->k + s) >> 1;   //losers[t] is the parent of s
 	
 	
 	int nexts = s;
@@ -214,7 +217,8 @@ void adjust(loser_tree_t *root, int s){
 }
 
 
-int init_loser_tree(loser_tree_t *root){
+int init_loser_tree(loser_tree_t *root)
+{
 	
 	for(int i = 0;i<root->k;i++)
 		root->losers[i] = -1;
@@ -263,7 +267,8 @@ int init_loser_tree(loser_tree_t *root){
 	return 0x0;
 }
 
-void multiways_merge(loser_tree_t *root){
+void multiways_merge(loser_tree_t *root)
+{
 	
 	while(root->losers[0] != -2){
 		int s = root->losers[0];
@@ -280,7 +285,8 @@ void multiways_merge(loser_tree_t *root){
 	printf("\n");
 }
 
-int main(int argc, char *argv[]){
+int main(int argc, char *argv[])
+{
 	loser_tree_t *root = NULL;
 	
 	root = create_loser_tree(5);
