@@ -383,7 +383,7 @@ int delete_rbtree(rb_tree_t *root, int key)
 
 	if(p->left && p->right)
 	{
-		//get Successor node
+		//get successor node
 		rb_node_t *successor = p->right;
 	
 		while(successor->left)
@@ -469,7 +469,7 @@ int delete_rbtree(rb_tree_t *root, int key)
 }
 {% endhighlight %}
 
-注意： 上面无论哪一种情况，得到的替换后的节点(即```sucessor_child```或```child```节点)都是平衡的， 因为它到达叶子节点的路径都不经过```被删节点```（如果被替换的节点为黑色节点， 那么该节点的父节点就会因为被删去了一个节点而失去平衡)。
+注意： 上面无论哪一种情况，得到的替换后的节点(即```successor_child```或```child```节点)都是平衡的， 因为它到达叶子节点的路径都不经过```被删节点```（如果被替换的节点为黑色节点， 那么该节点的父节点就会因为被删去了一个节点而失去平衡)。
 
 
 

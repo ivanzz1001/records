@@ -207,7 +207,7 @@ int insert_rbtree(rb_tree_t *root, rb_node_t *node)
 	//find the position we need to insert
 	while(p)
 	{
-	    q = p;
+		q = p;
 		if(p->key == node->key)
 			return 1;
 		else if(p->key > node->key)
