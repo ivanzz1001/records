@@ -229,11 +229,11 @@ x-studio同时还具备64位调试引擎，可调试Unity (slua ulua/tolua xlua)
 
 3. [Programming in Lua, Fourth Edition](http://www.lua.org/pil/)
 
-1. [Linux下安装lua开发环境](https://blog.csdn.net/qq_27855219/article/details/83790126)
+4. [Linux下安装lua开发环境](https://blog.csdn.net/qq_27855219/article/details/83790126)
 
-2. [第2课 - 搭建Lua开发环境](https://www.cnblogs.com/shiwenjie/p/6693998.html)
+5. [第2课 - 搭建Lua开发环境](https://www.cnblogs.com/shiwenjie/p/6693998.html)
 
-
+6. [Linux下安装lua开发环境](https://blog.csdn.net/qq_27855219/article/details/83790126)
 
 
 
