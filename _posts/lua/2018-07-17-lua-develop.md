@@ -14,6 +14,15 @@ description: lua开发
 ## 1. Lua介绍
 Lua是一种强大、高效、轻量级的嵌入式脚本语言，其由巴西里约热内卢天主教大学(Pontifical Catholic University of Rio de Janeiro)的一个研究小组于1993年开发。Lua以标准C语言编写并以源代码形式开放，其设计的目的是为了嵌入应用程序中，从而为应用程序提供灵活的扩展和定制功能。
 
+Lua支持面向过程编程(procedural programming)、面向对象(object-oriented)编程、函数式编程(functional programming)、数据驱动编程(data-driven programming)以及数据描述。
+
+Lua将简单的过程语法与基于关联数组和可扩展语义的强大数据描述结构结合在一起。Lua是一种动态类型的语言，可通过基于寄存器的虚拟机解释字节码来运行，并且通过一个通用的垃圾回收器从而实现了自动的内存管理，因此非常适合配置，脚本编写和快速原型制作。
+
+Lua被实现为一个库(library)，用clean C（标准C和C ++的公共子集）编写。Lua的发行版包括一个名为```lua```的主机程序，其使用Lua Library来提供完整独立的Lua解释器，以供交互式或批处理使用。Lua既可作为强大、轻量级、可嵌入的脚本语言来使用，也可作为强大且高效的独立语言来使用。
+
+作为一门扩展语言，Lua中并没有所谓的main程序：其是通过嵌入到宿主客户端(host client)来工作的，因此也可以将Lua称为```嵌入式程序```(embedding program)或者简单的称为```宿主```(host)。宿主程序(host program)可以通过调用函数来执行一系列的Lua代码，读写Lua变量，也可以注册相关的C函数以供Lua脚本调用。通过使用C函数，Lua可以被扩展到能够处理众多不同领域的问题，从而创建出一个共享语法框架的定制编程语言。
+
+
 
 ### 1.1 Lua特性
 
@@ -23,7 +32,7 @@ Lua是一种强大、高效、轻量级的嵌入式脚本语言，其由巴西�
 
 * 其他特性
 
-  * 支持面向过程(procedure-oriented)编程和函数式编程(functional programming)
+  * 支持过程式编程(procedural programming)、面向对象(object-oriented)编程、函数式编程(functional programming)、数据驱动编程(data-driven programming)以及数据描述。
 
   * 自动内存管理
   
@@ -214,8 +223,243 @@ x-studio是一款轻量级且强大的开发人员IDE，软件大小仅15M左右
 
 x-studio同时还具备64位调试引擎，可调试Unity (slua ulua/tolua xlua)，更多功能和使用细节请阅读软件文档:[x-studio软件文档](https://docs.x-studio.net/zh_CN/latest/)
 
+## 5. Lua作为嵌入式语言的执行原理
+这里我们不详细讲解Lua嵌入到宿主程序中运行的原理，而是直接给出一个相应的示例，让读者有一个大体的了解。
+
+### 5.1 示例1
+
+1） **编写lua脚本**
+
+这里我们编写一个名称为```add.lua```的脚本：
+{% highlight string %}
+function add(x, y)
+    return x + y;
+end
+{% endhighlight %}
+
+2) **编写宿主程序**
+
+如下我们编写宿主程序```call_lua_add.c```:
+{% highlight string %}
+/*
+ * 注： 如果是C++代码，请用extern "C"
+ *
+ *
+ *
+ * extern "C"{
+	#include <lua.h>
+	#include <lauxlib.h>
+	#include <lualib.h>
+   }
+   
+ * 
+ */
+ 
+#include <stdio.h>
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
 
 
+/*
+ * call lua add function 
+ */
+int call_lua_add(lua_State *L)
+{
+	lua_getglobal(L, "add");                  //获取add函数
+	lua_pushnumber(L, 123);                  //第一个操作数入栈
+	lua_pushnumber(L, 456);                  //第二个操作数入栈
+	lua_pcall(L, 2, 1, 0);                   //调用函数，2个参数，1个返回值
+	int sum = (int)lua_tonumber(L, -1);      //获取栈顶元素（结果）
+	lua_pop(L, 1);                           //栈顶元素出栈
+	
+	return sum;
+}
+
+int main(int argc, char *argv[])
+{
+	lua_State *L = luaL_newstate();              //新建lua解释器
+	luaL_openlibs(L);                            //载入lua所有函数库
+	
+	luaL_dofile(L, "add.lua");                   //执行"Test.lua"文件中的代码
+	printf("%d\n", call_lua_add(L));
+	
+	lua_close(L);                                //释放
+	return 0;
+}
+{% endhighlight %}
+
+注： 由于我们并没有将lua安装到标准的/usr/local目录，因此这里我们引用lua头文件时是```#include "lua.h"```
+
+3） **编译**
+
+当前我们的代码在/home/compile-machine/LuaInst/LuaTest目录下：
+<pre>
+# pwd
+/home/compile-machine/LuaInst/LuaTest
+# ls
+add.lua  call_lua_add.c
+</pre>
+
+我们的lua环境安装在/home/compile-machine/LuaInst/lua-5.4.1/install目录下：
+<pre>
+# pwd
+/home/compile-machine/LuaInst/lua-5.4.1/install
+# ls
+bin  include  lib  man  share
+</pre>
+
+因此我们采用如下方式来进行编译：
+<pre>
+# gcc -I/home/compile-machine/LuaInst/lua-5.4.1/install/include -o call_lua_add.o -c call_lua_add.c
+
+# gcc -o call_lua_add call_lua_add.o -L/home/compile-machine/LuaInst/lua-5.4.1/install/lib -ldl -lm -llua
+# ./call_lua_add
+579
+</pre>
+
+### 5.2 示例2
+
+1) **编写C代码call_lua_plus.c**
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
+
+
+/*
+ * 每一个Lua注册的函数都必须是这个原型，它已经在lua.h中定义了：
+ *
+ * typedef int (*lua_CFunction) (lua_State *L);
+ *
+*/
+static int lua_plus(lua_State *L)
+{
+	lua_Integer a = luaL_checkinteger(L, 1);           //第一个参数的额索引是1
+	lua_Integer b = luaL_checkinteger(L, 2);
+	lua_pushinteger(L, a + b);                         //将结果入栈
+	
+	/* 这里可以看出，C可以返回给Lua多个结果，
+     * 通过多次调用lua_push*()，之后return返回结果的数量。
+	 *
+	 * 由于c函数返回了一个int类型的返回值个数。因此，当压入返回值之前，
+	 * 不必要清理栈，lua会自动移除返回值下面的任何数据
+     */
+	return 1;                                          
+}
+
+int main(int argc,char *argv[])
+{
+	lua_State *L = luaL_newstate();
+	luaL_openlibs(L);
+	
+	lua_pushcfunction(L, lua_plus);                     //将C函数转换为Lua的"function"并压入虚拟栈
+	lua_setglobal(L, "myplus");                         //弹出栈顶元素，并在Lua中用名为"myplus"的全局变量存储。
+	
+	if (luaL_dostring(L, "print(myplus(2,4));")){	
+		printf("Failed to invoke");
+	}
+	lua_close(L);
+	
+	return 0x0;
+}
+{% endhighlight %}
+
+2) **编译**
+<pre>
+# gcc -I/home/compile-machine/LuaInst/lua-5.4.1/install/include -o call_lua_plus.o -c call_lua_plus.c
+# gcc -o call_lua_plus call_lua_plus.o -L/home/compile-machine/LuaInst/lua-5.4.1/install/lib -lc -lm -ldl -llua
+# ./call_lua_plus
+6
+</pre>
+
+## 6. Lua调用C语言
+
+如下我们介绍一下如何在Lua中调用C库函数。
+
+1） **编写C程序**
+
+编写如下名为```my_luac.c```的程序：
+{% highlight string %}
+#include <stdio.h>
+#include "lua.h"
+#include "lualib.h"
+#include "lauxlib.h"
+ 
+LUALIB_API int luaopen_mylib(lua_State *L );
+ 
+//自定义函数
+static int my_add(lua_State *L)
+{
+    int x = lua_tonumber(L,1);   //第一个参数,转换为数字
+    int y = lua_tonumber(L,2);   //第二个参数,转换为数字
+	
+    int sum = x + y;
+    lua_pushnumber(L, sum);
+    return 1;                    //返回sum计算结果
+}
+ 
+static int showstr(lua_State *L)
+{
+   //从lua中传入的第一个参数
+   const char *str = lua_tostring (L, 1);
+   printf ("c program str = %s\n", str);
+   
+   return 0;
+}
+ 
+//函数列表
+static  luaL_Reg funclist[] =
+{
+    {"add", my_add},                //my_add()函数，lua中访问时使用名称为add
+    {"show", showstr},              //showstr()函数，lua中访问时使用名称为show
+    {NULL, NULL}                    //最后必须有这个
+};
+ 
+//注册函数列表方便扩展
+//我们编译后的动态库名称为mylib.so
+LUALIB_API int luaopen_mylib(lua_State *L )
+{
+    luaL_newlib(L, funclist);    //lua中使用mylibfunc.add访问my_add函数
+	
+    return 1;
+}
+ 
+#if 0
+//直接注册一个函数
+LUALIB_API int luaopen_mylib(lua_State *L )
+{
+    lua_register(L, "add", my_add);
+    return 1;
+}
+#endif
+{% endhighlight %}
+
+2) **编列lua脚本my_lua.lua**
+{% highlight string %}
+mylib = require "mylib"
+local sum = mylib.add(3,9)
+
+print("sum=",sum)
+local str = mylib.show("haha")
+
+{% endhighlight %}
+
+3) **编译C程序为动态库**
+<pre>
+# gcc -o mylib.so -shared -fPIC -I/home/compile-machine/LuaInst/lua-5.4.1/install/include my_luac.c
+# ls 
+mylib.so  my_luac.c  my_lua.lua
+</pre>
+
+4) **测试Lua调用C程序**
+<pre>
+# /home/compile-machine/LuaInst/lua-5.4.1/install/bin/lua ./my_lua.lua
+sum=    12.0
+c program str = haha
+</pre>
 
 <br />
 <br />
@@ -235,7 +479,9 @@ x-studio同时还具备64位调试引擎，可调试Unity (slua ulua/tolua xlua)
 
 6. [Linux下安装lua开发环境](https://blog.csdn.net/qq_27855219/article/details/83790126)
 
+7. [Lua安装](http://www.lua.org/manual/5.4/readme.html)
 
+8. [lua_setglobal](https://www.wenjiangs.com/doc/lua_setglobal)
 
 <br />
 <br />
