@@ -499,7 +499,27 @@ function
 for var_1, ···, var_n in explist do body end
 {% endhighlight %}
 
+参看如下示例：
+{% highlight string %}
+a = {"one", "two", "three"}
+for i, v in ipairs(a) do
+    print(i, v)
+end 
 
+for var_1, var_2, var_3 in ipairs(a)
+do
+    print(var_1, var_2, var_3)
+end
+{% endhighlight %}
+编译运行：
+<pre>
+1       one
+2       two
+3       three
+1       one     nil
+2       two     nil
+3       three   nil
+</pre>
 
 
 <br />
