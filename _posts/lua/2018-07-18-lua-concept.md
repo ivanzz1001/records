@@ -499,6 +499,25 @@ function
 for var_1, ···, var_n in explist do body end
 {% endhighlight %}
 
+变量名```var_i```可以在循环体中被使用，其中第一个变量var_1是控制变量。
+
+在循环开始之前，首先会计算explist并产生4个结果值：
+
+* iterator function
+
+* state
+
+* initial value for the control variable
+
+* closing value
+
+之后在每一次迭代过程中，lua都会调用iterator function，该函数接收两个参数：state和control variable。该迭代函数将返回结果赋值给```var_i```变量列表。假如控制变量的值变为了```nil```，那么整个循环将结束；否则，将执行循环体中的内容，并执行下一个迭代。
+
+closing value类似于一个```to-be-closed```变量，可用于在循环结束后释放相应的资源。
+
+我们不应该在循环体中修改控制变量的值。
+
+
 参看如下示例：
 {% highlight string %}
 a = {"one", "two", "three"}
@@ -520,6 +539,127 @@ end
 2       two     nil
 3       three   nil
 </pre>
+
+###### 3.3.6 Local Declarations
+
+局部变量声明的语法如下所示：
+{% highlight string %}
+local var_1 = 0;
+local var_2;
+
+local var3, var4 = 3, "this is a string";
+{% endhighlight %}
+对于未赋值的变量，其值默认都为```nil```。
+
+此外在声明变量时，还可以为变量指明属性，Lua变量支持的属性有两个：
+
+* const: 用于指明该变量是一个常量类型，即初始化之后我们将不能够再修改其对应的值；
+
+* close: 用于指明该变量是一个to-be-closed变量，
+
+参看如下示例：
+{% highlight string %}
+local a <const> = 1;
+local fd <close> = io.open("./1.txt", "r");
+{% endhighlight %}
+
+
+###### 3.3.7 To-be-close Variables
+to-be-close变量类似于constant local变量，但是其会在超出作用域范围时被关闭。无论是block执行完毕退出，还是在block中通过break、goto、return退出，还是由于error退出，均会导致相关的变量被关闭。
+
+这里关闭一个变量意味着会调用其```__close()```元方法(metamethod)。当调用此metamethod时，向该函数传递的第一个变量就是该close变量本身，第二个参数为error对象，表示调用```__close()```的退出原因。假如并不是因为error退出，那么对应的error的值即为nil。
+
+在为to-be-close变量赋值时，要求对应的值必须要有```__close```元方法(metamethod)或者是一个false值。
+
+
+假如有多个to-be-close变量同时超出作用域，那么h后声明的to-be-close变量将会先被释放。
+
+假如在执行```__close```方法时其内部出现了error，那么对其中错误的处理方式与正常情况下的错误处理保持一致。
+
+### 3.4 表达式
+这里我们对函数调用以及泛型表达式做一个说明。函数调用的返回值以及泛型都可能会产生多个结果值。假如函数调用仅仅是作为一个statement，那么其返回值将会被忽略；假如expression A是作为一个表达式列表中的最后一个元素，或者是表达式列表的唯一元素，那么expression A 所有的返回结果值将不会被忽略；在其他情况下，Lua会将result list调整为1个元素，而将其他元素都忽略掉。
+
+参看如下示例：
+{% highlight string %}
+f()                -- adjusted to 0 results
+g(f(), x)          -- f() is adjusted to 1 result
+g(x, f())          -- g gets x plus all results from f()
+a,b,c = f(), x     -- f() is adjusted to 1 result (c gets nil)
+a,b = ...          -- a gets the first vararg argument, b gets
+                -- the second (both a and b can get nil if there
+                -- is no corresponding vararg argument)
+
+a,b,c = x, f()     -- f() is adjusted to 2 results
+a,b,c = f()        -- f() is adjusted to 3 results
+return f()         -- returns all results from f()
+return ...         -- returns all received vararg arguments
+return x,y,f()     -- returns x, y, and all results from f()
+{f()}              -- creates a list with all results from f()
+{...}              -- creates a list with all vararg arguments
+{f(), nil}         -- f() is adjusted to 1 result
+{% endhighlight %}
+
+任何放在```()```中的表达式都只会返回一个值。因此，(f(x,y,z))总是返回一个值，即使f(x,y,z)本身可能会返回多个值。
+
+>注： 假如f(x,y,z)返回多个值，那么(f(x,y,z))将返回第一个值；如果f(x,y,z)不返回值，那么(f(x,y,z))的值将为nil。
+
+###### 3.4.1 算术运算符
+Lua支持如下算术运算符：
+{% highlight string %}
++       : addition
++       
+-       : subtraction
+-       
+*       : multiplication
+*       
+/       : float division
+
+//      : floor division
+
+%       : modulo
+
+^       : exponentiation
+
+-       : unary minus
+{% endhighlight %}
+
+
+###### 3.4.2 位运算符
+
+Lua支持如下的位运算符：
+{% highlight string %}
+&        : bitwise AND
+
+|        : bitwise OR
+
+~        : bitwise exclusive OR
+
+>>       : right shift
+
+<<       : left shift
+
+~        : unary bitwise NOT
+{% endhighlight %}
+
+###### 3.4.3 强制转换规范
+对于有一些数据类型，Lua会在运行时自动的进行类型转换。比如在进行```位操作```运算时就会自动的将浮点操作数转换为整数。指数运算和浮点除法运算则会自动的将操作数转换为浮点数。甚至，对于字符串连接，可以接收数字作为参数。
+
+###### 3.4.4 关系运算符
+Lua支持如下关系运算符：
+{% highlight string %}
+==       : equality
+
+~=       : inequality
+
+<        : less than
+
+>        : greater than
+
+<=       : less or equal
+
+>=       : greater or equal
+{% endhighlight %}
+
 
 
 <br />
