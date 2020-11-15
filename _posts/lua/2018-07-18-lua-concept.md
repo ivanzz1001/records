@@ -660,6 +660,230 @@ Lua支持如下关系运算符：
 >=       : greater or equal
 {% endhighlight %}
 
+如上关系运算符产生的结果为```true```或者```false```。
+
+对于```==```运算符，首先会比较对应操作数的类型，如果类型不同则直接返回```false```。如果类型相同，然后再会比较对应的值是否相等。对于```字符串```来说，比较的是两个操作数之间的字节内容是否相等；对于数值来说，比较的是两个操作数在数学层面是否相等。
+
+table、userdata以及thread之间的比较是它们之间的引用是否相等，即是否引用的是同一个对象。任何时候你创建一个新的对象(table、userdata、thread)，该新的对象都与已存在的对象不同。
+
+我们也可以为table和userdata指定```__eq```这样一个metamethod，从而按我们自定义的方式来比较连个table(或userdata)是否相等。
+
+
+此外，这里还需要注意的一点是，在进行字符串和数字之间的```==```比较时，并不会自动的将整数转换成字符串（或者将字符串转换为整数）。因此```"0" == 0```的结果为false。对于table t而言，t[0]与t["0"]也是不一样的。
+
+
+###### 3.4.5 逻辑运算符
+Lua中的逻辑运算符有：
+
+* and
+
+* or
+
+* not
+
+与控制结构(control structure)类似，所有的逻辑运算符也都会将```false```、```nil```认为是false，而其他值认为是true。
+
+对于逻辑反运算(not)其结果总是为```true```或者```false```；对于逻辑与运算(and)，假如第一个操作数的值为false或者nil，那么其返回第一个操作数，否则其返回第二个操作数；对于逻辑或运算(or)，假如第一个参数不是false/nil，那么其返回第一个操作数，否则返回第二个操作数。
+
+参看如下示例：
+{% highlight string %}
+10 or 20            --> 10
+
+10 or error()       --> 10
+
+nil or "a"          --> "a"
+
+nil and 10          --> nil
+
+false and error()   --> false
+
+false and nil       --> false
+
+false or nil        --> nil
+
+10 and 20           --> 20
+{% endhighlight %}
+
+###### 3.4.6 Concatenation
+在Lua中字符串的连接操作采用两个点(```..```)来实现。假如两个操作数都是字符串或者数字，则数字会自动的转换成字符串，否则调用```__concat```元方法(metamethod)来完成。
+
+###### 3.4.7 求长度运算符
+采用单目运算符```#```来实现求长度的运算。
+
+对于一个字符串来说，其长度为所占用的字节数。如果在一个table变量上运用求长度运算符```#```，那么其返回该table的边界。对于一个table的边界，其是满足如下条件的自然数：
+{% highlight string %}
+(border == 0 or t[border] ~= nil) and t[border + 1] == nil
+{% endhighlight %}
+换句话说，边界(border)就是table中存在的一个索引，该索引处的元素不为nil，但是该索引下一个位置上的元素为nil。
+
+只有一个border的table，我们称之为序列(sequence)。例如，对于table {10, 20, 30, 40, 50}来说其就是一个sequence，其只有一个border(5)；对于table {10, 20, 30, nil, 50}有连个border，分别是border(3)和border(5)，因此其并不是一个sequence（在索引4处的nil，我们称之为hole)；对于table {nil, 20, 30, nil, nil, 60, ni}具有三个border，分别是border(0)、border(3)、border(6)，并且有3个hole，这3个hole的索引分别是1、4、5，因此其也不是一个sequence。对于table {}来说，其只有一个border(0)，因此是一个sequence。
+
+当t是一个sequence时，```#t```只会返回一个border，即对应于序列的长度。当t不是一个sequence时，```#t```会返回所有的borders。
+
+###### 3.4.8 优先级
+在Lua中，运算符的优先级表如下所示(从低到高）：
+{% highlight string %}
+or
+
+and
+
+<     >     <=    >=    ~=    ==
+
+|
+
+~
+
+&
+
+<<    >>
+
+..
+
++     -
+
+*     /     //    %
+
+unary operators (not   #     -     ~)
+
+^
+{% endhighlight %}
+通常情况下，你可以使用括号```()```来改变一个表达式的优先级顺序。连接运算符```..```和指数运算符```^```具有从右到左的结合性，而其他运算符的结合性为从左到右。
+
+
+
+###### 3.4.9 Table Constructors
+
+table的构造可以采用相应的构造表达式来完成。当构造表达式被执行，那么table就构造出来了。我们可以构造一个空的table，也可以在构造的时候直接初始化其中的一些field。table的构造语法如下：
+{% highlight string %}
+tableconstructor ::= ‘{’ [fieldlist] ‘}’
+
+fieldlist ::= field {fieldsep field} [fieldsep]
+
+field ::= ‘[’ exp ‘]’ ‘=’ exp | Name ‘=’ exp | exp
+
+fieldsep ::= ‘,’ | ‘;’
+{% endhighlight %}
+
+如果table初始化中字段(Field)的形式为```[exp1] = exp2```，其表示向table中添加一条key为```exp1```，value为```exp2```的的entry； 如果字段(Field)的形式为```name = exp```，那么其等价于```["name"]=exp```；而对于单独的```exp```形式，其等价于[i] = exp，这里i是从1开始的连续自然数，并且其他形式的field并不会影响i的计数。例如：
+{% highlight string %}
+a = { [f(1)] = g; "x", "y"; x = 1, f(x), [30] = 23; 45 }
+{% endhighlight %}
+
+其等价于：
+{% highlight string %}
+do
+	local t = {}
+	t[f(1)] = g
+	t[1] = "x"         -- 1st exp
+	t[2] = "y"         -- 2nd exp
+	t.x = 1            -- t["x"] = 1
+	t[3] = f(x)        -- 3rd exp
+	t[30] = 23
+	t[4] = 45          -- 4th exp
+	a = t
+end
+{% endhighlight %}
+>注： 构造函数中的赋值顺序是未定的（影响到的点主要是重复的key)
+
+假如初始化列表的最后一个字段为exp形式，并且该exp是一个函数调用或者是泛型表达式，那么该表达式返回的所有值都会被放入table中。
+
+###### 3.4.10 Function calls
+在Lua中函数调用的语法如下：
+{% highlight string %}
+functioncall ::= prefixexp args
+{% endhighlight %}
+在一个函数调用中，```prefixexp```和```args```首先会被评估。假如```prefixexp```的值是function类型，那么该函数就会直接以指定的参数被调用；否则，假如```prefixexp```存在```__call```这样的metamethod，那么该元方法会被调用： 第一个参数为prefixexp本身，后面才是	对应的参数列表。
+
+而对于如下形式：
+{% highlight string %}
+functioncall ::= prefixexp ‘:’ Name args
+{% endhighlight %}
+其可被用于模仿method。调用v:name(args)等价于v.name(v,args)，只是前者只会对v计算一次。
+
+###### 3.4.11 Function Definitions
+函数定义的语法如下：
+{% highlight string %}
+functiondef ::= function funcbody
+funcbody ::= ‘(’ [parlist] ‘)’ block end
+{% endhighlight %}
+
+另外，采用如下的语法糖可以简化function的定义：
+{% highlight string %}
+stat ::= function funcname funcbody
+stat ::= local function Name funcbody
+funcname ::= Name {‘.’ Name} [‘:’ Name]
+{% endhighlight %}
+
+对于上面的语法糖，请参看如下转化：
+{% highlight string %}
+ The statement
+
+     function f () body end
+
+translates to
+
+     f = function () body end
+
+The statement
+
+     function t.a.b.c.f () body end
+
+translates to
+
+     t.a.b.c.f = function () body end
+
+The statement
+
+     local function f () body end
+
+translates to
+
+     local f; f = function () body end
+
+not to
+
+     local f = function () body end
+
+(This only makes a difference when the body of the function contains references to f.) 
+{% endhighlight %}
+
+下面我们给出一些函数参数转化的实例：
+{% highlight string %}
+ As an example, consider the following definitions:
+
+     function f(a, b) end
+     function g(a, b, ...) end
+     function r() return 1,2,3 end
+
+Then, we have the following mapping from arguments to parameters and to the vararg expression:
+
+     CALL             PARAMETERS
+     
+     f(3)             a=3, b=nil
+     f(3, 4)          a=3, b=4
+     f(3, 4, 5)       a=3, b=4
+     f(r(), 10)       a=1, b=10
+     f(r())           a=1, b=2
+     
+     g(3)             a=3, b=nil, ... -->  (nothing)
+     g(3, 4)          a=3, b=4,   ... -->  (nothing)
+     g(3, 4, 5, 8)    a=3, b=4,   ... -->  5  8
+     g(5, r())        a=5, b=1,   ... -->  2  3
+
+{% endhighlight %}
+
+我们使用**return**语句来返回函数的结果。假如在到达end之前都没有return，那么表示该函数不会有结果返回。
+
+另外，对于如下的colon syntax，其被用来模仿method，其会在函数调用时隐式的添加一个额外的参数到参数列表中，参看如下：
+{% highlight string %}
+     function t.a.b.c:f (params) body end
+
+is syntactic sugar for
+
+     t.a.b.c.f = function (self, params) body end
+
+{% endhighlight %}
+
 
 
 <br />
