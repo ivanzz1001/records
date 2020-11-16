@@ -412,7 +412,31 @@ index:10
 
 {% endhighlight %}
 
-**21) ubuntu16.04 修改配置文件 禁止系统自动更新**
+**21) 文件批量重命名**
+
+假设我们在当前目录下有如下文件：
+<pre>
+# ls -al *.bak
+-rw-r--r-- 1 root root 20227 12月 29 2014 luaconf.h.bak
+-rw-r--r-- 1 root root 14734 12月 27 2014 lua.h.bak
+-rw-r--r-- 1 root root   191 12月 23 2004 lua.hpp.bak
+-rw-r--r-- 1 root root  1173 2月   7 2014 lualib.h.bak
+</pre>
+现在我们需要将其中的所有```.bak```文件重命名回原来的名字，即将```.bak```后缀去掉：
+{% highlight string %}
+# ls -al *.bak | while read line; do filename=`echo $line | awk '{print $9}'`; newfilename=`echo $filename | awk -F .bak '{print $1}'`; echo "prepare to rename file: $filename == > $newfilename"; mv ./$filename ./$newfilename;done
+prepare to rename file: luaconf.h.bak == > luaconf.h
+prepare to rename file: lua.h.bak == > lua.h
+prepare to rename file: lua.hpp.bak == > lua.hpp
+prepare to rename file: lualib.h.bak == > lualib.h
+
+# ls -al lua
+luaconf.h  lua.h      lua.hpp    lualib.h  
+{% endhighlight %}
+
+
+
+**22) ubuntu16.04 修改配置文件 禁止系统自动更新**
 
 可以通过修改配置文件或者通过界面操作来禁止系统自动更新。
 
@@ -431,14 +455,14 @@ APT::Periodic::AutocleanInterval "0";
 菜单栏点 系统 --> 首选项 --> 启动应用程序 --> 更新提示 前面的钩打掉,从不更新 关闭即可
 {% endhighlight %}
 
-**22) 批量重命名文件**
+**23) 批量重命名文件**
 {% highlight string %}
 // 将当前文件夹下的所有.jpg文件命名为.png文件
 
 # for files in `ls *.txt`; do filename=`echo $files | sed 's/.jpg/.png/'`; mv $files $filename; done
 {% endhighlight %}
 
-**23) tee命令**
+**24) tee命令**
 
 tee命令用于从标准输入读取数据，然后写到标准输出及文件中去。基本语法如下：
 {% highlight string %}
@@ -462,7 +486,7 @@ hello,world 0
 hello,world 1
 </pre>
 
-**24） 计算一个文本文件中所有数字之和**
+**25） 计算一个文本文件中所有数字之和**
 {% highlight string %}
 # cat qq.txt
 100,200,300,400
@@ -474,7 +498,7 @@ hello,world 1
 1500
 {% endhighlight %}
 
-**25) 统计一个文本中数字出现的次数，并按出现次数从大到小排序**
+**26) 统计一个文本中数字出现的次数，并按出现次数从大到小排序**
 {% highlight string %}
 # cat test.txt
 100
@@ -492,7 +516,7 @@ hello,world 1
 {% endhighlight %}
 
 
-**26） size 查看程序内存映像大小**
+**27） size 查看程序内存映像大小**
 
 ```size```可用于查看程序被映射到内存中的映像所占用的大小信息。程序映射到内存中，从低地址到高地址依次为下列段：
 
@@ -517,7 +541,7 @@ text    data     bss     dec     hex filename
 1259     540      16    1815     717 main
 </pre>
 
-**27) file文件类型查询**
+**28) file文件类型查询**
 
 可以用```file```命令查看文件的类型。比如我们在64位机器上发现了一个32位的库，链接不上，这就有问题了。
 
@@ -526,7 +550,7 @@ text    data     bss     dec     hex filename
 a.out: ELF 64-bit LSB executable, AMD x86-64, version 1 (SYSV), for GNU/Linux 2.6.9, dynamically linked (uses shared libs), for GNU/Linux 2.6.9, not stripped
 </pre>
 
-**28) strings 查询数据中的文本信息**
+**29) strings 查询数据中的文本信息**
 
 一个文件中包含二进制数据和文本数据，如果只需要查看其文本信息，使用这个命令就很方便。可以过滤掉非字符数据，将文本信息输出：
 {% highlight string %}
@@ -534,7 +558,7 @@ a.out: ELF 64-bit LSB executable, AMD x86-64, version 1 (SYSV), for GNU/Linux 2.
 {% endhighlight %}
 
 
-**29) shell awk 统计重复个数**
+**30) shell awk 统计重复个数**
 
 现有如下```file.log```文件：
 {% highlight string %}
@@ -555,7 +579,7 @@ www.sina.com 2
 www.163.com 1
 {% endhighlight %}
 
-**30) shell去除空行**
+**31) shell去除空行**
 
 有时我们在处理和查看文件时，经常会有很多空行，为了美观或是有需要时，就有必要把这些空行去除掉。例如我们有如下文件````file.log```：
 {% highlight string %}
@@ -650,7 +674,7 @@ http://www.163.com/zzz
 http://www.sohu.com/ddd
 {% endhighlight %}
 
-**31) shell去除空格**
+**32) shell去除空格**
 
 假设我们有如下文件:
 {% highlight string %}
