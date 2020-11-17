@@ -75,6 +75,17 @@ RF = {<root, ri> | i = 1,2,...,m,  m>0}
 ![ds-tree-special](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_tree_special.jpg)
 
 
+
+----------
+
+完全二叉树将在很多场合下出现，下面介绍完全二叉树的两个重要特性。
+
+![ds-tree-feature2](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_tree_feature2.jpg)
+
+上图6.5所示为完全二叉树上结点及其左、右孩子结点之间的关系。
+
+
+
 <br />
 <br />
 
