@@ -84,6 +84,67 @@ RF = {<root, ri> | i = 1,2,...,m,  m>0}
 
 上图6.5所示为完全二叉树上结点及其左、右孩子结点之间的关系。
 
+### 2.3 二叉树的存储结构
+###### 1. 顺序存储结构
+{% highlight string %}
+//------ 二叉树的顺序存储表示------
+
+#define MAX_TREE_SIZE 100                         //二叉树的最大结点数
+
+typedef TElemType SqBiTree[MAX_TREE_SIZE];        //0号单元存储根节点
+
+SqBiTree bt;
+{% endhighlight %}
+按照顺序存储结构的定义，在此约定，用一组地址连续的存储单元依次自上而下、自左至右存储完全二叉树上的结点元素，即将完全二叉树上编号为```i```的结点元素存储在如上定义的一维数组中下标为```i-1```的分量中。例如，下图6.6(a)所示为图6.4(b)所示完全二叉树的顺序存储结构。对于一般二叉树，则应将其每个节点与完全二叉树上的结点相对照，存储在一维数组的相应分量中，如图6.4(c)所示二叉树的顺序存储结构如图6.6(b)所示，图中以```“0”```表示不存在此节点。由此可见，这种顺序存储结构仅适用完全二叉树。因为，在最坏情况下，一个深度为k且只有k个节点的单支树（树中不存在度为2的结点）却需要长度为2<sup>k</sup>-1的一维数组。
+
+![ds-tree-sequence](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_tree_sequence.jpg)
+
+
+###### 2. 链式存储结构
+设计不同的结点结构可构成不同形式的链式存储结构。由二叉树的定义得知，二叉树的结点（如下图6.7(a)所示）由一个数据元素和分别指向其左、右子树的两个分支构成，则表示二叉树的链表中的结点至少包含3个域： 数据域和左、右指针域，如图6.7(b)所示。有时，为了便于找到结点的双亲，则还可以在结点结构中增加一个指向其双亲结点的指针域，如下图6.7(c)所示。
+
+![ds-tree-link1](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_tree_link1.jpg)
+
+
+利用这两种结点结构所得二叉树的存储结构分别称之为二叉链表和三叉链表，如下图6.8所示。
+
+![ds-tree-link2](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_tree_link2.jpg)
+
+链表的头指针指向二叉树的根结点。容易证得，在含有n个结点的二叉链表中有n+1个空链域。在后面的章节中我们将会看到可以利用这些空链域存储其他有用信息，从而得到另一种链式存储结构————线索链表。以下是二叉链表的定义和部分基本操作的函数原型说明。
+
+{% highlight string %}
+//------- 二叉树的二叉链表存储表示------------
+typedef struct BiTNode{
+	TElemType data;                        
+	struct BiTNode *lchild, *right;         //左右孩子指针
+}BiTNode, *BiTree;
+
+//--------- 基本操作的函数原型说明(部分) -------------
+
+//按先序次序输入二叉树中结点的值（一个字符），空格表示空树，
+//构造二叉链表表示的二叉树
+Status CreateBiTree(BiTree &T);
+
+//采用二叉链表存储结构，Visit是对结点操作的应用函数
+//先序遍历二叉树T，对每个结点调用函数Visit一次且仅一次。一旦Visit失败，则操作失败
+Status PreOrderTraverse(BiTree T, Status (*Visit)(TElemType e));
+
+
+//采用二叉链表存储结构，Visit是对结点操作的应用函数
+//中序遍历二叉树T，对每个结点调用函数Visit一次且仅一次。一旦Visit失败，则操作失败
+Status InOrderTraverse(BiTree T, Status (*Visit)(TElemType e));
+
+//采用二叉链表存储结构，Visit是对结点操作的应用函数
+//后序遍历二叉树T，对每个结点调用函数Visit一次且仅一次。一旦Visit失败，则操作失败
+Status PostOrderTraverse(BiTree T, Status (*Visit)(TElemType e));
+
+
+//采用二叉链表存储结构，Visit是对结点操作的应用函数
+//层序遍历二叉树T，对每个结点调用函数Visit一次且仅一次。一旦Visit失败，则操作失败
+Status LevelOrderTraverse(BiTree T, Status (*Visit)(TElemType e));
+{% endhighlight %}
+
+在不同的存储结构中，实现二叉树的操作方法也不同，如找节点x的双亲PARENT(T, e)，在三叉链表中很容易实现，而在二叉链表中则需要从根指针出发巡查。由此，在具体应用中采用什么存储结构，除根据二叉树的形态之外，还应考虑需进行何种操作。
 
 
 <br />
