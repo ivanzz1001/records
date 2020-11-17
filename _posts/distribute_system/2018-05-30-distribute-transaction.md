@@ -46,6 +46,7 @@ description: 分布式事务解决方案
 
 1. [分布式事务解决方案](https://www.cnblogs.com/the-zym/p/13230674.html)
 
+2. [分布式系统一致性解决方案](https://blog.csdn.net/kevin860/article/details/82322519)
 
 
 <br />
