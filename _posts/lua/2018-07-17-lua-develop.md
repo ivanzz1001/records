@@ -205,6 +205,8 @@ hello, world
 可以看到执行成功。
 
 ## 4. Windows上Lua相关的IDE工具
+
+### 4.1 x-studio
 通常我们学习一门编程语言，都会选择一个好用的IDE工具，这里我们可以使用```x-studio```，如下图所示：
 
 ![x-sudio](https://ivanzz1001.github.io/records/assets/img/lua/x-studio.jpg)
@@ -222,6 +224,9 @@ x-studio是一款轻量级且强大的开发人员IDE，软件大小仅15M左右
 3） **x-studio拥有64位调试引擎**
 
 x-studio同时还具备64位调试引擎，可调试Unity (slua ulua/tolua xlua)，更多功能和使用细节请阅读软件文档:[x-studio软件文档](https://docs.x-studio.net/zh_CN/latest/)
+
+### 4.2 ZeroBrane Studio
+此外，我们还可以使用官方所推荐的[ZeroBrane Studio](http://www.lua.org/start.html)，但是其目前并不支持Lua5.4。
 
 ## 5. Lua作为嵌入式语言的执行原理
 这里我们不详细讲解Lua嵌入到宿主程序中运行的原理，而是直接给出一个相应的示例，让读者有一个大体的了解。
