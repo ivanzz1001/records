@@ -185,9 +185,67 @@ redo log会在事务提交之前，或者redo log buffer满了的时候写入磁
 
 InnoDB引擎采用的是第二种方案，因此undo log要在redo log前持久化。 
 
+### 2.3 总结
+
+* undo log记录更新前数据，用于保证事务原子性
+
+* redo log记录更新后数据，用于保证事务的持久性
+
+* redo log有自己的内存buffer，先写入到buffer，事务提交时写入磁盘
+
+* redo log持久化之后，意味着事务是**可提交**的
+
+## 3. 分布式事务
+
+### 3.1 应用场景
+
+当我们的系统采用了微服务架构后，一个电商系统往往被拆分成如下几个子系统： 商品系统、订单系统、支付系统、积分系统等。整个下单的过程如下：
+
+1） 用户通过商品系统浏览商品，他看中了某一项商品，便点击下单
+
+2） 此时订单系统会生成一条订单
+
+3） 订单创建成功后，支付系统提供支付功能
+
+4） 当支付完成后，由积分系统为该用户增加积分
+
+上述2）、3）、4） 需要在一个事务中完成。对于传统单体应用而言，实现事务非常简单，只需将这三个步骤放在一个方法A中，再用spring的@Transactional注解标识该方法即可。Spring通过数据库的事务支持，保证这些步骤要么全部执行完成，要么全都不执行。但在这个微服务架构中，这三个步骤涉及三个系统，涉及三个数据库，此时我们必须在数据库和应用系统之间，通过某项黑科技，实现分布式事务的支持。
 
 
-Inodb引擎采用的是第二种方案，因此undo log要在 redo log前持久化
+### 3.2 CAP理论
+在一个分布式系统中，最多只能满足C、A、P中的两个需求：
+
+* C--Consistency: 一致性，同一数据的多个副本是否实时相同
+
+* A--Availability: 可用性，一定时间内，系统返回一个明确的结果，则称为该系统可用
+
+* P--Partition tolerance: 分区容错性，将同一服务分布在多个系统中，从而保证某一个系统宕机，仍然有其他系统提供相同的服务。
+
+![system-cap](https://ivanzz1001.github.io/records/assets/img/distribute/system-cap-1.png)
+
+
+
+### 3.3 BASE理论
+
+BASE是三个单词的缩写：
+
+* Basically Available(基本可用）
+
+* Soft state(软状态）
+
+* Eventually consistent(最终一致性）
+
+如下图所示，订单服务、库存服务、用户服务及他们对应的数据库就是分布式应用中的三个部分。
+
+![system-base](https://ivanzz1001.github.io/records/assets/img/distribute/system-base-1.png)
+
+
+207
+
+ 
+
+
+
 
 
 
