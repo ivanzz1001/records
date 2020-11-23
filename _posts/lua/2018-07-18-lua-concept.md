@@ -884,7 +884,92 @@ is syntactic sugar for
 
 {% endhighlight %}
 
+## 4. 示例
 
+### 4.1 Lua的注释
+如下给出一段lua的示例
+{% highlight string %}
+-- this is single line note
+print("hello, world")
+
+
+--[[
+
+this is multiline note
+
+--]]
+
+function fact(n)
+  if n == 0 then
+    return 1
+  else
+    return n * fact(n - 1)
+  end   
+end
+
+ --[====[  
+ 
+ this is another multiline note!!!
+ 
+ call the function fact
+
+ -- ]====]
+ 
+print("enter a number:")
+a = io.read("*n")                   -- read a number
+
+print(fact(a))
+{% endhighlight %}
+
+
+### 4.2 八皇后问题
+{% highlight string %}
+N = 8 -- board size
+
+
+-- check whether position (n,c) is free from attacks
+function isplaceok (a, n, c)
+  for i = 1, n - 1 do -- for each queen already placed
+      if (a[i] == c) or -- same column?
+          (a[i] - i == c - n) or -- same diagonal?
+          (a[i] + i == c + n) then -- same diagonal?
+          return false -- place can be attacked
+      end
+  end
+  return true -- no attacks; place is OK
+end
+
+    
+
+-- print a board
+function printsolution (a)
+  for i = 1, N do -- for each row
+      for j = 1, N do -- and for each column
+      -- write "X" or "-" plus a space
+          io.write(a[i] == j and "X" or "-", " ")
+      end
+      io.write("\n")
+  end
+  io.write("\n")
+end
+
+-- add to board 'a' all queens from 'n' to 'N'
+function addqueen (a, n)
+  if n > N then -- all queens have been placed?
+      printsolution(a)
+  else -- try to place n-th queen
+      for c = 1, N do
+          if isplaceok(a, n, c) then
+              a[n] = c -- place n-th queen at column 'c'
+              addqueen(a, n + 1)
+          end
+      end
+  end
+end
+
+-- run the program
+addqueen({}, 1)
+{% endhighlight %}
 
 <br />
 <br />
