@@ -129,7 +129,7 @@ osdmap e17117 pool 'oss-uat.rgw.buckets.index' (188) object '.dir.135882fc-2865-
 
 首先通过下面找到某个文件的分片信息：
 <pre>
-# rados -p nanhai-01.rgw.buckets.data ls | grep "批量上传走joss文件 -003-KZyxg"
+# rados -p oss-uat.rgw.buckets.data ls | grep "批量上传走joss文件 -003-KZyxg"
 135882fc-2865-43ab-9f71-7dd4b2095406.20037185.269__multipart_批量上传走joss文件 -003-KZyxg.docx.9ss6V-4Efpjof9AdqAayrGIOmkAPA-n.57
 135882fc-2865-43ab-9f71-7dd4b2095406.20037185.269__multipart_批量上传走joss文件 -003-KZyxg.docx.FTs9hvCvK3AxxgakEGmLrpgyslhm4zm.56
 135882fc-2865-43ab-9f71-7dd4b2095406.20037185.269__multipart_批量上传走joss文件 -003-KZyxg.docx.0TdGNIm7YIznPEf1UMPxcwYhHmR8VoL.101
@@ -181,6 +181,17 @@ osdmap e16540 pool 'oss-uat.rgw.buckets.data' (189) object '-003-KZyxg.docx.VLRH
 ./DIR_1/DIR_A/DIR_B/DIR_D/135882fc-2865-43ab-9f71-7dd4b2095406.20037185.269\u\umultipart\u批量上传走joss文件 -003-KZyxg.docx.GTC1zukNjjgNvpWalgjS77qP2gHIggn.78__head_8F52DBA1__bd
 ./DIR_1/DIR_A/DIR_B/DIR_E/135882fc-2865-43ab-9f71-7dd4b2095406.20037185.269\u\umultipart\u批量上传走joss文件001-zEoD9.docx.2~7efn984ORCmhEbcMO3zJxjfIkvzEoD9.53__head_AFAEEBA1__bd
 </pre>
+
+
+7) **下载分片**
+
+接着我们可以使用如下命令将分片下载下来：
+{% highlight string %}
+# rados get 135882fc-2865-43ab-9f71-7dd4b2095406.20037185.269__multipart_批量上传走joss文件 -003-KZyxg.docx.9ss6V-4Efpjof9AdqAayrGIOmkAPA-n.57 /opt/批量上传走joss文件 -003-KZyxg.docx-part57 -p oss-uat.rgw.buckets.data
+
+# ls /opt/
+批量上传走joss文件 -003-KZyxg.docx-part57
+{% endhighlight %}
 
 ## 2. 示例
 
