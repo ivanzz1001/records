@@ -31,6 +31,21 @@ description: 字符编码
 
 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx     65536−0x10ffff    (other values unused)
 </pre>
+
+此外，还可以参考如下一段对utf8的说明：
+>
+>UTF-8 represents each Unicode character using a variable number of bytes. For instance, it represents A
+with one byte, 65; it represents the Hebrew character Aleph, which has code 1488 in Unicode, with the
+two-byte sequence 215–144. UTF-8 represents all characters in the ASCII range as in ASCII, that is, with
+a single byte smaller than 128. It represents all other characters using sequences of bytes where the first
+byte is in the range [194,244] and the continuation bytes are in the range [128,191]. More specifically,
+the range of the starting bytes for two-byte sequences is [194,223]; for three-byte sequences, the range
+is [224,239]; and for four-byte sequences, it is [240,244]. None of those ranges overlap. This property
+ensures that the code sequence of any character never appears as part of the code sequence of any other
+character. In particular, a byte smaller than 128 never appears in a multibyte sequence; it always represents
+its corresponding ASCII character.
+
+
 例如，对于```国```，其Unicode-16值为```\u56fd```，那么编码为utf-8后，其对应的字节为：
 
 ![cb-utf8-guo](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_utf8_guo.jpg)
@@ -44,6 +59,11 @@ description: 字符编码
 "\u4e16\u754c"
 "\U00004e16\U0000754c"
 </pre>
+
+
+
+
+
 
 
 <br />
