@@ -922,8 +922,25 @@ print(fact(a))
 {% endhighlight %}
 对于上面第三种注释方式，```[[```之间的```=```数可以为任意值，但是请注意结尾处的```=```个数应与之相同。
 
+### 4.2 泛型
+{% highlight string %}
+function add(...)
+  local s = 0
+  
+  for _, v in ipairs{...} do
+    
+      s = s + v
+    
+  end  
+  
+  return s 
+end
 
-### 4.2 八皇后问题
+print(add(1,2,3,4,5))
+{% endhighlight %}
+
+
+### 4.3 八皇后问题
 {% highlight string %}
 N = 8 -- board size
 
