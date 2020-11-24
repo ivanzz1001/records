@@ -607,11 +607,11 @@ return x,y,f()     -- returns x, y, and all results from f()
 Lua支持如下算术运算符：
 {% highlight string %}
 +       : addition
-+       
+      
 -       : subtraction
--       
+     
 *       : multiplication
-*       
+     
 /       : float division
 
 //      : floor division
