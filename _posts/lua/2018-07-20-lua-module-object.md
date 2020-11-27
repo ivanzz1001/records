@@ -236,7 +236,108 @@ p/b.lua
 
 
 ## 2. metatables与metamethods
+在Lua中，对于每一个值(value)通常都有一系列可预见的操作(operations)。我们可以对numbers进行相加，对strings进行concatenate操作，也可以在tables中插入key-value对，等等。然而，我们并不能够直接对tables进行相加，也不能够对functions进行比较，也不能直接对字符串进行函数调用。如果我们要实现这些，就需要用到metatables。
 
+当遇到无法处理的的操作时，metatables允许我们修改对应value的行为。比如，有两个table，分别为a、b，我们可以使用metatables，从而实现a+b的操作。在任何时候，当Lua尝试对两个table进行相加时，都会检查其中是否有table具有metatable，并且该metatable是否有```__add```字段。假如Lua找到了该字段，其就会调用该字段的值（即所谓的```metamethod```)，来完成加法运算。
+
+用面向对象的术语来说，我们可以认为metatables是一种严格类型的类(class)。与class类似，metatables定义了对应实例的行为。然而，metatables比普通的class更严格，因为其只能给预先定义好的一系列操作来指定相应的行为(behavior)；此外，metatables也不允许继承。
+
+>注： 下一节我们介绍Object-Oriented Programming的时候，将会讲解如何使用metatables来构建一个完整的类。
+
+在Lua中，每一个value都可以有一个metatable。对于table及userdata类型的值来说，其拥有独立的metatable；而其他类型的value，统一类型的各个实例都共用同一个metatable。Lua所创建的新tables都是没有metatable的：
+{% highlight string %}
+t = {}
+
+print(getmetatable(t))    ---> nil 
+{% endhighlight %}
+我们可以使用```setmetatable()```方法来设置或修改一个table的metatable:
+{% highlight string %}
+t1 = {}
+setmetatable(t, t1)
+
+print(getmetatable(t) == t1)   ---> true
+{% endhighlight %}
+
+通过Lua，我们只能够将metatable设置为table类型的值；如果要操作其他类型的metatable值，则我们必须要用C语言代码或者使用debug库（之所以有这样的限制，主要原因在于防止对metatable的过度使用）。
+
+string library对于字符串设置了一个metatable，而其他的类型默认情况下是没有metatable的：
+{% highlight string %}
+print(getmetatable("hi"))        --> table: 0x80772e0
+print(getmetatable("xuxu"))      --> table: 0x80772e0
+print(getmetatable(10))          --> nil
+print(getmetatable(print))       --> nil
+{% endhighlight %}
+
+任何一个table都可以成为一个value的metatable；一组相关的table可以共用同一个metatable，用于描述它们共同的行为； 一个table也可以是其自身的metatable，这样其就可以实现自描述。
+
+>注： 在面向对象的设计中，类的所有实例都共享同一个metatable。因此metatable在Lua的面向对象编程中，具有是非重要的地位。
+
+### 2.1 Arithmetic Metamethods
+在本节，我们会通过相关的示例来讲述metatable的一些基础知识。假设我们有一个module，其使用tables来表示集合(set)，在module中实现了计算集合的并集(union)、交集(intersection)等操作。参看如下示例(```arith_meta.lua```):
+{% highlight string %}
+--[[
+
+   A simple module for sets
+
+--]]
+
+local Set = {}
+
+-- create a new set with the values of a give list
+function Set.new(l)
+  
+  local set = {}
+  
+  for _, v in ipairs(l) do
+    
+    set[v] = true 
+  end  
+  
+  return set 
+  
+end  
+
+function Set.union(a, b)
+  
+  local res = Set.new()
+  
+  for k in pairs(a) do
+    res[k] = true 
+  end
+  
+  for k in pairs(b) do 
+    res[k] = true
+  end
+  
+end   
+
+
+function Set.intersection (a, b)
+  
+  local res = Set.new{}
+  for k in pairs(a) do
+    res[k] = b[k]
+  end
+  return res
+  
+end
+
+
+-- presents a set as a string
+function Set.tostring (set)
+  
+  local l = {} -- list to put all elements from the set
+  for e in pairs(set) do
+    l[#l + 1] = tostring(e)
+  end
+  return "{" .. table.concat(l, ", ") .. "}"
+
+end
+
+
+
+return Set
+{% endhighlight %}
 
 
 
