@@ -1,6 +1,6 @@
 ---
 layout: post
-title: lua模块开发及面向对象开发
+title: lua模块开发
 tags:
 - lua
 categories: lua
@@ -558,6 +558,12 @@ stdin:1: cannot change protected metatable
 ###### 2.4.1 The ```__index``` metamethod
 
 ###### 2.4.2 The ```__newindex``` metamethod
+
+###### 2.4.3 Tables with default values
+
+###### 2.4.4 Tracking table accesses
+
+###### 2.4.5 Read-only tables
 
 
 
