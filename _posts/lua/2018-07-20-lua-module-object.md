@@ -308,7 +308,8 @@ function Set.union(a, b)
   for k in pairs(b) do 
     res[k] = true
   end
-  
+
+  return res 
 end   
 
 
@@ -338,6 +339,227 @@ end
 
 return Set
 {% endhighlight %}
+
+现在，我们想要使用```加法```操作来实现两个集合的并集。为了实现此目的，我们会使所有代表集合的table都共享同一个metatable。在该metatable中将会定义如何响应加法操作。我们的第一个步骤就是创建一个普通的table，然后将其设置为集合表的metatable:
+{% highlight string %}
+local mt = {}            -- metatable for sets
+{% endhighlight %}
+
+接下来我们修改```Set.new()```方法，在其中添加一行，用于将mt设置为集合的metatable:
+{% highlight string %}
+function Set.new(l)             --- 2nd version
+
+	local set = {}
+  setmetatable(set, mt)
+  
+  for _, v in ipairs(l) do
+    set[v] = true 
+  end
+
+  return set 
+end
+{% endhighlight %}
+修改之后，每一次我们调用Set.new()来创建集合的时候，创建出来的集合都拥有相同的metatable：
+{% highlight string %}
+s1 = Set.new{10, 20,30, 50}
+s2 = Set.new{30, 1}
+
+print(getmetatable(s1)   --> table: 0x00672B60
+print(getmetatable(s1)   --> table: 0x00672B60
+{% endhighlight %}
+
+
+最后，我们向metatable中添加一个metamethod ```__add```，通过该元方法字段来描述如何执行加法操作：
+{% highlight string %}
+mt.__add = Set.union
+{% endhighlight %}
+
+这样设置之后，当我们只想两个集合的加法操作时，其就会调用Set.union()函数。
+
+如下是我们采用加法操作来求集合的并集：
+{% highlight string %}
+s3 = s1 + s2
+print(Set.tostring(s3))     --> {1, 10, 20, 30, 50}
+{% endhighlight %}
+
+相似地，我们也可以使用乘法来实现交集操作：
+{% highlight string %}
+mt.__mul = Set.intersection
+
+print(Set.tostring((s1 + s2)*s1)) --> {10, 20, 30, 50}
+{% endhighlight %}
+
+
+
+----------
+
+在Lua中对于每一种算术操作，都有一个对应的metamethod名，下面我们简单列出：
+
+* ```__add```: 加法操作
+
+* ```__sub```: 减法操作
+
+* ```__mul```: 乘法操作
+
+* ```__div```: 除法操作
+
+* ```__idiv```: floor division
+
+* ```__unm```: 负号操作
+
+* ```__mod```: 求模运算
+
+* ```__pow```: 指数运算
+
+同样，对位操作也有相关的metamethod:
+
+* ```__band```: 按位与操作
+
+* ```__bor```: 按位或操作
+
+* ```__bxor```: 按位异或
+
+* ```__bnot```: 按位取反
+
+* ```__shl```: 左移操作
+
+* ```__shr```: 右移操作
+
+此外，我们也可以通过```__concat```这样一个metamethod来实现concatenation operator。
+
+
+
+----------
+当我们执行两个集合的加法操作时，会调用对应metamethod来进行，这一点是没有疑问的。但是假如有一个表达式，其对应的两个操作数各自有不同的metamethod，例如：
+{% highlight string %}
+s = Set.new({1,2,3})
+
+s = s + 8
+{% endhighlight %} 
+Lua在查找metamethod时，遵循如下的步骤： 假如第一个操作数有metatable且含有对应操作的metamethod，那么lua就会直接使用此metamethod， 此时并不理会第二个操作数是什么；否则，假如第二个操作数有metatable且含有对应操作的metamethod，那么Lua就使用此metamethod； 否则，Lua不能执行此操作，并报告相应的错误。因此在上面的例子中，其会调用Set.union()操作。
+
+Lua并不关心这些混合类型的操作，但是我们在实现时应该需要考虑。假如我们运行```s = s + 8```，那么在函数Set.union()中将会产生如下的错误提示：
+<pre>
+bad argument #1 to 'pairs' (table expected, got number)
+</pre>
+
+假如我们想要获取到更详细的错误消息，在Set.union()函数的实现中，我们需要检查两个操作数的类型，例如：
+{% highlight string %}
+function Set.union(a, b)
+  if getmetatable(a) ~= mt or getmetatable(b) ~= mt then
+    error("attempt to 'add' a set with a non-set value", 2)
+  end
+  
+  local res = Set.new({})
+  
+  for k in pairs(a) do
+    res[k] = true 
+  end
+  
+  for k in pairs(b) do 
+    res[k] = true
+  end
+  
+  return res 
+  
+end 
+{% endhighlight %}
+在这里，我们注意到error()函数的第二个参数，其用于设置调用此操作时，在哪一层级打印对应的错误消息。
+
+### 2.2 Relational Metamethods
+metatables也允许我们自定义关系运算符的含义。我们可以通过如下metamethod:
+
+* ```__eq```: 相等运算的判断
+
+* ```__lt```: 小于
+
+* ```__le```: 小于等于
+
+但是请注意，并没有单独的metamethods来实现另外的三个关系操作： Lua会将```a ~= b```转换为```not (a == b)```运算； 将```a > b```转换为```b < a```运算；将```a >= b```转换为```b <= a```运算。
+
+在老版本中，Lua会将所有的关系运算符转换成一个单独的运算，例如将```a <= b```转换成```not (b < a)```，但是这种转换存在一定的问题（这里我们不做详细介绍）。
+
+在我们上面集合的例子中，其实也是会有相似地问题。在集合运算中，```<=```运算的含义一般为集合的包含关系： a<=b表示a是b的一个子集。假如按照此含义来解释，那么可能同时出现```a <=b```与```b < a```都为false的情况。例如a={1,2}, b = {3}，此时```a<=b```为false，且```b < a```也为false。因此，我们必须同时实现```__le```和```_lt```操作：
+{% highlight string %}
+mt.__le = function (a, b) -- subset
+  for k in pairs(a) do
+    if not b[k] then return false end
+  end
+
+  return true
+end
+
+mt.__lt = function (a, b) -- proper subset
+  return a <= b and not (b <= a)
+end
+{% endhighlight %}
+
+最后，我们可以定义两个集合是否相等的实现：
+{% highlight string %}
+mt.__eq = function (a, b)
+   return a <= b and b <= a
+end
+{% endhighlight %}
+
+在拥有上面这些定义之后，我们就可以对两个集合进行比较了：
+{% highlight string %}
+s1 = Set.new{2, 4}
+s2 = Set.new{4, 10, 2}
+
+print(s1 <= s2) --> true
+print(s1 < s2) --> true
+print(s1 >= s1) --> true
+print(s1 > s1) --> false
+{% endhighlight %}
+对于相等的比较具有一些限制。假如两个object具有不同的基本类型，则进行相等比较时返回```false```，此时甚至不会调用metamethod。因此，Set集合与一个number比较时永远返回false，而不会管metamethod如何定义。
+
+### 2.3 Library-Defined Metamethods
+到目前为止，我们所遇见的所有metamethods都是由Lua内核来使用的。Lua虚拟机会检测对应操作数的metatable，然后找到对应的metamethod来执行相关操作。然而，由于metatables也是一个普通的table，任何用户都可以使用。因此，在对应的Lib库中，也经常会定义和使用自己的metatable。
+
+函数tostring()是一个典型的例子。正如我们前面所看到的，对一个table使用tostring()时会返回如下简单信息：
+{% highlight string %}
+print({}) --> table: 0x8062ac0
+{% endhighlight %}
+
+上面的print()函数总是会调用tostring()方法来格式化输出。然而，当格式化一个值时，tostring()首先会检查是否有一个名为```__tostring```的metamethod。在这种情况下，Lua会调用此metamethod来格式化对应的object。该metamethod的返回值就是tostring()函数的返回值。
+
+在我们上面的Set集合的例子中，我们已经定义了一个函数来格式化set。因此我们只需要将此函数设置为metatable的```__tostring```域：
+{% highlight string %}
+mt.__tostring = Set.tostring
+{% endhighlight %}
+
+这样设置之后，当我们调用print()来打印一个集合时，print就会调用该集合的tostring()方法来完成输出：
+{% highlight string %}
+s1 = Set.new{10, 4, 5}
+print(s1) --> {4, 5, 10}
+{% endhighlight %}
+
+函数setmetatable()和getmetatable()也同样会使用一个metafield，通过这种方法来保护metatables。假设想要保护自己定义的集合(Set)，以防用户看见或修改集合的metatable，我们可以在metatable中设置```__metatable```字段，这样getmetatable()就会返回该字段的值，而调用setmetatable()则会报错：
+{% highlight string %}
+mt.__metatable = "not your business"
+s1 = Set.new{}
+
+print(getmetatable(s1)) --> not your business
+setmetatable(s1, {})
+stdin:1: cannot change protected metatable
+{% endhighlight %}
+
+
+从Lua5.2版本开始，pairs也有一个metamethod，因此我们可以修改table的遍历方式，以及为非table对象添加相应的变量方法。当一个对象有```__pairs```这样一个metamethod时，pairs()将会调用此方法来完成相应工作。
+
+### 2.4 Table-Access Metamethods
+算术运算、位运算、以及关系运算的metamethods都定义了相应的方式来应对各种错误场景，它们并不会改变Lua语言所定义的正常行为。Lua也提供了一种方式来修改table的行为，主要适用于如下两种场景： 
+
+* 访问table中所缺失的fields
+
+* 修改table中所缺失的fields
+
+
+###### 2.4.1 The ```__index``` metamethod
+
+###### 2.4.2 The ```__newindex``` metamethod
+
+
 
 
 
