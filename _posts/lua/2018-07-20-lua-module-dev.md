@@ -557,17 +557,236 @@ stdin:1: cannot change protected metatable
 
 ###### 2.4.1 The ```__index``` metamethod
 
+在前面我们看到，当访问table中缺失的field时，返回nil。事实上，这种访问会触发Lua解释器查找```__index```这样一个metamethod： 假如并没有这样一个metamethod，则结果会返回nil； 否则会调用该metamethod来提供相应的结果。
+
+
+
+关于```__index```的典型例子就是继承(inheritance)。假设我们想要创建多个table来描述windows，每一个table都必须描述多个windows参数，比如position、size、color schema等等。所有的这些参数都有默认值，因此当我们想要创建window对象的时候，我们只需要传递非默认值参数即可。第一种方法是提供一个构造函数来填充缺省字段；第二种方法就是就是创建```新window```来从```prototype window```那里继承缺省field。我们首先声明如下原型：
+
+{% highlight string %}
+-- create the prototype with default values
+prototype = {x = 0, y = 0, width = 100, height = 100}
+
+{% endhighlight %}
+
+之后，我们定义一个构造函数来创建```新window```，这些新window共享同一个metatable:
+{% highlight string %}
+local mt = {}   -- create a metatable
+
+--declare the constructor function
+function new(o)
+  setmetatable(o, mt)
+	
+  return o
+end
+{% endhighlight %}
+现在我们来设置metamethod ```__index```:
+{% highlight string %}
+mt.__index = function(_, key)
+   return prototype[key]
+end
+{% endhighlight %}
+写完上述代码之后，我们创建一个新的window对象，然后来查询其缺省的field:
+{% highlight string %}
+w = new({x = 10, y = 20})
+
+print(w.width)   -->100
+{% endhighlight %}
+
+上面的代码中，当Lua检测到w并没有所请求的字段，但是有一个metable，在metable中有```__index```，因此Lua就会调用```__index```元方法，并在调用时传递两个参数：w(the table)和width(the absent key)。在```__index```方法中会查找prototype从而返回相应的结果。
+
+在Lua中使用```__index```这样一个metamethod来实现继承是十分常见的，为此Lua提供了另一种简单的实现方式。除了可以将```__index```设置为一个function外，还可以直接将一个table赋值给```__index```，如此当访问缺失的field时，就会直接访问```__index```所指向的table。仍然拿上面的例子来说明，我们可以直接采用如下的方式来定义```__index```:
+{% highlight string %}
+mt.__index = prototype
+{% endhighlight %}
+
+现在，当Lua查询到metatable的```__index```域时，其发现值为prototype（是一个table)，因此Lua就会再一次访问该table，执行prototype["width"]操作，从而返回相应的结果。
+
+通过将```__index```设置为一个table，就可以简单快速的实现单继承。如果将```__index```设置为一个函数，则可能会使得代码更臃肿，但是却可以提供更好的灵活性： 可以实现多继承、caching、以及其他的一些功能。关于继承(inheritance)我们会在Lua面向对象编程一章中进一步讲解。
+
+当我们想要访问一个table，但是并不想触发调用其```__index```元方法的话，我们可以使用```rawget()```方法。调用rawget(t, i)方法时，会以raw的方式来访问table t： 即这是一个primitive访问，并不会关心metable。以raw的方式访问相关field并不能提高效率，只是有的时候我们可能需要此特性。
+
+
+
+
 ###### 2.4.2 The ```__newindex``` metamethod
+
+metamethod ```__index```主要用于table对field的访问，而```__newindex```主要用于table对field的更新。当我们为table的缺省field赋值时，Lua解释器会查询```__newindex```元方法： 假如有该metamethod，那么解释器就会调用此方法，而并不会直接进行赋值操作。与```__index```类似，假如```__newindex```的值是一个table的话，那么解释器就会对该table来进行赋值（而不是对原始table进行赋值）。同样，Lua也提供了一个raw function来忽略metamethod: 调用rawset(t, k, v)等价于不触发任何metamethod调用的t[k] = v操作。
+
+通过组合使用```__index```和```__newindex```，我们可以获得十分强大的构造能力，比如read-only tables、默认值table、面向对象编程的继承特性等。
+
+
+
 
 ###### 2.4.3 Tables with default values
 
+通常情况下table中任何字段的默认值都为nil，我们可以通过metatable来轻易的改变默认值：
+
+{% highlight string %}
+function setDefault(t, d)
+
+  local mt = {
+    __index = function()
+      return d
+    end
+  }
+
+  setmetatable(t, mt)
+
+end 
+
+tab = {x = 10, y = 20}
+print(tab.x, tab.z)      -->10 nil
+setDefault(tab, 0)
+print(tab.x, tab.z)      -->10 0
+{% endhighlight %}
+在上面的代码中，我们调用setDefault()之后，任何访问tab缺省字段时都会调用```__index```，该函数会返回0.
+
+函数setDefault()创建了一个闭包(closure)，以及为每个需要默认值的table创建了metatable。假如我们有许多table都需要默认值的话，这可能会导致产生十分多的closure和metatable，因此代价可能极高。然而，由于metatable已经将默认值d包装进其对应的metamethod中了，因此我们并不能使用一个单独的metatable来设置不同的默认值。为了使得不同的table都可以共用同一个metatable，我们可以在每个table中选用一个没有被占用的field来存放默认值。例如，我们可以选择```___```来存放此默认值：
+{% highlight string %}
+local mt= {
+  __index = function(t)
+    return t.___
+  end
+}
+
+function setDefault(t, d)
+  t.___ = d
+  setmetatable(t, mt)
+end
+{% endhighlight %}
+
+上面的代码我们只在setDefault()函数外部创建了一次metatable（及相应的metamethod)，所耗费的代价明显会比前面一个示例低。
+
+假如我们担心名称冲突的话，我们也很容易保证相应key的唯一性。我们只需要用一个```exclusive table```来作为key即可：
+{% highlight string %}
+local key = {} -- unique key
+
+local mt = {
+  __index = function (t) 
+    return t[key] 
+  end
+}
+
+function setDefault (t, d)
+  t[key] = d
+  setmetatable(t, mt)
+end
+{% endhighlight %}
+
 ###### 2.4.4 Tracking table accesses
+假设我们需要跟踪对table的每一次访问，使用```__index```或```__newindex```只能够应对哪些缺省的field，因此如果要捕获对table的所有访问，则我们需要将table设置为空表。假如我们我们要监控对table的所有访问操作，我们可以创建一个代理(proxy)。该proxy是一个空表(empty table)，其拥有相关的metamethods来跟踪所有的访问，并将访问请求转发到原表。下面的代码是一个实现的案例：
+{% highlight string %}
+--[[
+
+  Tracking table access
+
+--]]
+
+function track(t)
+  
+  local proxy = {}    --proxy table for t
+  
+  --create a metatable for the proxy
+  local mt = {
+    __index = function(_, k)
+      
+      print("*access to element " .. tostring(k))
+      return t[k]   --access the original table
+      
+    end,
+    
+    __newindex = function(_, k, v)
+      
+      print("*update of element " .. tostring(k))
+      t[k] = v       --update original table
+      
+    end,
+    
+    __pairs = function()
+      
+      return function(_, k)       --iteration function
+        local nextkey, nextvalue = next(t, k)
+        
+        if nextkey ~= nil then    --avoid last value
+          print("*traversing element " .. tostring(nextkey))
+        end
+        
+        return nextkey, nextvalue
+        
+      end  
+      
+    end,
+    
+    __len = function()
+      return #t
+    end  
+    
+  }
+  
+  
+  setmetatable(proxy, mt)
+  
+  return proxy
+  
+end  
+{% endhighlight %}
+
+如下我们展示如何使用此代理(proxy):
+{% highlight string %}
+t = {}
+t = track(t)
+
+t[2] = "hello"      -->*update of element 2
+
+print(t[2])         -->*access to element 2
+                    --> hello
+{% endhighlight %}
+上面的例子中，metamethod ```__index```和```__newindex```遵循了我们设定的规则： 跟踪每一次访问，并且将访问请求转发到原表。对于```__pairs```允许我们遍历proxy，就像是直接遍历原table那样。最后```__len```会返回原table的长度，主要是为了使代理(proxy)也能处理长度运算符：
+{% highlight string %}
+t = track({10, 20})
+print(#t)          --> 2
+
+for k, v in pairs(t) do
+ print(k, v) 
+end
+
+
+--> *traversing element 1
+--> 1 10
+--> *traversing element 2
+--> 2 20
+{% endhighlight %}
+
+假如我们想要监控(monitor)多个table的话，我们并不需要为每一个table设置不同的metatable。相反，我们可以通过某种方式将每一个proxy映射到原表，然后让所有的代理都共用同一个metatable。可以参看上面介绍的**Table with default values**一节。
+
 
 ###### 2.4.5 Read-only tables
 
+采用代理(proxy)的概念，我们可以很容的实现read-only tables。我们所需要做的就是在任何试图修改table时，报告相应的错误。对于```__index```这个metamethod，我们可以将其值直接设置为原表，因为我们并不需要监控查询操作。参看下面的示例：
+{% highlight string %}
+function readOnly (t)
+  local proxy = {}
+  local mt = { -- create metatable
+    __index = t,
+    __newindex = function (t, k, v)
+      error("attempt to update a read-only table", 2)
+    end
+  }
+  
+  setmetatable(proxy, mt)
+  return proxy
+end
+{% endhighlight %}
 
+然后，我们可以为weekdays来创建一个只读表：
+{% highlight string %}
+days = readOnly{"Sunday", "Monday", "Tuesday", "Wednesday","Thursday", "Friday", "Saturday"}
 
-
+print(days[1]) --> Sunday
+days[2] = "Noday"
+--> stdin:1: attempt to update a read-only table
+{% endhighlight %}
 
 
 
