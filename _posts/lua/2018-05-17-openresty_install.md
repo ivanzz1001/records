@@ -172,6 +172,8 @@ configure arguments:
 # wget https://openresty.org/download/openresty-1.11.2.5.tar.gz
 </pre>
 
+该版本所使用的LuaJIT版本为v2.1-20170808
+
 **2) 安装pcre依赖库**
 
 参看：http://www.pcre.org/
