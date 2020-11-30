@@ -419,6 +419,175 @@ account = NamedAccount:new{name = "Paul"}
 print(account:getname()) --> Paul
 {% endhighlight %}
 
+现在我们来看一下account::getname()的执行过程，其实说的更明确一点就是account["getname"]的执行过程。Lua在account这个table中不能直接找到```getname```字段，因此就会查找对应metatable的```__index```，在我们例子中account的metatable就是NamedAccount。在NamedAccount中也找不到getname字段，因此就会再往上一级查找NamedAccount的metatable的```__index```。此时```__index```字段的值为一个函数，因此就调用该函数。在search()函数中会分别在Account和Named两个基类中进行查找，当查找到一个非空的值，就返回。
+
+当然，由于底层查找的复杂性，多继承的性能会比单继承低。提高性能的一个简单的方法就是直接拷贝所继承的方法到子类中。使用该技术，类的index metamethod的实现方式如下：
+{% highlight string %}
+setmetatable(c, {
+  __index = function (t, k) 
+    local v = search(k, parents)
+    t[k] = v -- save for next access
+    return v
+  end
+})
+{% endhighlight %}
+
+使用此技巧，除了第一次访问继承方法外，后续再访问就会像访问local method一样快。而这样做的缺点就在于，当程序已经运行之后，我们再改变基类的方法时，其并不能马上扩散到子类。
+
+## 4. Privacy
+作为一个完整的面向对象的编程语言，很多人都会考虑privacy(也被称为```information hiding```： object的状态应该是其内部的事情。在有一些面向对象的编程语言中，比如C++、Java，我们可以控制一个成员变量、或成员函数的可见性；而另一种流行的面向对象编程语言smalltalk，则是所有的成员变量都是私有的，而成员函数都是公有的；而作为第一个实现面向对象的Simula语言，其并没有提供任何保护机制。
+
+在前面的章节我们看到，在Lua中object的标准实现并没有提供privacy机制。部分原因是我们使用通用的数据结构```table```来表示objects，而更为重要的原因是Lua为了避免冗余及一些人为的限制。假如你不想访问object中的某一些字段，那么*just do not do it*。根据过往的实践，我们通常将不想暴露的私有成员以```_```开头来命名。
+
+无论如何，Lua的另一个目标就是灵活性，其提供了meta-mechanisms来给开发人员以模仿许多不同的机制。尽管Lua对object的基本设计并没有提供privacy机制，但是我们可以用另一种方式来实现object，从而达到对访问的控制。尽管开发人员并不会经常使用此机制来实现，但是我们也可以了解一下，不仅仅因为其会涉及到Lua的一些有趣的方面，还因为其是对某一类特定问题的很好的解决方案。
+
+这种设计的基本思路在于通过两个table来表示一个object: 其中一个table用于存储状态，另一个table用于存储operations。我们通过第二个table来访问对象本身，即通过object所暴露的接口来操作。为了避免非授权访问，用于保存object状态的table并不会保存为另一个table的field，相反其仅作为对应实现函数的闭包(closure)。例如，采用本设计思路来表示银行账户，我们可以通过如下的工厂方法(factory function)来创建对象：
+{% highlight string %}
+function newAccount (initialBalance)
+  local self = {balance = initialBalance}
+  
+  local withdraw = function (v)
+    self.balance = self.balance - v
+  end
+  
+  local deposit = function (v)
+    self.balance = self.balance + v
+  end
+  
+  local getBalance = function ()
+    return self.balance
+  end
+  
+  return {
+    withdraw = withdraw,
+    deposit = deposit,
+    getBalance = getBalance
+  }
+  
+end
+{% endhighlight %}
+在上面的newAccount()函数中首先创建了一个table来保存object的状态，将状态保存在局部变量self中。然后又在函数中为object创建了对应的方法。最后通过一个table将object所拥有的方法导出并返回。这里的关键点在于这些方法并没有将```self```作为额外的参数，相反它们可以直接访问self。由于并没有额外的参数，我们并不需要使用冒号(```:```)语法来操作这种object，我们可以直接像普通函数那样来调用：
+{% highlight string %}
+acc1 = newAccount(100.00)
+acc1.withdraw(40.00)
+print(acc1.getBalance()) --> 60
+{% endhighlight %}
+
+这种设计方式使得存储在self这个table中所有字段都是私有的。在newAccount()函数返回之后，将再没有方法直接访问到该table。我们只能够通过newAccount()中所设置的函数来访问。尽管在我们的例子中我们只在私有成员中放置了一个实例变量，但其实我们可以将所有需要保存的私有成员都放入该table。此外，我们也可以定义private方法： 它们类似于public方法，只是并不会将其放入到导出列表。例如，我们的银行账户可能会给一些达到一定资产的用户10%的信用额度，但是我们并不想用户直接访问到相关的详细信息。我们可以通过如下的方式来实现此功能：
+{% highlight string %}
+function newAccount (initialBalance)
+  local self = {
+    balance = initialBalance,
+    LIM = 10000.00,
+  }
+  
+  local extra = function ()
+    if self.balance > self.LIM then
+      return self.balance*0.10
+    else
+      return 0
+    end
+  end
+  
+  local getBalance = function ()
+    return self.balance + extra()
+  end
+  
+  as before
+{% endhighlight %}
+这样，用户也不能够直接访问到extra()函数。
+
+## 4. The Single-Method Approach
+面向对象编程中有一个特殊的场景就是object只有一个method。在这种场景下，我们并不需要创建一个interface table，我们只需要返回该唯一方法作为object的表示。这听起来有点怪异，但是记住很多iterators的实现都是采用此方式，比如io.lines、string.gmatch。iterator直接在内部保持相关状态，这通过一个single-method object就可以做到。
+
+single-method object的另一个有趣的场景就是： single-method仅仅作为一个dispatch method，其根据参数来处理不同的任务。典型的实现如下：
+{% highlight string %}
+function newObject (value)
+  return function (action, v)
+    if action == "get" then return value
+	elseif action == "set" then value = v
+	else error("invalid action")
+	end
+  end
+end
+{% endhighlight %}
+此时，我们可以直接使用：
+{% highlight string %}
+d = newObject(0)
+print(d("get")) --> 0
+d("set", 10)
+print(d("get")) --> 10
+{% endhighlight %}
+这种不同寻常的实现方式其实十分高效。上面的```d("set", 10)```语法，尽管看起来有点怪异，但仅仅只比我们通常所使用的d:set(10)长两个字符。在上面的实现中，每一个object都单独使用一个闭包(closure)，这通常比使用一个table更轻量、廉价。并没有继承，但我们实现了全private控制： 访问object的唯一方式就是通过该函数。
+
+## 5. Dual Representation
+另一种实现privacy的有趣的方法是使用dual representation。下面我们来看看dual representation的实现。
+
+通常我们会使用key的方式来为table关联属性，例如：
+{% highlight string %}
+table[key] = value
+{% endhighlight %}
+然而，我们可以使用dula representation： 将对象本身作为另一个table的key。例如：
+{% highlight string %}
+key = {}
+...
+key[table] = value
+{% endhighlight %}
+这里的关键点在于，在Lua中不仅可以使用numbers、strings来索引table，也可以使用任何值（包括tables)。
+
+以我们上面的银行账户的实现为例，我们会将所有账户的余额信息都存入一个表balance中，而不是将它们保存在账户表中。按此设计，withdraw()方法可以改写成如下：
+{% highlight string %}
+function Account.withdraw (self, v)
+balance[self] = balance[self] - v
+end
+{% endhighlight %}
+通过这样，我们实现了privacy。即使有一个函数需要访问账户，它都不能直接访问其余额信息，除非该函数也有访问balance表的权限。假如表balance保存为Account模块的一个local变量，那么就只会有模块内的函数可以访问balance，因此我们就只能通过这些函数来操作balance。
+
+在我们进一步讲解之前，这里我必须指出此种实现方式存在的一个很大的缺陷。一旦我们使用account作为key来索引balance表，那么该account对象将不会被GC回收。对应的account对象将会一直存在，直到在代码中显式的将此账户移除。这对于银行账户场景来说通常不会存在很大的问题（账户被销毁通常都需要显示的关闭账户），但是对于其他场景则会是一个严重的问题。在后面```Object Attributes```一节中，我们将会介绍如何解决该问题。此处，我们可以暂时忽略该问题。
+
+下面的代码展示了如何通过dual representation来实现银行账户：
+{% highlight string %}
+--[[
+
+  Accounts using a dual representation
+
+--]]
+
+local balance = {}
+Account = {}
+
+function Account:withdraw (v)
+  balance[self] = balance[self] - v
+end
+
+function Account:deposit (v)
+  balance[self] = balance[self] + v
+end
+
+function Account:balance ()
+  return balance[self]
+end
+
+function Account:new (o)
+  o = o or {} -- create table if user does not provide one
+  setmetatable(o, self)
+  self.__index = self
+  balance[o] = 0 -- initial balance
+  return o
+end
+{% endhighlight %}
+
+之后我们就可以像往常一样使用该类：
+{% highlight string %}
+a = Account:new{}
+a:deposit(100.00)
+print(a:balance())
+{% endhighlight %}
+
+然而，我们并不能够直接干预一个账户的余额信息。通过将balance表设置为对应module的private变量，这样就确保了成员变量的安全性。
+
+实现继承也并不需要做任何修改。本实现方式的代价与标准实现方式类似（在内存与耗时方面均相似）。在新建对象的时候，会创建一个新的table，并在私有成员变量balance中添加一个新的entry。对balance[self]的访问会比self.balance略慢，主要是因为后者是一个局部变量，而前者使用的是一个外部变量。通常情况下这一点的不同是忽略不计的。在稍后我们会看到，在进行GC的时候我们也需要做一些额外的操作。
+
 
 <br />
 <br />
