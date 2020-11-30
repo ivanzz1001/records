@@ -2,8 +2,8 @@
 layout: post
 title: Centos7下OpenResty的安装
 tags:
-- cplusplus
-categories: cplusplus
+- lua
+categories: lua
 description: Centos7下OpenResty
 ---
 

@@ -2,8 +2,8 @@
 layout: post
 title: OpenResty lua模块指令
 tags:
-- cplusplus
-categories: cplusplus
+- lua
+categories: lua
 description: openresty lua模块指令
 ---
 

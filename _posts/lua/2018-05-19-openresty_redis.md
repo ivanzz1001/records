@@ -2,8 +2,8 @@
 layout: post
 title: openResty访问redis
 tags:
-- cplusplus
-categories: cplusplus
+- lua
+categories: lua
 description: openresty访问redis
 ---
 
