@@ -228,6 +228,14 @@ x-studio同时还具备64位调试引擎，可调试Unity (slua ulua/tolua xlua)
 ### 4.2 ZeroBrane Studio
 此外，我们还可以使用官方所推荐的[ZeroBrane Studio](http://www.lua.org/start.html)，但是其目前并不支持Lua5.4。
 
+ZeroBrane Studio支持以多种方式调试LuaJIT应用程序：
+
+* v0.39+版本的ZeroBrane Studio内置包含LuaJIT(v2.02)解释器，并且是其默认解释器（Project | Lua Interpreter | Lua)
+
+* 可以使用remote debugging来远程调试LuaJIT程序
+
+
+
 ## 5. Lua作为嵌入式语言的执行原理
 这里我们不详细讲解Lua嵌入到宿主程序中运行的原理，而是直接给出一个相应的示例，让读者有一个大体的了解。
 
