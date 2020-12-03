@@ -361,6 +361,141 @@ http
 ######Nginx配置文件nginx.conf中文详解#####
 {% endhighlight %}
 
+如下我们再给出一个参考示例：
+{% highlight string %}
+#user  nobody;
+worker_processes  auto;
+
+error_log /var/log/nginx/error.log; 
+#error_log  logs/error.log  notice;
+#error_log  logs/error.log  info;
+
+pid /run/nginx.pid; 
+
+
+events {
+    worker_connections  10240;
+    use epoll;
+    multi_accept on;
+}
+
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+    access_log  /var/log/nginx/access.log combined buffer=512k flush=5m; 
+
+    sendfile        on;
+    tcp_nopush     on;
+    tcp_nodelay         on;
+
+    lua_shared_dict limit 10m;
+    lua_shared_dict locks 1m;
+
+    keepalive_timeout  600;
+    #keepalive_timeout  3600;
+    keepalive_requests  10000;
+    types_hash_max_size 2048;
+    client_max_body_size 1024m;
+    #include /etc/nginx/mime.types;
+    #default_type application/octet-stream;
+
+    include /etc/nginx/conf.d/*.conf;
+    init_by_lua_file /etc/nginx/conf.d/lua/init.lua;
+    lua_package_path '/etc/nginx/conf.d/lua/?.lua;/etc/nginx/conf.d/lua/auth/?.lua;;';
+
+    #gzip  on;
+
+    #server {
+    #    listen       80;
+    #    server_name  localhost;
+
+    #    #charset koi8-r;
+
+    #    #access_log  logs/host.access.log  main;
+
+    #    location / {
+    #        root   html;
+    #        index  index.html index.htm;
+    #    }
+
+    #    #error_page  404              /404.html;
+
+    #    # redirect server error pages to the static page /50x.html
+    #    #
+    #    error_page   500 502 503 504  /50x.html;
+    #    location = /50x.html {
+    #        root   html;
+    #    }
+
+    #    # proxy the PHP scripts to Apache listening on 127.0.0.1:80
+    #    #
+    #    #location ~ \.php$ {
+    #    #    proxy_pass   http://127.0.0.1;
+    #    #}
+
+    #    # pass the PHP scripts to FastCGI server listening on 127.0.0.1:9000
+    #    #
+    #    #location ~ \.php$ {
+    #    #    root           html;
+    #    #    fastcgi_pass   127.0.0.1:9000;
+    #    #    fastcgi_index  index.php;
+    #    #    fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;
+    #    #    include        fastcgi_params;
+    #    #}
+
+    #    # deny access to .htaccess files, if Apache's document root
+    #    # concurs with nginx's one
+    #    #
+    #    #location ~ /\.ht {
+    #    #    deny  all;
+    #    #}
+    #}
+
+
+    # another virtual host using mix of IP-, name-, and port-based configuration
+    #
+    #server {
+    #    listen       8000;
+    #    listen       somename:8080;
+    #    server_name  somename  alias  another.alias;
+
+    #    location / {
+    #        root   html;
+    #        index  index.html index.htm;
+    #    }
+    #}
+
+
+    # HTTPS server
+    #
+    #server {
+    #    listen       443 ssl;
+    #    server_name  localhost;
+
+    #    ssl_certificate      cert.pem;
+    #    ssl_certificate_key  cert.key;
+
+    #    ssl_session_cache    shared:SSL:1m;
+    #    ssl_session_timeout  5m;
+
+    #    ssl_ciphers  HIGH:!aNULL:!MD5;
+    #    ssl_prefer_server_ciphers  on;
+
+    #    location / {
+    #        root   html;
+    #        index  index.html index.htm;
+    #    }
+    #}
+
+}
+
+{% endhighlight %}
+
 <br />
 <br />
 
