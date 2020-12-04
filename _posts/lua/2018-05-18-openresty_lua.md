@@ -671,6 +671,8 @@ phase: access tail
 
     * 要返回失败，status的值应该为ngx.HTTP_INTERNAL_SERVER_ERROR；
 
+>注： 上面请注意ngx.ok与ngx.HTTP_OK的不同，调用ngx.exit(ngx.ok)时才会执行后续的content handler
+
 
 * 从版本```v0.9.20```开始，可以使用access_by_lua_no_postpone指令来控制在access请求处理阶段的哪一个时间点来执行access_by_lua指令；
 
