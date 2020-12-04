@@ -40,6 +40,8 @@ location !~* URI { configuration } # 不区分大小写不匹配
 location @name { configuration } # 定义一个location，用于处理内部重定向
 </pre>
 
+>注： 前缀匹配时，Nginx 不对url做编码，因此请求为```/static/20%/aa```，可以被规则 ```^~ /static//aa```匹配到（注意是空格）
+
 各个匹配之间的优先级顺序为：
 {% highlight string %}
 (location =) > (location 完整路径) > (location ^~ 路径) > (location ~,~* 正则顺序) > (location 部分起始路径) > (/)
@@ -316,6 +318,36 @@ location /proxy {
             break;
     }
 
+}
+
+server {
+  listen 80 default_server;
+  server_name ceph_s3;
+  chunked_transfer_encoding on;
+  
+  location /{
+      deny all;
+  }
+  
+  location ~* ^/([a-z]\w+)/(\S+) {
+    # this is the object operation
+    set $bucket $1;
+    set $object $2;
+    echo $bucket;
+    echo $2;
+       
+       
+  }
+   
+  location ~* ^/([a-z]\w+) {
+    # this is the bucket operations(Note: must be placed after object operations)
+    set $bucket $1;
+    
+    echo "bucket operations";
+    echo $1;
+    
+  }
+   
 }
 
 {% endhighlight %}
