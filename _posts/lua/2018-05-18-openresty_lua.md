@@ -759,6 +759,88 @@ local ndk = require "ndk"
 如果想在用户自己的Lua代码中执行网络IO操作的话，那么就只能通过Nginx Lua API调用来实现，否则可能会造成Nginx event loop阻塞并严重的降低性能。而对于磁盘操作读写少量数据的话，我们可以使用标准的Lua IO库即可，但无论如何我们还是应该避免大数据量的文件IO读写操作，因为其可能会严重阻塞Nginx进程。我们强烈推荐将所有的Network IO以及disk IO操作委托给nginx subrequest来处理，以达到最高的性能（通过ngx.location.capture或其他类似的指令）。
 
 
+## 3. 示例
+1) **nginx.conf**
+{% highlight string %}
+#user  nobody;
+worker_processes  1;
+
+#error_log  logs/error.log;
+#error_log  logs/error.log  notice;
+#error_log  logs/error.log  info;
+
+#pid        logs/nginx.pid;
+
+
+events {
+    worker_connections  1024;
+}
+
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    #log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+    #                  '$status $body_bytes_sent "$http_referer" '
+    #                  '"$http_user_agent" "$http_x_forwarded_for"';
+
+    #access_log  logs/access.log  main;
+
+    sendfile        on;
+    #tcp_nopush     on;
+
+    #keepalive_timeout  0;
+    keepalive_timeout  65;
+
+    #gzip  on;
+   
+    include conf.d/*.conf;
+    lua_package_path 'conf.d/lua/?.lua;;';
+}
+{% endhighlight %}
+
+2) **conf.d/alibaba_s3.conf**
+{% highlight string %}
+server {
+  listen 80 default_server;
+  server_name alibaba_s3;
+  chunked_transfer_encoding on;
+  
+  location /{
+      deny all;
+  }
+  
+  location ~* ^/([a-z]\w+)/(\S+) {
+    # this is the object operation
+    set $bucket $1;
+    set $object $2;
+    
+    access_by_lua_block{
+      if ngx.var.bucket == "aaa" then
+        ngx.say(ngx.var.bucket)
+        ngx.say(ngx.var.object)
+        ngx.exit(ngx.HTTP_OK)
+      end
+    }
+    proxy_pass http://rgw;
+    #echo $bucket;
+    #echo $2;
+       
+       
+  }
+   
+  location ~* ^/([a-z]\w+) {
+    # this is the bucket operations(Note: must be placed after object operations)
+    set $bucket $1;
+    
+    echo "bucket operations";
+    echo $1;
+    
+  }
+   
+}
+{% endhighlight %}
 
 
 
