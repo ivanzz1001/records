@@ -234,6 +234,8 @@ ZeroBrane Studio支持以多种方式调试LuaJIT应用程序：
 
 * 可以使用remote debugging来远程调试LuaJIT程序
 
+ZeroBrane Studio目前一个窗口只能打开一个工程，路径的查找都是基于工程的。笔者在使用时就碰到一个一直找不到对应Lua文件的问题，此问题就与此相关。
+
 
 
 ## 5. Lua作为嵌入式语言的执行原理
