@@ -225,6 +225,12 @@ Options: (H) means HTTP/HTTPS only, (F) means FTP only
 # curl -v http://www.baidu.com  // 显示get请求全过程解析
 </pre>
 
+另外一点需要注意的是，由于```&```符号在Linux shell环境下表示进程以后台方式运行，因此如果我们要传递多个参数的话，我们需要多```&```符号进行转义。例如：
+<pre>
+# curl -X GET http://127.0.0.1/aaa?acl\&age=30
+</pre>
+
+
 这里我们可以同时用tcpdump进行抓包，来观察响应的请求与响应：
 {% highlight string %}
 // 窗口1启动tcpdump抓取数据包
