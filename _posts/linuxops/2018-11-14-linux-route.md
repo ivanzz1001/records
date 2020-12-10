@@ -426,6 +426,8 @@ ONBOOT=on
 
 5. [linux下永久添加静态路由](https://www.cnblogs.com/wanghuaijun/p/8059664.html)
 
+6. [在线tracert工具](http://tool.chinaz.com/Tracert/)
+
 <br />
 <br />
 <br />
