@@ -307,7 +307,7 @@ int bottom_up_cut_rod(int p[], int n)
 上面的代码只给出了最优的收益值，但是却没有给出最优收益到底是在那种切割分配方式下得到的，比如说n=9时，最佳收益为25，要分成3和6两段。这里可以使用另一个数组s来存储分段情况，比如s[9]存储3，然后我们让n=9-3，就可以得到s[6]的最佳分段情况，发现就是6，于是就不需要继续。
 
 只需要将代码稍微修改即可达到目的：
-{% highlight %}
+{% highlight string%}
 #include<iostream>  
 
 using namespace std;  
