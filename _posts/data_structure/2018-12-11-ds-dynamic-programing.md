@@ -159,7 +159,13 @@ int fib(int n)
 
 下面的例子来自于算法导论：
 
-![ds-dynamic-split](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_dynamic_split.png)
+![ds-dynamic-split](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_dynamic_split1.png)
+
+![ds-dynamic-split](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_dynamic_split2.png)
+
+![ds-dynamic-split](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_dynamic_split3.png)
+
+![ds-dynamic-split](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_dynamic_split4.png)
 
 关于题目的讲解就直接截图算法导论书上了，这里就不展开讲。现在使用一下前面讲到的三种方法来实现一下。
 
@@ -215,7 +221,7 @@ cut_rod(p,4)的划分可能：
         
 而其中cut_rod(p,3)又可以划分为数组p中元素与cut_rod(p,0)，cut_rod(p,1)和cut_rod(p,2)；以此类推，可以给出一种以递归调用树的形式展示cut_rod递归调用了多少次：
 
-![ds-dynamic-split](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_dynamic_split2.jpg)
+![ds-dynamic-split](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_dynamic_split5.jpg)
 
 不难从图中看出，做了大量重复工作，以n=2的节点为例，分别在n=4和n=3的时候都被调用了。根据上图，可以给出递归调用次数的一个公式，假设T(n)表示cur_rod()第二个参数为n时的调用次数，T(0)这时候是为1的，因为根节点的第一次调用也要算进去。于是有：
 <pre>                                                                              T(n)=1+T(0)+T(1)+...+T(n-1)
