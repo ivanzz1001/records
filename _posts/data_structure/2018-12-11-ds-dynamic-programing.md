@@ -224,8 +224,8 @@ cut_rod(p,4)的划分可能：
 ![ds-dynamic-split](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_dynamic_split5.jpg)
 
 不难从图中看出，做了大量重复工作，以n=2的节点为例，分别在n=4和n=3的时候都被调用了。根据上图，可以给出递归调用次数的一个公式，假设T(n)表示cur_rod()第二个参数为n时的调用次数，T(0)这时候是为1的，因为根节点的第一次调用也要算进去。于是有：
-<pre>                                                                              T(n)=1+T(0)+T(1)+...+T(n-1)
-</pre>
+{% highlight string %}                                                                             T(n)=1+T(0)+T(1)+...+T(n-1)
+{% endhighlight %}
 使用归纳法，可以比较容易的得出：T(n)=2^n。 指数次幂的调用次数，显然太大，我们稍微让n大一点，则会让整个过程变的漫长。
 
 
