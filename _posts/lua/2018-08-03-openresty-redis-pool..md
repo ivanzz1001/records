@@ -357,7 +357,7 @@ return _M
  
 {% endhighlight %}
 
-
+>注： 对于hmget等操作，返回的结果是table
 
 
 
