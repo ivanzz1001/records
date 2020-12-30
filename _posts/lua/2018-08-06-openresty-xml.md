@@ -229,6 +229,9 @@ end
 
 2. [luaXml库的使用方法](https://blog.csdn.net/shaonian_wuya/article/details/16120143)
 
+3. [lua-cjson官网](https://github.com/openresty/lua-cjson)
+
+
 <br />
 <br />
 <br />
