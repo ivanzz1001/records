@@ -15,7 +15,7 @@ description: lua开发
 ## 1. 值(Values)与类型(Types)
 
 Lua是一种动态类型的语言，这就意味着变量(variables)并没有类型，只有值。在Lua语言中并没有类型定义，所有的值(Values)都携带了他们自己的类型。
-
+c
 在Lua中所有的values都是一级(first-class)的，这就意味着任何的value都可以保存在变量中，通过参数传递给函数，或者作为一个结果被返回。
 
 在Lua中有8种基本的类型：
@@ -190,7 +190,7 @@ Lua是支持coroutines的，也被称为collaborative multithreading。在Lua中
 
 我们可以使用coroutine.create()来创建一个coroutine。该函数接受的唯一参数就是协程需要执行的主函数。create()函数仅仅只会创建一个coroutine，然后返回相应的操作句柄，其并不会启动coroutine。
 
-如果我们要启动执行一个coroutine，那么我们需要调用coroutine.resume()。当你coroutine.resume()时，传递给该函数的第一个阐述即是对应的coroutine句柄，剩余的参数就会被传递给协程的执行主函数。在coroutine运行起来之后，它会一直运行到结束或者主动调用了yield()。
+如果我们要启动执行一个coroutine，那么我们需要调用coroutine.resume()。当你coroutine.resume()时，传递给该函数的第一个参数即是对应的coroutine句柄，剩余的参数就会被传递给协程的执行主函数。在coroutine运行起来之后，它会一直运行到结束或者主动调用了yield()。
 
 coroutine可以通过两种方式来终止： 正常情况下，当主函数返回时，coroutine终止；异常情况下，当出现unprotected错误时，对应的coroutine也会终止。在第一种情况下，coroutine.resume()会返回true，以及coroutine主函数的其他返回值；而在发生错误是，coroutine.resume()返回false，以及相应的error object信息（此时，coroutine并不会清空栈，因此我们后面可以通过相应的debug API获取到相应的堆栈信息）。
 
