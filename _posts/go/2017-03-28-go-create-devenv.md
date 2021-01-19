@@ -32,12 +32,17 @@ description: go开发环境的搭建
 <pre>
 # pwd
 /home/ivanzz1001/Go/oss
+
 # ls
 env.cfg  src
+
+
 # cat env.cfg
 export GOROOT=/usr/local/go/
 export GOPATH=/home/ivanzz1001/Go/oss/
 export GOBIN=/usr/local/go/
+#export GOTOOLDIR=/usr/local/go1.13.3/pkg/tool/${platform}
+export GOTOOLDIR=/usr/local/go1.13.3/pkg/tool/linux_amd64
 </pre>
 
 这样在每一次需要进行编译时，先执行```source env.cfg```将相应的全局配置更改称为当前项目所需的配置。
