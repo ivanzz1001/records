@@ -714,6 +714,13 @@ abcd   efg
 abcdefg
 {% endhighlight %}
 
+
+**33) 以后台方式启动程序**
+{% highlight string %}
+# nohup ./test_program > /dev/null &
+{% endhighlight %}
+
+
 <br />
 <br />
 <br />
