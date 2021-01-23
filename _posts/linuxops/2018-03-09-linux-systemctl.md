@@ -622,7 +622,32 @@ Systemd统一管理所有Unit的启动日志。带来的好处就是，可以只
 注： 默认情况下,Systemd将日志保存在```/run/log/journal```中，系统重启就会清除。通过新建```/var/log/journal```目录，日志会自动记录到这个目录中，并永久存储。
 
 
+## 7. 设置开机启动示例
 
+编写如下脚本```start@.service```:
+{% highlight string %}
+[Unit]
+Description=oss application server
+After=network-online.target
+
+[Service]
+Type=forking
+User=apps
+ExecStart=/usr/bin/python /workspace/service.py %i start
+ExecStop=/usr/bin/python /workspace/service.py %i stop
+Restart=on-failure
+#StartLimitInterval=5s
+#StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target
+{% endhighlight %} 
+
+将上述脚本复制到/etc/systemd/system目录下，然后通过如下方式将某个程序(例如```mytest```)设置为开机启动：
+<pre>
+# systemctl enable start@mytest.service
+# systemctl is-enabled start@mytest
+</pre>
 
 
 
