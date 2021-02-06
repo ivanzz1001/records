@@ -237,6 +237,18 @@ ZeroBrane Studio支持以多种方式调试LuaJIT应用程序：
 ZeroBrane Studio目前一个窗口只能打开一个工程，路径的查找都是基于工程的。笔者在使用时就碰到一个一直找不到对应Lua文件的问题，此问题就与此相关。
 
 
+关于ZeroBrane Studio Preference的定制，可以参考[这里](https://studio.zerobrane.com/doc-editor-preferences#keyboard-shortcuts)。如下给出一个简短示例：
+{% highlight string %}
+--[[--
+  Use this file to specify **System** preferences.
+  Review [examples](+D:\Program Files (x86)\ZeroBraneStudio\cfg\user-sample.lua) or check [online documentation](http://studio.zerobrane.com/documentation.html) for details.
+--]]--
+editor.fontsize = 12
+
+editor.defaulteol = wxstc.wxSTC_EOL_L
+editor.usewrap = false
+{% endhighlight %}
+
 
 ## 5. Lua作为嵌入式语言的执行原理
 这里我们不详细讲解Lua嵌入到宿主程序中运行的原理，而是直接给出一个相应的示例，让读者有一个大体的了解。
