@@ -156,7 +156,11 @@ description: 计算机中数据信息的表示
 
 
 ### 4.1 模的概念
-补码表示的引入是基于模的概念。所谓“模”是指一个计数器的容量。比如钟表以12为一个计数循环，即可以看作以12为模。在进行钟表对时时，设当前钟表的时针停在9点钟的位置，要将时钟拨到4点钟，可以采用两种方法： 一种是反时针方向拨动指针，使指针后退5个小时，即9-5=4; 另一种是顺时针方向拨动指针，使时针前进7个小时，也能够使时针指向4。这是因为钟表的时间只有1、2、...、12这12个刻度，时针指向超过12时，将又指向1、2、...，相当于每超过12，就把12丢掉。由于 9 + 7 等于16，超过了12，因此把12减掉后得到4，即用 9 + 7也同样能够将钟表对准到4点钟。这样，对于采用12为模的钟表而言，```9-5≡9+7(mod 12)```，称为在模12的条件下，9-5等于9+7。这里，7称为-5对12的补数，即```7=[-5]补 = 12+(-5)(mod 12)```。举个例子说明，对某一个确定的模而言，当需要减去一个数x时，可以加上对应的负数```-x```的补数```[-x]```补来代替。
+补码表示的引入是基于模的概念。所谓“模”是指一个计数器的容量。比如钟表以12为一个计数循环，即可以看作以12为模。在进行钟表对时时，设当前钟表的时针停在9点钟的位置，要将时钟拨到4点钟，可以采用两种方法： 一种是反时针方向拨动指针，使指针后退5个小时，即9-5=4; 另一种是顺时针方向拨动指针，使时针前进7个小时，也能够使时针指向4。这是因为钟表的时间只有1、2、...、12这12个刻度，时针指向超过12时，将又指向1、2、...，相当于每超过12，就把12丢掉。由于 9 + 7 等于16，超过了12，因此把12减掉后得到4，即用 9 + 7也同样能够将钟表对准到4点钟。这样，对于采用12为模的钟表而言，```9-5≡9+7(mod 12)```，称为在模12的条件下，9-5等于9+7。这里，7称为-5对12的补数，即```7=[-5]补 = 12+(-5)(mod 12)```。如下图所示：
+
+![cb-clock](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_clock.jpg)
+
+举个例子说明，对某一个确定的模而言，当需要减去一个数x时，可以加上对应的负数```-x```的补数```[-x]```补来代替。
 
 ![cb-buma-mod](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_buma_mod.jpg)
 
@@ -214,6 +218,132 @@ description: 计算机中数据信息的表示
 
 ![cb-yima-feature](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_yima_feature.jpg)
 
+
+## 7. 代码示例
+如下代码程序(number_rep.c):
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+
+
+int main(int argc, char *argv[])
+{
+    int a = 128;
+    char b = (char)a;
+    printf("b: %d\n", b);
+
+    char c = -250;
+    int d = (int)c;
+    printf("d: %d\n", d);
+
+    char e[17] = {0, 0, 0, 0, 0, 0, 0, 0, -520, 0, 0, 0, 0, 0, 0, 0, 0};
+    int f = (int)e[8];
+    unsigned char g = (unsigned char)e[8];
+    printf("f: %d\n", f);
+    printf("g: %d\n", g);
+
+    unsigned char h = 520;
+    int i = (int)g;
+    char j = (char)g;
+    printf("i: %d\n", i);
+    printf("j: %d\n", j);
+
+
+    return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -g -o number_rep number_rep.c 
+number_rep.c: 在函数‘main’中:
+number_rep.c:11:14: 警告：隐式常量转换溢出 [-Woverflow]
+     char c = -250;
+              ^
+number_rep.c:15:43: 警告：隐式常量转换溢出 [-Woverflow]
+     char e[17] = {0, 0, 0, 0, 0, 0, 0, 0, -520, 0, 0, 0, 0, 0, 0, 0, 0};
+                                           ^
+number_rep.c:21:23: 警告：大整数隐式截断为无符号类型 [-Woverflow]
+     unsigned char h = 520;
+                       ^~~
+
+#  ./number_rep 
+b: -128
+d: 6
+f: -8
+g: 248
+i: 248
+j: -8
+</pre>
+
+gdb调试如下：
+{% highlight string %}
+# gdb ./number_rep
+GNU gdb (GDB) Red Hat Enterprise Linux 7.6.1-94.el7
+Copyright (C) 2013 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
+and "show warranty" for details.
+This GDB was configured as "x86_64-redhat-linux-gnu".
+For bug reporting instructions, please see:
+<http://www.gnu.org/software/gdb/bugs/>...
+Reading symbols from /data/home/lzy/just_for_test/number_rep...done.
+(gdb) l 16
+11          char c = -250;
+12          int d = (int)c;
+13          printf("d: %d\n", d);
+14      
+15          char e[17] = {0, 0, 0, 0, 0, 0, 0, 0, -520, 0, 0, 0, 0, 0, 0, 0, 0};
+16          int f = (int)e[8];
+17          unsigned char g = (unsigned char)e[8];
+18          printf("f: %d\n", f);
+19          printf("g: %d\n", g);
+20      
+(gdb) b number_rep.c:16
+Breakpoint 1 at 0x40058e: file number_rep.c, line 16.
+(gdb) r
+Starting program: /data/home/lzy/just_for_test/./number_rep 
+b: -128
+d: 6
+
+Breakpoint 1, main (argc=1, argv=0x7fffffffe048) at number_rep.c:16
+16          int f = (int)e[8];
+Missing separate debuginfos, use: debuginfo-install glibc-2.17-307.el7.1.x86_64
+(gdb) p &e[0]
+$1 = 0x7fffffffdf30 ""
+(gdb) x/17xb 0x7fffffffdf30
+0x7fffffffdf30: 0x00    0x00    0x00    0x00    0x00    0x00    0x00    0x00
+0x7fffffffdf38: 0xf8    0x00    0x00    0x00    0x00    0x00    0x00    0x00
+0x7fffffffdf40: 0x00
+(gdb) 
+{% endhighlight %}
+
+
+源代码分析如下：
+
+![cb-buma-prog](https://ivanzz1001.github.io/records/assets/img/computer_basis/cb_buma_prog.jpg)
+
+### 7.1 关于整形溢出
+C语言的整形问题相信大家并不陌生了。对于整形溢出，分为无符号整形溢出和有符号整形溢出。
+
+对于unsigned整形溢出，C语言的规范是有定义的————溢出后的数会以2^(8*sizeof(type))作模运算。也就是说，如果一个unsigned char溢出了，会把溢出的值与256求模。例如：
+{% highlight string %}
+unsigned char x = 0xff;
+
+print("%d\n", ++x);
+{% endhighlight %}
+上面的代码会输出: 0(因为0xff+1是256， 与2^8求模后就是0）。
+
+
+----------
+对于signed整形的溢出，C的规范定义是"undefined behavior"。也就是说，编译器爱怎么实现就怎么实现。对于大多数编译器来说，算的啥就是啥。比如：
+{% highlight string %}
+signed char x = 0x7f;
+
+printf("%d\n", ++x);
+{% endhighlight %}
+
+上面的输出为：-128，因为0x7f+0x01得到的是0x80，也就是二进制的0b1000 0000，将该补码表示转换成真值即为-128。
 
 
 <br />
