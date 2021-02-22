@@ -1050,6 +1050,8 @@ Dump of assembler code for function main:
 End of assembler dump.
 (gdb) 
 {% endhighlight %}
+>注： 这里汇编语言中,rsp指向的是当前的栈顶元素的位置，而不是下一个待插入元素的位置。因此在执行push指令时，首先会减少rsp的值，然后再将数据复制到rsp指向的内存中。
+
 
 
 <br />
