@@ -21,7 +21,7 @@ lsof命令常用的选项包括：
 <pre>
 # lsof -i [4|6] [protocol] [@hostname|ipaddr][:service|port]
 </pre>
-其中，4表示IPv4协议，6表示IPv6协议； protocol指定传输层协议，可以是TCP或者UDP； hostname指定主机名；ipaddr指定主机的IP地址；service指定服务名； port指定端口号。比如，要显示所有连接到主机**192.168.1.108**的ssh服务的socket文件描述符，可以使用命令：
+其中，4表示IPv4协议，6表示IPv6协议； protocol指定传输层协议，可以是TCP或者UDP； hostname指定主机名；ipaddr指定主机的IP地址；service指定服务名； port指定端口号。比如，要显示所有连接到主机**192.168.1.108**的ssh服务的socket文件描述符，可以使用命令（注： 可能需要切换成root权限才能查询出来）：
 <pre>
 # lsof -i@192.168.10.129:22
 COMMAND  PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
