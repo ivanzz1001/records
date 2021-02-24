@@ -91,9 +91,9 @@ Tasks: 243 total,   1 running, 242 sleeping,   0 stopped,   0 zombie
 
 第二行显示 自上一次刷新以来CPU的状态百分比。默认情况下，会显示如下条目：
 
-* **us, user:** 普通用户进程的运行时间(un-niced user processes)
+* **us, user:** 普通用户进程运行在用户空间的时间占总CPU时间的百分比(un-niced user processes)
 
-* **sy, system:** 内核进程的运行时间
+* **sy, system:** 所有进程运行在内核空间的时间占总CPU时间的百分比
 
 * **ni, nice:** 特权用户进程的运行时间(niced user processes)
 
@@ -128,7 +128,7 @@ KiB Swap:  8000508 total,      880 used,  7999628 free.  1732676 cached Mem
 </pre>
 这一个部分包含两行，单位可以是KiB到EiB,这依赖于使用top时所采用的选项。
 
-默认情况下，第一行反映的物理内存的情况，一般包含如下几类： total, free, used, buff/cache
+默认情况下，第一行反映的```物理内存```的情况，一般包含如下几类： total, free, used, buff/cache
 
 第二行反映的是虚拟内存的情况，一般包含如下几类：total, free, used, avail。
 
