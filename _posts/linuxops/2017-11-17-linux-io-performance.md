@@ -83,6 +83,8 @@ IO Time = Seek Time + 60 sec/Rotational Speed /2 + IO Chunk Size / Transfer Rate
 IOPS = 1/IO Time = 1/(Seek Time + 60 sec / Rotational Speed / 2 + IO Chunk Size / Transfer Rate)
 {% endhighlight %}
 
+>注：IOPS全称为Input/Output Operations Per Second，大意是硬盘每秒的读写次数。一个硬盘的随机读取IOPS主要由其主控和接口决定。在测试硬盘随机读取性能上，大部分软件会使用4KB大小的数据区块作为测试基准。以希捷酷鱼510系列固态硬盘为例，由于其搭载的主控支持NVMe 1.3协议，所以在4KB随机读取上可达到100096 IOPS，写入上也高达896000 IOPS。
+
 对于给定不同的IO大小，我们可以得出下面的一系列数据：
 
 1) **IO大小为4K**
