@@ -196,8 +196,29 @@ Transfer Rate = IOPS * IO Chunk Size
 另外补充说一下这个70%的指导值也适用于CPU响应时间，这也是在实践中证明过得。一旦CPU超过70%，系统将会变得受不了的慢。很有意思的东西。
 
 
+## 7. 附: Linux内核文件系统block与硬盘sector关系
 
+在系统运行过程中，有时会遇到下面打印信息，报告读写某个扇区错误
+<pre>
+kernel: end_request: I/O error, dev sdg, sector 2252148039
+kernel: end_request: I/O error, dev sdc, sector 3297222879
+</pre>
 
+1、这个扇区（sector）的含义是什么？和硬盘上的sector是一回事吗？
+
+2、Sector和文件系统中的Block有什么关系？
+
+3、而在我们上层应用读写的是文件内偏移量pos，pos与block/Sector之间有什么关系？
+
+![linuxops-block-sector](https://ivanzz1001.github.io/records/assets/img/linux/linuxops_block_sector.png)
+
+文件偏移量pos，是针对文件本身而言，即文件内的偏移。
+
+Block是文件系统上的概念，一般文件系统block大小为4K。
+
+Sector是磁介质硬盘最小单元，一般为512字节。
+
+Block值一般与sector值是不相等的.
 
 
 
