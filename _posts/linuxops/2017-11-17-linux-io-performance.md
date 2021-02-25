@@ -230,7 +230,7 @@ kernel: end_request: I/O error, dev sdc, sector 3297222879
 
 3、而在我们上层应用读写的是文件内偏移量pos，pos与block/Sector之间有什么关系？
 
-![linuxops-block-sector](https://ivanzz1001.github.io/records/assets/img/linux/linuxops_block_sector.png)
+![linuxops-block-sector](https://ivanzz1001.github.io/records/assets/img/linuxops/linuxops_block_sector.png)
 
 文件偏移量pos，是针对文件本身而言，即文件内的偏移。
 
