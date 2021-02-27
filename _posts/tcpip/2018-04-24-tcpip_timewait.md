@@ -59,8 +59,6 @@ description: time_wait的快速回收和重用
 具体而言，local peer主动调用close后，此时的TCP连接进入```TIME_WAIT```状态，处于该状态下的TCP连接不能立即以同样的四元组建立新连接，即发起active close的那方占用的local port在```TIME_WAIT```期间不能再被重新分配。由于```TIME_WAIT```状态持续时间为**2MSL**， 这样保证了旧TCP连接双工链路中旧数据包因过期（超过MSL)而消失，此后，就可以用相同的四元组建立一条新连接而不会发生前后两次连接数据错乱的情况。
 
 
-具体而言，local peer主动调用close后，此时的TCP连接进入TIME_WAIT状态，处于该状态下的TCP连接不能立即以同样的四元组建立新连接，即发起active close的那方占用的local port在TIME_WAIT期间不能再被重新分配。由于TIME_WAIT状态持续时间为2MSL，这样保证了旧TCP连接双工链路中的旧数据包均因过期（超过MSL）而消失，此后，就可以用相同的四元组建立一条新连接而不会发生前后两次连接数据错乱的情况。 
-
 
 ## 2. 处理系统上的TIME_WAIT连接过多问题
 
