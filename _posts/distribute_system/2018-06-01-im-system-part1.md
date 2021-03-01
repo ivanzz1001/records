@@ -325,6 +325,8 @@ message C2SPullMessageResponse {
 
 4. [一套海量在线用户的移动端IM架构设计实践分享](http://www.52im.net/thread-812-1-1.html)
 
+5. [解密融云IM产品的聊天消息ID生成策略](http://www.52im.net/thread-2747-1-1.html)
+
 <br />
 <br />
 <br />
