@@ -86,7 +86,15 @@ ONBOOT="yes"
 
 ![vmware-bridge-step6](https://ivanzz1001.github.io/records/assets/img/linux/vmware_bridge_step6.jpg)
 
-主机与虚拟机通信正常。
+能ping通外网ip，证明桥接模式设置成功。
+
+
+那主机与虚拟机之间的通信是否正常呢？可以用远程工具来测试一下。
+
+![vmware-bridge-step6](https://ivanzz1001.github.io/records/assets/img/linux/vmware_bridge_step7.jpg)
+
+从上面我们主机与虚拟机通信正常。
+
 
 ### 2.2 Linux下重启网络的几种方式
 
@@ -118,6 +126,121 @@ ONBOOT="yes"
 
 3) 这样就完成了对网卡的重启操作。
 </pre>
+
+## 3. NAT(地址转换模式)
+
+如果你的网络IP资源紧缺，但是你又希望你的虚拟机能够联网，这时候NAT模式是最好的选择。NAT模式借助虚拟NAT设备和虚拟DHCP服务器，使得虚拟机可以联网。其网络结构如下图所示：
+
+
+![vmware-nat-step1](https://ivanzz1001.github.io/records/assets/img/linux/vmware_nat_step1.jpg)
+
+在NAT模式中，主机网卡直接与虚拟NAT设备相连，然后虚拟NAT设备与虚拟DHCP服务器一起连接在虚拟交换机VMnet8上，这样就实现了虚拟机联网。那么我们会觉得很奇怪，为什么需要虚拟网卡VMware Network Adapter VMnet8呢？原来我们的VMware Network Adapter VMnet8虚拟网卡主要是为了实现主机与虚拟机之间的通信。在之后的设置步骤中，我们可以加以验证。
+
+
+1） **设置NAT及DHCP参数**
+
+设置虚拟机中NAT模式的选项，打开vmware，点击“编辑”下的“虚拟网络编辑器”，设置NAT参数及DHCP参数：
+
+![vmware-nat-step2](https://ivanzz1001.github.io/records/assets/img/linux/vmware_nat_step2.jpg)
+
+![vmware-nat-step3](https://ivanzz1001.github.io/records/assets/img/linux/vmware_nat_step3.jpg)
+
+![vmware-nat-step4](https://ivanzz1001.github.io/records/assets/img/linux/vmware_nat_step4.jpg)
+
+2) **将虚拟机的网络连接模式设置为NAT模式**
+
+将虚拟机的网络连接模式修改成NAT模式，点击“编辑虚拟机设置”:
+
+![vmware-nat-step5](https://ivanzz1001.github.io/records/assets/img/linux/vmware_nat_step5.jpg)
+
+点击“网络适配器”，选择“NAT模式”：
+
+![vmware-nat-step6](https://ivanzz1001.github.io/records/assets/img/linux/vmware_nat_step6.jpg)
+
+
+3) **Linux系统网络相关设置**
+
+开机启动系统，编辑网卡配置文件，命令为:
+<pre>
+# vi /etc/sysconfig/network-scripts/ifcfg-eth0
+</pre>
+配置如下：
+
+![vmware-nat-step7](https://ivanzz1001.github.io/records/assets/img/linux/vmware_nat_step7.jpg)
+
+编辑完成，保存退出，然后重启虚拟机网卡，动态获取ip地址，使用ping命令ping外网ip，测试能否联网。
+
+![vmware-nat-step8](https://ivanzz1001.github.io/records/assets/img/linux/vmware_nat_step8.jpg)
+
+4) **测试VMware Network Adapter VMnet8虚拟网卡**
+
+之前，我们说过VMware Network Adapter VMnet8虚拟网卡的作用，那我们现在就来测试一下。这里我们先禁用该网卡：
+
+
+![vmware-nat-step9](https://ivanzz1001.github.io/records/assets/img/linux/vmware_nat_step9.jpg)
+
+然后再ping外网：
+
+![vmware-nat-step10](https://ivanzz1001.github.io/records/assets/img/linux/vmware_nat_step10.jpg)
+
+上面我们看到，虚拟机仍然能联通外网，说明不是通过VMware Network Adapter VMnet8虚拟网卡，那么为什么要有这块虚拟网卡呢？那是因为我们需要使用VMware Network Adapter VMnet8来实现主机与虚拟机之间的通信，接下来，我们就用远程连接工具来测试一下。
+
+![vmware-nat-step11](https://ivanzz1001.github.io/records/assets/img/linux/vmware_nat_step11.jpg)
+
+然后，将VMware Network Adapter VMnet8启用之后，发现远程工具可以连接上虚拟机了。
+
+这就是NAT模式，利用虚拟的NAT设备以及虚拟DHCP服务器来使虚拟机连接外网，而VMware Network Adapter VMnet8虚拟网卡是用来与虚拟机通信的。
+
+
+## 3. Host-Only(仅主机模式)
+Host-Only模式其实就是NAT模式去除了虚拟NAT设备，然后使用VMware Network Adapter VMnet1虚拟网卡连接VMnet1虚拟交换机来与虚拟机通信的，Host-Only模式将虚拟机与外网隔开，使得虚拟机成为一个独立的系统，只与主机相互通讯。其网络结构如下图所示：
+
+![vmware-hostonly-step1](https://ivanzz1001.github.io/records/assets/img/linux/vmware_hostonly_step1.jpg)
+
+通过上图，我们可以发现，如果要使得虚拟机能联网，我们可以将主机网卡共享给VMware Network Adapter VMnet1网卡，从而达到虚拟机联网的目的。接下来，我们就来测试一下。
+
+1） **设置DHCP参数**
+
+首先设置“虚拟网络编辑器”，可以设置DHCP的起始范围:
+
+![vmware-hostonly-step2](https://ivanzz1001.github.io/records/assets/img/linux/vmware_hostonly_step2.jpg)
+
+2） **设置虚拟机为Host-Only模式**
+
+![vmware-hostonly-step3](https://ivanzz1001.github.io/records/assets/img/linux/vmware_hostonly_step3.jpg)
+
+3) **Linux系统网络相关设置**
+
+开机启动系统，然后设置网卡文件：
+
+![vmware-hostonly-step4](https://ivanzz1001.github.io/records/assets/img/linux/vmware_hostonly_step4.jpg)
+
+保存退出，然后重启网卡，利用远程工具测试能否与主机通信。
+
+![vmware-hostonly-step5](https://ivanzz1001.github.io/records/assets/img/linux/vmware_hostonly_step5.jpg)
+
+上面我们看到，主机与虚拟机之间可以正常通信的。
+
+4) **设置虚拟机联通外网**
+
+到目前位置，Host-Only模式下虚拟机是不能联通外网的。如果要联通外网，我们必须将主机网卡共享给VMware Network Adapter VMnet1网卡。参看如下：
+
+![vmware-hostonly-step6](https://ivanzz1001.github.io/records/assets/img/linux/vmware_hostonly_step6.jpg)
+
+上图有一个提示，强制将VMware Network Adapter VMnet1的ip设置成192.168.137.1，那么接下来，我们就要将虚拟机的DHCP的子网和起始地址进行修改，点击“虚拟网络编辑器”:
+
+![vmware-hostonly-step7](https://ivanzz1001.github.io/records/assets/img/linux/vmware_hostonly_step7.jpg)
+
+重新配置网卡，将VMware Network Adapter VMnet1虚拟网卡作为虚拟机的路由。
+
+![vmware-hostonly-step8](https://ivanzz1001.github.io/records/assets/img/linux/vmware_hostonly_step8.jpg)
+
+重启网卡，然后通过 远程工具测试能否联通外网以及与主机通信。
+
+![vmware-hostonly-step9](https://ivanzz1001.github.io/records/assets/img/linux/vmware_hostonly_step9.jpg)
+
+测试结果证明可以使得虚拟机连接外网。
+
 
 
 <br />
