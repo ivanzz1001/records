@@ -106,6 +106,86 @@ void MergeSort(SqList *L)
 }
 {% endhighlight %}
 
+下面给出一个具体实现：
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+#include <memory.h>
+
+
+
+void merge(int *src, int *dst, int s, int m, int n)
+{
+	int i,j,k;
+
+	for(i = s, j = m+1, k = s; i <= m && j <= n; k++){
+		if(src[i] <= src[j])
+			dst[k] = src[i++];
+		else
+			dst[k] = src[j++];
+	
+	}
+
+	for(; i <= m; i++, k++)
+		dst[k] = src[i];
+
+	for(; j <= n; j++, k++)
+		dst[k] = src[j];
+}
+
+/*
+ * 将src中的数据元素利用aux_space辅助空间合并到src中
+ */
+void merge_sort(int *src, int *aux_space, int start, int end)
+{
+	if(start == end)
+		aux_space[start] = src[start];
+	else{
+		int middle = (start + end) >> 1;
+
+		merge_sort(aux_space, src, start, middle);
+		merge_sort(aux_space, src, middle + 1, end);
+
+		merge(aux_space, src, start, middle, end);
+	}
+}
+
+int msort(int *src, int len)
+{
+	if(!src || len <= 0)
+		return -1;
+	else if(len == 1)
+		return 0;
+
+	int *aux_space = (int *)malloc(sizeof(int) * len);
+	if(!aux_space)
+		return -2;
+
+	memcpy(aux_space, src, sizeof(int)*len);
+
+	merge_sort(src, aux_space, 0, len-1);
+	return 0x0;
+}
+
+int main(int argc, char *argv[])
+{
+	int a[10] = {30, 20, 10, 60, 100, 1100, 5, 90, 300, 20};
+
+	if(msort(a, 10) != 0)
+	{
+		printf("invalid input\n");
+		return -1;
+	}
+
+	for(int i = 0; i<10; i++)
+		printf("%d  ", a[i]);
+
+	printf("\n");
+
+	return 0x0;
+}
+{% endhighlight %}
+
 
 ## 2. 基数排序
 ```基数排序```(Radix Sorting)是和前面所述各类排序方法完全不相同的一种排序方法。从前面的讨论可见，实现排序主要是通过关键字间的比较和移动记录这两种操作，而实现基数排序不需要进行记录关键字间的比较。基数排序是一种借助多关键字排序的思想对单逻辑关键字进行排序的方法。
