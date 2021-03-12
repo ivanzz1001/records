@@ -83,7 +83,7 @@ void DFS(Graph G, int v)
     visited[v] = TRUE;
     VisitFunc(v);         //访问第v个顶点
 
-    for(w = FirstAdjVex(G, v); v >= 0; w = NextAdjVex(G, v, w))
+    for(w = FirstAdjVex(G, v); w >= 0; w = NextAdjVex(G, v, w))
     {
         if(!visited[w])
             DFS(G, w);          //对v的尚未访问的邻接顶点w递归调用DFS
@@ -127,7 +127,7 @@ void  BFSTraverse(Graph G , Status (*Visit)(int v))
               visited[v] = TRUE;
               Visit(v);
 
-			  EnQueue(Q, v);               //v入队列
+              EnQueue(Q, v);               //v入队列
 
               while(!QueueEmpty(Q))
               {
