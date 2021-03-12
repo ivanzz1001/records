@@ -1412,6 +1412,8 @@ node[15], score=19.000000, level=2
 6. [跳跃表 SkipList【数据结构】原理及实现](https://blog.csdn.net/u014427196/article/details/52454462)
 
 7. [深夜学算法之SkipList：让链表飞](https://www.jianshu.com/p/fcd18946994e)
+
+8. [跳跃表的实现](https://github.com/begeekmyfriend/skiplist/blob/master/skiplist.h)
 <br />
 <br />
 
