@@ -83,10 +83,24 @@ mysql> UPDATE enormous_table SET col1 =0 ;
 为什么叫半同步复制？先说说同步复制，所谓同步复制就是一个事务在master和slave都执行后，才返回给用户执行成功。这里核心是说master和slave要么都执行，要么都不执行，涉及到2PC(2 Phase Commit)。而MySQL只实现了本地redo log和binlog的2PC，但并没有实现Master和Slave的2PC，所以不是严格意义上的同步复制。而MySQL半同步复制不要求slave执行，而仅仅是接收到日志后，就通知master可以返回了。这里关键点是slave接收日志后是否执行，若执行后才通知master则是同步复制；若仅仅是接收日志成功，则是半同步复制。对于MySQL而言，我们谈到的日志都是binlog，对于其他的关系型数据库可能是redo log或其他日志。
 
 
-半同步复制如何实现？半同步复制实现的关键点是master对于事务提交过程特殊处理。目前实现半同步复制主要有两种模式：```AFTER_SYNC```模式和```AFTER_COMMIT```模式。两种方式的主要区别在于是否在存储引擎提交后等待slave的ACK。
+半同步复制如何实现？ MySQL半同步复制的实现是建立在MySQL异步复制的基础上的，其关键点是master对于事务提交过程特殊处理。MySQL支持两种略有不同的半同步复制策略：```AFTER_SYNC```和```AFTER_COMMIT```(受 rpl_semi_sync_master_wait_point控制)。这两种策略的主要区别在于是否在存储引擎提交后等待slave的ACK。
+
+
+开启半同步复制时，master在返回之前会等待slave的响应或超时。当slave超时时，半同步复制退化成异步复制。这也是MySQL半同步复制存在的一个问题。本文不讨论slave超时的情形（不讨论异步复制）。
+
 
 ### 3.1 AFTER_COMMIT模式
-我们先来看看AFTER_COMMIT模式，如下图，Start和End分别表示用户发起commit命令和master返回给用户的时间点，中间部分就是整个commit过程master和slave坐的事情：
+MySQL 5.5和5.6的半同步复制只支持```AFTER_COMMIT```，其基本流程如下：
+
+* Prepare the transaction in the storage engine(s).
+
+* Write the transaction to the binlog, flush the binlog to disk
+
+* Commit the transaction to the storage engines(s)
+
+* Wait for at least one slave to acknowledge the reception for the binlog events for the transaction.
+
+如下图所示，Start和End分别表示用户发起commit命令和master返回给用户的时间点，中间部分就是整个commit过程master和slave坐的事情：
 
 ![db-mysql-dolog](https://ivanzz1001.github.io/records/assets/img/db/db_semi_rep1.png)
 
@@ -101,20 +115,109 @@ master提交时，会首先将该事务的redo log刷入磁盘，然后将事务
 
 2）**场景2**
 
-假设第3步innodb commit执行成功后，
+假设第3步innodb commit执行成功后，binlog还没来得及传递给slave，此时master挂了，此时与第一种情况一样，备库比主库少一个事务，但是其他用户在3执行完后，可以看到该事务的更新，而切换到备库后，却发现再次读这个更新又没了，这个就发生了```“幻读”```，如果其他事务依赖于这个更新，则会对业务逻辑产生影响。当然这仅仅是极端情况。
+
+3） **场景3**
+
+客户端事务在存储引擎层提交后，在得到从库确认的过程中，主库宕机了。此时，客户端会收到事务提交失败的信息，客户端会重新提交该事务到新的主上，当宕机的主库重新启动后，以从库的身份重新加入到该主从结构中，会发现，该事务在从库中被提交了两次，一次是之前作为主的时候，一次是被新主同步过来的。
+
+4) **场景4**
+
+客户端事务在存储引擎层提交后，在得到从库确认的过程中，主库宕机了，但是从库实际上已经收到并应用了该事务，此种情况客户端仍然会收到事务提交失败的信息，重新提交该事务到新的主上。
+
+针对上面的```场景2```，```AFTER_SYNC```模式可以解决这一问题。
 
 
+### 3.2 AFTER_SYNC模式
+AFTER_SYNC模式是MySQL 5.7才支持的半同步复制方式，也是MySQL 5.7默认的半同步复制方式。
+
+>注： MySQL5.7.3开始支持配置半同步复制等待Slave应答的个数：rpl_semi_sync_master_wait_slave_count
+
+其基本流程如下：
+
+* Prepare the transaction in the storage engine(s)
+
+* Write the transaction to the binlog, flush the binlog to disk
+
+* Wait for at least one slave to acknowledge the reception for the binlog events for the transaction.
+
+* Commit the transaction to the storage engine(s)
+
+如下图所示：
+
+![db-mysql-dolog](https://ivanzz1001.github.io/records/assets/img/db/db_semi_rep2.png)
+
+与AFTER_COMMIT相比，master在AFTER_SYNC模式下，fsync binlog后，就开始等待slave同步。那么在进行第5步```innodb commit```后，即其他事务能看到该事务的更新时，slave肯定已经成功接收到binlog，因此即使发生切换，slave也拥有与master同样的数据，不会发生```幻读```现象。但是对于```AFTER_COMMIT```中描述的第一种情况，结果是一样的。
 
 
-半同步复制是否能保证不丢数据？我们通过几种场景来简单分析下。第一种情况：假设Master第1，2步执行成功后，binlog还没来得及传递给Slave，此时Master挂了，Slave作为新Master提供服务，那么备库比主库要少一个事务(因为主库的redo 和binlog已经落盘)，但是不影响用户，对于用户而言，这个事务没有成功返回，那么提交与否，用户都可以接受，用户一定会进行异常捕获而重试。第二种情况，假设第3步innodb commit执行成功后，binlog还没来得及传递给Slave，此时Master挂了，此时与第一种情况一样，备库比主库少一个事务，但是其他用户在3执行完后，可以看到该事务的更新，而切换到备库后，却发现再次读这个更新又没了，这个就发生了“幻读”，如果其他事务依赖于这个更新，则会对业务逻辑产生影响。当然这仅仅是极端情况。
+###### 3.2.1 异常情形
+
+下面我们来分析一下```AFTER_SYNC```模式下的异常情形：
+
+1） **异常情形1： master宕机后，主备切换**
+
+a） master执行```事务T```，在将事务T的binlog刷到硬盘之前，master发生宕机。slave升级为master。master重启后，crash recovery会对事务T进行回滚，此时主备数据一致。
+
+b） master执行```事务T```，在将事务T的binlog刷到硬盘之后，收到ACK之前，master发生宕机（存在pendinglog)。slave升级为master。此时又可能有如下两种子情形：
+<pre>
+b1) slave还没收到事务T的binlog，master重启后，crash recovery会直接提交pendinglog，主备数据不一致；
+
+b2） slave已经接收到事务T的binlog，主备数据一致；
+</pre>
+
+2） **异常情形2：master宕机后，不切换主机**
+
+我们只需要考虑```异常情形1```中的```b1)```。master重启后，直接提交pendinglog，此时，主备数据不一致：
+
+a） slave连上master，通过异步复制的方式获得事务的binlog，从而达到主备数据一致；
+
+b） slave还没来得及复制事务T的binlog，如果master又发生宕机，磁盘损坏。主备数据不一致，事务T的数据丢失。
+
+###### 3.2.2 异常情形处理
+从上面异常情况的简单分析我们得知，半同步需要处理master宕机后重启存在pendinglog(slave没有应答）的特殊情况。
+
+1） 针对master宕机后，不进行主备切换的情形
+
+在crash recovery之后，master等到slave的连接和复制，直到至少有一个slave复制了所有已提交的事务的binlog。（SHOW MASTER STATUS on master and SELECT master_pos_wait()  on slave
+
+2） 针对master宕机后，进行主备切换的情形
+
+旧master重启后，在crash recovery时，对pendinglog进行回滚。（人工截断master的binlog未复制的部分？）
 
 
+###### 3.2.3 思考
+
+为什么master重启之后，crash recovery的过程中，是直接commit pendinglog，而不是重试请求slave的应答呢？ 
+
+我们知道MySQL的异步复制和半同步复制都是由slave触发的，slave主动去连接master同步binlog。若没有发生主备切换，机器重启后无法知道哪台机器是slave；若发生了主备切换，它已经不是master了，则不会在再有slave连上来，此时如果继续等待，则无法正常运行。
 
 
+### 3.3 总结
+MySQL半同步复制存在以下问题：
 
+* 当Slave超时时，会退化成异步复制。
 
+* 当Master宕机时，数据一致性无法保证，需要人工处理。
 
+* 复制是串行的。
 
+正因为MySQL在主备数据一致性存在着这些问题，影响了互联网业务```7*24```的高可用服务，因此各大公司纷纷祭出自己的“补丁”：腾讯的TDSQL、微信的PhxSQL、阿里的AliSQL、网易的InnoSQL。
+
+MySQL官方已经在MySQL5.7推出新的复制模式——MySQL Group Replication。
+
+## 4. 并行复制
+
+半同步复制解决了master-slave的强一致问题，那么性能问题呢？从本文的第一张图可以看到参与复制的主要有两个线程：IO线程和SQL线程，分别用于拉取和回放binlog。对于slave而言，所有拉取和解析binlog的动作都是串行的，相对于master并发处理用户请求，在高负载下，若master产生binlog的速度超过slave消费binlog的速度，就会导致slave出现延迟。如下图所示，我们可以看到users和master中间的管道远远大于master和slave之间的管道：
+
+![db-mysql-dolog](https://ivanzz1001.github.io/records/assets/img/db/db_semi_rep3.png)
+
+那么如何并行化，是并行IO线程，还是并行SQL线程？其实两方面都可以并行，但是并行SQL线程的收益更大，因为SQL线程做的事情更多（解析、执行）。并行IO线程，可以将从master拉取和写relay log分为两个线程；并行SQL线程则可以根据需要做到库级并行、表级并行、事务级并行。库级并行在MySQL官方版本5.6已经实现。如下图所示，并行复制框架实际包含了一个协调线程和若干个工作线程，协调线程负责分发和解决冲突，工作线程只负责执行。图中DB1、DB2和DB3的事务就可以并发执行，提高了复制的性能。有时候库级并发可能不够，需要做表级并发，或更细粒度的事务级并发。
+
+![db-mysql-dolog](https://ivanzz1001.github.io/records/assets/img/db/db_semi_rep4.png)
+
+并行复制如何解决冲突？并发的世界是美好的，但不能乱并发，否则数据就乱了。master上面通过锁机制来保证并发的事务有序进行，那么并行复制呢？slave必须保证回放的顺序与master上事务执行顺序一致，因此只要做到顺序读取binlog，将不冲突的事务并发执行即可。对于库级并发而言，协调线程要保证执行同一个库的事务放在一个工作线程串行执行；对于表级并发而言，协调线程要保证同一个表的事务串行执行；对于事务级而言，则是保证操作同一行的事务串行执行。
+
+是否粒度越细，性能越好？这个并不是一定的。相对于串行复制而言，并行复制多了一个协调线程。协调线程一个重要作用是解决冲突，粒度越细的并发，可能会有更多的冲突，最终可能也是串行执行的，但消耗了大量的冲突检测代价。
 
 
 
