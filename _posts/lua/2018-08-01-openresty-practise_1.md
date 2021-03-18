@@ -19,9 +19,7 @@ Lua非常高效，它运行的比许多其他脚本(如Perl、Python、Ruby)都�
 
 LuaJIT是采用C和汇编语言编写的Lua解释器与即时编译器。LuaJIT被设计成全兼容标准的Lua5.1语言，同时可选地支持Lua 5.2和Lua 5.3中的一些不破坏向后兼容性的有用特性。因此，标准Lua语言的代码可以不加修改地运行在LuaJIT之上。LuaJIT和标准Lua解释器的一大区别是：LuaJIT的执行速度，即使是其汇编编写的Lua解释器，也要比标准Lua5.1解释器快很多，可以说是一个高效的Lua实现。另一个区别是，LuaJIT支持比标准Lua5.1语言更多的基本原语和特性，因此功能上也要更加强大。
 
-[Lua官网链接](http://www.lua.org)
 
-[LuaJIT官网链接](http://luajit.org)
 
 
 
@@ -32,7 +30,9 @@ LuaJIT是采用C和汇编语言编写的Lua解释器与即时编译器。LuaJIT�
 
 参看:
 
+1. [Lua官网链接](http://www.lua.org)
 
+2. [LuaJIT官网链接](http://luajit.org)
 
 
 <br />
