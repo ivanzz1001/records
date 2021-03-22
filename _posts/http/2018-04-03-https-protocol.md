@@ -34,24 +34,24 @@ HTTP因为存在以上三大安全风险，所以才有了HTTPS的出现。HTTPS
 
 好了，现在我们来看看Bob是怎么应用非对称算法与他的好朋友通信的：
 
-1. 首先Bob弄到了两把钥匙： 公钥和私钥
+1) 首先Bob弄到了两把钥匙： 公钥和私钥
 
 ![https-pubpriv-key](https://ivanzz1001.github.io/records/assets/img/http/https_pubpriv_key.jpg)
 
 
-2. Bob自己留下私钥，把公钥复制成三份送给了他的三个好朋友Pat、Doug和Susan。
+2) Bob自己留下私钥，把公钥复制成三份送给了他的三个好朋友Pat、Doug和Susan。
 
 ![https-pubkey-distribute](https://ivanzz1001.github.io/records/assets/img/http/https_pubkey_distribute.jpg)
 
 
-3. 此时，Bob总算可以安心地和他的好朋友愉快地通信了。比如Susan要和他讨论关于去哪吃午饭的事情，Susan就可以先把自己的内容（明文）首先用Bob送给他的公钥做一次加密，然后把加密的内容传送给Bob。Bob收到信后，再用自己的私钥解开信的内容。
+3)  此时，Bob总算可以安心地和他的好朋友愉快地通信了。比如Susan要和他讨论关于去哪吃午饭的事情，Susan就可以先把自己的内容（明文）首先用Bob送给他的公钥做一次加密，然后把加密的内容传送给Bob。Bob收到信后，再用自己的私钥解开信的内容。
 
 ![https-info-transfer](https://ivanzz1001.github.io/records/assets/img/http/https_info_transfer.jpg)
 
 说明： 这其实是计算机安全学里的加密的概念，加密的目的是为了不让别人看到传送的内容，加密的手段是通过一定的加密算法及约定的密钥进行的（比如上述用了非对称加密算法以及Bob的公钥），而解密则需要相关的解密算法及约定的密钥（如上述用了非对称加密算法和Bob自己的私钥），可以看出加密是可逆的（可解密的）。
 
 
-4. Bob看完信后，决定给Susan回一封信。为了防止信的内容被篡改（或者别人伪装成他的身份跟Susan通信），他决定先对信的内容用hash算法做一次处理，得到一个字符串哈希值，Bob又用自己的私钥对哈希值做了一次加密得到一个签名，然后把签名和信（明文的）一起发送给Susan。
+4) Bob看完信后，决定给Susan回一封信。为了防止信的内容被篡改（或者别人伪装成他的身份跟Susan通信），他决定先对信的内容用hash算法做一次处理，得到一个字符串哈希值，Bob又用自己的私钥对哈希值做了一次加密得到一个签名，然后把签名和信（明文的）一起发送给Susan。
 
 ![https-signature](https://ivanzz1001.github.io/records/assets/img/http/https_signature.jpg)
 
@@ -59,18 +59,18 @@ HTTP因为存在以上三大安全风险，所以才有了HTTPS的出现。HTTPS
 
 
 
-5. Susan接收到了Bob的信，首先用Bob给的公钥对签名做了解密处理，得到了哈希值A，然后Susan用了同样的Hash算法对信的内容做了一次哈希处理，得到了另外一个哈希值B，对比A和B，如果这两个值是相同的，那么可以确认信就是Bob本人写的，并且内容没有被篡改过。
+5) Susan接收到了Bob的信，首先用Bob给的公钥对签名做了解密处理，得到了哈希值A，然后Susan用了同样的Hash算法对信的内容做了一次哈希处理，得到了另外一个哈希值B，对比A和B，如果这两个值是相同的，那么可以确认信就是Bob本人写的，并且内容没有被篡改过。
 
 ![https-signature-check](https://ivanzz1001.github.io/records/assets/img/http/https_signature_check.jpg)
 
 说明： 4跟5其实构成了一次完整的通过数字签名进行认证的过程。数字签名的过程简述为：发送方通过不可逆算法对内容```text1```进行处理（哈希），得到的结果值为```hash1```，然后用私钥加密```hash1```得到结果值```encry1```; 对方接收到```text1```和```encry1```，用公钥解密```encry1```得到```hash1```，然后用```text1```进行相同的不可逆处理得到```hash2```，对```hash1```和```hash2```进行对比即可认证发送方。
 
-6. 此时，另外一种比较复杂的情况出现了，Bob是通过网络把公钥寄送给他的三个好朋友的，有一个不怀好意的家伙```Jerry```截获了Bob给Doug的公钥。Jerry开始伪装成Bob跟Doug通信，Doug感觉通信的对象不像是Bob，但是他又无法确认。
+6) 此时，另外一种比较复杂的情况出现了，Bob是通过网络把公钥寄送给他的三个好朋友的，有一个不怀好意的家伙```Jerry```截获了Bob给Doug的公钥。Jerry开始伪装成Bob跟Doug通信，Doug感觉通信的对象不像是Bob，但是他又无法确认。
 
 ![https-cheat](https://ivanzz1001.github.io/records/assets/img/http/https_cheat.jpg)
 
 
-7. Bob最终发现了自己的公钥被Jerry截获了，他感觉自己的公钥通过网络传输给自己的小伙伴似乎也是不安全的，不怀好意的家伙可以截获这个明文传输的公钥。为此，他想到了去第三方权威机构```证书中心```(Certificate Authority,简称CA）做认证。证书中心用自己的私钥对Bob的公钥和其他信息做了一次加密。这样Bob通过网络将数字证书传递给他的小伙伴后，小伙伴们先用CA给的公钥解密证书，这样就可以安全获取Bob的公钥了。
+7) Bob最终发现了自己的公钥被Jerry截获了，他感觉自己的公钥通过网络传输给自己的小伙伴似乎也是不安全的，不怀好意的家伙可以截获这个明文传输的公钥。为此，他想到了去第三方权威机构```证书中心```(Certificate Authority,简称CA）做认证。证书中心用自己的私钥对Bob的公钥和其他信息做了一次加密。这样Bob通过网络将数字证书传递给他的小伙伴后，小伙伴们先用CA给的公钥解密证书，这样就可以安全获取Bob的公钥了。
 
 ![https-sign-data](https://ivanzz1001.github.io/records/assets/img/http/https_sign_data.jpg)
 
