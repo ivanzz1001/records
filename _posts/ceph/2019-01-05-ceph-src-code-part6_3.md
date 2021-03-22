@@ -258,9 +258,7 @@ int ReplicatedPG::prepare_transaction(OpContext *ctx)
 	...
 	finish_ctx(ctx,
 		ctx->new_obs.exists ? pg_log_entry_t::MODIFY :
-		pg_log_entry_t::DELETE);  finish_ctx(ctx,
-		ctx->new_obs.exists ? pg_log_entry_t::MODIFY :
-		pg_log_entry_t::DELETE);
+		pg_log_entry_t::DELETE); 
 }
 
 void ReplicatedPG::finish_ctx(OpContext *ctx, int log_op_type, bool maintain_ssc,
