@@ -187,6 +187,15 @@ struct pg_info_t {
 
 * 在ReplicatedPG::do_op()中创建了一个对象修改操作的上下文OpContext，然后在ReplicatedPG::execute_ctx()中完成PGLog日志版本等的设置：
 {% highlight string %}
+eversion_t get_next_version() const {
+	eversion_t at_version(get_osdmap()->get_epoch(),
+		pg_log.get_head().version+1);
+
+	assert(at_version > info.last_update);
+	assert(at_version > pg_log.get_head());
+	return at_version;
+}
+
 void ReplicatedPG::do_op(OpRequestRef& op)
 {
 	...
@@ -271,7 +280,44 @@ void ReplicatedPG::finish_ctx(OpContext *ctx, int log_op_type, bool maintain_ssc
 				ctx->mtime));
 	...
 }
+
+
+/**
+ * pg_log_entry_t - single entry/event in pg log
+ *
+ * (src/osd/osd_types.h)
+ */
+struct pg_log_entry_t {
+	// describes state for a locally-rollbackable entry
+	ObjectModDesc mod_desc;
+	bufferlist snaps;                                       // only for clone entries
+	hobject_t  soid;
+	osd_reqid_t reqid;                                      // caller+tid to uniquely identify request
+	vector<pair<osd_reqid_t, version_t> > extra_reqids;
+	eversion_t version, prior_version, reverting_to;
+	version_t user_version;                                 // the user version for this entry
+	utime_t     mtime;                                      // this is the _user_ mtime, mind you
+	
+	__s32      op;
+	bool invalid_hash;                                     // only when decoding sobject_t based entries
+	bool invalid_pool;                                     // only when decoding pool-less hobject based entries
+
+	pg_log_entry_t()
+		: user_version(0), op(0),
+		invalid_hash(false), invalid_pool(false) {
+
+	}
+
+	pg_log_entry_t(int _op, const hobject_t& _soid,
+		const eversion_t& v, const eversion_t& pv,
+		version_t uv,const osd_reqid_t& rid, const utime_t& mt)
+		: soid(_soid), reqid(rid), version(v), prior_version(pv), user_version(uv),
+		mtime(mt), op(_op), invalid_hash(false), invalid_pool(false){
+
+	}
+};
 {% endhighlight %}
+上面我们可以看到将```ctx->at_version```传递给了pg_log_entry_t.version； 而pg_log_entry_t.prior_version则为ctx->obs->oi.version；pg_log_entry_t.user_version则为ctx->user_at_version。
 
 * 在ReplicatedBackend::submit_transaction()里调用parent->log_operation()将PGLog序列化到transaction里。在PG::append_log()里将PGLog相关信息序列化到transaction里。
 {% highlight string %}
