@@ -317,7 +317,7 @@ struct pg_log_entry_t {
 	}
 };
 {% endhighlight %}
-上面我们可以看到将```ctx->at_version```传递给了pg_log_entry_t.version； 而pg_log_entry_t.prior_version则为ctx->obs->oi.version；pg_log_entry_t.user_version则为ctx->user_at_version。
+上面我们可以看到将```ctx->at_version```传递给了pg_log_entry_t.version； 将```ctx->obs->oi.version```传递给了pg_log_entry_t.prior_version；将```ctx->user_at_version```传递给了pg_log_entry_t.user_version。
 
 * 在ReplicatedBackend::submit_transaction()里调用parent->log_operation()将PGLog序列化到transaction里。在PG::append_log()里将PGLog相关信息序列化到transaction里。
 {% highlight string %}
