@@ -740,9 +740,40 @@ void ReplicatedBackend::submit_transaction(...)
 		op_t);
 
 	...
+
+	vector<ObjectStore::Transaction> tls;
+	tls.push_back(std::move(op_t));
+
 	parent->queue_transactions(tls, op.op);
 }
 {% endhighlight %}
+这里ReplicatedPG实现了PGBackend::Listener接口：
+{% highlight string %}
+class ReplicatedPG : public PG, public PGBackend::Listener {
+};
+
+ReplicatedPG::ReplicatedPG(OSDService *o, OSDMapRef curmap,const PGPool &_pool, spg_t p) :
+	PG(o, curmap, _pool, p),
+	pgbackend(
+		PGBackend::build_pg_backend(
+			_pool.info, curmap, this, coll_t(p), ch, o->store, cct)),
+	object_contexts(o->cct, g_conf->osd_pg_object_context_cache_count),
+	snapset_contexts_lock("ReplicatedPG::snapset_contexts"),
+	backfills_in_flight(hobject_t::Comparator(true)),
+	pending_backfill_updates(hobject_t::Comparator(true)),
+	new_backfill(false),
+	temp_seq(0),
+	snap_trimmer_machine(this)
+{ 
+	missing_loc.set_backend_predicates(
+		pgbackend->get_is_readable_predicate(),
+		pgbackend->get_is_recoverable_predicate());
+
+	snap_trimmer_machine.initiate();
+}
+{% endhighlight %}
+因此这里调用的parent->queue_transactions()就是ReplicatedPG::queue_transactions()
+
 
 * 调用到FileStore::queue_transactions()里，就将list构造成一个FileStore::Op，对应的list放到FileStore::Op::tls里
 {% highlight string %}
