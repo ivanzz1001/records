@@ -341,6 +341,37 @@ void ReplicatedPG::do_op(OpRequestRef& op)
 
 * 在ReplicatedBackend::submit_transaction()里调用parent->log_operation()将PGLog序列化到transaction里。在PG::append_log()里将PGLog相关信息序列化到transaction里。
 {% highlight string %}
+//issue_repop()即处理replication operations，
+void ReplicatedPG::issue_repop(RepGather *repop, OpContext *ctx)
+{
+	...
+
+	Context *on_all_commit = new C_OSD_RepopCommit(this, repop);
+	Context *on_all_applied = new C_OSD_RepopApplied(this, repop);
+	Context *onapplied_sync = new C_OSD_OndiskWriteUnlock(
+		ctx->obc,
+		ctx->clone_obc,
+		unlock_snapset_obc ? ctx->snapset_obc : ObjectContextRef());
+
+	pgbackend->submit_transaction(
+		soid,
+		ctx->at_version,
+		std::move(ctx->op_t),
+		pg_trim_to,
+		min_last_complete_ondisk,
+		ctx->log,
+		ctx->updated_hset_history,
+		onapplied_sync,
+		on_all_applied,
+		on_all_commit,
+		repop->rep_tid,
+		ctx->reqid,
+		ctx->op);
+
+	...
+}
+
+
 void ReplicatedBackend::submit_transaction(
   const hobject_t &soid,
   const eversion_t &at_version,
