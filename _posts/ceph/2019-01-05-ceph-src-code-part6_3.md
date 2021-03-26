@@ -140,7 +140,7 @@ struct pg_info_t {
 
 其中：
 
-* last_complete: 在该指针之前的版本都已经在所有的OSD上完成更新（只表示内存更新完成）；
+* last_complete: 在该指针```之前```的版本都已经在所有的OSD上完成更新（只表示内存更新完成）；
 
 * last_update: PG内最近一次更新的对象的版本，还没有在所有OSD上完成更新。在last_update与last_complete之间的操作表示该操作已在部分OSD上完成，但是还没有全部完成。
 
@@ -481,6 +481,12 @@ void PG::add_log_entry(const pg_log_entry_t& e)
 	// log mutation
 	pg_log.add(e);
 	dout(10) << "add_log_entry " << e << dendl;
+}
+
+//src/osd/pglog.h
+void add(const pg_log_entry_t& e) {
+	mark_writeout_from(e.version);
+	log.add(e);
 }
 {% endhighlight %}
  
