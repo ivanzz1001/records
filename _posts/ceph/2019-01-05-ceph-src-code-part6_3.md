@@ -601,7 +601,7 @@ void pg_log_entry_t::encode_with_checksum(bufferlist& bl) const
 	::encode(crc, bl);
 }
 {% endhighlight %}
-通过上面，我们可以看到在PGLog::_write_log()函数中将pg_log_entry_t数据放入了```km```对应的bufferlist中，然后PG::write_if_dirty()的最后将这些bufferlist打包进transaction中。
+通过上面，我们可以看到在PGLog::_write_log()函数中将pg_log_entry_t数据放入了```km```对应的bufferlist中，然后PG::write_if_dirty()函数的```最后```将这些bufferlist打包进transaction中。
 
 >注： 这里PGLog所在的transaction与实际的object对象数据所在的transaction是同一个
 
