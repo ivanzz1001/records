@@ -319,6 +319,26 @@ struct pg_log_entry_t {
 {% endhighlight %}
 上面我们可以看到将```ctx->at_version```传递给了pg_log_entry_t.version； 将```ctx->obs->oi.version```传递给了pg_log_entry_t.prior_version；将```ctx->user_at_version```传递给了pg_log_entry_t.user_version。
 
+对于```ctx->obs->oi.version```，其值是在如下函数中赋予的：
+{% highlight string %}
+void ReplicatedPG::do_op(OpRequestRef& op)
+{
+	...
+
+	int r = find_object_context(
+		oid, &obc, can_create,
+		m->has_flag(CEPH_OSD_FLAG_MAP_SNAP_CLONE),
+		&missing_oid);
+
+	...
+
+	execute_ctx(ctx);
+
+	...
+}
+{% endhighlight %}
+
+
 * 在ReplicatedBackend::submit_transaction()里调用parent->log_operation()将PGLog序列化到transaction里。在PG::append_log()里将PGLog相关信息序列化到transaction里。
 {% highlight string %}
 void ReplicatedBackend::submit_transaction(
