@@ -373,6 +373,7 @@ void ReplicatedBackend::submit_transaction(
 	....
 }
 
+//src/osd/ReplicatedPG.h
 void log_operation(
     const vector<pg_log_entry_t> &logv,
     boost::optional<pg_hit_set_history_t> &hset_history,
