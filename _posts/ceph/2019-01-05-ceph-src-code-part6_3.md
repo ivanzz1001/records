@@ -508,7 +508,7 @@ void PG::write_if_dirty(ObjectStore::Transaction& t)
 }
 
 {% endhighlight %}
-在PG::write_if_dirty()中，由于在PG::append_log()时将dirty_info设置为了true，因此肯定先调用prepare_write_info()函数，该函数可能会将当前的epoch信息、pg_info信息打包放入```km```中。
+在PG::write_if_dirty()中，由于在PG::append_log()时将dirty_info设置为了true，因此肯定先调用prepare_write_info()函数，该函数可能会将当前的epoch信息、pg_info信息打包放入```km```中。之后如果km不为空，则调用t.omap_setkeys()将相关信息打包进transaction中。
 
 >注：通过上面我们可以看到，PGLog中除了包含当前所更新的object信息外，还可能包含如下：
 {% highlight string %}
@@ -523,7 +523,7 @@ const string epoch_key("_epoch");
 
 
 
-之后调用pg_log.write_log():
+现在我们来看pg_log.write_log():
 {% highlight string %}
 void PGLog::write_log(
   ObjectStore::Transaction& t,
