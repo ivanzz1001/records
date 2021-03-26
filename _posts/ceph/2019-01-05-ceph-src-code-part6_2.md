@@ -30,6 +30,24 @@ description: ceph源代码分析
 
 >注： OSD进程的主入口为src/ceph_osd.cc。这里从RadosClient发送过来的对象读写消息都为CEPH_MSG_OSD_OP
 
+
+从上面我们可以看到，PG写操作的核心逻辑为：
+{% highlight string %}
+void ReplicatedPG::do_op()
+{
+	execute_ctx();
+}
+
+void ReplicatedPG::execute_ctx()
+{
+	prepare_transaction();
+	issue_repop();
+
+	submit_transaction();
+	eval_repop();
+}
+{% endhighlight %}
+
 ## 2. 读写流程代码分析
 在介绍了上述的数据结构和基本的流程之后，下面将从服务端接收到消息开始，分三个阶段具体分析读写的过程。
 
