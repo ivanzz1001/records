@@ -447,6 +447,10 @@ void PG::append_log(
 	* have arrived yet.  We want to make sure that we cannot remember this
 	* write without remembering that it happened in an interval which went
 	* active in epoch history.last_epoch_started.
+	* 
+	* （注： 在PG完成Peering之后，会由Primary发送消息来更新副本PG的history，但由于网络延时等，
+	* 可能存在相应的更新消息未到达的情况。这里我们要确保： 只有在PG进入active epoch之后的写操作
+	* 才是有效的(该epoch记录在history.last_epoch_started字段中)。
 	*/
 	if (info.last_epoch_started != info.history.last_epoch_started) {
 		info.history.last_epoch_started = info.last_epoch_started;
