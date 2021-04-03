@@ -328,8 +328,14 @@ server {
   location /{
       deny all;
   }
+
+  location ~* /proxy_my_backend{
+    internal;
+
+    proxy_pass http://backend$request_uri
+  }
   
-  location ~* ^/([a-z]\w+)/(\S+) {
+  location ~* ^/([a-z][^/]+)/(.*)$ {
     # this is the object operation
     set $bucket $1;
     set $object $2;
@@ -339,13 +345,12 @@ server {
        
   }
    
-  location ~* ^/([a-z]\w+) {
+  location ~* ^/([a-z][^/]+) {
     # this is the bucket operations(Note: must be placed after object operations)
     set $bucket $1;
     
     echo "bucket operations";
     echo $1;
-    
   }
    
 }
