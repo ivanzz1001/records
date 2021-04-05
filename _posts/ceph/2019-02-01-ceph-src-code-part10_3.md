@@ -57,21 +57,648 @@ protected:
 
 };
 {% endhighlight %}
-我们知道一个PG有三个副本（通常情况下），有所谓的Primary/Replica之分，因此其中的一些字段按功能来说可划分为：
-
-* 作用于所有PG副本
-
-* 仅作用于Primary副本
 
 下面我们分别介绍这些字段。
 
 
 ## 1. PG重要字段分析
 
+### 1.1 PG.primary
+
+在如下几种情况下，会计算PG的primary，并调用函数PG::init_primary_up_acting()来初始化primary、up set、acting set信息:
+
+* OSD启动时，加载已存在的PG
+
+* 创建新的PG
+
+* PG分裂产生新的PG
+
+* PG进行Peering操作
+
+下面我们对这些情况进行介绍：
 
 
+###### 1.1.1 OSD启动加载已存在PG
+在OSD启动时，会调用如下函数来加载PG：
+{% highlight string %}
+int OSD::init()
+{
+	...
+
+	osdmap = get_map(superblock.current_epoch);
+
+	...
+
+	load_pgs();
+	...
+}
+void OSD::load_pgs()
+{
+	...
+
+	for (vector<coll_t>::iterator it = ls.begin();it != ls.end();++it) {
+	
+		...
+	
+		// generate state for PG's current mapping
+		int primary, up_primary;
+		vector<int> acting, up;
+		
+		pg->get_osdmap()->pg_to_up_acting_osds(
+			pgid.pgid, &up, &up_primary, &acting, &primary);
+	
+		pg->init_primary_up_acting(
+			up,
+			acting,
+			up_primary,
+			primary);
+			
+		int role = OSDMap::calc_pg_role(whoami, pg->acting);
+		pg->set_role(role);
+	
+	
+		...
+	}
+
+	...
+}
 
 
+/**
+* map a pg to its acting set as well as its up set. You must use
+* the acting set for data mapping purposes, but some users will
+* also find the up set useful for things like deciding what to
+* set as pg_temp.
+* Each of these pointers must be non-NULL.
+*/
+void pg_to_up_acting_osds(pg_t pg, vector<int> *up, int *up_primary,
+                            vector<int> *acting, int *acting_primary) const {
+							
+    _pg_to_up_acting_osds(pg, up, up_primary, acting, acting_primary);
+	
+}
+{% endhighlight %}
+上面我们看到会调用OSDMap::pg_to_up_acting_osds()来计算当前PG的up osds以及acting osds。我们```必须```使用acting set来进行数据的映射；而对于up set则主要用于pg temp场景。
+
+>注：OSD启动时，并不是直接去monitor拿最新的osdmap，而是从superblock中读取上一次所保存的osdmap。
+
+下面我们来看_pg_to_up_acting_osds()函数的实现：
+{% highlight string %}
+void OSDMap::_pg_to_up_acting_osds(const pg_t& pg, vector<int> *up, int *up_primary,
+                                   vector<int> *acting, int *acting_primary) const
+{
+	const pg_pool_t *pool = get_pg_pool(pg.pool());
+	
+	if (!pool) {
+		if (up)
+			up->clear();
+			
+	if (up_primary)
+		*up_primary = -1;
+		
+	if (acting)
+		acting->clear();
+		
+	if (acting_primary)
+		*acting_primary = -1;
+		
+		return;
+	}
+	
+	vector<int> raw;
+	vector<int> _up;
+	vector<int> _acting;
+	int _up_primary;
+	int _acting_primary;
+	ps_t pps;
+	
+	_pg_to_osds(*pool, pg, &raw, &_up_primary, &pps);
+	_raw_to_up_osds(*pool, raw, &_up, &_up_primary);
+	_apply_primary_affinity(pps, *pool, &_up, &_up_primary);
+	_get_temp_osds(*pool, pg, &_acting, &_acting_primary);
+	
+	if (_acting.empty()) {
+		_acting = _up;
+		
+		if (_acting_primary == -1) {
+			_acting_primary = _up_primary;
+		}
+	}
+	
+	if (up)
+		up->swap(_up);
+		
+	if (up_primary)
+		*up_primary = _up_primary;
+		
+	if (acting)
+		acting->swap(_acting);
+		
+	if (acting_primary)
+		*acting_primary = _acting_primary;
+}
+{% endhighlight %}
+
+从上面我们可以看到，对于PG的映射有多个步骤：
+
+1） **_pg_to_osds()**
+
+{% highlight string %}
+int OSDMap::_pg_to_osds(const pg_pool_t& pool, pg_t pg,
+			vector<int> *osds, int *primary,ps_t *ppps) const
+{
+	// map to osds[]
+	ps_t pps = pool.raw_pg_to_pps(pg);  // placement ps
+	unsigned size = pool.get_size();
+
+	// what crush rule?
+	int ruleno = crush->find_rule(pool.get_crush_ruleset(), pool.get_type(), size);
+	if (ruleno >= 0)
+		crush->do_rule(ruleno, pps, *osds, size, osd_weight);
+
+	_remove_nonexistent_osds(pool, *osds);
+
+	*primary = -1;
+	for (unsigned i = 0; i < osds->size(); ++i) {
+		if ((*osds)[i] != CRUSH_ITEM_NONE) {
+			*primary = (*osds)[i];
+			break;
+		}
+	}
+	
+	if (ppps)
+		*ppps = pps;
+
+	return osds->size();
+}
+
+bool exists(int osd) const
+{
+    //assert(osd >= 0);
+    return osd >= 0 && osd < max_osd && (osd_state[osd] & CEPH_OSD_EXISTS);
+}
+
+void OSDMap::_remove_nonexistent_osds(const pg_pool_t& pool,
+				      vector<int>& osds) const
+{
+	if (pool.can_shift_osds()) {
+		unsigned removed = 0;
+		
+		for (unsigned i = 0; i < osds.size(); i++) {
+			if (!exists(osds[i])) {
+				removed++;
+				continue;
+			}
+			
+			if (removed) {
+				osds[i - removed] = osds[i];
+			}
+		}
+		
+		if (removed)
+			osds.resize(osds.size() - removed);
+	} else {
+		for (vector<int>::iterator p = osds.begin(); p != osds.end(); ++p) {
+			if (!exists(*p))
+				*p = CRUSH_ITEM_NONE;
+		}
+	}
+}
+{% endhighlight %}
+
+_pg_to_osds()函数的实现比较简单，其从crushmap中获取PG所映射到的OSD。这里注意，从crushmap获取到到的映射与OSD的运行状态无关。之后调用_remove_nonexistent_osds()函数移除在该OSDMap下不存在的OSD。
+
+_pg_to_osds()函数返回了最原始的PG到OSD的映射，并且第一个即为primary。
+
+2) **_raw_to_up_osds()**
+{% highlight string %}
+void OSDMap::_raw_to_up_osds(const pg_pool_t& pool, const vector<int>& raw,
+                             vector<int> *up, int *primary) const
+{
+	if (pool.can_shift_osds()) {
+		// shift left
+		up->clear();
+		
+		for (unsigned i=0; i<raw.size(); i++) {
+			if (!exists(raw[i]) || is_down(raw[i]))
+				continue;
+			up->push_back(raw[i]);
+		}
+		
+		*primary = (up->empty() ? -1 : up->front());
+		
+	} else {
+		// set down/dne devices to NONE
+		*primary = -1;
+		up->resize(raw.size());
+		
+		for (int i = raw.size() - 1; i >= 0; --i) {
+			if (!exists(raw[i]) || is_down(raw[i])) {
+				(*up)[i] = CRUSH_ITEM_NONE;
+			} else {
+				*primary = (*up)[i] = raw[i];
+			}
+		}
+	}
+}
+{% endhighlight %}
+
+通过_pg_to_osds()函数，我们获取到了原始的PG到OSD的映射关系。而_raw_to_up_osds()函数主要是移除了在该OSDMap下处于down状态的OSD，即获取到了原始的up osds，并且将第一个设置为up primary。
+
+3) **_apply_primary_affinity()**
+
+此函数主要是处理primary亲和性的设置，这里不做介绍(默认不做设置)。
+
+4) **_get_temp_osds()**
+{% highlight string %}
+void OSDMap::_get_temp_osds(const pg_pool_t& pool, pg_t pg,
+				vector<int> *temp_pg, int *temp_primary) const
+{
+	pg = pool.raw_pg_to_pg(pg);
+	map<pg_t,vector<int32_t> >::const_iterator p = pg_temp->find(pg);
+	temp_pg->clear();
+	
+	if (p != pg_temp->end()) {
+		for (unsigned i=0; i<p->second.size(); i++) {
+			if (!exists(p->second[i]) || is_down(p->second[i])) {
+				if (pool.can_shift_osds()) {
+					continue;
+				} else {
+					temp_pg->push_back(CRUSH_ITEM_NONE);
+				}
+			} else {
+				temp_pg->push_back(p->second[i]);
+			}
+		}
+	}
+	
+	map<pg_t,int32_t>::const_iterator pp = primary_temp->find(pg);
+	*temp_primary = -1;
+	
+	if (pp != primary_temp->end()) {
+		*temp_primary = pp->second;
+		
+	} else if (!temp_pg->empty()) { // apply pg_temp's primary
+		for (unsigned i = 0; i < temp_pg->size(); ++i) {
+			if ((*temp_pg)[i] != CRUSH_ITEM_NONE) {
+				*temp_primary = (*temp_pg)[i];
+				break;
+			}
+		}
+	}
+}
+{% endhighlight %}
+
+_get_temp_osds()用于获取指定OSDMap下，指定PG所对应的temp_pg所映射到的OSD。
+
+5）**完成PG的up set、acting set的映射**
+
+我们再回到_pg_to_up_acting_osds()函数的最后，如果当前没有temp_pg，那么该PG的acting set即为up set。
+
+
+###### 1.1.2 PG进行Peering操作
+在PG进行peering操作过程中，也会导致重新计算primary、acting set以及up set:
+{% highlight string %}
+bool OSD::advance_pg(
+	epoch_t osd_epoch, PG *pg,
+	ThreadPool::TPHandle &handle,
+	PG::RecoveryCtx *rctx,
+	set<boost::intrusive_ptr<PG> > *new_pgs)
+{
+	...
+
+	for (;next_epoch <= osd_epoch && next_epoch <= max;++next_epoch) {
+		...
+
+		vector<int> newup, newacting;
+		int up_primary, acting_primary;
+		
+		nextmap->pg_to_up_acting_osds(
+			pg->info.pgid.pgid,
+			&newup, &up_primary,
+			&newacting, &acting_primary);
+
+		pg->handle_advance_map(
+			nextmap, lastmap, newup, up_primary,
+			newacting, acting_primary, rctx);
+	}
+}
+
+void PG::handle_advance_map(
+	OSDMapRef osdmap, OSDMapRef lastmap,
+	vector<int>& newup, int up_primary,
+	vector<int>& newacting, int acting_primary,
+	RecoveryCtx *rctx)
+{
+	...
+
+	AdvMap evt(
+		osdmap, lastmap, newup, up_primary,
+		newacting, acting_primary);
+
+  	recovery_state.handle_event(evt, rctx);
+
+	...
+}
+
+void PG::start_peering_interval(
+	const OSDMapRef lastmap,
+	const vector<int>& newup, int new_up_primary,
+	const vector<int>& newacting, int new_acting_primary,
+	ObjectStore::Transaction *t)
+{
+	...
+
+	init_primary_up_acting(
+		newup,
+		newacting,
+		new_up_primary,
+		new_acting_primary);
+
+	...
+}
+{% endhighlight %}
+从上面我们看到当有新的OSDMap产生时，在OSD::advance_pg()函数中又计算出了新的upset与acting set。
+
+
+那具体是在什么地方会导致up set与acting set不一致呢？我们来看peering过程中的GetLog事件：
+{% highlight string %}
+PG::RecoveryState::GetLog::GetLog(my_context ctx)
+  : my_base(ctx),
+    NamedState(
+      context< RecoveryMachine >().pg->cct, "Started/Primary/Peering/GetLog"),
+    msg(0)
+{
+	context< RecoveryMachine >().log_enter(state_name);
+
+	PG *pg = context< RecoveryMachine >().pg;
+
+	// adjust acting?
+	if (!pg->choose_acting(auth_log_shard, false,
+		&context< Peering >().history_les_bound)) {
+		
+		if (!pg->want_acting.empty()) 
+		{
+			post_event(NeedActingChange());
+		} 
+		else {
+			post_event(IsIncomplete());
+		}
+		return;
+	}
+
+	// am i the best?
+	if (auth_log_shard == pg->pg_whoami) {
+		post_event(GotLog());
+		return;
+	}
+
+	const pg_info_t& best = pg->peer_info[auth_log_shard];
+
+	// am i broken?
+	if (pg->info.last_update < best.log_tail) {
+		dout(10) << " not contiguous with osd." << auth_log_shard << ", down" << dendl;
+		post_event(IsIncomplete());
+		return;
+	}
+
+	// how much log to request?
+	eversion_t request_log_from = pg->info.last_update;
+	assert(!pg->actingbackfill.empty());
+	for (set<pg_shard_t>::iterator p = pg->actingbackfill.begin();p != pg->actingbackfill.end();++p) {
+		if (*p == pg->pg_whoami) continue;
+		
+		pg_info_t& ri = pg->peer_info[*p];
+		if (ri.last_update >= best.log_tail && ri.last_update < request_log_from)
+			request_log_from = ri.last_update;
+	}
+
+	// how much?
+	dout(10) << " requesting log from osd." << auth_log_shard << dendl;
+	context<RecoveryMachine>().send_query(
+		auth_log_shard,
+		pg_query_t(
+			pg_query_t::LOG,
+			auth_log_shard.shard, pg->pg_whoami.shard,
+			request_log_from, pg->info.history,
+			pg->get_osdmap()->get_epoch()));
+
+	assert(pg->blocked_by.empty());
+	pg->blocked_by.insert(auth_log_shard.osd);
+	pg->publish_stats_to_osd();
+}
+{% endhighlight %}
+在上面会调用choose_acting()函数，此时就会导致up set与acting set不一致。下面我们来看这个函数：
+{% highlight string %}
+/**
+ * choose acting
+ *
+ * calculate the desired acting, and request a change with the monitor
+ * if it differs from the current acting.
+ *
+ * if restrict_to_up_acting=true, we filter out anything that's not in
+ * up/acting.  in order to lift this restriction, we need to
+ *  1) check whether it's worth switching the acting set any time we get
+ *     a new pg info (not just here, when recovery finishes)
+ *  2) check whether anything in want_acting went down on each new map
+ *     (and, if so, calculate a new want_acting)
+ *  3) remove the assertion in PG::RecoveryState::Active::react(const AdvMap)
+ * TODO!
+ */
+bool PG::choose_acting(pg_shard_t &auth_log_shard_id,
+		       bool restrict_to_up_acting,
+		       bool *history_les_bound)
+
+{
+	...
+
+	if (!pool.info.ec_pool())
+		calc_replicated_acting(
+			auth_log_shard,
+			get_osdmap()->get_pg_size(info.pgid.pgid),
+			acting,
+			primary,
+			up,
+			up_primary,
+			all_info,
+			compat_mode,
+			restrict_to_up_acting,
+			&want,
+			&want_backfill,
+			&want_acting_backfill,
+			&want_primary,
+			ss);
+	else
+		calc_ec_acting(
+			auth_log_shard,
+			get_osdmap()->get_pg_size(info.pgid.pgid),
+			acting,
+			primary,
+			up,
+			up_primary,
+			all_info,
+			compat_mode,
+			restrict_to_up_acting,
+			&want,
+			&want_backfill,
+			&want_acting_backfill,
+			&want_primary,
+			ss);
+
+
+	....
+
+	if (want != acting) {
+		dout(10) << "choose_acting want " << want << " != acting " << acting
+		<< ", requesting pg_temp change" << dendl;
+
+		want_acting = want;
+	
+		if (want_acting == up) {
+			// There can't be any pending backfill if
+			// want is the same as crush map up OSDs.
+			assert(compat_mode || want_backfill.empty());
+			vector<int> empty;
+			osd->queue_want_pg_temp(info.pgid.pgid, empty);
+		} else
+			osd->queue_want_pg_temp(info.pgid.pgid, want);
+
+		return false;
+	}
+
+	...
+
+}
+{% endhighlight %}
+上面我们看到会调用calc_replicated_acting()来计算我们所期望的acting set，即want_acting。如果want_acting不等于up的话，那么采用want来申请temp pg。申请temp pg会导致产生新的osdmap，因此会触发新的peering操作，从而在OSD::advance_pg()中调用pg_to_up_acting_osds()完成新的acting set的映射。
+
+
+因此，这里我们可以总结为：up set是直接根据crushmap算出来的，与权威日志等没有任何关系；而acting set是我们真正读写数据时所依赖的一个osd序列，该序列的第一个osd作为primary来负责数据读写，因此必须拥有权威日志。
+
+### 1.2 pg_whoami
+包含PG的shard信息，以及所在的OSD信息：
+{% highlight string %}
+PG::PG(OSDService *o, OSDMapRef curmap,
+       const PGPool &_pool, spg_t p):
+pg_whoami(osd->whoami, p.shard)
+{
+
+	...
+}
+{% endhighlight %}
+对于ReplicatedPG来说，其shard值为shard_id_t::NO_SHARD；对于EC类型的PG来说，由于对数据的读写与PG副本的顺序相关，因此需要shard来指定。
+
+这里我们先来看一下PG的创建：
+{% highlight string %}
+/*
+ * holding osd_lock
+ */
+void OSD::handle_pg_create(OpRequestRef op)
+{
+	...
+
+	for (map<pg_t,pg_create_t>::iterator p = m->mkpg.begin();p != m->mkpg.end();++p, ++ci) {
+
+		...
+
+		spg_t pgid;
+    	bool mapped = osdmap->get_primary_shard(on, &pgid);
+
+		...
+	}
+
+	...
+}
+
+bool get_primary_shard(const pg_t& pgid, spg_t *out) const {
+	map<int64_t, pg_pool_t>::const_iterator i = get_pools().find(pgid.pool());
+	if (i == get_pools().end()) {
+		return false;
+	}
+	
+	if (!i->second.ec_pool()) {
+		*out = spg_t(pgid);
+		return true;
+	}
+	
+	int primary;
+	vector<int> acting;
+	pg_to_acting_osds(pgid, &acting, &primary);
+	
+	for (uint8_t i = 0; i < acting.size(); ++i) {
+		if (acting[i] == primary) {
+			*out = spg_t(pgid, shard_id_t(i));
+			return true;
+		}
+	}
+	
+	return false;
+}
+{% endhighlight %}
+从上面我们看到对于ReplicatedPG，其直接调用spg_t(pgid)构造函数来创建spg_t对象。
+
+### 1.3 up_primary
+
+通常是up set中的第一个osd为up_primary。
+
+### 1.4 up/acting
+这里的up是指PG的up set； acting是指PG的acting set。通常情况下，这两个集合是相同的，只有当系统出现异常时，当前的acting set并不能满足正常的读写请求，那么就会在peering时申请产生pg_temp，此时生成的新的acting set就会与up不一样。
+
+关于up set与acting set，我们在前面已经讲述，因此这里不再赘述。
+
+
+### 1.5 want_acting
+want_acting用于保存我们所期望的的acting set集合，只在pg_temp过程中，该字段有效。下面我们来简单看代码：
+{% highlight string %}
+bool PG::choose_acting(pg_shard_t &auth_log_shard_id,
+		       bool restrict_to_up_acting,
+		       bool *history_les_bound)
+{
+	...
+	map<pg_shard_t, pg_info_t>::const_iterator auth_log_shard =
+		find_best_info(all_info, restrict_to_up_acting, history_les_bound);
+	
+	if (auth_log_shard == all_info.end()) {
+		if (up != acting) {
+			dout(10) << "choose_acting no suitable info found (incomplete backfills?),"
+				<< " reverting to up" << dendl;
+
+			want_acting = up;
+			vector<int> empty;
+			osd->queue_want_pg_temp(info.pgid.pgid, empty);
+		} else {
+			dout(10) << "choose_acting failed" << dendl;
+			assert(want_acting.empty());
+		}
+		return false;
+	}
+
+	...
+
+	if (want != acting) {
+		dout(10) << "choose_acting want " << want << " != acting " << acting
+			<< ", requesting pg_temp change" << dendl;
+
+		want_acting = want;
+	
+		if (want_acting == up) {
+			// There can't be any pending backfill if
+			// want is the same as crush map up OSDs.
+			assert(compat_mode || want_backfill.empty());
+			vector<int> empty;
+			osd->queue_want_pg_temp(info.pgid.pgid, empty);
+		} else
+			osd->queue_want_pg_temp(info.pgid.pgid, want);
+
+		return false;
+	}
+
+	...
+}
+	
+{% endhighlight %}
+
+### 1.6 
 
 
 
