@@ -1085,7 +1085,52 @@ void PG::RecoveryState::GetInfo::get_infos()
 从上面我们看到peer_info是来源于prior_set，这就引出PG::build_prior()函数，我们会在相关章节进行详细介绍。
 
 
+### 1.7 actingset
+actingset其实就是pg.acting，只是其用std::set<pg_shard_t>方式来进行存储，在init_primary_up_acting()函数中进行设置：
+{% highlight string %}
+void init_primary_up_acting(
+	const vector<int> &newup,
+	const vector<int> &newacting,
+	int new_up_primary,
+	int new_acting_primary) {
 
+	actingset.clear();
+	acting = newacting;
+	for (uint8_t i = 0; i < acting.size(); ++i) {
+		if (acting[i] != CRUSH_ITEM_NONE)
+			actingset.insert(
+				pg_shard_t(
+					acting[i],
+					pool.info.ec_pool() ? shard_id_t(i) : shard_id_t::NO_SHARD));
+	}
+
+	...
+}
+{% endhighlight %}
+
+### 1.8 upset
+upset其实就是pg.up，只是其用std::set<pg_shard_t>方式来进行存储，在init_primary_acting()函数中进行设置：
+{% highlight string %}
+void init_primary_up_acting(
+	const vector<int> &newup,
+	const vector<int> &newacting,
+	int new_up_primary,
+	int new_acting_primary) {
+
+	...
+	for (uint8_t i = 0; i < up.size(); ++i) {
+		if (up[i] != CRUSH_ITEM_NONE)
+			upset.insert(
+				pg_shard_t(
+					up[i],
+					pool.info.ec_pool() ? shard_id_t(i) : shard_id_t::NO_SHARD));
+	}
+
+	...
+}
+{% endhighlight %}
+
+### 1.9 
 
 <br />
 <br />
