@@ -698,7 +698,391 @@ bool PG::choose_acting(pg_shard_t &auth_log_shard_id,
 	
 {% endhighlight %}
 
-### 1.6 
+### 1.6 actingbackfill
+actingbackfill在整个代码中只有一个地方进行赋值，我们来看一下：
+{% highlight string %}
+bool PG::choose_acting(pg_shard_t &auth_log_shard_id,
+		       bool restrict_to_up_acting,
+		       bool *history_les_bound)
+{
+	...
+
+	set<pg_shard_t> want_backfill, want_acting_backfill;
+	vector<int> want;
+	pg_shard_t want_primary;
+	stringstream ss;
+
+	if (!pool.info.ec_pool())
+	calc_replicated_acting(
+		auth_log_shard,
+		get_osdmap()->get_pg_size(info.pgid.pgid),
+		acting,
+		primary,
+		up,
+		up_primary,
+		all_info,
+		compat_mode,
+		restrict_to_up_acting,
+		&want,
+		&want_backfill,
+		&want_acting_backfill,
+		&want_primary,
+		ss);
+	else
+	calc_ec_acting(
+		auth_log_shard,
+		get_osdmap()->get_pg_size(info.pgid.pgid),
+		acting,
+		primary,
+		up,
+		up_primary,
+		all_info,
+		compat_mode,
+		restrict_to_up_acting,
+		&want,
+		&want_backfill,
+		&want_acting_backfill,
+		&want_primary,
+		ss);
+
+
+	...
+
+	actingbackfill = want_acting_backfill;
+	dout(10) << "actingbackfill is " << actingbackfill << dendl;
+
+	...
+}
+
+/**
+ * calculate the desired acting set.
+ *
+ * Choose an appropriate acting set.  Prefer up[0], unless it is
+ * incomplete, or another osd has a longer tail that allows us to
+ * bring other up nodes up to date.
+ */
+void PG::calc_replicated_acting(
+	map<pg_shard_t, pg_info_t>::const_iterator auth_log_shard,
+	unsigned size,
+	const vector<int> &acting,
+	pg_shard_t acting_primary,
+	const vector<int> &up,
+	pg_shard_t up_primary,
+	const map<pg_shard_t, pg_info_t> &all_info,
+	bool compat_mode,
+	bool restrict_to_up_acting,
+	vector<int> *want,
+	set<pg_shard_t> *backfill,
+	set<pg_shard_t> *acting_backfill,
+	pg_shard_t *want_primary,
+	ostream &ss)
+{
+	...
+}
+{% endhighlight %}
+对acting_backfill的计算分为如下几个步骤：
+
+1） **acting_backfill的第一个元素是拥有权威日志的OSD**
+{% highlight string %}
+void PG::calc_replicated_acting(
+	map<pg_shard_t, pg_info_t>::const_iterator auth_log_shard,
+	unsigned size,
+	const vector<int> &acting,
+	pg_shard_t acting_primary,
+	const vector<int> &up,
+	pg_shard_t up_primary,
+	const map<pg_shard_t, pg_info_t> &all_info,
+	bool compat_mode,
+	bool restrict_to_up_acting,
+	vector<int> *want,
+	set<pg_shard_t> *backfill,
+	set<pg_shard_t> *acting_backfill,
+	pg_shard_t *want_primary,
+	ostream &ss)
+{
+	...
+
+	// select primary
+	map<pg_shard_t,pg_info_t>::const_iterator primary;
+
+	if (up.size() &&
+		!all_info.find(up_primary)->second.is_incomplete() &&
+		all_info.find(up_primary)->second.last_update >=
+		auth_log_shard->second.log_tail) {
+
+		ss << "up_primary: " << up_primary << ") selected as primary" << std::endl;
+		primary = all_info.find(up_primary); // prefer up[0], all thing being equal
+
+	} else {
+		assert(!auth_log_shard->second.is_incomplete());
+		ss << "up[0] needs backfill, osd." << auth_log_shard_id
+			<< " selected as primary instead" << std::endl;
+		primary = auth_log_shard;
+	}
+	
+	ss << "calc_acting primary is osd." << primary->first
+		<< " with " << primary->second << std::endl;
+
+	*want_primary = primary->first;
+	want->push_back(primary->first.osd);
+	acting_backfill->insert(primary->first);
+}
+{% endhighlight %}
+从上面我们可以看到，如果当前up_primary拥有全量数据，那么就优先选择up_primary；否则选择拥有权威日志的osd作为acting_backfill的第一个元素。
+
+2） **从upset中选择**
+{% highlight string %}
+void PG::calc_replicated_acting(
+	map<pg_shard_t, pg_info_t>::const_iterator auth_log_shard,
+	unsigned size,
+	const vector<int> &acting,
+	pg_shard_t acting_primary,
+	const vector<int> &up,
+	pg_shard_t up_primary,
+	const map<pg_shard_t, pg_info_t> &all_info,
+	bool compat_mode,
+	bool restrict_to_up_acting,
+	vector<int> *want,
+	set<pg_shard_t> *backfill,
+	set<pg_shard_t> *acting_backfill,
+	pg_shard_t *want_primary,
+	ostream &ss)
+{
+	...
+	for (vector<int>::const_iterator i = up.begin();i != up.end();++i) {
+		pg_shard_t up_cand = pg_shard_t(*i, shard_id_t::NO_SHARD);
+
+		if (up_cand == primary->first)
+			continue;
+		const pg_info_t &cur_info = all_info.find(up_cand)->second;
+
+		if (cur_info.is_incomplete() ||
+			cur_info.last_update < MIN(
+			primary->second.log_tail,
+			auth_log_shard->second.log_tail)) {
+			/* We include auth_log_shard->second.log_tail because in GetLog,
+			* we will request logs back to the min last_update over our
+			* acting_backfill set, which will result in our log being extended
+			* as far backwards as necessary to pick up any peers which can
+			* be log recovered by auth_log_shard's log */
+			* 
+			ss << " shard " << up_cand << " (up) backfill " << cur_info << std::endl;
+			if (compat_mode) {
+				if (backfill->empty()) {
+					backfill->insert(up_cand);
+					want->push_back(*i);
+					acting_backfill->insert(up_cand);
+				}
+			} else {
+				backfill->insert(up_cand);
+				acting_backfill->insert(up_cand);
+			}
+
+		} else {
+			want->push_back(*i);
+			acting_backfill->insert(up_cand);
+			usable++;
+			ss << " osd." << *i << " (up) accepted " << cur_info << std::endl;
+		}
+	}
+
+	...
+}
+{% endhighlight %}
+从上面我们可以看到，对于upset中的osd，不管是否与权威日志有重叠，都会被加入到acting_backfill中。
+
+3) **从acting set中选择**
+{% highlight string %}
+void PG::calc_replicated_acting(
+	map<pg_shard_t, pg_info_t>::const_iterator auth_log_shard,
+	unsigned size,
+	const vector<int> &acting,
+	pg_shard_t acting_primary,
+	const vector<int> &up,
+	pg_shard_t up_primary,
+	const map<pg_shard_t, pg_info_t> &all_info,
+	bool compat_mode,
+	bool restrict_to_up_acting,
+	vector<int> *want,
+	set<pg_shard_t> *backfill,
+	set<pg_shard_t> *acting_backfill,
+	pg_shard_t *want_primary,
+	ostream &ss)
+{
+	...
+	// This no longer has backfill OSDs, but they are covered above.
+	for (vector<int>::const_iterator i = acting.begin();i != acting.end();++i) {
+		pg_shard_t acting_cand(*i, shard_id_t::NO_SHARD);
+		if (usable >= size)
+			break;
+	
+		// skip up osds we already considered above
+		if (acting_cand == primary->first)
+			continue;
+
+		vector<int>::const_iterator up_it = find(up.begin(), up.end(), acting_cand.osd);
+		if (up_it != up.end())
+			continue;
+	
+		const pg_info_t &cur_info = all_info.find(acting_cand)->second;
+		if (cur_info.is_incomplete() ||
+			cur_info.last_update < primary->second.log_tail) {
+			ss << " shard " << acting_cand << " (stray) REJECTED "
+			<< cur_info << std::endl;
+		} 
+		else {
+			want->push_back(*i);
+			acting_backfill->insert(acting_cand);
+			ss << " shard " << acting_cand << " (stray) accepted "
+				<< cur_info << std::endl;
+			usable++;
+		}
+	}
+
+	...
+}
+
+bool is_incomplete() const { return !last_backfill.is_max(); }
+{% endhighlight %}
+从上面我们可以看到，对于acting set中的元素，其需要同时满足如下两个条件才会被加入到acting_backfill中：
+
+* last_backfill已经完成
+
+* 与权威日志有重叠
+
+4) **从all_info中选择**
+{% highlight string %}
+void PG::calc_replicated_acting(
+	map<pg_shard_t, pg_info_t>::const_iterator auth_log_shard,
+	unsigned size,
+	const vector<int> &acting,
+	pg_shard_t acting_primary,
+	const vector<int> &up,
+	pg_shard_t up_primary,
+	const map<pg_shard_t, pg_info_t> &all_info,
+	bool compat_mode,
+	bool restrict_to_up_acting,
+	vector<int> *want,
+	set<pg_shard_t> *backfill,
+	set<pg_shard_t> *acting_backfill,
+	pg_shard_t *want_primary,
+	ostream &ss)
+{
+	for (map<pg_shard_t,pg_info_t>::const_iterator i = all_info.begin();i != all_info.end();++i) {
+		if (usable >= size)
+			break;
+	
+		// skip up osds we already considered above
+		if (i->first == primary->first)
+			continue;
+
+		vector<int>::const_iterator up_it = find(up.begin(), up.end(), i->first.osd);
+		if (up_it != up.end())
+			continue;
+
+		vector<int>::const_iterator acting_it = find(
+			acting.begin(), acting.end(), i->first.osd);
+
+		if (acting_it != acting.end())
+			continue;
+	
+		if (i->second.is_incomplete() ||
+			i->second.last_update < primary->second.log_tail) {
+
+			ss << " shard " << i->first << " (stray) REJECTED "
+				<< i->second << std::endl;
+		} else {
+			want->push_back(i->first.osd);
+			acting_backfill->insert(i->first);
+			ss << " shard " << i->first << " (stray) accepted "
+				<< i->second << std::endl;
+			usable++;
+		}
+	}
+}
+{% endhighlight %}
+从上面我们可以看到，对于all_info中的元素，其需要同时满足如下两个条件才会被加入到acting_backfill中：
+
+* last_backfill已经完成
+
+* 与权威日志有重叠
+
+
+----------
+
+这里```all_info```是怎么来的？我们来简单看一下获取peer_info信息的流程：
+{% highlight string %}
+bool PG::choose_acting(pg_shard_t &auth_log_shard_id,
+		       bool restrict_to_up_acting,
+		       bool *history_les_bound)
+{
+	map<pg_shard_t, pg_info_t> all_info(peer_info.begin(), peer_info.end());
+
+	...
+}
+
+void PG::proc_master_log(
+  ObjectStore::Transaction& t, pg_info_t &oinfo,
+  pg_log_t &olog, pg_missing_t& omissing, pg_shard_t from)
+{
+	...
+	peer_info[from] = oinfo;
+}
+
+void PG::proc_replica_log(
+  ObjectStore::Transaction& t,
+  pg_info_t &oinfo, pg_log_t &olog, pg_missing_t& omissing,
+  pg_shard_t from)
+{
+	...
+	peer_info[from] = oinfo;
+	...
+}
+
+bool PG::proc_replica_info(
+  pg_shard_t from, const pg_info_t &oinfo, epoch_t send_epoch)
+{
+	...
+	peer_info[from] = oinfo;
+}
+{% endhighlight %}
+从上面可以看出，peer_info主要来源于上面三处。而这些peer_info又是由于在peering过程中调用GetInfo来进行触发的，现在我们来看：
+{% highlight string %}
+PG::RecoveryState::GetInfo::GetInfo(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Started/Primary/Peering/GetInfo")
+{
+	context< RecoveryMachine >().log_enter(state_name);
+	
+	PG *pg = context< RecoveryMachine >().pg;
+	pg->generate_past_intervals();
+	unique_ptr<PriorSet> &prior_set = context< Peering >().prior_set;
+	
+	assert(pg->blocked_by.empty());
+	
+	if (!prior_set.get())
+		pg->build_prior(prior_set);
+	
+	pg->reset_min_peer_features();
+	get_infos();
+
+	if (peer_info_requested.empty() && !prior_set->pg_down) {
+		post_event(GotInfo());
+	}
+}
+
+void PG::RecoveryState::GetInfo::get_infos()
+{
+	PG *pg = context< RecoveryMachine >().pg;
+	unique_ptr<PriorSet> &prior_set = context< Peering >().prior_set;
+	
+	pg->blocked_by.clear();
+	for (set<pg_shard_t>::const_iterator it = prior_set->probe.begin();it != prior_set->probe.end();++it) {
+		...
+	}	
+}
+{% endhighlight %}
+从上面我们看到peer_info是来源于prior_set，这就引出PG::build_prior()函数，我们会在相关章节进行详细介绍。
 
 
 
