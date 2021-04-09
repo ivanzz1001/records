@@ -356,6 +356,9 @@ _get_temp_osds()用于获取指定OSDMap下，指定PG所对应的temp_pg所映�
 我们再回到_pg_to_up_acting_osds()函数的最后，如果当前没有temp_pg，那么该PG的acting set即为up set。
 
 
+>注： 在PG::init_primary_up_acting()函数中，将acting primary设置给了PG::primary。
+
+
 ###### 1.1.2 PG进行Peering操作
 在PG进行peering操作过程中，也会导致重新计算primary、acting set以及up set:
 {% highlight string %}
@@ -1130,7 +1133,173 @@ void init_primary_up_acting(
 }
 {% endhighlight %}
 
-### 1.9 
+### 1.9 last_update_ondisk
+
+我们在代码中搜寻```last_update_ondisk```，看到对其的修改主要有如下两个地方：
+{% highlight string %}
+void PG::activate(ObjectStore::Transaction& t,
+		  epoch_t activation_epoch,
+		  list<Context*>& tfin,
+		  map<int, map<spg_t,pg_query_t> >& query_map,
+		  map<int,
+		      vector<
+			pair<pg_notify_t,
+			     pg_interval_map_t> > > *activator_map,
+                  RecoveryCtx *ctx)
+{
+	...
+	
+	if (is_primary()) {
+		last_update_ondisk = info.last_update;
+		min_last_complete_ondisk = eversion_t(0,0);  // we don't know (yet)!
+	}
+
+	...
+}
+
+void ReplicatedPG::repop_all_committed(RepGather *repop)
+{
+	dout(10) << __func__ << ": repop tid " << repop->rep_tid << " all committed "<< dendl;
+	repop->all_committed = true;
+	
+	if (!repop->rep_aborted) {
+		if (repop->v != eversion_t()) {
+			last_update_ondisk = repop->v;
+			last_complete_ondisk = repop->pg_local_last_complete;
+		}
+		eval_repop(repop);
+	}
+}
+{% endhighlight %}
+下面我们来分析：
+
+1） **PG::activate()**
+
+PG::activate()会在PG peering完成时被调用，这里将last_update_ondisk设置为了info.last_update。
+
+>注： peering完成时，对于PG primary，其info.last_update是否就等于info.last_complete?
+
+2) **PG::repop_all_committed()**
+
+
+PG::repop_all_committed()函数会在写对象（注： 非写日志）完成时被调用。通过该函数我们看到，repop->v赋值给了last_update_ondisk。现在我们来看这中间的过程：
+{% highlight string %}
+void ReplicatedPG::execute_ctx(OpContext *ctx)
+{
+	...
+	ctx->at_version = get_next_version();
+
+	// issue replica writes
+	ceph_tid_t rep_tid = osd->get_tid();
+	
+	RepGather *repop = new_repop(ctx, obc, rep_tid);
+	
+	issue_repop(repop, ctx);
+	eval_repop(repop);
+	repop->put();
+}
+
+void ReplicatedPG::issue_repop(RepGather *repop, OpContext *ctx)
+{
+	const hobject_t& soid = ctx->obs->oi.soid;
+	dout(7) << "issue_repop rep_tid " << repop->rep_tid<< " o " << soid<< dendl;
+	
+	repop->v = ctx->at_version;
+	
+	...
+}
+{% endhighlight %}
+从上面我们可以看到，其实就是将ctx->at_version赋值给了repop->v。
+
+### 1.10 last_complete_ondisk
+
+我们在代码中搜寻```last_update_ondisk```，看到对其的修改主要有如下两个地方：
+{% highlight string %}
+void ReplicatedPG::repop_all_committed(RepGather *repop)
+{
+	dout(10) << __func__ << ": repop tid " << repop->rep_tid << " all committed "<< dendl;
+	repop->all_committed = true;
+	
+	if (!repop->rep_aborted) {
+		if (repop->v != eversion_t()) {
+			last_update_ondisk = repop->v;
+			last_complete_ondisk = repop->pg_local_last_complete;
+		}
+		eval_repop(repop);
+	}
+}
+
+void update_last_complete_ondisk(
+	eversion_t lcod) {
+
+	last_complete_ondisk = lcod;
+}
+{% endhighlight %}
+下面我们来分析：
+
+1） **ReplicatedPG::repop_all_committed()**
+
+对于repop_all_committed()函数，其会在写对象(注： 非写日志）完成时被回调。我们看到在该函数中，其将repop->pg_local_last_complete赋值给了last_complete_ondisk:
+{% highlight string %}
+void ReplicatedPG::execute_ctx(OpContext *ctx)
+{
+	...
+	ctx->at_version = get_next_version();
+
+	// issue replica writes
+	ceph_tid_t rep_tid = osd->get_tid();
+	
+	RepGather *repop = new_repop(ctx, obc, rep_tid);
+	
+	issue_repop(repop, ctx);
+	eval_repop(repop);
+	repop->put();
+}
+
+ReplicatedPG::RepGather *ReplicatedPG::new_repop(
+  OpContext *ctx, ObjectContextRef obc,
+  ceph_tid_t rep_tid)
+{
+	if (ctx->op)
+		dout(10) << "new_repop rep_tid " << rep_tid << " on " << *ctx->op->get_req() << dendl;
+	else
+		dout(10) << "new_repop rep_tid " << rep_tid << " (no op)" << dendl;
+	
+	RepGather *repop = new RepGather(ctx, rep_tid, info.last_complete);
+	
+	repop->start = ceph_clock_now(cct);
+	
+	repop_queue.push_back(&repop->queue_item);
+	repop->get();
+	
+	osd->logger->inc(l_osd_op_wip);
+	
+	return repop;
+}    
+
+RepGather(OpContext *c, ceph_tid_t rt,
+  eversion_t lc) :
+	hoid(c->obc->obs.oi.soid),
+	op(c->op),
+	queue_item(this),
+	nref(1),
+	rep_tid(rt), 
+	rep_aborted(false), rep_done(false),
+	all_applied(false), all_committed(false),
+	pg_local_last_complete(lc),
+	lock_manager(std::move(c->lock_manager)),
+	on_applied(std::move(c->on_applied)),
+	on_committed(std::move(c->on_committed)),
+	on_success(std::move(c->on_success)),
+	on_finish(std::move(c->on_finish)) {}
+{% endhighlight %}
+由上面可见，repop_all_committed()函数中记录的last_complete_ondisk可能并不是当前最新写入的事务的version值，而可能是一个更老的info.last_complete。
+
+
+2) **update_last_complete_ondisk()**
+
+
+
 
 <br />
 <br />
