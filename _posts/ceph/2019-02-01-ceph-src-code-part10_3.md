@@ -1182,7 +1182,7 @@ PG::activate()会在PG peering完成时被调用，这里将last_update_ondisk�
 2) **PG::repop_all_committed()**
 
 
-PG::repop_all_committed()函数会在写对象（注： 非写日志）完成时被调用。通过该函数我们看到，repop->v赋值给了last_update_ondisk。现在我们来看这中间的过程：
+PG::repop_all_committed()函数会在对象的三个副本都写完成时被调用(注：这里是对象写完成，而不是日志)。通过该函数我们看到，repop->v赋值给了last_update_ondisk。现在我们来看这中间的过程：
 {% highlight string %}
 void ReplicatedPG::execute_ctx(OpContext *ctx)
 {
@@ -1210,6 +1210,14 @@ void ReplicatedPG::issue_repop(RepGather *repop, OpContext *ctx)
 }
 {% endhighlight %}
 从上面我们可以看到，其实就是将ctx->at_version赋值给了repop->v。
+
+也就是说，当PG::repop_all_committed()被回调，说明该OpContext对应的事务已经提交到硬盘，此时会直接将last_update_ondisk设置为ctx->at_version。
+
+>疑问：此处如何保证按顺序提交的事务，其响应也是按顺序返回的呢？比如事务A、事务B按顺序提交，但是事务A响应丢失，从而导致ReplicatedPG::repop_all_committed()中last_update_ondisk是一个更新的ctx->at_version。
+>
+>如能保证PG每个节点所成功提交的事务都是连续的，似乎也没有问题。代码中是如何保证？？？
+
+
 
 ### 1.10 last_complete_ondisk
 
@@ -1293,7 +1301,7 @@ RepGather(OpContext *c, ceph_tid_t rt,
 	on_success(std::move(c->on_success)),
 	on_finish(std::move(c->on_finish)) {}
 {% endhighlight %}
-由上面可见，repop_all_committed()函数中记录的last_complete_ondisk可能并不是当前最新写入的事务的version值，而可能是一个更老的info.last_complete。
+由上面可见，repop_all_committed()函数中记录的last_complete_ondisk可能并不是当前最新写入的事务的version值，而可能是一个更老的info.last_complete(注：猜测主要原因可能是本PG还可能在进行backfilling操作，因此last_complete_ondisk会是一个更老的位置）
 
 
 2) **update_last_complete_ondisk()**
