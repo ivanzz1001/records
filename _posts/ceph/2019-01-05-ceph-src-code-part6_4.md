@@ -98,9 +98,23 @@ ReplicatedPG::OpContext::op_t  –>  PGBackend::PGTransaction::write（即t->wri
 
 ###### 2.1.3 Transaction里的内容
 
+从上面的分析得知，写IO和PGLog都会序列化到transaction里的bufferlist里，这里就对这个bufferlist里的主要内容以图的形式展示出来。transaction的bufferlist里就是按照操作类型op来序列化不同的内容，如```OP_WRITE```表示写IO；而```OP_OMAPSETKEYS```就表示设置对象的omap，其中的attrset就是一个kv的map。注意这里面的oid，对于pglog来说，每个PG在创建的时候就会生成一个logoid，会加上pglog构造的一个对象；对于pginfo来说，是pginfo_t构造的一个对象；而对于真正的数据对象来说，attrset就是其属性。
+
+![ceph-chapter64-2](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter64_2.png)
 
 
 
+###### 2.1.4 Trim Log
+
+前面说到PGLog的记录数是有限制的，正常情况下默认是3000条（由参数osd_min_pg_log_entries控制），PG降级情况下默认增加到10000条(由参数osd_max_pg_log_entries控制）。当达到限制时，就会trim log进行截断。
+
+在ReplicatedPG::execute_ctx()里调用ReplicatedPG::calc_trim_to()来进行计算。计算的时候从log的tail(tail指向最老的记录）开始，需要trim的条数=log.head - log.tail - max_entries。但是trim的时候需要考虑到min_last_complete_ondisk(这个表示各个副本上last_complete的最小版本，是主OSD在收到3副本都完成时再进行计算的，也就是计算last_complete_ondisk和其他副本osd上的last_complete_ondisk-即peer_last_complete_ondisk的最小值得到min_last_complete_ondisk)，也就是说trim的时候不能超过min_last_complete_ondisk，因为超过了的也trim掉的话就会导致没有更新到磁盘上的pg log丢失。所以说可能存在某个时候pglog的记录数超过max_entries。
+
+![ceph-chapter64-3](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter64_3.png)
+
+在ReplicatedPG::log_operation()里的trim_to就是pg_trim_to，trim_rollback_to就是min_last_complete_ondisk。log_operation()里调用pg_log.trim(&handler, trim_to, info)进行trim，会将需要trim的key加入到PGLog::trimmed这个set里。然后在_write_log()里将trimmed插入到to_remove里，最后在调用t.omap_rmkeys()序列化到transaction的bufferlist里。
+
+###### 2.1.5 PGLog写到journal盘
 
 
 <br />
