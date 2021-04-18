@@ -80,7 +80,8 @@ int ReplicatedPG::do_osd_ops(OpContext *ctx, vector<OSDOp>& ops)
 	}
 }
 {% endhighlight %}
-ReplicatedPG::OpContext::op_t  –>  PGBackend::PGTransaction::write（即t->write） –>  RPGTransaction::write  –> ObjectStore::Transaction::write（encode到ObjectStore::Transaction::tbl). 
+
+ReplicatedPG::OpContext::op_t  -->  PGBackend::PGTransaction::write（即t->write） -->  RPGTransaction::write  --> ObjectStore::Transaction::write（encode到ObjectStore::Transaction::tbl). 
 >  
 后面调用ReplicatedBackend::submit_transaction()时传入的```PGTransaction *_t```就是上面这个，通过转换成```RPGTransaction *t```，然后这个函数里用到的```ObjectStore::Transaction *op_t```就是对应到RPGTransaction里的```ObjectStore::Transaction *t```。
 
@@ -115,6 +116,65 @@ ReplicatedPG::OpContext::op_t  –>  PGBackend::PGTransaction::write（即t->wri
 在ReplicatedPG::log_operation()里的trim_to就是pg_trim_to，trim_rollback_to就是min_last_complete_ondisk。log_operation()里调用pg_log.trim(&handler, trim_to, info)进行trim，会将需要trim的key加入到PGLog::trimmed这个set里。然后在_write_log()里将trimmed插入到to_remove里，最后在调用t.omap_rmkeys()序列化到transaction的bufferlist里。
 
 ###### 2.1.5 PGLog写到journal盘
+PGLog写到journal盘上就是写journal一样的流程，具体如下：
+
+
+* 在ReplicatedBackend::submit_transaction()里调用log_operation()将PGLog序列化到transaction里，然后调用queue_transaction()将这个transaction传到后续进行处理；
+
+* 调用到了FileStore::queue_transactions()里，就将list构造成要给FileStore::Op，对应的list放到FileStore::Op::tls里；
+
+* 接着在JournalingObjectStore::_op_journal_transactions()函数里遍历list &tls，将ObjectStore::Transaction encode到一个bufferlist里（记为tbl)；
+
+
+* 然后FileJournal::submit_entry()里将bufferlist构造成write_item放到writeq；
+
+* 接着在FileJournal::write_thread_entry()会从writeq里取出write_item，放到另外一个bufferlist里；
+
+* 最后调用do_aio_write()将bufferlist的内容异步写到磁盘上（也就是journal)；
+
+
+
+### 2.2 PGLog写入LevelDB
+在《OSD读写流程》里描述到是在FileStore::_do_op()里进行写数据到本地缓存的操作。将PGLog写入到leveldb里的操作也是从这里出发的，会根据不同的op类型来进行不同的操作。
+
+比如```OP_OMAP_SETKEYS```(PGLog写入leveldb就是根据这个key):
+{% highlight string %}
+FileStore::_do_op() --> FileStore::_do_transactions() --> FileStore::_do_transaction()，
+然后根据不同的transaction类型来进行不同的操作：
+
+case Transaction::OP_OMAP_SETKEYS --> FileStore::_omap_setkeys() --> object_map->set_keys()，
+即DBObjectMap::set_keys() --> KeyValueDB::TransactionImpl::set()，遍历map<string, bufferlist>，
+然后调用set(prefix, it->first, it->second)，即调用到LevelDBStore::LevelDBTransactionImpl::set() 
+-->最后调用到db->submit_transaction()提交事务写到盘上。
+{% endhighlight %}
+
+再比如以```OP_OMAP_RMKEYS```(trim pglog的时候就是用到了这个key)为例：
+{% highlight string %}
+FileStore::_do_op() --> FileStore::_do_transactions() --> FileStore::_do_transaction()，
+然后根据不同的transaction类型来进行不同的操作：
+
+case Transaction::OP_OMAP_RMKEYS --> FileStore::_omap_rmkeys() --> object_map->rm_keys()，
+后面就是调用到LevelDB里的rm_keys()去删除keys。
+{% endhighlight %}
+
+PGLog封装到transaction里面和journal一起写到盘上的好处：如果osd异常崩溃时，journal写完成了，但是数据有可能没有写到磁盘上，相应的pg log也没有写到leveldb里，这样在osd再启动起来时，就会进行journal replay，这样从journal里就能读出完整的transaction，然后再进行事务的处理，也就是将数据写到盘上，pglog写到leveldb里。
+
+
+
+## 3. PGLog如何参与恢复
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 <br />
