@@ -162,6 +162,57 @@ PGLog封装到transaction里面和journal一起写到盘上的好处：如果osd
 
 
 ## 3. PGLog如何参与恢复
+PGLog参与恢复主要体现在ceph进行peering的时候建立missing列表来标记过时数据，以便于对这些数据进行修复。故障的OSD重新上线后，PG就会标记为peering状态并暂停处理请求。
+
+1） **对于故障OSD所拥有的Primary PG**
+
+* 它作为这部分数据“权责”主体，需要发送查询PG元数据请求给所有属于该PG的Replicate角色节点；
+
+* 该PG的Replicate角色节点实际上在故障OSD下线期间成为了Primary角色，并维护了“权威”的PGLog，该PG在得到故障OSD的Primary PG的查询请求后会发送回应；
+
+* Primary PG通过对比Replicate PG发送的元数据和PG版本信息后发现处于落后状态，因此它会合并得到的PGLog并建立“权威”PGLog，同时会建立missing列表来标记过时数据；
+
+* Primary PG在完成“权威”PGLog的建立后就可以标记自己处于Active状态；
+
+2）**对于故障OSD所拥有的Replicated PG**
+
+* 这时上线后故障OSD的Replicate PG会得到Primary PG的查询请求，发送自己这份“过时”的元数据和PGLog；
+
+* Primary PG对比数据后发现该PG落后并且过时，通过对比PGLog建立missing列表；
+
+* Primary PG标记自己处于Active状态；
+
+
+----------
+Peering过程中涉及到PGLog（pg_info和pg_log）的步骤主要包括：
+
+1） **GetInfo**
+
+PG的Primary OSD通过发送消息获取各个Replicate OSD的pg_info信息。在收到各个Replicated OSD的pg_info后，会调用PG::proc_replica_info()处理副本OSD的pg_info，在这里面会调用info.history.merge()合并Replicate OSD发过来的pg_info信息，合并的原则就是更新为最新的字段（比如last_epoch_started和last_epoch_clean都变成最新的）；
+
+2） **GetLog**
+
+根据pg_info的比较，选择一个拥有权威日志的OSD(auth_log_shard)，如果Primary OSD不是拥有权威日志的OSD，就去该OSD上获取权威日志。
+
+* 选取拥有权威日志的OSD时，遵循3个原则（在find_best_info()里)
+
+  - Prefer new last_update
+  - Prefer longer tail if it brings another info into contiguity
+  - Prefer current primary
+
+* 也就是说对比各个OSD的pg_info_t，谁的last_update大，就选谁；如果last_update都一样，则谁的log_tail小，就选谁；如果log_tail也一样，就选当前的Primary OSD；
+
+* 如果Primary OSD不是拥有权威日志的OSD，则需要去拥有权威日志的OSD上去拉取权威日志，收到权威日志后，会调用proc_master_log()将权威日志合并到本地pg log;
+
+* 在merge权威log到本地pg log的过程中，会将merge的pg_log_entry_t对应的oid和eversion放到missing列表里，这个missing列表里的对象就是Primary OSD所缺失的对象，后续在recovery的时候需要从其他osd pull的。
+
+![ceph-chapter64-4](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter64_4.png)
+
+
+* GetMissing: 拉取其他Replicate OSD的pg log（或者部分获取，或者全部获取FULL_LOG)，通过本地的auth log对比，调用proc_replica_log()处理日志，会将Replicate OSD里缺失的对象放到peer_missing列表里，以用于后续recovery过程的依据。注意： 实际上是在PG::activate()里更新peer_missing列表的，在proc_replica_log()处理的只是从replica传过来它本地的missing(就是relica重启后根据自身的last_update和last_complete构造的missing列表），一般情况下这个missing列表是空；
+
+
+
 
 
 
