@@ -730,6 +730,8 @@ listening on ens33, link-type EN10MB (Ethernet), capture size 65535 bytes
 ## 6. 补充
 很多时候keepalived/fwmark还会搭配iptables来使用。一般我们可以先在iptables的mangle表对数据流量进行标记，然后在keepalived中根据相应的标记进行流量转发。例如：
 <pre>
+# iptables -A PREROUTING -d 10.4.18.69/32 -p tcp -m tcp --dport 17443 -m mac ! --mac-source F8:98:EF:7E:9E:8B -j MARK --set-xmark 0x96be3/0xffffffff
+
 # iptables -t mangle -L
 Chain PREROUTING (policy ACCEPT)
 target     prot opt source               destination         
@@ -740,7 +742,7 @@ MARK       tcp  --  anywhere             server-ceph01         tcp dpt:17480 MAC
 MARK       tcp  --  anywhere             server-ceph01         tcp dpt:irdmi MAC ! F8:98:EF:7E:9E:8B MARK set 0x109a0
 MARK       tcp  --  anywhere             server-ceph01         tcp dpt:http MAC ! F8:98:EF:7E:9E:8B MARK set 0x2a8
 </pre>
-上面第一条表示： 对于发送到目标端口为17443的数据流量（目标网卡不应该为F8:98:EF:7E:9E:8B)，将其标志为617443(0x96be3)
+上面第一条表示： 对于发送到目标端口为17443的数据流量（源网卡地址不为F8:98:EF:7E:9E:8B，通常为另一个副本lvs的网卡地址)，将其标志为617443(0x96be3)
 
 那么此时，我们可以在keepalived做如下配置以处理带有该标志的流量：
 {% highlight string %}

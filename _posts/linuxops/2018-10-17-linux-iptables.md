@@ -122,6 +122,17 @@ Usage: iptables -[ACD] chain rule-specification [options]
 {% endhighlight %}
 上面为```-m tcp```匹配添加了```--dport```扩展选项； 另外为```-m mac```添加了```--mac-source```扩展选项。
 
+上面设置的含义为： 对目标地址为10.4.18.69:17443的tcp数据包(且源mac地址不为```F8:98:EF:7E:9E:1B```），将其打上标记0x96be3。
+
+对于```--set-xmark value/mask```，即Zero out the bits given by mask and XOR value into the ctmark。其操作结果为：
+<pre>
+ctmark = (ctmark AND NOT mask) XOR value
+</pre>
+```zero out```(ctmark AND NOT mask): 如果设置了mask中的某个位，则ctmark中相应位将为零（在XOR之前)。
+
+
+
+
 5） **针对limit的扩展选项**
 <pre>
 --limit rate             最大平均匹配速率：可赋的值有'/second', '/minute', '/hour', or '/day'这样的单位，默认是3/hour
@@ -265,6 +276,7 @@ iptables -t nat -A POSTROUTING -s 192.168.1.0/24 -j SNAT --to 202.106.18.8
 {% highlight string %}
 # iptables -t mangle -A PREROUTING -d 10.4.18.69/32 -p tcp -m tcp --dport 80 -m mac ! --mac-source F8:98:EF:7E:9E:1B -j MARK --set-xmark 0x2a8/0xffffffff
 {% endhighlight %}
+
 
 
 9） **LOG**
@@ -727,6 +739,8 @@ iptables -t nat -L -n --line-number
 5. [Linux的iptables常用配置范例](http://www.ha97.com/3928.html)
 
 6. [为啥使用ＳＮＡＴ设置了数据包的源地址之后，使用抓包工具没抓到源地址](https://www.cnblogs.com/honpey/p/9066494.html)
+
+7. [关于--set-mark的一些问题](https://www.it1352.com/1516340.html)
 
 <br />
 <br />
