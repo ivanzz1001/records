@@ -12,10 +12,13 @@ description: ceph源代码分析
 
 <!-- more -->
 
-1. OSD数据读写相关数据结构
+## 1. OSD数据读写相关数据结构
 
 ![ceph-chapter63-1](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter63_1.jpg)
 
+## 2. 主OSD处理流程
+### 2.1 主OSD读写流程
+本文基于Jewel版本对OSD读写流程进行分析，如下图所示：
 
 
 
