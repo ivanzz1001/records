@@ -34,6 +34,32 @@ description: ceph源代码分析
 4）Primary OSD创建了2个回调函数来处理写journal和写到缓存(分别是C_OSD_RepopCommit和C_OSD_RepopApplied），主副本的写和从副本的写没有先后顺序，有可能主的journal先写完，也有可能从的journal先写完，ceph不管这个顺序，只要保证3副本都写完了之后才返回客户端响应（degrade情况下例外），3个副本的journal写完成(all_commit)，会返回客户端“写操作完成”，而3个副本都写本地缓存完成后（all_applied)，才返回客户端“数据可读”；
 
 
+### 2.2 主OSD的写操作事务的处理
+![ceph-chapter63-3](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter63_3.jpg)
+
+下面我们对上图进行简要说明：
+
+1）OSD中写操作的处理中涉及到很多回调函数（这也是ceph本身的一个特点），这些回调函数追溯到Context类，这个类是回调函数类的抽象基类，继承它的类只需要在子类中实现它的finish()函数，然后在finish函数中调用字注册的回调函数，就能完成回调；
+
+2） 上面说到的调用Context类的finish()函数就能进行回调，那么具体调用它的地方就在Finisher类的finisher_thread_entry()里，这个是finisher的线程处理函数，并且finisher还有一个finisher_queue，实现生产者消费者模型，生产者往finisher_queue里放东西，并通过条件变量通知finisher的线程处理函数来进行处理，在这个线程处理函数里就能通过调用Context类的complete()函数，然后调用其子类实现的finish()函数，从而完成回调的处理；
+
+3）OSD的写操作先放到writeq里，通知FileJournal的线程处理函数进行journal的处理，然后再放入到journal的finisher_queue里，然后对应的finisher线程处理函数调用之前注册的回调函数(C_JournaledAhead对应的函调函数是FileStore::_journaled_ahead)进行处理，这里就分成两条线路进行下去：
+
+* 放入ondisk_finisher，进而触发ondisk_finisher的线程处理函数进行处理，就会调用到C_OSD_OnOpCommit的回调函数ReplicatedBackend::op_commit()，在这里会检查waiting_for_commit是否为空（如果是3副本，这里面就有3项，每完成一个副本的写journal操作，就会从waiting_for_commit里删除一个），如果为空，才调用C_OSD_RepopCommit的回调函数repop_all_committed()，从而调用ReplicatedPG::eval_repop()发给客户端写操作完成；
+
+* 放入op_wq里，FileStore::op_tp线程池就会从op_wq中取出进行操作，在FileStore::OpWQ::_process()去进行写到本地缓存的操作（FileStore::_write())，并且在完成后FileStore::OpWQ::_process_finish()中处理，类似的也是放到一个finisher_queue里(op_finisher)，然后finisher的线程调用C_OSD_OnOpApplied的回调函数（ReplicatedBackend::op_applied）来处理。如果waiting_for_applied为空（如果是3副本，这里面就有3项，每完成一个副本的写本地操作，就会从waiting_for_applied里删除一个），才调用C_OSD_RepopApplied的回调函数repop_all_applied()，进而调用ReplicatedPG::eval_repop()发给客户端数据可读；
+
+
+### 2.3 副本OSD的消息处理及主OSD的响应处理
+
+![ceph-chapter63-4](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter63_4.jpg)
+
+下面我们对上图进行简要说明：
+
+1） 副本OSD收到主OSD的写请求时，也是按照消息处理的流程从队列里取出来进行处理，先写PGLog，然后注册两个回调函数，之后进行写journal和写本地缓存的操作，在处理完成后发送响应给主OSD(sub_op_modify_commit()和sub_op_modify_applied())，具体流程可参看上一节；
+
+2） 主OSD收到副本OSD的响应后，从in_progress_ops中找到op，op里保存有注册的回调函数，判断flag如果是CEPH_OSD_FLAG_ONDISK，则从waiting_for_commit中删除，否则从waiting_for_applied中删除；然后根据waiting_for_commit、waiting_for_applied是否为空，来调用对应的回调函数，在完成的情况下发送消息给客户端；
+
 
 
 
