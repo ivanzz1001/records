@@ -50,6 +50,14 @@ description: ceph源代码分析
 * 放入op_wq里，FileStore::op_tp线程池就会从op_wq中取出进行操作，在FileStore::OpWQ::_process()去进行写到本地缓存的操作（FileStore::_write())，并且在完成后FileStore::OpWQ::_process_finish()中处理，类似的也是放到一个finisher_queue里(op_finisher)，然后finisher的线程调用C_OSD_OnOpApplied的回调函数（ReplicatedBackend::op_applied）来处理。如果waiting_for_applied为空（如果是3副本，这里面就有3项，每完成一个副本的写本地操作，就会从waiting_for_applied里删除一个），才调用C_OSD_RepopApplied的回调函数repop_all_applied()，进而调用ReplicatedPG::eval_repop()发给客户端数据可读；
 
 
+4）在FileStore::queue_transactions()中调用submit_manager来进行提交；在FileStore::_do_op()中调用apply_manager来进行应用，如下图所示：
+
+![ceph-chapter63-5](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter63_5.jpg)
+
+
+
+
+
 ### 2.3 副本OSD的消息处理及主OSD的响应处理
 
 ![ceph-chapter63-4](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter63_4.jpg)
