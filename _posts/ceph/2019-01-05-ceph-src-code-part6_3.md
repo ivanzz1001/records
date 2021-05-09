@@ -54,8 +54,9 @@ description: ceph源代码分析
 
 ![ceph-chapter63-5](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter63_5.jpg)
 
+5）数据写入过程中的数据回调函数如下
 
-
+![ceph-chapter63-6](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter63_6.jpg)
 
 
 ### 2.3 副本OSD的消息处理及主OSD的响应处理
