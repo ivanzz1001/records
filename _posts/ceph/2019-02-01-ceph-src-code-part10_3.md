@@ -1217,6 +1217,9 @@ void ReplicatedPG::issue_repop(RepGather *repop, OpContext *ctx)
 >
 >如能保证PG每个节点所成功提交的事务都是连续的，似乎也没有问题。代码中是如何保证？？？
 
+3）**总结**
+
+last_update_ondisk记录的是PG所有副本均完成写日志操作的最新对象版本号。
 
 
 ### 1.10 last_complete_ondisk
@@ -1305,6 +1308,39 @@ RepGather(OpContext *c, ceph_tid_t rt,
 
 
 2) **update_last_complete_ondisk()**
+
+对于sub_op_modify_commit()函数，其会在PG的非主副本日志写入完成时被调用：
+{% highlight string %}
+void ReplicatedBackend::sub_op_modify(OpRequestRef op)
+{
+	...
+	RepModifyRef rm(std::make_shared<RepModify>());
+	rm->op = op;
+	rm->ackerosd = ackerosd;
+	rm->last_complete = get_info().last_complete;
+	rm->epoch_started = get_osdmap()->get_epoch();
+	...
+}
+void ReplicatedBackend::sub_op_modify_commit(RepModifyRef rm)
+{
+	...
+
+	get_parent()->update_last_complete_ondisk(rm->last_complete);
+
+	...
+}
+void update_last_complete_ondisk(eversion_t lcod)
+{
+	last_complete_ondisk = lcod;
+}
+{% endhighlight %}
+从上面我们可以看到，对于PG的非主副本，当写日志操作完成时触发回调sub_op_modify_commit()，从而更新last_complete_ondisk，其更新的值同样为当前PGInfo的last_complete值。
+
+
+3） **总结**
+
+last_complete_ondisk用于记录PG所有副本均完成写对象到硬盘的版本号，其是通过pginfo.last_complete来得到的。在后面的章节中，我们会分析PGInfo在整个PG生命周期中的变化。
+
 
 
 
