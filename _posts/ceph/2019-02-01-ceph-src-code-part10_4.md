@@ -80,6 +80,9 @@ struct pg_info_t {
 
 下面我们分别介绍一下各字段：
 
+* pgid: 保存当前PG的pgid信息；
+
+
 * last_update:
 
 * last_complete:
@@ -206,12 +209,31 @@ struct pg_history_t {
 {% endhighlight %}
 
 
+## 2. PG info信息的初始化
+
+1）**PG构造函数中初始化pginfo**
+
+{% highlight string %}
+PG::PG(OSDService *o, OSDMapRef curmap,const PGPool &_pool, spg_t p) 
+	: info(p){
+}
+
+pg_info_t(spg_t p)
+: pgid(p),
+  last_epoch_started(0), last_user_version(0),
+  last_backfill(hobject_t::get_max()),
+  last_backfill_bitwise(false)
+{ }
+{% endhighlight %}
+
+从上面我们可以看到，在PG的构造函数中设置了pg_info_t.pgid；将last_epoch_started初始化为0；将last_user_version初始化为0；将last_backfill设置为hobject_t::get_max()，表示没有需要backfill的对象；将last_backfill_bitwise设置为false。
+
 <br />
 <br />
 
 **[参看]**
 
-
+1. [ceph中PGLog处理流程](https://ivanzz1001.github.io/records/post/ceph/2019/02/05/ceph-src-code-part14_1)
 
 <br />
 <br />
