@@ -164,6 +164,11 @@ go version go1.8 windows/amd64
 
 上面我们注意到，设置的project GOPATH是```E:\Workspace\go\oss```，并没有包含```src```。而我们实际建立的工程文件夹是放在src目录下的。
 
+>注： 新版go sdk默认采用module的方式来进行编译，可以执行如下命令来关闭
+>
+> go env -w GO111MODULE=off 或者 go env -w GO111MODULE=auto
+
+
 
 
 <br />
@@ -178,11 +183,13 @@ go version go1.8 windows/amd64
 
 4. [go官网](https://golang.org/dl/)
 
-5. [centos 7搭建go环境](https://www.cnblogs.com/ylqs/p/7541806.html)
+5. [go国内官网](https://golang.google.cn/)
 
-6. [Goland2018破解](https://blog.csdn.net/github_39533414/article/details/81038333)
+6. [centos 7搭建go环境](https://www.cnblogs.com/ylqs/p/7541806.html)
 
-7. [go官网](https://golang.org/)
+7. [Goland2018破解](https://blog.csdn.net/github_39533414/article/details/81038333)
+
+8. [go官网](https://golang.org/)
 
 <br />
 <br />
