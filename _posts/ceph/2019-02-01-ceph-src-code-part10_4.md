@@ -107,6 +107,13 @@ last_update表示PG内最近一次更新的对象版本，还没有在所有OSD�
 
 1） PG数据写入阶段增加log entry
 {% highlight string %}
+eversion_t get_next_version() const {
+	eversion_t at_version(get_osdmap()->get_epoch(),pg_log.get_head().version+1);
+	assert(at_version > info.last_update);
+	assert(at_version > pg_log.get_head());
+	return at_version;
+}
+
 void ReplicatedPG::execute_ctx(OpContext *ctx)
 {
 	// version
