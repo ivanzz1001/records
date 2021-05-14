@@ -43,7 +43,7 @@ public:
 
 ## 1. pginfo相关数据结构
 
-1) **pg_info_t数据结构**
+### 1.1 pg_info_t数据结构
 
 pg_info_t数据结构定义在osd/osd_types.h头文件中，如下：
 {% highlight string %}
@@ -80,7 +80,162 @@ struct pg_info_t {
 
 下面我们分别介绍一下各字段：
 
-* pgid: 保存当前PG的pgid信息；
+###### 1.1.1 pgid
+
+pgid用于保存当前PG的pgid信息。
+
+###### 1.1.2 last_update
+{% highlight string %}
+//src/include/types.h
+// NOTE: these must match ceph_fs.h typedefs
+typedef uint64_t ceph_tid_t; // transaction id
+typedef uint64_t version_t;
+typedef __u32 epoch_t;       // map epoch  (32bits -> 13 epochs/second for 10 years)
+
+
+//osd/osd_types.h
+class eversion_t {
+public:
+	version_t version;
+	epoch_t epoch;
+	__u32 __pad;
+};
+{% endhighlight %}
+last_update表示PG内最近一次更新的对象版本，还没有在所有OSD上更新完成。在last_update与last_complete之间的操作表示该操作已经在部分OSD上完成，但是还没有全部完成。
+
+下面我们来看一下pginfo.last_update在ceph整个运行过程中的更新操作：
+
+1） PG数据写入阶段增加log entry
+{% highlight string %}
+void ReplicatedPG::execute_ctx(OpContext *ctx)
+{
+	// version
+	ctx->at_version = get_next_version();
+	ctx->mtime = m->get_mtime();
+}
+void ReplicatedPG::finish_ctx(OpContext *ctx, int log_op_type, bool maintain_ssc,
+			      bool scrub_ok)
+{
+	...
+	 // append to log
+	ctx->log.push_back(pg_log_entry_t(log_op_type, soid, ctx->at_version,
+		ctx->obs->oi.version,
+		ctx->user_at_version, ctx->reqid,
+		ctx->mtime));
+
+}
+void PG::add_log_entry(const pg_log_entry_t& e)
+{
+	// raise last_complete only if we were previously up to date
+	if (info.last_complete == info.last_update)
+		info.last_complete = e.version;
+	
+	// raise last_update.
+	assert(e.version > info.last_update);
+	info.last_update = e.version;
+	
+	// raise user_version, if it increased (it may have not get bumped
+	// by all logged updates)
+	if (e.user_version > info.last_user_version)
+	info.last_user_version = e.user_version;
+	
+	// log mutation
+	pg_log.add(e);
+	dout(10) << "add_log_entry " << e << dendl;
+}
+{% endhighlight %}
+从上面可以看到，在PG数据写入阶段，将pg_log_entry_t添加进pg_log时，会将info.last_update更新为ctx->at_version，
+
+2) 进入activate阶段更新本地保存的peer.last_update
+{% highlight string %}
+void PG::activate(ObjectStore::Transaction& t,
+	epoch_t activation_epoch,
+	list<Context*>& tfin,
+	map<int, map<spg_t,pg_query_t> >& query_map,
+	map<int,
+	  vector<
+	    pair<pg_notify_t,
+	    pg_interval_map_t> > > *activator_map,
+	RecoveryCtx *ctx)
+{
+	...
+
+	// if primary..
+	if (is_primary()) {
+		for (set<pg_shard_t>::iterator i = actingbackfill.begin();i != actingbackfill.end();++i) {
+
+			if (*i == pg_whoami) continue;
+			pg_shard_t peer = *i;
+			pg_info_t& pi = peer_info[peer];
+
+
+			...
+			/*
+			* cover case where peer sort order was different and
+			* last_backfill cannot be interpreted
+			*/
+			bool force_restart_backfill =!pi.last_backfill.is_max() && pi.last_backfill_bitwise != get_sort_bitwise();
+
+			if (pi.last_update == info.last_update && !force_restart_backfill) {
+
+				//已经追上权威
+
+			}else if (pg_log.get_tail() > pi.last_update || pi.last_backfill == hobject_t() ||
+				force_restart_backfill ||(backfill_targets.count(*i) && pi.last_backfill.is_max())){
+
+				/* ^ This last case covers a situation where a replica is not contiguous
+				* with the auth_log, but is contiguous with this replica.  Reshuffling
+				* the active set to handle this would be tricky, so instead we just go
+				* ahead and backfill it anyway.  This is probably preferrable in any
+				* case since the replica in question would have to be significantly
+				* behind.
+				*/
+				// backfill(日志不重叠，采用backfill方式来进行恢复)
+
+				pi.last_update = info.last_update;
+				pi.last_complete = info.last_update;
+				pi.set_last_backfill(hobject_t(), get_sort_bitwise());
+				pi.last_epoch_started = info.last_epoch_started;
+				pi.history = info.history;
+				pi.hit_set = info.hit_set;
+				pi.stats.stats.clear();
+			}else{
+				//catch up(具有日志重叠，直接采用pglog进行恢复)
+
+				m = new MOSDPGLog(i->shard, pg_whoami.shard,get_osdmap()->get_epoch(), info);
+
+				// send new stuff to append to replicas log
+				//(拷贝pg_log中last_update之后的日志到m中)
+				m->log.copy_after(pg_log.get_log(), pi.last_update);
+			}
+
+			// peer now has(此处认为peer完成，因此更新本地pi.last_update)
+			pi.last_update = info.last_update;
+		}
+	}
+}
+{% endhighlight %}
+从上面的代码可以，当PG primary进入activate阶段，表示副本之间已经达成一致，此时对于PG primary来说，可以更新本地保存的peer.last_update为权威的last_update。
+
+3）PG分裂时设置info.last_update
+{% highlight string %}
+void PG::split_into(pg_t child_pgid, PG *child, unsigned split_bits)
+{
+	...
+
+	pg_log.split_into(child_pgid, split_bits, &(child->pg_log));
+	child->info.last_complete = info.last_complete;
+
+	info.last_update = pg_log.get_head();
+	child->info.last_update = child->pg_log.get_head();
+
+	...
+}
+{% endhighlight %}
+在PG分裂时，肯定已经完成了peering操作，此时info.last_update必定等于pg_log.get_head，既然如此为何代码中还要在重新设置一遍呢？这是因为在PG分裂时，pg_log也要进行分裂，原来的head有可能被分裂到了child中了，因此这里需要重新设置当前PG的last_update。如下图所示：
+
+
+![ceph-chapter104-1](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter104_1.jpg)
 
 
 * last_update:
