@@ -809,13 +809,43 @@ bool ReplicatedPG::start_recovery_ops(
 ----------
 **总结**
 
-last_complete就是PG副本间达成一致的最后一个日志版本。
+通过上面，我们发现pginfo.last_complete的确切含义似乎不是很好理解，下面我们再来看一下代码中对该字段的注释：
+{% highlight string %}
+/**
+ * pg_info_t - summary of PG statistics.
+ *
+ * some notes: 
+ *  - last_complete implies we have all objects that existed as of that
+ *    stamp, OR a newer object, OR have already applied a later delete.
+ *  - if last_complete >= log.bottom, then we know pg contents thru log.head.
+ *    otherwise, we have no idea what the pg is supposed to contain.
+ */
+struct pg_info_t {
+	eversion_t last_complete;    ///< last version pg was complete through.
+};
+{% endhighlight %}
+
+"last version pg was complete through"翻译成中文为：上一版PG已经完成。那么是否可以理解为：在last_complete之前的版本都在所有OSD上更新完成，而对于last_complete本身则是不确定的。
 
 
 
+###### 1.1.4 last_epoch_started
 
+last_epoch_started表示指定PG在本OSD上启动时的epoch值。下面我们来看一下其在PG整个生命周期中的更新操作：
 
-
+1） **处理权威日志时，更新pginfo.last_epoch_started**
+{% highlight string %}
+void PG::proc_master_log(
+  ObjectStore::Transaction& t, pg_info_t &oinfo,
+  pg_log_t &olog, pg_missing_t& omissing, pg_shard_t from)
+{
+	// See doc/dev/osd_internals/last_epoch_started
+	if (oinfo.last_epoch_started > info.last_epoch_started) {
+		info.last_epoch_started = oinfo.last_epoch_started;
+		dirty_info = true;
+	}
+}
+{% endhighlight %}
 
 
 * last_epoch_started:
