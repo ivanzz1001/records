@@ -904,7 +904,6 @@ info.history.last_epoch_started记录的是PG最近一次整体进入active状�
 
 
 
-
 下面我们来看一下其在PG整个生命周期中的更新操作：
 
 1） **处理权威日志时，更新pginfo.last_epoch_started**
@@ -920,13 +919,282 @@ void PG::proc_master_log(
 	}
 }
 {% endhighlight %}
-可以看到，这里是从权威pginfo以及本地pginfo中选出一个较大的last_epoch_started作为pginfo.last_epoch_started。
+可以看到，这里是从权威pginfo以及本地pginfo中选出一个较大的last_epoch_started作为info.last_epoch_started。
+
+2）**PG::activate()激活时更新**
+{% highlight string %}
+void PG::activate(ObjectStore::Transaction& t,
+		  epoch_t activation_epoch,
+		  list<Context*>& tfin,
+		  map<int, map<spg_t,pg_query_t> >& query_map,
+		  map<int,
+		      vector<
+			pair<pg_notify_t,
+			     pg_interval_map_t> > > *activator_map,
+                  RecoveryCtx *ctx)
+{
+
+	...
+
+	if (is_primary()) {
+		// only update primary last_epoch_started if we will go active
+		if (acting.size() >= pool.info.min_size) {
+			assert(cct->_conf->osd_find_best_info_ignore_history_les || info.last_epoch_started <= activation_epoch);
+
+			info.last_epoch_started = activation_epoch;
+		}
+	} else if (is_acting(pg_whoami)) {
+		/* update last_epoch_started on acting replica to whatever the primary sent
+		* unless it's smaller (could happen if we are going peered rather than
+		* active, see doc/dev/osd_internals/last_epoch_started.rst) */
+		* 
+		if (info.last_epoch_started < activation_epoch)
+			info.last_epoch_started = activation_epoch;
+	}
+
+	...
+}
+{% endhighlight %}
+
+从上面可以看出，对于PG Primary来说，直接将激活时的activation_epoch设置为info.last_epoch_started，即在activate完成新一轮的last_epoch_started的设置；对于PG replicas而言，则当收到primary发送的activation_epoch较大时，更新其last_epoch_started值。
+
+3) **PG::activate()更新本地保存的peerinfo.last_epoch_started**
+{% highlight string %}
+void PG::activate(ObjectStore::Transaction& t,
+		  epoch_t activation_epoch,
+		  list<Context*>& tfin,
+		  map<int, map<spg_t,pg_query_t> >& query_map,
+		  map<int,
+		      vector<
+			pair<pg_notify_t,
+			     pg_interval_map_t> > > *activator_map,
+                  RecoveryCtx *ctx)
+{
+	...
+	// if primary..
+	if (is_primary()) {
+		for (set<pg_shard_t>::iterator i = actingbackfill.begin();i != actingbackfill.end();++i) {
+
+			if (*i == pg_whoami) continue;
+			pg_shard_t peer = *i;
+			pg_info_t& pi = peer_info[peer];
+
+
+			...
+			/*
+			* cover case where peer sort order was different and
+			* last_backfill cannot be interpreted
+			*/
+			bool force_restart_backfill =!pi.last_backfill.is_max() && pi.last_backfill_bitwise != get_sort_bitwise();
+
+			if (pi.last_update == info.last_update && !force_restart_backfill) {
+
+				//已经追上权威
+
+			}else if (pg_log.get_tail() > pi.last_update || pi.last_backfill == hobject_t() ||
+				force_restart_backfill ||(backfill_targets.count(*i) && pi.last_backfill.is_max())){
+
+				/* ^ This last case covers a situation where a replica is not contiguous
+				* with the auth_log, but is contiguous with this replica.  Reshuffling
+				* the active set to handle this would be tricky, so instead we just go
+				* ahead and backfill it anyway.  This is probably preferrable in any
+				* case since the replica in question would have to be significantly
+				* behind.
+				*/
+				// backfill(日志不重叠，采用backfill方式来进行恢复)
+
+				pi.last_update = info.last_update;
+				pi.last_complete = info.last_update;
+				pi.set_last_backfill(hobject_t(), get_sort_bitwise());
+				pi.last_epoch_started = info.last_epoch_started;
+				pi.history = info.history;
+				pi.hit_set = info.hit_set;
+				pi.stats.stats.clear();
+
+				...
+				pm.clear();
+			}else{
+				//catch up(具有日志重叠，直接采用pglog进行恢复)
+
+				m = new MOSDPGLog(i->shard, pg_whoami.shard,get_osdmap()->get_epoch(), info);
+
+				// send new stuff to append to replicas log
+				//(拷贝pg_log中last_update之后的日志到m中)
+				m->log.copy_after(pg_log.get_log(), pi.last_update);
+			}
+
+			....
+
+		}
+
+	}
+}
+{% endhighlight %}
+
+4) **Replicas激活完成，调用_activate_committed()通知primary**
+{% highlight string %}
+void PG::_activate_committed(epoch_t epoch, epoch_t activation_epoch)
+{
+	lock();
+	if (pg_has_reset_since(epoch)) {
+		...
+
+	}else if (is_primary()) {
+		...
+
+	}else {
+		dout(10) << "_activate_committed " << epoch << " telling primary" << dendl;
+		MOSDPGInfo *m = new MOSDPGInfo(epoch);
+		pg_notify_t i = pg_notify_t(
+			get_primary().shard, pg_whoami.shard,
+			get_osdmap()->get_epoch(),
+			get_osdmap()->get_epoch(),
+			info);
+	
+		i.info.history.last_epoch_started = activation_epoch;
+	
+		...
+	}
+
+	...
+}
+{% endhighlight %}
+上面发送pg_notify_t消息，将info.history.last_epoch_started设置为了activation_epoch。
+
+5）**PG分裂设置child的last_epoch_started**
+{% highlight string %}
+void PG::split_into(pg_t child_pgid, PG *child, unsigned split_bits)
+{
+	...
+	child->info.last_epoch_started = info.last_epoch_started;
+}
+{% endhighlight %}
+
+6) **PG replica写数据时，更新history.last_epoch_started**
+{% highlight string %}
+void PG::append_log(
+  const vector<pg_log_entry_t>& logv,
+  eversion_t trim_to,
+  eversion_t trim_rollback_to,
+  ObjectStore::Transaction &t,
+  bool transaction_applied)
+{
+	...
+	
+	/* The primary has sent an info updating the history, but it may not
+	* have arrived yet.  We want to make sure that we cannot remember this
+	* write without remembering that it happened in an interval which went
+	* active in epoch history.last_epoch_started.
+	*/
+	if (info.last_epoch_started != info.history.last_epoch_started) {
+		info.history.last_epoch_started = info.last_epoch_started;
+	}
+
+	...
+}
+{% endhighlight %}
+
+7) **share pginfo时，更新本地保存的peerinfo.last_epoch_started**
+{% highlight string %}
+// the part that actually finalizes a scrub
+void PG::scrub_finish() 
+{
+	...
+
+	if (is_active() && is_primary()) {
+		share_pg_info();
+	}
+}
+void PG::share_pg_info()
+{
+void PG::share_pg_info()
+{
+	dout(10) << "share_pg_info" << dendl;
+	
+	// share new pg_info_t with replicas
+	assert(!actingbackfill.empty());
+
+	for (set<pg_shard_t>::iterator i = actingbackfill.begin();i != actingbackfill.end();++i) {
+		if (*i == pg_whoami) continue;
+
+		pg_shard_t peer = *i;
+
+		if (peer_info.count(peer)) {
+			peer_info[peer].last_epoch_started = info.last_epoch_started;
+			peer_info[peer].history.merge(info.history);
+		}
+		
+		MOSDPGInfo *m = new MOSDPGInfo(get_osdmap()->get_epoch());
+		m->pg_list.push_back(
+			make_pair(
+				pg_notify_t(
+					peer.shard, pg_whoami.shard,
+					get_osdmap()->get_epoch(),
+					get_osdmap()->get_epoch(),
+					info),
+			pg_interval_map_t()));
+
+		osd->send_message_osd_cluster(peer.osd, m, get_osdmap()->get_epoch());
+	}
+}
+{% endhighlight %}
+上面的代码中，当scrub完成时，PG Primary就会更新本地保存的peer_info信息，并将其发送到对应的副本以更新对应副本上的pginfo信息。
+
+8）**当所有副本被激活时，更新info.history.last_epoch_started**
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Active::react(const AllReplicasActivated &evt)
+{
+	PG *pg = context< RecoveryMachine >().pg;
+	all_replicas_activated = true;
+	
+	pg->state_clear(PG_STATE_ACTIVATING);
+	pg->state_clear(PG_STATE_CREATING);
+	if (pg->acting.size() >= pg->pool.info.min_size) {
+		pg->state_set(PG_STATE_ACTIVE);
+	} else {
+		pg->state_set(PG_STATE_PEERED);
+	}
+	
+	// info.last_epoch_started is set during activate()
+	pg->info.history.last_epoch_started = pg->info.last_epoch_started;
+	pg->dirty_info = true;
+	
+	pg->share_pg_info();
+	pg->publish_stats_to_osd();
+	
+	pg->check_local();
+	
+	// waiters
+	if (pg->flushes_in_progress == 0) {
+		pg->requeue_ops(pg->waiting_for_peered);
+	}
+	
+	pg->on_activate();
+	
+	return discard_event();
+}
+{% endhighlight %}
+从上面的代码中，我们看到当peering完成，所有的副本完成激活时，会将info.last_epoch_started赋值给history.last_epoch_started。
+
+9）**pginfo初始化时，将last_epoch_started置为0**
+{% highlight string %}
+pg_info_t()
+	: last_epoch_started(0), last_user_version(0),
+	last_backfill(hobject_t::get_max()),
+	last_backfill_bitwise(false)
+{ }
+
+// cppcheck-suppress noExplicitConstructor
+pg_info_t(spg_t p)
+	: pgid(p),
+	last_epoch_started(0), last_user_version(0),
+	last_backfill(hobject_t::get_max()),
+	last_backfill_bitwise(false)
+{ }
+{% endhighlight %}
 
 
 
-
-
-* last_epoch_started:
 
 * last_user_version:
 
