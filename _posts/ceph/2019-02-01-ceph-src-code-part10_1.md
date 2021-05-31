@@ -61,7 +61,7 @@ struct Start : boost::statechart::state< Start, Started >, NamedState {
 ### 1.2 事件
 状态能够接收并处理事件。事件可以改变状态，促使状态发生转移。在boost库的statechart状态机中定义事件的方式如下所示：
 {% highlight string %}
- struct QueryState : boost::statechart::event< QueryState >{
+struct QueryState : boost::statechart::event< QueryState >{
 }; 
 {% endhighlight %}
 

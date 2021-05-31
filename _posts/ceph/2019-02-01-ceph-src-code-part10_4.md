@@ -1105,8 +1105,7 @@ void PG::scrub_finish()
 		share_pg_info();
 	}
 }
-void PG::share_pg_info()
-{
+
 void PG::share_pg_info()
 {
 	dout(10) << "share_pg_info" << dendl;
@@ -1194,23 +1193,512 @@ pg_info_t(spg_t p)
 {% endhighlight %}
 
 
+###### 1.1.4 last_user_version
+用于记录用户所更新对象的最大版本号。
+
+下面我们来看一下其在PG整个生命周期中的更新操作：
+
+1) **last_user_version初始化**
+{% highlight string %}
+pg_info_t()
+	: last_epoch_started(0), last_user_version(0),
+	last_backfill(hobject_t::get_max()),
+	last_backfill_bitwise(false)
+{ }
+
+// cppcheck-suppress noExplicitConstructor
+pg_info_t(spg_t p)
+	: pgid(p),
+	last_epoch_started(0), last_user_version(0),
+	last_backfill(hobject_t::get_max()),
+	last_backfill_bitwise(false)
+{ }
+{% endhighlight %}
+在PGInfo初始化时，将last_user_version均初始化为0值。
+
+2) **PG分裂时，从父PG中拷贝info.last_user_version的值**
+{% highlight string %}
+void PG::split_into(pg_t child_pgid, PG *child, unsigned split_bits)
+{
+	...
+
+	child->info.last_user_version = info.last_user_version;
+
+	...
+}
+{% endhighlight %}
+
+3) **数据更新操作，添加log entry时更新last_user_version**
+{% highlight string %}
+void PG::add_log_entry(const pg_log_entry_t& e)
+{
+	// raise last_complete only if we were previously up to date
+	if (info.last_complete == info.last_update)
+		info.last_complete = e.version;
+	
+	// raise last_update.
+	assert(e.version > info.last_update);
+	info.last_update = e.version;
+	
+	// raise user_version, if it increased (it may have not get bumped
+	// by all logged updates)
+	if (e.user_version > info.last_user_version)
+		info.last_user_version = e.user_version;
+	
+	// log mutation
+	pg_log.add(e);
+	dout(10) << "add_log_entry " << e << dendl;
+}
+{% endhighlight %}
+
+4）**merge_log时更新info.last_user_version**
+{% highlight string %}
+void PGLog::merge_log(ObjectStore::Transaction& t,
+                      pg_info_t &oinfo, pg_log_t &olog, pg_shard_t fromosd,
+                      pg_info_t &info, LogEntryHandler *rollbacker,
+                      bool &dirty_info, bool &dirty_big_info)
+{
+	...
+
+	info.last_user_version = oinfo.last_user_version;
+
+	...
+}
+{% endhighlight %}
+
+5) **finish_ctx()更新last_user_version**
+{% highlight string %}
+void ReplicatedPG::finish_ctx(OpContext *ctx, int log_op_type, bool maintain_ssc,
+			      bool scrub_ok)
+{
+	...
+	// finish and log the op.
+	if (ctx->user_modify) {
+		// update the user_version for any modify ops, except for the watch op
+
+		ctx->user_at_version = MAX(info.last_user_version, ctx->new_obs.oi.user_version) + 1;
+
+		/* In order for new clients and old clients to interoperate properly
+		* when exchanging versions, we need to lower bound the user_version
+		* (which our new clients pay proper attention to)
+		* by the at_version (which is all the old clients can ever see). */
+		if (ctx->at_version.version > ctx->user_at_version)
+			ctx->user_at_version = ctx->at_version.version;
+
+		ctx->new_obs.oi.user_version = ctx->user_at_version;
+	}
+
+	...
+}
+{% endhighlight %}
 
 
-* last_user_version:
+###### 1.1.5 log_tail
 
-* log_tail:
+log_tail指向pg log最老的那条记录。下面我们来看其在整个PG生命周期中的变化：
 
-* last_backfill:
+1） **PG分裂时，生成新的log_tail**
+{% highlight string %}
+void PG::split_into(pg_t child_pgid, PG *child, unsigned split_bits)
+{
+	...
 
-* last_backfill_bitwise:
+	info.log_tail = pg_log.get_tail();
+	child->info.log_tail = child->pg_log.get_tail();
 
-* purged_snaps:
+	...
+}
+{% endhighlight %}
+PG分裂时，日志也会进行分裂。
 
-* stats:
+2) **trim日志时，log_tail移动**
+{% highlight string %}
+void PGLog::trim(
+  LogEntryHandler *handler,
+  eversion_t trim_to,
+  pg_info_t &info)
+{
+	// trim?
+	if (trim_to > log.tail) {
+		/* If we are trimming, we must be complete up to trim_to, time
+		* to throw out any divergent_priors
+		*/
+		if (!divergent_priors.empty()) {
+			dirty_divergent_priors = true;
+		}
 
-* history:
+		divergent_priors.clear();
+		// We shouldn't be trimming the log past last_complete
+		assert(trim_to <= info.last_complete);
+		
+		dout(10) << "trim " << log << " to " << trim_to << dendl;
+		log.trim(handler, trim_to, &trimmed);
+		info.log_tail = log.tail;
+	}
+}
+{% endhighlight %}
 
-* hit_set:
+3) **merge_log时，更新info.log_tail**
+{% highlight string %}
+void PGLog::merge_log(ObjectStore::Transaction& t,
+                      pg_info_t &oinfo, pg_log_t &olog, pg_shard_t fromosd,
+                      pg_info_t &info, LogEntryHandler *rollbacker,
+                      bool &dirty_info, bool &dirty_big_info)
+{
+	...
+
+	bool changed = false;
+
+	// extend on tail?
+	//  this is just filling in history.  it does not affect our
+	//  missing set, as that should already be consistent with our
+	//  current log.
+	if (olog.tail < log.tail) {
+		dout(10) << "merge_log extending tail to " << olog.tail << dendl;
+		list<pg_log_entry_t>::iterator from = olog.log.begin();
+		list<pg_log_entry_t>::iterator to;
+		eversion_t last;
+
+		for (to = from;to != olog.log.end();++to) {
+			if (to->version > log.tail)
+				break;
+
+			log.index(*to);
+			dout(15) << *to << dendl;
+			last = to->version;
+		}
+
+		mark_dirty_to(last);
+	
+		// splice into our log.
+		log.log.splice(log.log.begin(),
+		olog.log, from, to);
+	
+		info.log_tail = log.tail = olog.tail;
+		changed = true;
+	}
+
+	...
+}
+{% endhighlight %}
+
+4) **读取PGlog时，更新log.tail**
+{% highlight string %}
+void PG::read_state(ObjectStore *store, bufferlist &bl)
+{
+	int r = read_info(store, pg_id, coll, bl, info, past_intervals,info_struct_v);
+	assert(r >= 0);
+	
+	if (g_conf->osd_hack_prune_past_intervals) {
+		_simplify_past_intervals(past_intervals);
+	}
+	
+	ostringstream oss;
+	pg_log.read_log(store,
+		coll,
+		info_struct_v < 8 ? coll_t::meta() : coll,
+		ghobject_t(info_struct_v < 8 ? OSD::make_pg_log_oid(pg_id) : pgmeta_oid),
+		info, oss, cct->_conf->osd_ignore_stale_divergent_priors);
+>
+	if (oss.tellp())
+		osd->clog->error() << oss.rdbuf();
+	
+	// log any weirdness
+	log_weirdness();
+}
+
+void read_log(ObjectStore *store, coll_t pg_coll,
+	coll_t log_coll, ghobject_t log_oid,
+	const pg_info_t &info, ostringstream &oss,
+	bool tolerate_divergent_missing_log) {
+
+	return read_log(
+		store, pg_coll, log_coll, log_oid, info, divergent_priors,
+		log, missing, oss, tolerate_divergent_missing_log,
+		this,
+		(pg_log_debug ? &log_keys_debug : 0));
+}
+void PGLog::read_log(ObjectStore *store, coll_t pg_coll,
+		     coll_t log_coll,
+		     ghobject_t log_oid,
+		     const pg_info_t &info,
+		     map<eversion_t, hobject_t> &divergent_priors,
+		     IndexedLog &log,
+		     pg_missing_t &missing,
+		     ostringstream &oss,
+		     bool tolerate_divergent_missing_log,
+		     const DoutPrefixProvider *dpp,
+		     set<string> *log_keys_debug)
+		   
+{
+	...
+	// legacy?
+	struct stat st;
+	int r = store->stat(log_coll, log_oid, &st);
+	assert(r == 0);
+	assert(st.st_size == 0);
+	
+	log.tail = info.log_tail;
+
+	...
+}
+{% endhighlight %}
+
+
+###### 1.1.6 last_backfill
+
+last_backfill用于记录上一次backfill到的位置，处于[last_backfill, last_complete)之间的对象可能处于missing状态。下面我们来看一下本字段在PG整个生命周期里的变化。
+
+1) **PGinfo初始化时设置last_backfill**
+{% highlight string %}
+pg_info_t()
+	: last_epoch_started(0), last_user_version(0),
+	last_backfill(hobject_t::get_max()),
+	last_backfill_bitwise(false)
+{ }
+
+// cppcheck-suppress noExplicitConstructor
+pg_info_t(spg_t p)
+	: pgid(p),
+	last_epoch_started(0), last_user_version(0),
+	last_backfill(hobject_t::get_max()),
+	last_backfill_bitwise(false)
+{ }
+{% endhighlight %}
+初始化时，还不知道有哪些对象缺失，因此直接设置为hobject_t::get_max()。
+
+
+2）**activate()时根据权威日志计算出所要backfill的对象列表**
+{% highlight string %}
+void PG::activate(ObjectStore::Transaction& t,
+		  epoch_t activation_epoch,
+		  list<Context*>& tfin,
+		  map<int, map<spg_t,pg_query_t> >& query_map,
+		  map<int,
+		      vector<
+			pair<pg_notify_t,
+			     pg_interval_map_t> > > *activator_map,
+                  RecoveryCtx *ctx)
+{
+	...
+	// if primary..
+	if (is_primary()) {
+		for (set<pg_shard_t>::iterator i = actingbackfill.begin();i != actingbackfill.end();++i) {
+
+			if (*i == pg_whoami) continue;
+			pg_shard_t peer = *i;
+			pg_info_t& pi = peer_info[peer];
+
+
+			...
+			/*
+			* cover case where peer sort order was different and
+			* last_backfill cannot be interpreted
+			*/
+			bool force_restart_backfill =!pi.last_backfill.is_max() && pi.last_backfill_bitwise != get_sort_bitwise();
+
+			if (pi.last_update == info.last_update && !force_restart_backfill) {
+
+				//已经追上权威
+
+			}else if (pg_log.get_tail() > pi.last_update || pi.last_backfill == hobject_t() ||
+				force_restart_backfill ||(backfill_targets.count(*i) && pi.last_backfill.is_max())){
+
+				/* ^ This last case covers a situation where a replica is not contiguous
+				* with the auth_log, but is contiguous with this replica.  Reshuffling
+				* the active set to handle this would be tricky, so instead we just go
+				* ahead and backfill it anyway.  This is probably preferrable in any
+				* case since the replica in question would have to be significantly
+				* behind.
+				*/
+				// backfill(日志不重叠，采用backfill方式来进行恢复)
+
+				pi.last_update = info.last_update;
+				pi.last_complete = info.last_update;
+				pi.set_last_backfill(hobject_t(), get_sort_bitwise());
+				pi.last_epoch_started = info.last_epoch_started;
+				pi.history = info.history;
+				pi.hit_set = info.hit_set;
+				pi.stats.stats.clear();
+
+				...
+				pm.clear();
+			}else{
+				//catch up(具有日志重叠，直接采用pglog进行恢复)
+
+				m = new MOSDPGLog(i->shard, pg_whoami.shard,get_osdmap()->get_epoch(), info);
+
+				// send new stuff to append to replicas log
+				//(拷贝pg_log中last_update之后的日志到m中)
+				m->log.copy_after(pg_log.get_log(), pi.last_update);
+			}
+
+			....
+
+		}
+
+	}
+}
+{% endhighlight %}
+
+3) **PG分裂时，计算出child的last_backfill**
+{% highlight string %}
+void PG::split_into(pg_t child_pgid, PG *child, unsigned split_bits)
+{
+	...
+
+	if (info.last_backfill.is_max()) {
+		child->info.set_last_backfill(hobject_t::get_max(),info.last_backfill_bitwise);
+	} else {
+		// restart backfill on parent and child to be safe.  we could
+		// probably do better in the bitwise sort case, but it's more
+		// fragile (there may be special work to do on backfill completion
+		// in the future).
+		info.set_last_backfill(hobject_t(), info.last_backfill_bitwise);
+		child->info.set_last_backfill(hobject_t(), info.last_backfill_bitwise);
+	}
+
+	...
+}
+{% endhighlight %}
+如果父PG没有需要backfill的对象，那么自然child pg也是没有，直接设置为hobject_t::get_max()即可；如果父PG有需要backfill的对象，那么则将父PG及子PG的last_backfill均设置为hobject_t()，重新开始进行backfill操作。
+
+4) **PG初始化时，根据backfill标志设置last_backfill**
+{% highlight string %}
+void PG::init(
+  int role,
+  const vector<int>& newup, int new_up_primary,
+  const vector<int>& newacting, int new_acting_primary,
+  const pg_history_t& history,
+  pg_interval_map_t& pi,
+  bool backfill,
+  ObjectStore::Transaction *t)
+{
+	...
+	if (backfill) {
+		dout(10) << __func__ << ": Setting backfill" << dendl;
+		info.set_last_backfill(hobject_t(), get_sort_bitwise());
+		info.last_complete = info.last_update;
+		pg_log.mark_log_for_rewrite();
+	}
+	...
+}
+{% endhighlight %}
+
+5) **收到MOSDPGBackfill消息时设置last_backfill**
+{% highlight string %}
+void ReplicatedPG::do_backfill(OpRequestRef op)
+{
+	...
+
+	switch (m->op) {
+		...
+
+		case MOSDPGBackfill::OP_BACKFILL_PROGRESS:
+		{
+			assert(cct->_conf->osd_kill_backfill_at != 2);
+			
+			info.set_last_backfill(m->last_backfill, get_sort_bitwise());
+			if (m->compat_stat_sum) {
+				info.stats.stats = m->stats.stats; // Previously, we only sent sum
+			} else {
+				info.stats = m->stats;
+			}
+			
+			ObjectStore::Transaction t;
+			dirty_info = true;
+			write_if_dirty(t);
+			int tr = osd->store->queue_transaction(osr.get(), std::move(t), NULL);
+			assert(tr == 0);
+		}
+		break; 
+
+		...
+	}
+
+	...
+{% endhighlight %}
+
+6) **on_removal时设置last_backfill**
+{% highlight string %}
+void ReplicatedPG::on_removal(ObjectStore::Transaction *t)
+{
+	dout(10) << "on_removal" << dendl;
+	
+	// adjust info to backfill
+	info.set_last_backfill(hobject_t(), true);
+	dirty_info = true;
+	
+	
+	// clear log
+	PGLogEntryHandler rollbacker;
+	pg_log.clear_can_rollback_to(&rollbacker);
+	rollbacker.apply(this, t);
+	
+	write_if_dirty(*t);
+	
+	if (!deleting)
+		on_shutdown();
+}
+{% endhighlight %}
+
+7) **recover_backfill()时设置last_backfill**
+{% highlight string %}
+/**
+ * recover_backfill
+ *
+ * Invariants:
+ *
+ * backfilled: fully pushed to replica or present in replica's missing set (both
+ * our copy and theirs).
+ *
+ * All objects on a backfill_target in
+ * [MIN,peer_backfill_info[backfill_target].begin) are either
+ * not present or backfilled (all removed objects have been removed).
+ * There may be PG objects in this interval yet to be backfilled.
+ *
+ * All objects in PG in [MIN,backfill_info.begin) have been backfilled to all
+ * backfill_targets.  There may be objects on backfill_target(s) yet to be deleted.
+ *
+ * For a backfill target, all objects < MIN(peer_backfill_info[target].begin,
+ *     backfill_info.begin) in PG are backfilled.  No deleted objects in this
+ * interval remain on the backfill target.
+ *
+ * For a backfill target, all objects <= peer_info[target].last_backfill
+ * have been backfilled to target
+ *
+ * There *MAY* be objects between last_backfill_started and
+ * MIN(peer_backfill_info[*].begin, backfill_info.begin) in the event that client
+ * io created objects since the last scan.  For this reason, we call
+ * update_range() again before continuing backfill.
+ */
+int ReplicatedPG::recover_backfill(
+  int max,
+  ThreadPool::TPHandle &handle, bool *work_started)
+{
+	...
+
+	// If new_last_backfill == MAX, then we will send OP_BACKFILL_FINISH to
+	// all the backfill targets.  Otherwise, we will move last_backfill up on
+	// those targets need it and send OP_BACKFILL_PROGRESS to them.
+	for (set<pg_shard_t>::iterator i = backfill_targets.begin();i != backfill_targets.end();++i) {
+		
+		pg_shard_t bt = *i;
+		pg_info_t& pinfo = peer_info[bt];
+		
+		if (cmp(new_last_backfill, pinfo.last_backfill, get_sort_bitwise()) > 0) {
+			pinfo.set_last_backfill(new_last_backfill, get_sort_bitwise());
+			epoch_t e = get_osdmap()->get_epoch();
+			MOSDPGBackfill *m = NULL;
+
+			...
+		}
+	}
+
+	...
+}
+{% endhighlight %}
+
 
 ### 1.2 pg_stat_t数据结构
 
