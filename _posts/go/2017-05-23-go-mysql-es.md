@@ -104,6 +104,15 @@ go-mysql-elasticsearch
 </pre>
 上面看到，go-mysql-elasticsearch的启动方式很简单，这里我们主要需要关注```配置文件```的写法，留作稍后讲解。
 
+5） 所需权限
+
+运行go-mysql-elasticsearch进行日志同步时，要求访问数据库的用户具有如下权限：
+<pre>
+# GRANT REPLICATION CLIENT ON *.* TO 'repl'@'%';
+# GRANT REPLICATION SLAVE ON *.* TO 'repl'@'%';       
+# GRANT SELECT ON *.* TO 'repl'@'%';
+# GRANT RELOAD ON *.* TO 'repl'@'%';
+</pre>
 
 ## 2. go-mysql-elasticsearch注意事项
 
