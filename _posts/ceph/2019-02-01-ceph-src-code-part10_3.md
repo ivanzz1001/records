@@ -138,7 +138,7 @@ void pg_to_up_acting_osds(pg_t pg, vector<int> *up, int *up_primary,
 	
 }
 {% endhighlight %}
-上面我们看到会调用OSDMap::pg_to_up_acting_osds()来计算当前PG的up osds以及acting osds。我们```必须```使用acting set来进行数据的映射；而对于up set则主要用于pg temp场景。
+上面我们看到会调用OSDMap::pg_to_up_acting_osds()来计算当前PG的up osds以及acting osds。我们```必须```使用acting set来进行数据的映射；但有些用户也会发现up set也是很有用的，通过对比acting set与up set就可以知道pg_temp是什么。
 
 >注：OSD启动时，并不是直接去monitor拿最新的osdmap，而是从superblock中读取上一次所保存的osdmap。
 
@@ -153,14 +153,14 @@ void OSDMap::_pg_to_up_acting_osds(const pg_t& pg, vector<int> *up, int *up_prim
 		if (up)
 			up->clear();
 			
-	if (up_primary)
-		*up_primary = -1;
-		
-	if (acting)
-		acting->clear();
-		
-	if (acting_primary)
-		*acting_primary = -1;
+		if (up_primary)
+			*up_primary = -1;
+			
+		if (acting)
+			acting->clear();
+			
+		if (acting_primary)
+			*acting_primary = -1;
 		
 		return;
 	}
@@ -266,7 +266,7 @@ void OSDMap::_remove_nonexistent_osds(const pg_pool_t& pool,
 }
 {% endhighlight %}
 
-_pg_to_osds()函数的实现比较简单，其从crushmap中获取PG所映射到的OSD。这里注意，从crushmap获取到到的映射与OSD的运行状态无关。之后调用_remove_nonexistent_osds()函数移除在该OSDMap下不存在的OSD。
+_pg_to_osds()函数的实现比较简单，其从crushmap中获取PG所映射到的OSD。这里注意，从crushmap获取到到的映射与OSD的运行状态无关(与权重有关，当osd out出去之后，其权重变为了0，在进行crush->do_rule()时就不会再映射到该OSD上了)。之后调用_remove_nonexistent_osds()函数移除在该OSDMap下不存在的OSD。
 
 _pg_to_osds()函数返回了最原始的PG到OSD的映射，并且第一个即为primary。
 

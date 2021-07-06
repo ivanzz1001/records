@@ -27,7 +27,28 @@ up_thru的引入目的是为了解决如下这类极端场景：
 
 要想知道up_thru到底是啥，可以先通过其相关数据结构感受一下，如下：
 {% highlight string %}
-//src/osd/osdmap.h
+/*
+ * we track up to two intervals during which the osd was alive and
+ * healthy.  the most recent is [up_from,up_thru), where up_thru is
+ * the last epoch the osd is known to have _started_.  i.e., a lower
+ * bound on the actual osd death.  down_at (if it is > up_from) is an
+ * upper bound on the actual osd death.
+ *
+ * the second is the last_clean interval [first,last].  in that case,
+ * the last interval is the last epoch known to have been either
+ * _finished_, or during which the osd cleanly shut down.  when
+ * possible, we push this forward to the epoch the osd was eventually
+ * marked down.
+ *
+ * the lost_at is used to allow build_prior to proceed without waiting
+ * for an osd to recover.  In certain cases, progress may be blocked 
+ * because an osd is down that may contain updates (i.e., a pg may have
+ * gone rw during an interval).  If the osd can't be brought online, we
+ * can force things to proceed knowing that we _might_ be losing some
+ * acked writes.  If the osd comes back to life later, that's fine to,
+ * but those writes will still be lost (the divergent objects will be
+ * thrown out).
+ */
 struct osd_info_t {
 	epoch_t last_clean_begin;  // last interval that ended with a clean osd shutdown
 	epoch_t last_clean_end;
@@ -48,11 +69,29 @@ private:
 };
 {% endhighlight %}
 
-在OSD处于alive + healthy阶段，我们通常会跟踪两个interval。最近的一个interval就是[up_from, up_thru)，这里up_thru（假设大于up_from的话）就是OSD处于```_started_```状态时的最后一个epoch，通常是osd实际down掉时的一个下边界值， 而down_at(假设其大于up_from的话）则是osd实际down掉时的一个上边界值。
+* last_clean_begin和last_clean_end: 以一个clean的osd关闭而结束的最终区间
 
-另一个interval则是last_clean interval[first, last]。在这种情况下，last即为该OSD cleanly shutdown时的epoch值。
+* up_from: osd被标记为up时的epoch
 
-lost_at的作用在于不必等待OSD恢复，即可允许调用build_prior()来进行处理。在很多情况下，在osd处于down状态时，progress可能会被阻塞（这些操作中可能就包含一些更新操作）。假设OSD并不能回到online状态，我们可以强制继续进行处理，尽管这可能会丢失一些已经```应答```的write操作。稍后假设OSD重新回到线上后，则这些写操作仍然会被丢弃（the divergent objects will be thrown out）。
+* up_thru: 实际osd终止时的下界(如果它大于up_from)
+
+* down_at: 实际osd终止时的上界(如果它大于up_from)
+
+* lost_at: 决定数据已经丢失时的最终epoch
+
+osd_info_t结构用来表述随着时间推移，各个状态的epoch。
+
+
+在OSD处于alive + healthy期间，我们通常会跟踪两个interval。其中最近(the most recent)一个interval就是[up_from, up_thru)，这里```up_thru```就是OSD被确信进入```_started_```状态时的前一个epoch值，换句话说就是OSD实际进入```death```状态的下边界值。而```down_at```(假设其大于```up_from```的话)就是OSD实际进入```death```状态的上边界值。
+
+另一个则是```last_clean``` interval[first, last]，在这种情况下，last interval就是OSD进入```_finished```状态时的前一个epoch值，或者OSD执行```cleanly``` shutdown的这一段区间。
+
+
+>注： 关于up_thru的计算，我们会在下文讲述到
+
+
+
+```lost_at```的作用在于不必等待OSD恢复，即可允许调用build_prior()来进行处理。在很多情况下，在osd处于down状态时，progress可能会被阻塞（这些操作中可能就包含一些更新操作）。假设OSD并不能回到online状态，我们可以强制继续进行处理，尽管这可能会丢失一些已经```应答```的write操作。稍后假设OSD重新回到线上后，则这些写操作仍然会被丢弃（the divergent objects will be thrown out）。
 
 通过上面的数据结构我们便可以知道，up_thru是作为osd的信息保存在osdmap里的，其类型便是osdmap的版本号(epoch_t)。
 
@@ -870,6 +909,7 @@ bool OSDMonitor::prepare_pgtemp(MonOpRequestRef op)
 
 1. [分布式存储架构：Ceph之up_thru来龙去脉分析](https://zhuanlan.zhihu.com/p/166527885)
 
+2. [OSDMap](https://gitee.com/wanghongxu/cephknowledge/blob/master/Ceph-OSDMap.md)
 
 <br />
 <br />

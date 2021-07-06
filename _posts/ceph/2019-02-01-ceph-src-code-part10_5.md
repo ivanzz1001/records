@@ -690,59 +690,61 @@ void OSD::consume_map()
 在consume_map()中会触发发布新接收到的OSDMap，之后再触发相应PG的peering操作。
 
 
-### 3.1 Session数据结构介绍
-在进一步分析ms_fast_dispatch()之前，我们先来介绍一下Session这个数据结构：
+### 3.1 几个相关变量
+在进一步分析ms_fast_dispatch()之前，我们先来分析一下如下几个重要的变量：
 {% highlight string %}
 struct Session : public RefCountedObject {
 	list<OpRequestRef> waiting_on_map;
-	
-	OSDMapRef osdmap;  /// Map as of which waiting_for_pg is current
+
 	map<spg_t, list<OpRequestRef> > waiting_for_pg;
-
-	set<Session*> session_waiting_for_map;
-	map<spg_t, set<Session*> > session_waiting_for_pg;
 };
+class OSD : public Dispatcher,public md_config_obs_t {
+public:
+	set<Session*> session_waiting_for_map;
+  	map<spg_t, set<Session*> > session_waiting_for_pg;
+};
+
 {% endhighlight %}
-Session通常会与Connection所绑定。
+如下图所示：
 
-* waiting_on_map：用于保存等待在指定osdmap上的请求。在PG创建过程中，可能会有一些在指定PG上的请求被放入waiting_for_pg，当PG创建完成，就需要将这些请求重新放入waiting_on_map来进行分发。
+![ceph-chapter10](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_52.jpg)
 
-* waiting_for_pg: 用于保存等待在指定PG上的请求。通常为新创建PG或者PG分裂情况下，本OSD暂时未能获取到最新的PGMap，从而导致发到指定PG上的请求被阻塞。
+* Session::waiting_on_map: 等待在OSDMap上的请求。通常来说，在peering过程中当发现要创建PG，或者Peering过程中发现该PG有分裂出子PG，则可能会把相关的一些请求放入到session对应的waiting_on_map中；
 {% highlight string %}
-PG *OSD::get_pg_or_queue_for_pg(const spg_t& pgid, OpRequestRef& op)
+//处理peering event
+void OSD::handle_pg_peering_evt(
+  spg_t pgid,
+  const pg_history_t& orig_history,
+  pg_interval_map_t& pi,
+  epoch_t epoch,
+  PG::CephPeeringEvtRef evt)
 {
-	Session *session = static_cast<Session*>(op->get_req()->get_connection()->get_priv());
-	if (!session)
-		return NULL;
+	//
+	wake_pg_waiters(pgid);
+}
 
-	// get_pg_or_queue_for_pg is only called from the fast_dispatch path where
-	// the session_dispatch_lock must already be held.
-	assert(session->session_dispatch_lock.is_locked());
-	RWLock::RLocker l(pg_map_lock);
-	
-	ceph::unordered_map<spg_t, PG*>::iterator i = pg_map.find(pgid);
-	if (i == pg_map.end())
-		session->waiting_for_pg[pgid];
-	
-	map<spg_t, list<OpRequestRef> >::iterator wlistiter = session->waiting_for_pg.find(pgid);
-	
-	PG *out = NULL;
-	if (wlistiter == session->waiting_for_pg.end()) {
-		out = i->second;
-	} else {
-		wlistiter->second.push_back(op);
-		register_session_waiting_on_pg(session, pgid);
+
+//PG分裂
+void OSD::process_peering_events(
+  const list<PG*> &pgs,
+  ThreadPool::TPHandle &handle
+  )
+{
+	...
+	if (!split_pgs.empty()) {
+		rctx.on_applied->add(new C_CompleteSplits(this, split_pgs));
+		split_pgs.clear();
 	}
-	session->put();
-	return out;
 }
 {% endhighlight %}
-OSD::get_pg_or_queue_for_pg()当返回的PG不为空时，表示get pg；当为空时，表示queue for pg。当pg_map中查找不到指定的PG时，就会将该pgid添加到session的waiting_for_pg列表中。
 
-* session_waiting_for_map: 用于保存等待新OSDMap的session
+* Session::waiting_for_pg: 等待在指定PG上的请求。通常来说，当获取不到指定的PG时(比如当前并没有获得到最新的OSDMap，从而导致PG找不到)，就会将请求放入到waiting_for_pg中；
 
-* session_waiting_for_pg：用于保存等待在指定PG上的session。
 
+
+* OSD::session_waiting_for_map: 保存等待在OSDMap上的Session;
+
+* OSD::session_waiting_for_pg：保存等待在指定PG上的session。
 
 
 ### 3.1 函数update_waiting_for_pg()
@@ -985,6 +987,13 @@ _dispatch()会分发如下消息，其中有一些不需要依赖OSDMap，另外
 * MSG_OSD_BACKFILL_RESERVE
 
 * MSG_OSD_RECOVERY_RESERVE
+
+
+## 5. OSD运行状态
+下面我们简要介绍一下OSD运行中的几个状态，以便更好的理解peering:
+
+![ceph-chapter10](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_53.jpg)
+
 
 
 
