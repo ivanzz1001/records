@@ -77,7 +77,7 @@ private:
 
 * down_at: 实际osd终止时的上界(如果它大于up_from)
 
-* lost_at: 决定数据已经丢失时的最终epoch
+* lost_at: 决定数据被丢失时的epoch。通常是通过```ceph osd lost <id>```命令主动将某一个OSD标记为lost状态，这样在进行数据恢复时就不会等待该OSD上的数据了。
 
 osd_info_t结构用来表述随着时间推移，各个状态的epoch。
 

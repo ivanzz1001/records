@@ -1,6 +1,6 @@
 ---
 layout: post
-title: ceph数据修复
+title: ceph recovery研究(1)
 tags:
 - ceph
 categories: ceph
