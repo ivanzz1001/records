@@ -702,6 +702,8 @@ class OSD : public Dispatcher,public md_config_obs_t {
 public:
 	set<Session*> session_waiting_for_map;
   	map<spg_t, set<Session*> > session_waiting_for_pg;
+
+	list<OpRequestRef>  waiting_for_osdmap;
 };
 
 {% endhighlight %}
@@ -745,6 +747,10 @@ void OSD::process_peering_events(
 * OSD::session_waiting_for_map: 保存等待在OSDMap上的Session;
 
 * OSD::session_waiting_for_pg：保存等待在指定PG上的session。
+
+* OSD::waiting_for_osdmap: 保存等待在OSDMap上的请求
+
+>注：一般具有session状态、需要等待响应的消息会加入到session_waiting_for_map中；而无状态的需要等待osdmap的请求加入到waiting_for_osdmap中
 
 
 ### 3.1 函数update_waiting_for_pg()

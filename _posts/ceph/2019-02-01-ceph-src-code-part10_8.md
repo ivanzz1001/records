@@ -420,6 +420,386 @@ last_epoch_started字段有两个地方出现，一个是```pg_info_t```结构�
 ![ceph-chapter10-8](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter108_1.png)
 
 
+**情况2：** 当该osd1发生异常之后，过一段时间又重新恢复，当完成了Peering状态后的情况。此时该PG可以继续接受更新操作。例如：下面的灰色字体的日志记录为该osd1崩溃期间缺失的日志，obj7为新的写入的操作日志记录。last_update指向最新的更新版本(1,7)，last_complete依然指向版本(1,2)。即last_update指的是最新的版本，last_complete指的是上次的更新版本。过程如下：
+
+![ceph-chapter10-8](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_16.jpg)
+
+>注：obj7的epoch似乎不应该为1了
+
+**last_complete为Recovery修复进程完成的指针**。当该PG开始进行Recovery工作时，last_complete指针随着Recovery过程推进，它指向完成修复的版本。例如：当Recovery完成后last_complete指向最后一个修复的对象版本(1,6)，如下图所示：
+
+![ceph-chapter10-8](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_17.jpg)
+
+**last_backfill为Backfill修复进程的指针**。在Ceph Peering的过程中，该PG有osd2无法根据PG日志来恢复，就需要进行backfill过程。last_backfill初始化为MIN对象，用来记录Backfill的修复进程中已修复的对象。例如：进行Backfill操作时，扫描本地对象（按照对象的hash值排序）。last_backfill随修复的过程不断推进。如果对象小于等于last_backfill，就是已经修复完成的对象。如果对象大于last_backfill且对象的版本小于last_complete，就是处于缺失还没有修复的对象。过程如下所示：
+
+![ceph-chapter10-8](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_18.jpg)
+
+当恢复完成之后，last_backfill设置为MAX值，表明恢复完成，设置last_complete等于last_update的值。
+
+
+
+## 3. Peering的触发
+通常在如下两种情形下会触发PG的Peering过程：
+
+* OSD启动时主动触发
+{% highlight string %}
+int OSD::init()
+{
+	...
+	consume_map();
+	...
+}
+
+void OSD::consume_map()
+{
+	...
+}
+{% endhighlight %}
+
+
+* 接收到新的OSDMap触发
+
+对于上面第一种情况，这里不做介绍。这里主要讲述当OSD接受到新的OSDMap时，是如何触发Peering流程的。如下图所示：
+
+![ceph-chapter10-8](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter108_2.jpg)
+
+### 3.1 接收新的OSDMap
+OSD继承自Dispatcher,因此其可以作为网络消息的接收者：
+{% highlight string %}
+bool OSD::ms_dispatch(Message *m)
+{
+	....
+
+	while (dispatch_running) {
+	dout(10) << "ms_dispatch waiting for other dispatch thread to complete" << dendl;
+		dispatch_cond.Wait(osd_lock);
+	}
+	dispatch_running = true;
+	
+	do_waiters();
+	_dispatch(m);
+	do_waiters();
+	
+	dispatch_running = false;
+	dispatch_cond.Signal();
+	...
+}
+
+void OSD::do_waiters()
+{
+	assert(osd_lock.is_locked());
+	
+	dout(10) << "do_waiters -- start" << dendl;
+	finished_lock.Lock();
+	while (!finished.empty()) {
+		OpRequestRef next = finished.front();
+		finished.pop_front();
+		finished_lock.Unlock();
+		dispatch_op(next);
+		finished_lock.Lock();
+	}
+	finished_lock.Unlock();
+	dout(10) << "do_waiters -- finish" << dendl;
+}
+
+void OSD::activate_map(){
+	...
+	// process waiters
+	take_waiters(waiting_for_osdmap);
+}
+
+void take_waiters(list<OpRequestRef>& ls) {
+	finished_lock.Lock();
+	finished.splice(finished.end(), ls);
+	finished_lock.Unlock();
+}
+{% endhighlight %}
+
+ms_dispatch()所分发的一般是实时性不需要那么强的消息，因此这里我们看到其会调用do_waiters()来等待阻塞在osdmap上的消息分发完成。
+
+如下是对osdmap的分发：
+{% highlight string %}
+void OSD::_dispatch(Message *m)
+{
+	...
+	switch (m->get_type()) {
+		// map and replication
+		case CEPH_MSG_OSD_MAP:
+		handle_osd_map(static_cast<MOSDMap*>(m));
+		break;
+	}
+}
+{% endhighlight %}
+
+### 3.2 handle_osd_map()实现对新OSDMap的处理
+
+handle_osd_map()的实现比较简单，其主要是对接收到的Message中的相关OSDMap信息进行处理。如下图所示：
+
+![ceph-chapter10-8](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter108_3.jpg)
+
+
+1）如果接收到的osdmaps中，最后一个OSDMap小于等于superblock.newest，则直接跳过
+
+2） 如果收到的osdmaps中，第一个OSDMap大于superblock.newest +1，那么中间肯定存在缝隙，可分如下几种情况处理：
+
+* 如果Monitor上最老的osdmap小于等于superblock.newest+1，那么说明我们仍然可以获取到OSD所需的所有OSDMap，此时只需要发起一个订阅请求即可；
+
+* 如果Monitor上最老的osdmap大于superblock.newest+1，且monitor.oldest小于m.first，则当前OSD是无法从Monitor获得所有的OSDMap了，此时只能尝试从Monitor获取尽可能多的osdmap，因此也发起一个订阅请求；
+
+* 如果Monitor上最老的osdmap大于superblock.newest+1，且monitor.oldest等于m.first，则此时虽然存在缝隙，但是我们也不能从Monitor获取到更多的OSDMap，此时将skip_maps置为true；
+
+3）遍历Message中的所有OSDMap，然后存入缓存以及硬盘
+
+>注： 当skip_maps置为true时，我们要将superblock上保存的最老的OSDMap设置为m.first，确保OSD上所保存的OSDMap是连续的
+
+### 3.3 处理已提交的OSDMaps
+当接收到的OSDMap保存成功之后，就会回调_committed_osd_maps()，下面我们来看该函数的实现：
+
+1）遍历接收到的osdmaps，如果有OSD在新的osdmap中不存在了或者不为up状态了，那么在发布新的OSDMap之前，必须等待阻塞在当前osdmap上的请求处理完成
+{% highlight string %}
+void OSD::_committed_osd_maps(epoch_t first, epoch_t last, MOSDMap *m)
+{
+	...
+
+	// advance through the new maps
+	for (epoch_t cur = first; cur <= last; cur++) {
+		
+		OSDMapRef newmap = get_map(cur);
+		service.pre_publish_map(newmap);               //将新的osdmap标记为预发布状态
+
+		/*
+		 * kill connections to newly down osds
+		 * （等待当前OSDMap上的请求处理完成）
+		 */
+		bool waited_for_reservations = false;
+		set<int> old;
+		osdmap->get_all_osds(old);
+		for (set<int>::iterator p = old.begin(); p != old.end(); ++p) {
+			if (*p != whoami &&
+			  osdmap->have_inst(*p) &&                        // in old map
+			  (!newmap->exists(*p) || !newmap->is_up(*p))) {  // but not the new one
+				if (!waited_for_reservations) {
+					service.await_reserved_maps();
+					waited_for_reservations = true;
+				}
+				note_down_osd(*p);
+			}
+		}
+
+		//将newmap发布
+		osdmap = newmap;
+	}
+}
+{% endhighlight %}
+
+2）若当前所设置的最新的OSDMap合法，且当前OSD处于active状态，那么检测当前OSD状态看是否符合OSDMap要求：
+{% highlight string %}
+void OSD::_committed_osd_maps(epoch_t first, epoch_t last, MOSDMap *m)
+{	
+	...
+
+	if (osdmap->get_epoch() > 0 && is_active()) {
+		if (!osdmap->exists(whoami)) {
+
+			//当前OSD已经在OSDMap中不存在了，则发起相应的信号关闭当前OSD
+
+	}else if (!osdmap->is_up(whoami) ||
+		!osdmap->get_addr(whoami).probably_equals(
+		client_messenger->get_myaddr()) ||
+		!osdmap->get_cluster_addr(whoami).probably_equals(
+		cluster_messenger->get_myaddr()) ||
+		!osdmap->get_hb_back_addr(whoami).probably_equals(
+		hb_back_server_messenger->get_myaddr()) ||
+		(osdmap->get_hb_front_addr(whoami) != entity_addr_t() &&
+		!osdmap->get_hb_front_addr(whoami).probably_equals(
+		hb_front_server_messenger->get_myaddr()))){
+			
+			//当前OSD的绑定信息出现了错误，需要重新绑定
+
+
+		}
+	}
+}
+{% endhighlight %}
+
+3）消费并激活OSDMap
+{% highlight string %}
+void OSD::_committed_osd_maps(epoch_t first, epoch_t last, MOSDMap *m)
+{
+	...
+
+	// yay!
+	consume_map();
+	
+	if (is_active() || is_waiting_for_healthy())
+	maybe_update_heartbeat_peers();
+	
+	if (!is_active()) {
+		dout(10) << " not yet active; waiting for peering wq to drain" << dendl;
+		peering_wq.drain();
+	} else {
+		activate_map();
+	}
+	...
+}
+{% endhighlight %}
+
+对于consume_map()函数，我们放到后面来讲解，现在我们来看一下activate_map()的实现：
+{% highlight string %}
+void OSD::activate_map()
+{
+	...
+	
+	service.activate_map();
+	// process waiters
+	take_waiters(waiting_for_osdmap);
+}
+
+void take_waiters(list<OpRequestRef>& ls) {
+	finished_lock.Lock();
+	finished.splice(finished.end(), ls);
+	finished_lock.Unlock();
+}
+{% endhighlight %}
+
+我们知道waiting_for_osdmap里面存放的是一些因等待```新osdmap```而阻塞的请求,现在新的osdmap已经发布了，因此这里将相关的请求放入到finished队列里。
+
+>注：waiting_for_osdmap里面存放的是不需要绑定session的消息
+
+### 3.4 消费OSDMap
+在OSD::consume_map()中主要做如下事情：
+
+1） 遍历pg_map，检查是否有PG需要移除，或者是否有PG需要分裂
+{% highlight string %}
+void OSD::consume_map()
+{
+	 // scan pg's
+	{
+		RWLock::RLocker l(pg_map_lock);
+		for (ceph::unordered_map<spg_t,PG*>::iterator it = pg_map.begin();it != pg_map.end();++it) {
+			PG *pg = it->second;
+	
+			pg->lock();
+			if (pg->is_primary())
+				num_pg_primary++;
+			else if (pg->is_replica())
+				num_pg_replica++;
+			else
+				num_pg_stray++;
+		
+			if (!osdmap->have_pg_pool(pg->info.pgid.pool())) {
+				//pool is deleted!
+				to_remove.push_back(PGRef(pg));
+			} else {
+				service.init_splits_between(it->first, service.get_osdmap(), osdmap);
+			}
+			
+				pg->unlock();
+		}
+	}
+
+	for (list<PGRef>::iterator i = to_remove.begin();i != to_remove.end();to_remove.erase(i++)) {
+		RWLock::WLocker locker(pg_map_lock);
+		(*i)->lock();
+		_remove_pg(&**i);
+		(*i)->unlock();
+	}
+	to_remove.clear();
+}
+{% endhighlight %}
+
+2) 将OSDMap发布到OSDService
+{% highlight string %}
+void OSD::consume_map()
+{
+	...
+
+	service.pre_publish_map(osdmap);
+	service.await_reserved_maps();
+	service.publish_map(osdmap);
+	
+	dispatch_sessions_waiting_on_map();
+}
+{% endhighlight %}
+
+这里注意，我们在_committed_osd_maps()函数里只是将新收到的OSDMap发布给了OSD，在这里才将该最新的OSD发布到OSDService里。我们在进行数据读写操作时用的都是OSDService::osdmap。在真正发布之前，我们需要等到前一个OSDMap上的请求都执行完成。
+
+session_waiting_for_map中所存放的一般是需要绑定session且因等待osdmap而阻塞的消息，因此这里我们调用dispatch_sessions_waiting_on_map()来对阻塞的消息进行分发。
+
+>注：要绑定session，一般是说明请求与OSDMap严重相关，且一般需要对相关的请求做响应
+
+
+3）移除session_waiting_for_pg中不符合条件的PG
+{% highlight string %}
+void OSD::consume_map()
+{
+	// remove any PGs which we no longer host from the session waiting_for_pg lists
+	set<spg_t> pgs_to_check;
+	get_pgs_with_waiting_sessions(&pgs_to_check);
+	for (set<spg_t>::iterator p = pgs_to_check.begin();p != pgs_to_check.end();++p) {
+		if (!(osdmap->is_acting_osd_shard(p->pgid, whoami, p->shard))) {
+			set<Session*> concerned_sessions;
+			get_sessions_possibly_interested_in_pg(*p, &concerned_sessions);
+			for (set<Session*>::iterator i = concerned_sessions.begin();i != concerned_sessions.end();++i) {
+			  {
+				Mutex::Locker l((*i)->session_dispatch_lock);
+				session_notify_pg_cleared(*i, osdmap, *p);
+			  }
+			  (*i)->put();
+			}
+		}
+	}
+}
+{% endhighlight %}
+
+由于OSDMap发生变化，当前OSD上的一些PG可能会由pg primary变为pg replica，因此这里将session_waiting_for_pg中一些不再符合条件的PG移除。
+
+4) 向当前OSD上的所有PG发送CephPeeringEvt事件
+{% highlight string %}
+void OSD::consume_map()
+{
+	// scan pg's
+	{
+		RWLock::RLocker l(pg_map_lock);
+		for (ceph::unordered_map<spg_t,PG*>::iterator it = pg_map.begin();it != pg_map.end();++it) {
+			PG *pg = it->second;
+			pg->lock();
+			pg->queue_null(osdmap->get_epoch(), osdmap->get_epoch());
+			pg->unlock();
+		}
+	
+		logger->set(l_osd_pg, pg_map.size());
+	}
+}
+
+
+void PG::queue_null(epoch_t msg_epoch,epoch_t query_epoch)
+{
+	dout(10) << "null" << dendl;
+	queue_peering_event(
+    	CephPeeringEvtRef(std::make_shared<CephPeeringEvt>(msg_epoch, query_epoch,
+					 NullEvt())));
+}
+
+void PG::queue_peering_event(CephPeeringEvtRef evt)
+{
+	if (old_peering_evt(evt))
+		return;
+
+	peering_queue.push_back(evt);
+	osd->queue_for_peering(this);
+}
+
+void OSDService::queue_for_peering(PG *pg)
+{
+	peering_wq.queue(pg);
+}
+{% endhighlight %}
+这里我们看到，OSD会遍历pg_map上的所有PG(包括pg primary以及pg replica)，然后向其发送NullEvt事件。事件最终会添加进PG::peering_queue中，并且会将该PG添加到OSDService::peering_wq(即OSD::peering_wq，因为OSDService::peering_wq只是一个引用)
+
+>这里我们注意，CephPeeringEvt::epoch_sent以及CephPeeringEvt::epoch_requested都设置为了当前OSD::osdmap的版本号。
+
+
 
 
 
