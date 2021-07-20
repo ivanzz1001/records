@@ -63,9 +63,6 @@ remote: Counting objects: 100% (3/3), done.
 remote: Total 3 (delta 0), reused 0 (delta 0), pack-reused 0
 Unpacking objects: 100% (3/3), done.
 Checking connectivity... done.
-
-Administrator@ZHANGYW6668 MINGW64 /f/worksp
-
 {% endhighlight %}
 如果想在克隆远程仓库的时候，自定义本地仓库的名字，可以使用如下命令：
 <pre>
