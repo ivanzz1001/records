@@ -847,26 +847,424 @@ Peering的默认初始子状态为GetInfo状态，因此这里会马上进入```
 
 
 ## 3. Peering状态详细处理
-我们接着上面，对于PG Primary进入Peering状态后，马上进入Peering的默认初始子状态GetInfo。现在我们从```GetInfo```状态开始讲起。
+我们接着上面，对于PG Primary进入Peering状态后，马上进入Peering的默认初始子状态GetInfo。下图是Peering过程的一个整体状态转换图：
+
+![ceph-chapter10-10](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter1010_3.jpg)
+
+
+现在我们从```GetInfo```状态开始讲起。
 
 ### 3.1 GetInfo状态
 {% highlight string %}
 struct GetInfo : boost::statechart::state< GetInfo, Peering >, NamedState {
-set<pg_shard_t> peer_info_requested;
+  set<pg_shard_t> peer_info_requested;
 
-explicit GetInfo(my_context ctx);
-void exit();
-void get_infos();
+  explicit GetInfo(my_context ctx);
+  void exit();
+  void get_infos();
 
 typedef boost::mpl::list <
-boost::statechart::custom_reaction< QueryState >,
-boost::statechart::transition< GotInfo, GetLog >,
-boost::statechart::custom_reaction< MNotifyRec >
+ boost::statechart::custom_reaction< QueryState >,
+ boost::statechart::transition< GotInfo, GetLog >,
+ boost::statechart::custom_reaction< MNotifyRec >
 > reactions;
-boost::statechart::result react(const QueryState& q);
-boost::statechart::result react(const MNotifyRec& infoevt);
+  boost::statechart::result react(const QueryState& q);
+  boost::statechart::result react(const MNotifyRec& infoevt);
+};
+
+PG::RecoveryState::GetInfo::GetInfo(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Started/Primary/Peering/GetInfo")
+{
+	context< RecoveryMachine >().log_enter(state_name);
+	
+	PG *pg = context< RecoveryMachine >().pg;
+	pg->generate_past_intervals();
+	unique_ptr<PriorSet> &prior_set = context< Peering >().prior_set;
+	
+	assert(pg->blocked_by.empty());
+	
+	if (!prior_set.get())
+		pg->build_prior(prior_set);
+	
+	pg->reset_min_peer_features();
+	get_infos();
+	if (peer_info_requested.empty() && !prior_set->pg_down) {
+		post_event(GotInfo());
+	}
+}
+{% endhighlight %}
+
+在GetInfo构造函数中，首先调用PG::generate_past_intervals()产生past_intervals，之后调用PG::build_prior()来生成Recovery过程中所需要依赖的OSD列表。
+
+之后调用get_infos()来获取PG各副本的pg info信息。我们来看该函数实现。
+
+#### 3.1.1 获取PG各副本pg info信息
+{% highlight string %}
+void PG::RecoveryState::GetInfo::get_infos()
+{
+	PG *pg = context< RecoveryMachine >().pg;
+	unique_ptr<PriorSet> &prior_set = context< Peering >().prior_set;
+	
+	pg->blocked_by.clear();
+	for (set<pg_shard_t>::const_iterator it = prior_set->probe.begin();it != prior_set->probe.end();++it) {
+		pg_shard_t peer = *it;
+		if (peer == pg->pg_whoami) {
+			continue;
+		}
+		if (pg->peer_info.count(peer)) {
+			dout(10) << " have osd." << peer << " info " << pg->peer_info[peer] << dendl;
+			continue;
+		}
+
+		if (peer_info_requested.count(peer)) {
+			dout(10) << " already requested info from osd." << peer << dendl;
+			pg->blocked_by.insert(peer.osd);
+		} else if (!pg->get_osdmap()->is_up(peer.osd)) {
+			dout(10) << " not querying info from down osd." << peer << dendl;
+		} else {
+			dout(10) << " querying info from osd." << peer << dendl;
+			context< RecoveryMachine >().send_query(
+			  peer, pg_query_t(pg_query_t::INFO,
+				it->shard, pg->pg_whoami.shard,
+				pg->info.history,
+				pg->get_osdmap()->get_epoch()));
+
+			peer_info_requested.insert(peer);
+			pg->blocked_by.insert(peer.osd);
+		}
+	}
+	
+	pg->publish_stats_to_osd();
+}
+{% endhighlight %}
+
+1）清理PG::blocked_by
+
+PG::blocked_by用于记录当前PG被哪些OSD所阻塞，这样在执行pg stats时我们就知道这些阻塞信息。一般在一个状态退出，就会将其进行清理。比如在GetInfo状态退出时，就有如下：
+{% highlight string %}
+void PG::RecoveryState::GetInfo::exit()
+{
+	context< RecoveryMachine >().log_exit(state_name, enter_time);
+	PG *pg = context< RecoveryMachine >().pg;
+	utime_t dur = ceph_clock_now(pg->cct) - enter_time;
+	pg->osd->recoverystate_perf->tinc(rs_getinfo_latency, dur);
+	pg->blocked_by.clear();
+}
+{% endhighlight %}
+
+2) 向相应的Peer发送pg_query_t查询请求
+
+我们在GetInfo构造函数中创建了PriorSet，其中就告诉了我们需要向哪些OSD发送查询信息。这里遍历PriorSet，向当前仍处于```Up状态```的OSD发送```pg_query_t```查询请求。
+
+
+#### 3.1.2 重要提醒
+
+到目前为止，在OSD::advance_pg()中所触发的AdvMap以及ActMap事件就已经处理完成。接下来就是接受Peer返回过来的pg info信息了。
+
+#### 3.1.3 接收Peer返回过来的pg info信息
+这里我们先大概给出一张PG Primary发送pg_query_t查询请求，然后Peer返回响应的一个大体流程图：
+
+![ceph-chapter10-10](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter1010_4.jpg)
+
+###### MNotifyRec数据结构
+这里我们先来看一下查询pg_info的响应的数据结构：
+{% highlight string %}
+struct MNotifyRec : boost::statechart::event< MNotifyRec > {
+  pg_shard_t from;
+  pg_notify_t notify;
+  uint64_t features;
+
+MNotifyRec(pg_shard_t from, pg_notify_t &notify, uint64_t f) :
+from(from), notify(notify), features(f) {}
+
+void print(std::ostream *out) const {
+	*out << "MNotifyRec from " << from << " notify: " << notify<< " features: 0x" << hex << features << dec;
+}
+};
+
+struct pg_notify_t {
+	epoch_t query_epoch;           //查询时请求消息的epoch
+	epoch_t epoch_sent;            //发送时响应消息的epoch
+	pg_info_t info;                //pg_info的信息
+	shard_id_t to;                 //目标OSD
+	shard_id_t from;               //源OSD
 };
 {% endhighlight %}
+
+###### GetInfo状态下对MNotifyRec事件的处理
+因为我们实在GetInfo状态下发送的pg_info查询请求，假设没有新的Peering事件触发状态改变的话，我们会使用GetInfo::react(MNotifyRec)函数来处理。在讲解该函数之前，我们先来看一下PG::proc_replica_info()函数：
+{% highlight string %}
+bool PG::proc_replica_info(
+  pg_shard_t from, const pg_info_t &oinfo, epoch_t send_epoch)
+{
+	map<pg_shard_t, pg_info_t>::iterator p = peer_info.find(from);
+	if (p != peer_info.end() && p->second.last_update == oinfo.last_update) {
+		dout(10) << " got dup osd." << from << " info " << oinfo << ", identical to ours" << dendl;
+		return false;
+	}
+	
+	if (!get_osdmap()->has_been_up_since(from.osd, send_epoch)) {
+		dout(10) << " got info " << oinfo << " from down osd." << from<< " discarding" << dendl;
+		return false;
+	}
+	
+	dout(10) << " got osd." << from << " " << oinfo << dendl;
+	assert(is_primary());
+	peer_info[from] = oinfo;
+	might_have_unfound.insert(from);
+	
+	unreg_next_scrub();
+	if (info.history.merge(oinfo.history))
+		dirty_info = true;
+
+	reg_next_scrub();
+	
+	// stray?
+	if (!is_up(from) && !is_acting(from)) {
+		dout(10) << " osd." << from << " has stray content: " << oinfo << dendl;
+		stray_set.insert(from);
+		if (is_clean()) {
+			purge_strays();
+		}
+	}
+	
+	// was this a new info?  if so, update peers!
+	if (p == peer_info.end())
+		update_heartbeat_peers();
+	
+	return true;
+}
+
+bool pg_history_t::merge(const pg_history_t &other) {
+	// Here, we only update the fields which cannot be calculated from the OSDmap.
+	bool modified = false;
+	if (epoch_created < other.epoch_created) {
+		epoch_created = other.epoch_created;
+		modified = true;
+	}
+	if (last_epoch_started < other.last_epoch_started) {
+		last_epoch_started = other.last_epoch_started;
+		modified = true;
+	}
+	if (last_epoch_clean < other.last_epoch_clean) {
+		last_epoch_clean = other.last_epoch_clean;
+		modified = true;
+	}
+	if (last_epoch_split < other.last_epoch_split) {
+		last_epoch_split = other.last_epoch_split; 
+		modified = true;
+	}
+	if (last_epoch_marked_full < other.last_epoch_marked_full) {
+		last_epoch_marked_full = other.last_epoch_marked_full;
+		modified = true;
+	}
+	if (other.last_scrub > last_scrub) {
+		last_scrub = other.last_scrub;
+		modified = true;
+	}
+	if (other.last_scrub_stamp > last_scrub_stamp) {
+		last_scrub_stamp = other.last_scrub_stamp;
+		modified = true;
+	}
+	if (other.last_deep_scrub > last_deep_scrub) {
+		last_deep_scrub = other.last_deep_scrub;
+		modified = true;
+	}
+	if (other.last_deep_scrub_stamp > last_deep_scrub_stamp) {
+		last_deep_scrub_stamp = other.last_deep_scrub_stamp;
+		modified = true;
+	}
+	if (other.last_clean_scrub_stamp > last_clean_scrub_stamp) {
+		last_clean_scrub_stamp = other.last_clean_scrub_stamp;
+		modified = true;
+	}
+	return modified;
+}
+
+void PG::update_heartbeat_peers()
+{
+	assert(is_locked());
+	
+	if (!is_primary())
+		return;
+	
+	set<int> new_peers;
+	for (unsigned i=0; i<acting.size(); i++) {
+		if (acting[i] != CRUSH_ITEM_NONE)
+			new_peers.insert(acting[i]);
+	}
+	for (unsigned i=0; i<up.size(); i++) {
+		if (up[i] != CRUSH_ITEM_NONE)
+			new_peers.insert(up[i]);
+	}
+	for (map<pg_shard_t,pg_info_t>::iterator p = peer_info.begin();p != peer_info.end();++p)
+		new_peers.insert(p->first.osd);
+	
+	bool need_update = false;
+	heartbeat_peer_lock.Lock();
+	if (new_peers == heartbeat_peers) {
+		dout(10) << "update_heartbeat_peers " << heartbeat_peers << " unchanged" << dendl;
+	} else {
+		dout(10) << "update_heartbeat_peers " << heartbeat_peers << " -> " << new_peers << dendl;
+		heartbeat_peers.swap(new_peers);
+		need_update = true;
+	}
+	heartbeat_peer_lock.Unlock();
+	
+	if (need_update)
+		osd->need_heartbeat_peer_update();
+}
+{% endhighlight %}
+
+1) 首先检查如果该OSD的pg_info信息已经存在，并且last_update参数相同，则说明已经处理过，返回false。
+
+2) 调用函数OSDMap::has_been_up_since()检查该OSD在send_epoch时已经处于up状态
+
+3) 确保自己是主OSD，把从from返回来的pg_info信息保存到peer_info数组，并加入might_have_unfound数组里
+
+>注：PG::might_have_unfound数组里的OSD可能存放了PG的一些对象，我们后续需要利用这些OSD来进行数据恢复
+
+4) 调用函数unreg_next_scrub()使该PG不在scrub操作的队列里
+
+5) 调用info.history.merge()函数处理```副本OSD```发送过来的pg_info信息。处理的方法是：更新为最新的字段。
+
+6) 调用函数reg_next_scrub()注册PG下一次scrub的时间
+
+7) 如果该OSD既不在up数组中也不在acting数组中，那就加入stray_set列表中。当PG处于clean状态时，就会调用purge_strays()函数删除stray状态的PG及其上的对象数据。
+
+8) 如果是一个新的OSD，就调用函数update_heartbeat_peers()更新需要heartbeat的OSD列表
+
+
+----------
+接下来我们看GetInfo状态下对```MNotifyRec```事件的处理：
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::GetInfo::react(const MNotifyRec& infoevt) 
+{
+	PG *pg = context< RecoveryMachine >().pg;
+	
+	set<pg_shard_t>::iterator p = peer_info_requested.find(infoevt.from);
+	if (p != peer_info_requested.end()) {
+		peer_info_requested.erase(p);
+		pg->blocked_by.erase(infoevt.from.osd);
+	}
+	
+	epoch_t old_start = pg->info.history.last_epoch_started;
+	if (pg->proc_replica_info(infoevt.from, infoevt.notify.info, infoevt.notify.epoch_sent)) {
+		// we got something new ...
+		unique_ptr<PriorSet> &prior_set = context< Peering >().prior_set;
+
+		if (old_start < pg->info.history.last_epoch_started) {
+			dout(10) << " last_epoch_started moved forward, rebuilding prior" << dendl;
+			pg->build_prior(prior_set);
+	
+			// filter out any osds that got dropped from the probe set from
+			// peer_info_requested.  this is less expensive than restarting
+			// peering (which would re-probe everyone).
+			set<pg_shard_t>::iterator p = peer_info_requested.begin();
+			while (p != peer_info_requested.end()) {
+				if (prior_set->probe.count(*p) == 0) {
+					dout(20) << " dropping osd." << *p << " from info_requested, no longer in probe set" << dendl;
+					peer_info_requested.erase(p++);
+				} else {
+					++p;
+				}
+			}
+
+			get_infos();
+		}
+
+		dout(20) << "Adding osd: " << infoevt.from.osd << " peer features: "<< hex << infoevt.features << dec << dendl;
+
+		pg->apply_peer_features(infoevt.features);
+	
+		// are we done getting everything?
+		if (peer_info_requested.empty() && !prior_set->pg_down) {
+			/*
+			* make sure we have at least one !incomplete() osd from the
+			* last rw interval.  the incomplete (backfilling) replicas
+			* get a copy of the log, but they don't get all the object
+			* updates, so they are insufficient to recover changes during
+			* that interval.
+			*/
+			if (pg->info.history.last_epoch_started) {
+				for (map<epoch_t,pg_interval_t>::reverse_iterator p = pg->past_intervals.rbegin();p != pg->past_intervals.rend();++p) {
+					if (p->first < pg->info.history.last_epoch_started)
+						break;
+					if (!p->second.maybe_went_rw)
+						continue;
+
+					pg_interval_t& interval = p->second;
+					dout(10) << " last maybe_went_rw interval was " << interval << dendl;
+					OSDMapRef osdmap = pg->get_osdmap();
+	
+					/*
+					* this mirrors the PriorSet calculation: we wait if we
+					* don't have an up (AND !incomplete) node AND there are
+					* nodes down that might be usable.
+					*/
+					bool any_up_complete_now = false;
+					bool any_down_now = false;
+					for (unsigned i=0; i<interval.acting.size(); i++) {
+						int o = interval.acting[i];
+						if (o == CRUSH_ITEM_NONE)
+							continue;
+						pg_shard_t so(o, pg->pool.info.ec_pool() ? shard_id_t(i) : shard_id_t::NO_SHARD);
+						if (!osdmap->exists(o) || osdmap->get_info(o).lost_at > interval.first)
+							continue;  // dne or lost
+						if (osdmap->is_up(o)) {
+							pg_info_t *pinfo;
+							if (so == pg->pg_whoami) {
+								pinfo = &pg->info;
+							} else {
+								assert(pg->peer_info.count(so));
+								pinfo = &pg->peer_info[so];
+							}
+							if (!pinfo->is_incomplete())
+								any_up_complete_now = true;
+						} else {
+							any_down_now = true;
+						}
+					}
+
+					if (!any_up_complete_now && any_down_now) {
+						dout(10) << " no osds up+complete from interval " << interval << dendl;
+						pg->state_set(PG_STATE_DOWN);
+						pg->publish_stats_to_osd();
+						return discard_event();
+					}
+					break;
+				}
+			}
+			dout(20) << "Common peer features: " << hex << pg->get_min_peer_features() << dec << dendl;
+			dout(20) << "Common acting features: " << hex << pg->get_min_acting_features() << dec << dendl;
+			dout(20) << "Common upacting features: " << hex << pg->get_min_upacting_features() << dec << dendl;
+			post_event(GotInfo());
+		}
+	}
+	return discard_event();
+}
+{% endhighlight %}
+
+下面我们来看具体的处理过程：
+
+1）首先从peer_info_requested里删除该peer，同时从blocked_by队列里删除
+
+2）调用函数PG::proc_replica_info()来处理副本的pg_info信息。如果获取到了一个新的有效的pg_info，则PG::proc_replica_info()返回true，继续下面的步骤3）；否则丢弃该事件
+
+3）在变量osd_start里保存了调用PG::proc_replica_info()前主OSD的pg->info.history.last_epoch_started，如果该epoch值小于合并后的值，说明该值被更新了，副本OSD上的epoch值比较新，需要进行如下操作：
+
+  a) 调用PG::build_prior()重新构建prior_set对象
+
+  b) 从peer_info_requested队列中去掉上次构建的prior_set中存在的OSD，这里最新构建上次不存在的OSD列表；
+
+  c) 调用get_infos()函数重新发送查询peer_info请求
+
+4）调用pg->apply_peer_features()更新相关的features值
+
+5) 当peer_info_requested队列为空，并且prior_set不处于pg_down状态时，说明收到所有OSD的peer_info并处理完成
+
+6）
 
 <br />
 <br />
