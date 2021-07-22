@@ -1264,7 +1264,30 @@ boost::statechart::result PG::RecoveryState::GetInfo::react(const MNotifyRec& in
 
 5) 当peer_info_requested队列为空，并且prior_set不处于pg_down状态时，说明收到所有OSD的peer_info并处理完成
 
-6）
+6）之后检查past_interval阶段至少有一个OSD处于up状态且```非incomplete```状态；否则该PG无法恢复，标记状态为```PG_STATE_DOWN```并直接返回。如下图所示：
+
+![ceph-chapter10-10](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter1010_5.jpg)
+
+7）最后完成处理，调用函数post_event(GotInfo())抛出GotInfo事件进入状态机的下一个状态。
+
+在GetInfo状态里直接定义了当前状态接收到GotInfo事件后，直接跳转到下一个状态GetLog里：
+{% highlight string %}
+struct GetInfo : boost::statechart::state< GetInfo, Peering >, NamedState {
+  set<pg_shard_t> peer_info_requested;
+
+  explicit GetInfo(my_context ctx);
+  void exit();
+  void get_infos();
+
+typedef boost::mpl::list <
+ boost::statechart::custom_reaction< QueryState >,
+ boost::statechart::transition< GotInfo, GetLog >,
+ boost::statechart::custom_reaction< MNotifyRec >
+> reactions;
+  boost::statechart::result react(const QueryState& q);
+  boost::statechart::result react(const MNotifyRec& infoevt);
+};
+{% endhighlight %}
 
 <br />
 <br />
