@@ -957,10 +957,13 @@ void PG::RecoveryState::GetInfo::exit()
 
 我们在GetInfo构造函数中创建了PriorSet，其中就告诉了我们需要向哪些OSD发送查询信息。这里遍历PriorSet，向当前仍处于```Up状态```的OSD发送```pg_query_t```查询请求。
 
+<br />
 
 #### 3.1.2 重要提醒
 
 到目前为止，在OSD::advance_pg()中所触发的AdvMap以及ActMap事件就已经处理完成。接下来就是接受Peer返回过来的pg info信息了。
+
+<br />
 
 #### 3.1.3 接收Peer返回过来的pg info信息
 这里我们先大概给出一张PG Primary发送pg_query_t查询请求，然后Peer返回响应的一个大体流程图：
@@ -1252,7 +1255,7 @@ boost::statechart::result PG::RecoveryState::GetInfo::react(const MNotifyRec& in
 
 2）调用函数PG::proc_replica_info()来处理副本的pg_info信息。如果获取到了一个新的有效的pg_info，则PG::proc_replica_info()返回true，继续下面的步骤3）；否则丢弃该事件
 
-3）在变量osd_start里保存了调用PG::proc_replica_info()前主OSD的pg->info.history.last_epoch_started，如果该epoch值小于合并后的值，说明该值被更新了，副本OSD上的epoch值比较新，需要进行如下操作：
+3）在变量old_start里保存了调用PG::proc_replica_info()前主OSD的pg->info.history.last_epoch_started，如果该epoch值小于合并后的值，说明该值被更新了，副本OSD上的epoch值比较新，需要进行如下操作：
 
   a) 调用PG::build_prior()重新构建prior_set对象
 
