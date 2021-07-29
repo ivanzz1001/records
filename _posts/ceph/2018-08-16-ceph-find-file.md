@@ -193,7 +193,180 @@ osdmap e16540 pool 'oss-uat.rgw.buckets.data' (189) object '-003-KZyxg.docx.VLRH
 批量上传走joss文件 -003-KZyxg.docx-part57
 {% endhighlight %}
 
-## 2. 示例
+
+## 2. 查找示例2
+
+我们以查找```OpenResty完全开发指南.pdf```为例来演示相关过程：
+
+1） 查看对应bucket相关信息
+{% highlight string %}
+# radosgw-admin bucket list --bucket=liuzy_bucket
+[
+    {
+        "name": "OpenResty完全开发指南.pdf",
+        "instance": "",
+        "namespace": "",
+        "owner": "97B538618D3F46F8AE58EE91974EBCAB",
+        "owner_display_name": "app_97B538618D3F46F8AE58EE91974EBCAB",
+        "size": 155174619,
+        "mtime": "2021-07-29 08:03:03.828342Z",
+        "etag": "d1ca3c30886d9fdc722b1c25320431bd-37",
+        "content_type": "binary\/octet-stream",
+        "tag": "aeb60350-4244-488f-919a-6282e93464ea.202702.32611510",
+        "flags": 0,
+        "user_data": ""
+    }
+]
+{% endhighlight %}
+
+2) 查看object相关信息
+{% highlight string %}
+# radosgw-admin object stat --bucket=liuzy_bucket --object=OpenResty完全开发指南.pdf
+{
+    "name": "OpenResty完全开发指南.pdf",
+    "size": 155174619,
+    "policy": {
+        "acl": {
+            "acl_user_map": [
+                {
+                    "user": "97B538618D3F46F8AE58EE91974EBCAB",
+                    "acl": 15
+                }
+            ],
+            "acl_group_map": [],
+            "grant_map": [
+                {
+                    "id": "97B538618D3F46F8AE58EE91974EBCAB",
+                    "grant": {
+                        "type": {
+                            "type": 0
+                        },
+                        "id": "97B538618D3F46F8AE58EE91974EBCAB",
+                        "email": "",
+                        "permission": {
+                            "flags": 15
+                        },
+                        "name": "app_97B538618D3F46F8AE58EE91974EBCAB",
+                        "group": 0
+                    }
+                }
+            ]
+        },
+        "owner": {
+            "id": "97B538618D3F46F8AE58EE91974EBCAB",
+            "display_name": "app_97B538618D3F46F8AE58EE91974EBCAB"
+        }
+    },
+    "etag": "d1ca3c30886d9fdc722b1c25320431bd-37\u0000",
+    "tag": "aeb60350-4244-488f-919a-6282e93464ea.202702.32611510\u0000",
+    "manifest": {
+        "objs": [],
+        "obj_size": 155174619,
+        "explicit_objs": "false",
+        "head_obj": {
+            "bucket": {
+                "name": "liuzy_bucket",
+                "pool": "default.rgw.buckets.data",
+                "data_extra_pool": "default.rgw.buckets.non-ec",
+                "index_pool": "default.rgw.buckets.index",
+                "marker": "aeb60350-4244-488f-919a-6282e93464ea.185494.42",
+                "bucket_id": "aeb60350-4244-488f-919a-6282e93464ea.185494.42",
+                "tenant": ""
+            },
+            "key": "",
+            "ns": "",
+            "object": "OpenResty完全开发指南.pdf",
+            "instance": "",
+            "orig_obj": "OpenResty完全开发指南.pdf"
+        },
+        "head_size": 0,
+        "max_head_size": 0,
+        "prefix": "OpenResty完全开发指南.pdf.2~jecqhUKZn4B5exHPkB9LfYgqbVBj5in",
+        "tail_bucket": {
+            "name": "liuzy_bucket",
+            "pool": "default.rgw.buckets.data",
+            "data_extra_pool": "default.rgw.buckets.non-ec",
+            "index_pool": "default.rgw.buckets.index",
+            "marker": "aeb60350-4244-488f-919a-6282e93464ea.185494.42",
+            "bucket_id": "aeb60350-4244-488f-919a-6282e93464ea.185494.42",
+            "tenant": ""
+        },
+        "rules": [
+            {
+                "key": 0,
+                "val": {
+                    "start_part_num": 1,
+                    "start_ofs": 0,
+                    "part_size": 4194304,
+                    "stripe_max_size": 4194304,
+                    "override_prefix": ""
+                }
+            },
+            {
+                "key": 150994944,
+                "val": {
+                    "start_part_num": 37,
+                    "start_ofs": 150994944,
+                    "part_size": 4179675,
+                    "stripe_max_size": 4194304,
+                    "override_prefix": ""
+                }
+            }
+        ],
+        "tail_instance": ""
+    },
+    "attrs": {
+        "user.rgw.content_type": "binary\/octet-stream\u0000",
+        "user.rgw.pg_ver": "�d\u0004\u0000\u0000\u0000\u0000\u0000",
+        "user.rgw.source_zone": "j�\u001f�",
+        "user.rgw.x-amz-acl": "private\u0000"
+    }
+}
+{% endhighlight %}
+从上面可以看到，对象```OpenResty完全开发指南.pdf```对应的：
+
+* bucket_id为```aeb60350-4244-488f-919a-6282e93464ea.185494.42```；
+
+* prefix为```OpenResty完全开发指南.pdf.2~jecqhUKZn4B5exHPkB9LfYgqbVBj5in```
+
+* 对象总大小为```155174619```; 总的分片数为37片，分片序号为[1,37]; 每个分片的大小为```4194304```
+
+参看下面的拼接方法可以拼接出一个分片在ceph内部的名称：
+{% highlight string %}
+<bucket_id>__<multipart>_<prefix>.<part_idx>
+{% endhighlight %}
+因此，这里我们拼接出```OpenResty完全开发指南.pdf```的第9个分片在ceph内部的名称为：
+<pre>
+aeb60350-4244-488f-919a-6282e93464ea.185494.42__multipart_OpenResty完全开发指南.pdf.2~jecqhUKZn4B5exHPkB9LfYgqbVBj5in.9
+</pre>
+
+3) 查看对应分片在映射到了哪个PG
+{% highlight string %}
+# ceph osd map default.rgw.buckets.data aeb60350-4244-488f-919a-6282e93464ea.185494.42__multipart_OpenResty完全开发指南.pdf.2~jecqhUKZn4B5exHPkB9LfYgqbVBj5in.9
+osdmap e77518 pool 'default.rgw.buckets.data' (36) object 'aeb60350-4244-488f-919a-6282e93464ea.185494.42__multipart_OpenResty完全开发指南.pdf.2~jecqhUKZn4B5exHPkB9LfYgqbVBj5in.9' -> pg 36.4a19aa01 (36.1) -> up ([1,15,23], p1) acting ([1,15,23], p1)
+{% endhighlight %}
+
+4) 到对应的目录查找分片
+
+通过上面我们知道```OpenResty完全开发指南.pdf```的第9个分片放在```PG 36.1```上，而PG 36.1映射情况如下：
+<pre>
+up ([1,15,23], p1) acting ([1,15,23], p1)
+</pre>
+
+因此，我们可以到osd.1的```/var/lib/ceph/osd/ceph-1/current/36.1_head```目录进行查找：
+{% highlight string %}
+# find ./ -name "aeb60350-4244-488f-919a-6282e93464ea.185494.42\\\u\\\umultipart\\\uOpenResty完全开发指南.pdf.2~jecqhUKZn4B5exHPkB9LfYgqbVBj5in.9*"
+./DIR_1/DIR_0/DIR_A/DIR_A/DIR_9/aeb60350-4244-488f-919a-6282e93464ea.185494.42\u\umultipart\uOpenResty完全开发指南.pdf.2~jecqhUKZn4B5exHPkB9LfYgqbVBj5in.9__head_4A19AA01__24
+{% endhighlight %}
+这里需要注意以下两点：
+
+* 在ceph内部， 紧邻```multipart```前后的```_```会被替换为```\\\u```
+
+* 在分片名的最后面会添加上额外的一个后缀
+
+
+
+## 2. 查找示例3
 
 ### 2.1 集群osd树
 当前我们的ceph集群状况如下：
