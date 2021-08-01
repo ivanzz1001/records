@@ -603,7 +603,7 @@ pg_shard_t want_primary;
 5） 申请成功pg_temp以后，acting为[1,3,2]，up为[3,1,2]，osd1作为临时的主OSD，处理读写请求。当该PG恢复处于clean状态，pg_temp取消，acting和up都恢复为[3,1,2]。
 
 
-## 2. Peering之GetLog状态处理。
+## 2. Peering之GetLog状态处理
 
 我们在前面介绍了Peering之GetInfo状态的处理细节，这里介绍GetLog状态的处理：
 {% highlight string %}
@@ -685,7 +685,207 @@ PG::RecoveryState::GetLog::GetLog(my_context ctx)
 
 <br />
 
-### 2.1 获取权威日志流程
+### 2.1 PG日志
+在具体讲解获取权威日志之前，我们先对PG日志相关内容做一个介绍，以方便我们后续的理解。
+
+PG日志（pg log)为一个PG内所有更新操作的记录（下文所指的日志，如不特别指出，都是指PG日志）。每个PG对应一个PG日志，它持久化保存在每个PG对应pgmeta_oid对象的omap属性中。
+
+它有如下特点：
+
+* 记录一个PG内所有对象的更新操作元数据信息，并不记录操作的数据
+
+* 是一个完整的日志记录，版本号是顺序且连续的
+
+<br />
+
+###### 2.1.1 pg_log_t数据结构
+结构体pg_log_t在内存中保存了该PG的所有操作日志，以及相关的控制结构：
+{% highlight string %}
+/**
+ * pg_log_t - incremental log of recent pg changes.
+ *
+ *  serves as a recovery queue for recent changes.
+ */
+struct pg_log_t {
+	/*
+	*   head - newest entry (update|delete)
+	*   tail - entry previous to oldest (update|delete) for which we have
+	*          complete negative information.  
+	* i.e. we can infer pg contents for any store whose last_update >= tail.
+	*/
+	eversion_t head;                        // newest entry
+	eversion_t tail;                         // version prior to oldest
+	
+	// We can rollback rollback-able entries > can_rollback_to
+	eversion_t can_rollback_to;
+	
+	// always <= can_rollback_to, indicates how far stashed rollback data can be found
+	eversion_t rollback_info_trimmed_to;
+	
+	list<pg_log_entry_t> log;                 // the actual log.
+};
+{% endhighlight %}
+
+需要注意的是，PG日志的记录是以整个PG为单位，包括该PG内所有对象的修改记录。下面我们简要介绍一下各字段含义：
+
+* head: 日志的头，记录最新的日志记录；
+
+* tail: 日志的尾（version prior to oldest）
+
+* can_rollback_to: 用于EC，指示本地可以回滚的版本，可回滚的版本都大于版本can_rollback_to的值；
+
+* rollback_info_trimmed_to: 在EC的实现中，本地保留了不同版本的数据。本数据段指示本PG里可以删除掉的对象版本；
+
+* log: 所有日志的列表
+
+<br />
+
+###### 2.1.2 pg_log_entry_t数据结构
+结构体pg_log_entry_t记录了PG日志的单条记录，其数据结构如下：
+{% highlight string %}
+/**
+ * pg_log_entry_t - single entry/event in pg log
+ *
+ */
+struct pg_log_entry_t {
+	enum {
+		MODIFY = 1,        // some unspecified modification (but not *all* modifications)
+		CLONE = 2,         // cloned object from head
+		DELETE = 3,        // deleted object
+		BACKLOG = 4,       // event invented by generate_backlog [deprecated]
+		LOST_REVERT = 5,   // lost new version, revert to an older version.
+		LOST_DELETE = 6,   // lost new version, revert to no object (deleted).
+		LOST_MARK = 7,     // lost new version, now EIO
+		PROMOTE = 8,       // promoted object from another tier
+		CLEAN = 9,         // mark an object clean
+	};
+
+	// describes state for a locally-rollbackable entry
+	ObjectModDesc mod_desc;
+	bufferlist snaps;                                    // only for clone entries
+	hobject_t  soid;
+	osd_reqid_t reqid;                                  // caller+tid to uniquely identify request
+	vector<pair<osd_reqid_t, version_t> > extra_reqids;
+	eversion_t version, prior_version, reverting_to;
+	version_t user_version;                            // the user version for this entry
+	utime_t     mtime;                                 // this is the _user_ mtime, mind you
+	
+	__s32      op;
+	bool invalid_hash;                                // only when decoding sobject_t based entries
+	bool invalid_pool;                                // only when decoding pool-less hobject based entries
+};
+{% endhighlight %}
+
+下面简要介绍一下各字段的含义：
+
+* op: 操作的类型
+
+* soid: 操作的对象
+
+* version: 本次操作的版本
+
+* prior_version: 前一个操作的版本
+
+* reverting_to: 本次操作回退的版本（仅用于回滚操作）
+
+* mod_desc: 用于保存本地回滚的一些信息，用于EC模式下的回滚操作
+
+* snaps: 克隆操作，用于记录当前对象的snap列表
+
+* reqid: 请求唯一标识(called + tid)
+
+* user_version: 用户的版本
+
+* mtime: 还是用户的本地时间
+
+<br />
+
+###### 2.1.3 IndexedLog
+
+类IndexedLog继承了pg_log_t，在其基础上添加了根据一个对象来检索日志的功能，以及其他相关的功能。
+
+<br />
+
+###### 2.1.4 日志的写入
+函数PG::add_log_entry()添加pg_log_entry_t条目到PG日志中。同时更新了info.last_complete和info.last_update字段。
+
+PGLog::write_log()函数将日志写到对应的pgmeta_oid对象的kv存储中。在这里并没有直接写入磁盘，而是先把日志的修改添加到ObjectStore::Transaction类型的事务中，与数据操作组成一个事务整体提交磁盘。这样可以保证数据操作、日志更新及其pg_info信息的更新都在一个事务中，都以原子方式提交到磁盘上。
+
+<br />
+
+###### 2.1.5 日志的trim操作
+
+函数trim用来删除不需要的旧日志。当日志的条目数大于min_log_entries时，需要进行trim操作：
+{% highlight string %}
+void PGLog::trim(LogEntryHandler *handler,eversion_t trim_to,pg_info_t &info)
+{
+}
+{% endhighlight %}
+
+<br />
+
+###### 2.1.6 PG Primary合并权威日志
+当PG Primary收到权威日志之后，就会调用PG::proc_master_log()来进行处理，其中最主要的操作就是合并权威日志：
+{% highlight string %}
+void PG::proc_master_log(
+  ObjectStore::Transaction& t, pg_info_t &oinfo,
+  pg_log_t &olog, pg_missing_t& omissing, pg_shard_t from)
+{
+	...
+	merge_log(t, oinfo, olog, from);
+	...
+}
+
+void PG::merge_log(
+  ObjectStore::Transaction& t, pg_info_t &oinfo, pg_log_t &olog, pg_shard_t from)
+{
+	PGLogEntryHandler rollbacker;
+	pg_log.merge_log(t, oinfo, olog, from, info, &rollbacker, dirty_info, dirty_big_info);
+	rollbacker.apply(this, &t);
+}
+
+void PGLog::merge_log(ObjectStore::Transaction& t,
+                      pg_info_t &oinfo, pg_log_t &olog, pg_shard_t fromosd,
+                      pg_info_t &info, LogEntryHandler *rollbacker,
+                      bool &dirty_info, bool &dirty_big_info)
+{
+	...
+}
+{% endhighlight %}
+这里我们简单描述一下大体的处理过程（详细代码分析，我们会在后面再介绍）：
+
+1） 本地日志和权威日志没有重叠的部分：在这种情况下就无法根据日志来进行修复，只能通过Backfill过程来完成修复。所以先确保权威日志与本地日志有重叠的部分：
+{% highlight string %}
+assert(log.head >= olog.tail && olog.head >= log.tail);
+{% endhighlight %}
+
+2) 本地日志和权威日志有重叠部分的处理：
+
+* 如果olog.tail小于log.tail，也就是权威日志的尾部比本地日志长。这种情况下，只要把日志多出的部分添加到本地日志即可，它不影响missing对象集合
+
+* 本地日志的头部比权威日志的头部长，说明有多出来的divergent日志，调用函数rewind_divergent_log()去处理；
+
+* 本地日志的头部比权威日志的头部短，说明有缺失的日志，其处理过程为：把缺失的日志添加到本地日志中，记录missing的对象，并删除多出来的日志记录；
+
+<br />
+
+###### 2.1.7 处理副本日志
+
+PG Primary在GetMissing阶段会拉取各个副本上的有效日志，然后调用PG::proc_replica_log()函数来进行处理，其关键在于计算missing的对象列表，也就是需要修复的对象。
+{% highlight string %}
+void PG::proc_replica_log(
+  ObjectStore::Transaction& t,
+  pg_info_t &oinfo, pg_log_t &olog, pg_missing_t& omissing,
+  pg_shard_t from)
+{
+}
+{% endhighlight %} 
+
+
+
+
+
+### 2.2 获取权威日志流程
 
 在上面我们讲到，如果主OSD不是拥有权威日志的OSD，就需要去拥有权威日志的OSD上拉取权威日志。这里我们先大概给出一张PG Primary发送```pg_query_t```请求到权威日志的OSD拉取权威日志的流程：
 
@@ -838,65 +1038,7 @@ public:
 
 * past_intervals: 本PG副本的past_intervals
 
-5) **pg_log_t数据结构**
-{% highlight string %}
-/**
- * pg_log_entry_t - single entry/event in pg log
- *
- */
-struct pg_log_entry_t {
-	enum {
-		MODIFY = 1,        // some unspecified modification (but not *all* modifications)
-		CLONE = 2,         // cloned object from head
-		DELETE = 3,        // deleted object
-		BACKLOG = 4,       // event invented by generate_backlog [deprecated]
-		LOST_REVERT = 5,   // lost new version, revert to an older version.
-		LOST_DELETE = 6,   // lost new version, revert to no object (deleted).
-		LOST_MARK = 7,     // lost new version, now EIO
-		PROMOTE = 8,       // promoted object from another tier
-		CLEAN = 9,         // mark an object clean
-	};
-
-	// describes state for a locally-rollbackable entry
-	ObjectModDesc mod_desc;
-	bufferlist snaps;                                    // only for clone entries
-	hobject_t  soid;
-	osd_reqid_t reqid;                                  // caller+tid to uniquely identify request
-	vector<pair<osd_reqid_t, version_t> > extra_reqids;
-	eversion_t version, prior_version, reverting_to;
-	version_t user_version;                            // the user version for this entry
-	utime_t     mtime;                                 // this is the _user_ mtime, mind you
-	
-	__s32      op;
-	bool invalid_hash;                                // only when decoding sobject_t based entries
-	bool invalid_pool;                                // only when decoding pool-less hobject based entries
-};
-
-/**
- * pg_log_t - incremental log of recent pg changes.
- *
- *  serves as a recovery queue for recent changes.
- */
-struct pg_log_t {
-	/*
-	*   head - newest entry (update|delete)
-	*   tail - entry previous to oldest (update|delete) for which we have
-	*          complete negative information.  
-	* i.e. we can infer pg contents for any store whose last_update >= tail.
-	*/
-	eversion_t head;                        // newest entry
-	eversion_t tail;                         // version prior to oldest
-	
-	// We can rollback rollback-able entries > can_rollback_to
-	eversion_t can_rollback_to;
-	
-	// always <= can_rollback_to, indicates how far stashed rollback data can be found
-	eversion_t rollback_info_trimmed_to;
-	
-	list<pg_log_entry_t> log;                 // the actual log.
-};
-{% endhighlight %}
-
+<br />
 
 ###### PG::fulfill_log()函数
 {% highlight string %}
@@ -944,12 +1086,10 @@ void PG::fulfill_log(
 {% endhighlight %}
 副本构造构造权威日志信息，然后发送给primary。
 
-
-
 ----------
 
 
-### 2.2 GetLog状态下接收权威日志
+### 2.3 GetLog状态下接收权威日志
 {% highlight string %}
 struct GetLog : boost::statechart::state< GetLog, Peering >, NamedState {
 	pg_shard_t auth_log_shard;
@@ -1077,7 +1217,7 @@ void ReplicatedPG::on_flushed()
 
 经过GetLog阶段的处理后，该PG的主OSD已经获取了权威日志，以及pg_info的权威信息。
 
-### 2.3 PG::proc_master_log()详细分析
+### 2.4 PG::proc_master_log()详细分析
 PG Primary在接收到权威日志之后，就会调用PG::proc_master_log()来进行处理：
 {% highlight string %}
 void PG::proc_master_log(
@@ -1129,7 +1269,7 @@ void PG::proc_master_log(
 4) 再peer_missing列表中登记oinfo所在PG副本的缺失对象
 
 
-#### 2.3.1 PG::merge_log()实现
+#### 2.4.1 PG::merge_log()实现
 {% highlight string %}
 void PG::merge_log(
   ObjectStore::Transaction& t, pg_info_t &oinfo, pg_log_t &olog, pg_shard_t from)
@@ -1364,15 +1504,390 @@ void PGLog::merge_log(ObjectStore::Transaction& t,
 
 ![ceph-chapter10-11](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter1011_4.jpg)
 
-具体的关于PG::rewind_divergent_log()的实现，这里我们不进行细述。
+具体的关于PG::rewind_divergent_log()的实现，我们在下面单独讲述。
 
 6) 如果olog.head 大于log.head，那么需要进行日志头部分的合并，如下图所示
 
 ![ceph-chapter10-11](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter1011_5.jpg)
 
-在合并head时，涉及到```处理分歧日志```以及```构建missing对象```，这两天在图中都有展示，这里不再细述。
+在合并head时，涉及到```处理分歧日志```以及```构建missing对象```，这两项在图中都有展示，详细代码实现我们在下面单独讲述。
 
 
+----------
+###### PGLog::merge_log()应用举例
+
+下面我们举例说明函数PGLog::merge_log()的不同处理情形。
+
+1） **情形1： 权威日志的尾部版本比本地日志的尾部小**
+
+如下图所示：
+
+![ceph-chapter10-11](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_7.jpg)
+
+本地log的log_tail为obj10(1,6)，权威日志olog的log_tail为obj3(1,4)。
+
+日志合并的处理方式如下图所示：
+
+![ceph-chapter10-11](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_8.jpg)
+
+把日志记录obj3(1,4)、obj4(1,5)添加到本地日志中，修改info.log_tail和log.tail指针即可。
+
+2) **情形2： 本地日志的头部比权威日志长**
+
+如下图所示：
+
+![ceph-chapter10-11](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_9.jpg)
+
+权威日志的log_head为obj13(1,8)，而本地日志的log_head为obj10(1,11)。本地日志的log_head版本大于权威日志的log_head版本，调用函数rewind_divergent_log()来处理本地有分歧的日志。
+
+在本例的具体处理过程为：把对象obj10、obj11、obj13加入missing列表中用于修复。最后删除多余的日志，如下所示：
+
+![ceph-chapter10-11](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_10.jpg)
+
+本例比较简单，函数rewind_divergent_log()会处理比较复杂的一些情况，后面会介绍到。
+
+3） **情形3： 本地日志的头部版本比权威日志的头部短**
+
+如下图所示：
+
+![ceph-chapter10-11](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_11.jpg)
+
+
+权威日志的log_head为obj10(1,11)，而本地日志的log_head为obj13(1,8)，即本地日志的log_head版本小于权威日志的log_head版本。
+
+其处理方式如下：把本地日志缺失的日志添加到本地，并计算本地缺失的对象。最后把缺失的对象添加到missing object列表中用于后续的修复，处理结果如下所示：
+
+![ceph-chapter10-11](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_12.jpg)
+
+
+
+
+#### 2.4.2 PG::rewind_divergent_log()回退分歧日志
+{% highlight string %}
+/**
+ * rewind divergent entries at the head of the log
+ *
+ * This rewinds entries off the head of our log that are divergent.
+ * This is used by replicas during activation.
+ *
+ * @param t transaction
+ * @param newhead new head to rewind to
+ */
+void PGLog::rewind_divergent_log(ObjectStore::Transaction& t, eversion_t newhead,
+				 pg_info_t &info, LogEntryHandler *rollbacker,
+				 bool &dirty_info, bool &dirty_big_info)
+{
+	dout(10) << "rewind_divergent_log truncate divergent future " << newhead << dendl;
+	assert(newhead >= log.tail);
+	
+	list<pg_log_entry_t>::iterator p = log.log.end();
+	list<pg_log_entry_t> divergent;
+	while (true) {
+		if (p == log.log.begin()) {
+			// yikes, the whole thing is divergent!
+			divergent.swap(log.log);
+			break;
+		}
+		--p;
+		mark_dirty_from(p->version);
+		if (p->version <= newhead) {
+			++p;
+			divergent.splice(divergent.begin(), log.log, p, log.log.end());
+			break;
+		}
+		assert(p->version > newhead);
+		dout(10) << "rewind_divergent_log future divergent " << *p << dendl;
+	}
+	
+	log.head = newhead;
+	info.last_update = newhead;
+	if (info.last_complete > newhead)
+		info.last_complete = newhead;
+	
+	if (log.rollback_info_trimmed_to > newhead)
+		log.rollback_info_trimmed_to = newhead;
+	
+	log.index();
+	
+	map<eversion_t, hobject_t> new_priors;
+	_merge_divergent_entries(
+	  log,
+	  divergent,
+	  info,
+	  log.can_rollback_to,
+	  missing,
+	  &new_priors,
+	  rollbacker,
+	  this);
+	for (map<eversion_t, hobject_t>::iterator i = new_priors.begin();i != new_priors.end();++i) {
+		add_divergent_prior(i->first,i->second);
+	}
+	
+	if (info.last_update < log.can_rollback_to)
+		log.can_rollback_to = info.last_update;
+	
+	dirty_info = true;
+	dirty_big_info = true;
+}
+{% endhighlight %}
+
+PG::rewind_divergent_log()函数就是将当前的PGLog回退到参数```newhead```指定的未知。我们来看实现流程：
+
+1） 从后往前遍历当前的PGLog，找出PGLog中```newhead```之后的所有分歧日志放入divergent列表中；
+
+2） 因rewind分歧日志，可能造成pg info也要做相应的变动
+
+3） 调用IndexedLog::index()重建当前的日志索引
+
+4） 调用_merge_divergent_entries()合并分歧日志
+
+5) 将分歧的对象加入到PGLog::divergent_priors中
+
+
+----------
+
+###### 函数_merge_divergent_entries()
+{% highlight string %}
+/// Merge all entries using above
+static void _merge_divergent_entries(
+  const IndexedLog &log,                     ///< [in] log to merge against
+  list<pg_log_entry_t> &entries,             ///< [in] entries to merge
+  const pg_info_t &oinfo,                    ///< [in] info for merging entries
+  eversion_t olog_can_rollback_to,           ///< [in] rollback boundary
+  pg_missing_t &omissing,                    ///< [in,out] missing to adjust, use
+  map<eversion_t, hobject_t> *priors,        ///< [out] target for new priors
+  LogEntryHandler *rollbacker,               ///< [in] optional rollbacker object
+  const DoutPrefixProvider *dpp              ///< [in] logging provider
+) {
+	map<hobject_t, list<pg_log_entry_t>, hobject_t::BitwiseComparator > split;
+	split_by_object(entries, &split);
+
+	for (map<hobject_t, list<pg_log_entry_t>, hobject_t::BitwiseComparator>::iterator i = split.begin();i != split.end();++i) {
+		boost::optional<pair<eversion_t, hobject_t> > new_divergent_prior;
+		_merge_object_divergent_entries(
+		  log,
+		  i->first,
+		  i->second,
+		  oinfo,
+		  olog_can_rollback_to,
+		  omissing,
+		  &new_divergent_prior,
+		  rollbacker,
+		  dpp);
+
+		if (priors && new_divergent_prior) {
+			(*priors)[new_divergent_prior->first] = new_divergent_prior->second;
+		}
+	}
+}
+{% endhighlight %}
+处理流程如下：
+
+1） 调用split_by_object()函数将当前分歧列表中的日志按对象来进行划分
+{% highlight string %}
+static void split_by_object(
+  list<pg_log_entry_t> &entries,
+  map<hobject_t, list<pg_log_entry_t>, hobject_t::BitwiseComparator> *out_entries) {
+
+	while (!entries.empty()) {
+		list<pg_log_entry_t> &out_list = (*out_entries)[entries.front().soid];
+		out_list.splice(out_list.end(), entries, entries.begin());
+	}
+}
+{% endhighlight %}
+
+2) 遍历split列表，然后调用_merge_object_divergent_entries()来合并分歧对象
+{% highlight string %}
+/**
+ * _merge_object_divergent_entries
+ *
+ * There are 5 distinct cases:
+ * 1) There is a more recent update: in this case we assume we adjusted the
+ *    store and missing during merge_log
+ * 2) The first entry in the divergent sequence is a create.  This might
+ *    either be because the object is a clone or because prior_version is
+ *    eversion_t().  In this case the object does not exist and we must
+ *    adjust missing and the store to match.
+ * 3) We are currently missing the object.  In this case, we adjust the
+ *    missing to our prior_version taking care to add a divergent_prior
+ *    if necessary
+ * 4) We can rollback all of the entries.  In this case, we do so using
+ *    the rollbacker and return -- the object does not go into missing.
+ * 5) We cannot rollback at least 1 of the entries.  In this case, we
+ *    clear the object out of the store and add a missing entry at
+ *    prior_version taking care to add a divergent_prior if
+ *    necessary.
+ */
+void PGLog::_merge_object_divergent_entries(
+  const IndexedLog &log,
+  const hobject_t &hoid,
+  const list<pg_log_entry_t> &entries,
+  const pg_info_t &info,
+  eversion_t olog_can_rollback_to,
+  pg_missing_t &missing,
+  boost::optional<pair<eversion_t, hobject_t> > *new_divergent_prior,
+  LogEntryHandler *rollbacker,
+  const DoutPrefixProvider *dpp
+  )
+{
+	ldpp_dout(dpp, 20) << __func__ << ": merging hoid " << hoid << " entries: " << entries << dendl;
+	
+	if (cmp(hoid, info.last_backfill, info.last_backfill_bitwise) > 0) {
+		ldpp_dout(dpp, 10) << __func__ << ": hoid " << hoid << " after last_backfill" << dendl;
+		return;
+	}
+
+	// entries is non-empty
+	assert(!entries.empty());
+	eversion_t last;
+	for (list<pg_log_entry_t>::const_iterator i = entries.begin();i != entries.end();++i) {
+		// all entries are on hoid
+		assert(i->soid == hoid);
+
+		if (i != entries.begin() && i->prior_version != eversion_t()) {
+			// in increasing order of version
+			assert(i->version > last);
+			// prior_version correct
+			assert(i->prior_version == last);
+		}
+		last = i->version;
+	
+		if (rollbacker)
+			rollbacker->trim(*i);
+	}
+
+	const eversion_t prior_version = entries.begin()->prior_version;
+	const eversion_t first_divergent_update = entries.begin()->version;
+	const eversion_t last_divergent_update = entries.rbegin()->version;
+	const bool object_not_in_store = !missing.is_missing(hoid) && entries.rbegin()->is_delete();
+	ldpp_dout(dpp, 10) << __func__ << ": hoid " << hoid << " prior_version: " << prior_version
+	  << " first_divergent_update: " << first_divergent_update << " last_divergent_update: " << last_divergent_update << dendl;
+	
+	ceph::unordered_map<hobject_t, pg_log_entry_t*>::const_iterator objiter = log.objects.find(hoid);
+	if (objiter != log.objects.end() && objiter->second->version >= first_divergent_update) {
+		/// Case 1)
+		assert(objiter->second->version > last_divergent_update);
+	
+		ldpp_dout(dpp, 10) << __func__ << ": more recent entry found: " << *objiter->second << ", already merged" << dendl;
+	
+		// ensure missing has been updated appropriately
+		if (objiter->second->is_update()) {
+			assert(missing.is_missing(hoid) && missing.missing[hoid].need == objiter->second->version);
+		} else {
+			assert(!missing.is_missing(hoid));
+		}
+		missing.revise_have(hoid, eversion_t());
+
+		if (rollbacker && !object_not_in_store)
+			rollbacker->remove(hoid);
+		return;
+	}
+
+	ldpp_dout(dpp, 10) << __func__ << ": hoid " << hoid <<" has no more recent entries in log" << dendl;
+	if (prior_version == eversion_t() || entries.front().is_clone()) {
+		/// Case 2)
+		ldpp_dout(dpp, 10) << __func__ << ": hoid " << hoid << " prior_version or op type indicates creation," << " deleting" << dendl;
+		if (missing.is_missing(hoid))
+			missing.rm(missing.missing.find(hoid));
+
+		if (rollbacker && !object_not_in_store)
+			rollbacker->remove(hoid);
+		return;
+	}
+
+	if (missing.is_missing(hoid)) {
+		/// Case 3)
+		ldpp_dout(dpp, 10) << __func__ << ": hoid " << hoid << " missing, " << missing.missing[hoid] << " adjusting" << dendl;
+	
+		if (missing.missing[hoid].have == prior_version) {
+			ldpp_dout(dpp, 10) << __func__ << ": hoid " << hoid << " missing.have is prior_version " << prior_version
+			  << " removing from missing" << dendl;
+			missing.rm(missing.missing.find(hoid));
+		} else {
+			ldpp_dout(dpp, 10) << __func__ << ": hoid " << hoid << " missing.have is " << missing.missing[hoid].have
+			  << ", adjusting" << dendl;
+			missing.revise_need(hoid, prior_version);
+			if (prior_version <= info.log_tail) {
+				ldpp_dout(dpp, 10) << __func__ << ": hoid " << hoid << " prior_version " << prior_version
+				  << " <= info.log_tail " << info.log_tail << dendl;
+	
+				if (new_divergent_prior)
+					*new_divergent_prior = make_pair(prior_version, hoid);
+			}
+		}
+
+		return;
+	}
+
+	ldpp_dout(dpp, 10) << __func__ << ": hoid " << hoid << " must be rolled back or recovered," << " attempting to rollback" << dendl;
+	bool can_rollback = true;
+
+	/// Distinguish between 4) and 5)
+	for (list<pg_log_entry_t>::const_reverse_iterator i = entries.rbegin();i != entries.rend();++i) {
+		if (!i->mod_desc.can_rollback() || i->version <= olog_can_rollback_to) {
+			ldpp_dout(dpp, 10) << __func__ << ": hoid " << hoid << " cannot rollback "<< *i << dendl;
+			can_rollback = false;
+			break;
+		}
+	}
+
+	if (can_rollback) {
+		/// Case 4)
+		for (list<pg_log_entry_t>::const_reverse_iterator i = entries.rbegin(); i != entries.rend();++i) {
+			assert(i->mod_desc.can_rollback() && i->version > olog_can_rollback_to);
+			ldpp_dout(dpp, 10) << __func__ << ": hoid " << hoid<< " rolling back " << *i << dendl;
+			if (rollbacker)
+				rollbacker->rollback(*i);
+		}
+
+		ldpp_dout(dpp, 10) << __func__ << ": hoid " << hoid<< " rolled back" << dendl;
+		return;
+	} else {
+		/// Case 5)
+		ldpp_dout(dpp, 10) << __func__ << ": hoid " << hoid << " cannot roll back, "<< "removing and adding to missing" << dendl;
+
+		if (rollbacker && !object_not_in_store)
+			rollbacker->remove(hoid);
+
+		missing.add(hoid, prior_version, eversion_t());
+		if (prior_version <= info.log_tail) {
+			ldpp_dout(dpp, 10) << __func__ << ": hoid " << hoid << " prior_version " << prior_version << " <= info.log_tail "
+			  << info.log_tail << dendl;
+
+			if (new_divergent_prior)
+				*new_divergent_prior = make_pair(prior_version, hoid);
+		}
+	}
+}
+{% endhighlight %}
+
+其基本处理过程如下：
+
+1） 首先进行比较，如果处理的对象hoid大于info.last_backfill，说明该对象本来就不存在，没必要进行修复（？应该是Backfill还没有完成，直接等到下一次Backfill完成）。
+
+> 注意：这种情况一般发生在如下情形
+> 该PG在上一次Peering操作成功后，PG还没有处于clean状态，正在Backfill过程中，就再次触发了Peering的过程。info.last_backfill为上次最后一个修复的对象。
+> 
+> 在本PG完成Peering后就开始修复，先完成Recovery操作，然后会继续完成上次的Backfill操作，所以没有必要在这里检查来修复。
+
+
+2）通过该对象的日志记录来检查版本是否一致。首先确保是同一个对象，本次日志记录的版本prior_version等于上一条日志记录的version值；
+
+3） 版本first_divergent_update为该对象的日志记录中第一个产生分歧的版本；版本last_divergent_update为最后一个产生分歧的版本；版本prior_version为第一个分歧产生的前一个版本，也就是应该存在的对象版本。布尔变量object_not_in_store用来标记该对象不缺失，且第一条分歧日志操作是删除操作。处理分歧日志的5种情况如下所示：
+
+**情形1：** 在没有分歧的日志里找到该对象，但是已存在的对象版本大于第一个分歧对象的版本。这种情况的出现，是由于在merge_log()中产生权威日志时的日志更新，相应的处理已经做了，这里不做任何处理；
+
+**情形2：** 如果prior_version为eversion_t()，为对象的create操作或者是clone操作，那么这个对象就不需要修复。如果已经在missing记录中，就删除该missing记录；
+
+**情形3：** 如果该对象已经处于missing列表中，如下进行处理：
+
+  * 如果日志记录显示当前已经拥有的该对象版本have等于prior_version，说明对象不缺失，不需要进行修复，删除missing中的记录；
+
+  * 否则，修改需要修复的版本need为prior_version；如果prior_version小于等于info.last_tail时，这是不合理的，设置new_divergent_prior用于后续处理；
+
+**情形4：** 如果该对象的所有版本都可以回滚，直接通过本地回滚操作就可以修复，不需要加入missing列表来修复；
+
+**情形5：** 如果不是所有的对象版本都可以回滚，删除相关的版本，把prior_version加入missing记录中用于修复。
 
 
 <br />
