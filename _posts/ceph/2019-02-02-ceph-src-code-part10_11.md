@@ -1268,6 +1268,7 @@ void PG::proc_master_log(
 
 4) 再peer_missing列表中登记oinfo所在PG副本的缺失对象
 
+<br />
 
 #### 2.4.1 PG::merge_log()实现
 {% highlight string %}
@@ -1286,7 +1287,7 @@ void PG::merge_log(
 
 * 调用PGLogEntryHandler::apply()来将相关的pglog的改变以事务的形式保存到ObjectStore中
 
-###### PGLog::merge_log()分析
+###### 2.4.1.1 PGLog::merge_log()分析
 {% highlight string %}
 void PGLog::merge_log(ObjectStore::Transaction& t,
                       pg_info_t &oinfo, pg_log_t &olog, pg_shard_t fromosd,
@@ -1513,8 +1514,7 @@ void PGLog::merge_log(ObjectStore::Transaction& t,
 在合并head时，涉及到```处理分歧日志```以及```构建missing对象```，这两项在图中都有展示，详细代码实现我们在下面单独讲述。
 
 
-----------
-###### PGLog::merge_log()应用举例
+###### 2.4.1.2 PGLog::merge_log()应用举例
 
 下面我们举例说明函数PGLog::merge_log()的不同处理情形。
 
@@ -1559,7 +1559,7 @@ void PGLog::merge_log(ObjectStore::Transaction& t,
 
 ![ceph-chapter10-11](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter10_12.jpg)
 
-
+<br />
 
 
 #### 2.4.2 PG::rewind_divergent_log()回退分歧日志
@@ -1646,7 +1646,7 @@ PG::rewind_divergent_log()函数就是将当前的PGLog回退到参数```newhead
 
 ----------
 
-###### 函数_merge_divergent_entries()
+###### 2.4.2.1 函数_merge_divergent_entries()
 {% highlight string %}
 /// Merge all entries using above
 static void _merge_divergent_entries(
@@ -1873,11 +1873,15 @@ void PGLog::_merge_object_divergent_entries(
 
 2）通过该对象的日志记录来检查版本是否一致。首先确保是同一个对象，本次日志记录的版本prior_version等于上一条日志记录的version值；
 
-3） 版本first_divergent_update为该对象的日志记录中第一个产生分歧的版本；版本last_divergent_update为最后一个产生分歧的版本；版本prior_version为第一个分歧产生的前一个版本，也就是应该存在的对象版本。布尔变量object_not_in_store用来标记该对象不缺失，且第一条分歧日志操作是删除操作。处理分歧日志的5种情况如下所示：
+3） 版本first_divergent_update为该对象的日志记录中第一个产生分歧的版本；版本last_divergent_update为最后一个产生分歧的版本；版本prior_version为第一个分歧产生的前一个版本，也就是应该存在的对象版本。布尔变量object_not_in_store用来标记该对象不存在于object store。处理分歧日志的5种情况如下所示：
 
-**情形1：** 在没有分歧的日志里找到该对象，但是已存在的对象版本大于第一个分歧对象的版本。这种情况的出现，是由于在merge_log()中产生权威日志时的日志更新，相应的处理已经做了，这里不做任何处理；
+**情形1：** 在没有分歧的日志里找到该对象，但是已存在的对象版本大于等于第一个分歧对象的版本。这种情况的出现，是由于在merge_log()中产生权威日志时的日志更新，相应的处理已经做了，这里不做任何处理；
 
-**情形2：** 如果prior_version为eversion_t()，为对象的create操作或者是clone操作，那么这个对象就不需要修复。如果已经在missing记录中，就删除该missing记录；
+>注：此一情形应该是对应于PGLog::merge_log()中，olog.head 大于log.head
+
+**情形2：** 第一条分歧日志是对象的create操作（即prior_version为eversion_t()，或者entries.front().is_clone()）。此种情况下，该对象不存在，我们只需要调整missing列表与object store使两边一致即可。
+
+>注：如何调整为一致呢？ 如果该object存在于missing列表，那么直接从missing列表删除即可；如果存在于object store，则删除Object store中该对象
 
 **情形3：** 如果该对象已经处于missing列表中，如下进行处理：
 
