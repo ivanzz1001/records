@@ -1561,8 +1561,73 @@ void PGLog::merge_log(ObjectStore::Transaction& t,
 
 <br />
 
+下面我们介绍一下如下两个函数的实现：
 
-#### 2.4.2 PG::rewind_divergent_log()回退分歧日志
+* 函数PG::rewind_divergent_log()
+
+* 函数PG::append_log_entries_update_missing()
+
+这里我们首先介绍PG::append_log_entries_update_missing()，其可能会影响到我们对PG::rewind_divergent_log()的理解。
+
+<br />
+
+#### 2.4.2 PG::append_log_entries_update_missing()函数
+{% highlight string %}
+void PGLog::append_log_entries_update_missing(
+  const hobject_t &last_backfill,
+  bool last_backfill_bitwise,
+  const list<pg_log_entry_t> &entries,
+  IndexedLog *log,
+  pg_missing_t &missing,
+  LogEntryHandler *rollbacker,
+  const DoutPrefixProvider *dpp)
+{
+	if (log && !entries.empty()) {
+		assert(log->head < entries.begin()->version);
+		log->head = entries.rbegin()->version;
+	}
+
+	for (list<pg_log_entry_t>::const_iterator p = entries.begin();p != entries.end();++p) {
+		if (log) {
+			log->log.push_back(*p);
+			pg_log_entry_t &ne = log->log.back();
+			ldpp_dout(dpp, 20) << "update missing, append " << ne << dendl;
+			log->index(ne);
+		}
+
+		if (cmp(p->soid, last_backfill, last_backfill_bitwise) <= 0) {
+			missing.add_next_event(*p);
+
+			if (rollbacker) {
+				// hack to match PG::mark_all_unfound_lost
+				if (p->is_lost_delete() && p->mod_desc.can_rollback()) {
+					rollbacker->try_stash(p->soid, p->version.version);
+
+				} else if (p->is_delete()) {
+					rollbacker->remove(p->soid);
+				}
+			}
+		}
+	}
+	if (log)
+		log->reset_rollback_info_trimmed_to_riter();
+}
+{% endhighlight %}
+函数PG::append_log_entries_update_missing()顾名思义，就是向log中追加entries，并且更新missing列表。通过在PG::merge_log()中传入的参数，我们可知会向PGLog::log中追加entries，并且更新PGLog::missing。
+
+在函数中，会遍历传递进来的entries，针对每一个条目```p```:
+
+1) 向log追加该entry条目，并调用IndexedLog::index()建立该日志条目索引；
+
+2) 如果```p->soid```小于等于last_backfill，调用pg_missing_t::add_next_event()添加一个```pg_log_entry_t```事件。若rollbacker不为空，执行如下：
+
+* 若该日志条目是lost_delete一个object，且支持EC，则调用PGLogEntryHandler::try_stash()暂存该对象；
+
+* 若该日志条目是delete一个object，则PGLogEntryHandler::remove()删除该对象；
+
+
+
+#### 2.4.3 PG::rewind_divergent_log()回退分歧日志
 {% highlight string %}
 /**
  * rewind divergent entries at the head of the log
@@ -1646,7 +1711,7 @@ PG::rewind_divergent_log()函数就是将当前的PGLog回退到参数```newhead
 
 ----------
 
-###### 2.4.2.1 函数_merge_divergent_entries()
+###### 2.4.3.1 函数_merge_divergent_entries()
 {% highlight string %}
 /// Merge all entries using above
 static void _merge_divergent_entries(
@@ -1887,11 +1952,16 @@ void PGLog::_merge_object_divergent_entries(
 
   * 如果日志记录显示当前已经拥有的该对象版本have等于prior_version，说明对象不缺失，不需要进行修复，删除missing中的记录；
 
-  * 否则，修改需要修复的版本need为prior_version；如果prior_version小于等于info.last_tail时，这是不合理的，设置new_divergent_prior用于后续处理；
+  * 否则，修改需要修复的版本need为prior_version；如果prior_version小于等于info.log_tail时，这是不合理的，设置new_divergent_prior用于后续处理；
 
 **情形4：** 如果该对象的所有版本都可以回滚，直接通过本地回滚操作就可以修复，不需要加入missing列表来修复；
 
 **情形5：** 如果不是所有的对象版本都可以回滚，删除相关的版本，把prior_version加入missing记录中用于修复。
+
+<br />
+>总结：对于上面分歧日志的处理，核心的思想就是要使本PG副本达到与权威副本一致的状态。因此，需要根据不同的情形采用不同的方式来达成一致。
+
+
 
 
 <br />
