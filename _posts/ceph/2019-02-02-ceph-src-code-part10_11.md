@@ -681,7 +681,7 @@ PG::RecoveryState::GetLog::GetLog(my_context ctx)
 
 4）如果pg->info.last_update小于权威OSD的log_tail，也就是本OSD的日志和权威日志不重叠，那么本OSD无法恢复，抛出IsInComplete事件。经过函数PG::choose_acting()的选择后，主OSD必须是可恢复的。如果主OSD不可恢复，必须申请一个临时PG，选择拥有权威日志的OSD为临时主OSD；
 
-5） 如果自己不是权威日志的OSD，则需要去拥有权威日志的OSD去拉去权威日志，并与本地合并。
+5） 如果自己不是权威日志的OSD，则需要去拥有权威日志的OSD去拉取权威日志，并与本地合并。
 
 <br />
 
@@ -1037,6 +1037,40 @@ public:
 * missing: 当前PG的missing列表
 
 * past_intervals: 本PG副本的past_intervals
+
+5) **pg_missing_t数据结构**
+{% highlight string %}
+// src/include/types.h
+typedef uint64_t version_t;
+
+/**
+ * pg_missing_t - summary of missing objects.
+ *
+ *  kept in memory, as a supplement to pg_log_t
+ *  also used to pass missing info in messages.
+ */
+struct pg_missing_t {
+	struct item {
+		eversion_t need, have;
+	};
+
+	map<hobject_t, item, hobject_t::ComparatorWithDefault> missing;  // oid -> (need v, have v)
+	map<version_t, hobject_t> rmissing;  // v -> oid
+};
+{% endhighlight %}
+下面我们简单介绍一下各字段的含义：
+
+* item.need: 指示需要的object的版本号
+
+* item.have: 指示当前已经拥有的object的版本号
+
+* missing: 保存当前所missing的对象列表
+
+* rmissing: 一个通过version反向查找object的map
+
+关于pg_log_entry_t中各version的赋值，请参看[《ceph中PGLog处理流程》](https://ivanzz1001.github.io/records/post/ceph/2019/02/05/ceph-src-code-part14_1)。
+
+
 
 <br />
 
@@ -1611,6 +1645,42 @@ void PGLog::append_log_entries_update_missing(
 	}
 	if (log)
 		log->reset_rollback_info_trimmed_to_riter();
+}
+
+/*
+ * this needs to be called in log order as we extend the log.  it
+ * assumes missing is accurate up through the previous log entry.
+ */
+void pg_missing_t::add_next_event(const pg_log_entry_t& e)
+{
+	if (e.is_update()) {
+		map<hobject_t, item, hobject_t::ComparatorWithDefault>::iterator missing_it;
+		missing_it = missing.find(e.soid);
+		bool is_missing_divergent_item = missing_it != missing.end();
+
+		if (e.prior_version == eversion_t() || e.is_clone()) {
+			// new object.
+			if (is_missing_divergent_item) {  // use iterator
+				rmissing.erase((missing_it->second).need.version);
+				missing_it->second = item(e.version, eversion_t());  // .have = nil
+			} else  // create new element in missing map
+				missing[e.soid] = item(e.version, eversion_t());     // .have = nil
+
+		} else if (is_missing_divergent_item) {
+			// already missing (prior).
+			rmissing.erase((missing_it->second).need.version);
+			(missing_it->second).need = e.version;  // leave .have unchanged.
+		} else if (e.is_backlog()) {
+			// May not have prior version
+			assert(0 == "these don't exist anymore");
+		} else {
+			// not missing, we must have prior_version (if any)
+			assert(!is_missing_divergent_item);
+			missing[e.soid] = item(e.version, e.prior_version);
+		}
+		rmissing[e.version.version] = e.soid;
+	} else
+		rm(e.soid, e.version);
 }
 {% endhighlight %}
 函数PG::append_log_entries_update_missing()顾名思义，就是向log中追加entries，并且更新missing列表。通过在PG::merge_log()中传入的参数，我们可知会向PGLog::log中追加entries，并且更新PGLog::missing。
