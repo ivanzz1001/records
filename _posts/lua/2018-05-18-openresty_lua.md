@@ -811,6 +811,13 @@ server {
       deny all;
   }
   
+  location ~* /proxy {
+    # note: can not use lua in this block
+    internal;
+    set_by_lua $target_backend 'return ngx.ctx.target_backend';
+    proxy_pass http://$target_backend$request_uri;
+  }
+  
   location ~* ^/([a-z]\w+)/(\S+) {
     # this is the object operation
     set $bucket $1;
