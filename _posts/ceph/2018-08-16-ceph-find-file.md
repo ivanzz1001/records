@@ -10,7 +10,6 @@ description: 如何在ceph中定位文件
 
 我们知道,将一个文件存到ceph里之后，ceph会将该文件条带化为若干个小的object，然后使用cursh算法，将每一个object复制若干份（根据pool size 来定）分别存储到不同的osd上。 本文会介绍，如何通过命令找到一个文件真正被存在哪里了。
 
-
 <!-- more -->
 
 ## 1. 查找文件存放的物理位置
@@ -194,6 +193,8 @@ osdmap e16540 pool 'oss-uat.rgw.buckets.data' (189) object '-003-KZyxg.docx.VLRH
 {% endhighlight %}
 
 
+
+
 ## 2. 查找示例2
 
 我们以查找```OpenResty完全开发指南.pdf```为例来演示相关过程：
@@ -333,7 +334,7 @@ osdmap e16540 pool 'oss-uat.rgw.buckets.data' (189) object '-003-KZyxg.docx.VLRH
 
 参看下面的拼接方法可以拼接出一个分片在ceph内部的名称：
 {% highlight string %}
-<bucket_id>__<multipart>_<prefix>.<part_idx>
+<bucket_id>__multipart_<prefix>.<part_idx>
 {% endhighlight %}
 因此，这里我们拼接出```OpenResty完全开发指南.pdf```的第9个分片在ceph内部的名称为：
 <pre>
