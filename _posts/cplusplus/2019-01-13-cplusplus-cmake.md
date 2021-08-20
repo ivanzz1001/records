@@ -144,6 +144,252 @@ CMake suite maintained and supported by Kitware (kitware.com/cmake).
 </pre>
 
 
+## 3. cmake tutorial 
+下面我们分成12个小节，来介绍cmake的使用。
+
+### 3.1 入门案例
+
+通常，我们需要将工程(project)中的的源代码编译为一个可执行文件。对于最简单的项目来说，只需要一个3行的```CMakeList.txt```文件即可完成。
+
+1） 创建Step1文件夹
+<pre>
+# mkdir -p Step1 
+# cd Step1
+</pre>
+
+2) 编写tutorial.cxx源文件
+
+我们在上面的```Step1```文件中编写turorial.cxx源代码如下：
+{% highlight string %}
+// A simple program that computes the square root of a number
+#include <cmath>
+#include <cstdlib>
+#include <iostream>
+#include <string>
+
+int main(int argc, char* argv[])
+{
+  if (argc < 2) {
+    std::cout << "Usage: " << argv[0] << " number" << std::endl;
+    return 1;
+  }
+
+  // convert input to double
+  const double inputValue = atof(argv[1]);
+
+  // calculate square root
+  const double outputValue = sqrt(inputValue);
+  std::cout << "The square root of " << inputValue << " is " << outputValue
+            << std::endl;
+  return 0;
+}
+{% endhighlight %}
+上面的代码用于计算一个数的平方根。
+
+3) 创建CMakeLists.txt文件
+
+在```Step1```目录下创建CMakeLists.txt文件，内容如下：
+{% highlight string %}
+cmake_minimum_required(VERSION 3.10)
+
+# set the project name
+project(Tutorial)
+
+# add the executable 
+add_executable(Tutorial tutorial.cxx)
+{% endhighlight %}
+上面的CMakeLists.txt例子中，里面的cmake命令都使用的是小写格式。事实上，使用大写、小写、或者大小写混合，cmake都是支持的。
+
+###### 增加版本号和一个用于配置的头文件
+在这里，我们为可执行文件和工程添加```版本号```(version number)支持。我们可以不用修改```turorial.cxx```源代码，而是使用```CMakeLists.txt```以提供更好的灵活性：
+
+1） 使用project()命令设置工程名和版本号
+
+修改```CMakeLists.txt```文件，使用project()命令来设置工程名和版本号：
+{% highlight string %}
+cmake_minimum_required(VERSION 3.10)
+
+# set the project name and version
+project(Tutorial VERSION 1.0)
+{% endhighlight %}
+
+2) 配置一个头文件来将版本号传递给源文件
+
+修改```CMakeLists.txt```如下：
+{% highlight string %}
+configure_file(TutorialConfig.h.in TutorialConfig.h)
+{% endhighlight %}
+由于配置文件将会被写入到[binary tree](https://cmake.org/cmake/help/v3.0/variable/PROJECT_BINARY_DIR.html)，因此我们必须将该目录添加到源文件的搜索路径中。可以在```CMakeLists.txt```文件中添加如下：
+{% highlight string %}
+target_include_directories(Tutorial PUBLIC
+                           "${PROJECT_BINARY_DIR}"
+                           )
+{% endhighlight %}
+
+这样修改完成之后，到目前为止，我们的CMakeLists.txt看起来如下：
+{% highlight string %}
+cmake_minimum_required(VERSION 3.10)
+
+# set the project name and version
+project(Tutorial VERSION 1.0)
+
+configure_file(TutorialConfig.h.in TutorialConfig.h)
+
+# add the executable 
+add_executable(Tutorial tutorial.cxx)
+
+target_include_directories(Tutorial PUBLIC
+                           "${PROJECT_BINARY_DIR}"
+                           )
+{% endhighlight %}
+
+3) 创建TutorialConfig.h.in配置文件
+
+我们在```源代码目录```创建TutorialConfig.h.in配置文件，内容如下:
+{% highlight string %}
+// the configured options and settings for Tutorial
+#define Tutorial_VERSION_MAJOR @Tutorial_VERSION_MAJOR@
+#define Tutorial_VERSION_MINOR @Tutorial_VERSION_MINOR@
+{% endhighlight %}
+当CMake配置该头文件时，```@Tutorial_VERSION_MAJOR@```和```@Tutorial_VERSION_MINOR@```就会被替换。
+
+4） 修改tutorial.cxx源文件
+
+下面我们修改tutorial.cxx源文件，让其包含TutorialConfig.h头文件。并添加打印版本号的语句：
+{% highlight string %}
+// A simple program that computes the square root of a number
+#include <cmath>
+#include <cstdlib>
+#include <iostream>
+#include <string>
+#include "TutorialConfig.h"
+
+
+
+int main(int argc, char* argv[])
+{
+  if (argc < 2) {
+    // report version
+    std::cout << argv[0] << " Version " << Tutorial_VERSION_MAJOR << "."
+              << Tutorial_VERSION_MINOR << std::endl;
+    std::cout << "Usage: " << argv[0] << " number" << std::endl;
+    return 1;
+  }
+
+  // convert input to double
+  const double inputValue = atof(argv[1]);
+
+  // calculate square root
+  const double outputValue = sqrt(inputValue);
+  std::cout << "The square root of " << inputValue << " is " << outputValue
+            << std::endl;
+  return 0;
+}
+{% endhighlight %}
+
+###### 指定C++标准
+下面我们增加一些c++ 11的特性到工程中： 将tutorial.cxx源文件中的atof()替换为std::stod()
+{% highlight string %}
+// A simple program that computes the square root of a number
+#include <cmath>
+#include <iostream>
+#include <string>
+#include "TutorialConfig.h"
+
+
+
+int main(int argc, char* argv[])
+{
+  if (argc < 2) {
+    // report version
+    std::cout << argv[0] << " Version " << Tutorial_VERSION_MAJOR << "."
+              << Tutorial_VERSION_MINOR << std::endl;
+    std::cout << "Usage: " << argv[0] << " number" << std::endl;
+    return 1;
+  }
+
+  // convert input to double
+  const double inputValue = std::stod(argv[1]);
+
+  // calculate square root
+  const double outputValue = sqrt(inputValue);
+  std::cout << "The square root of " << inputValue << " is " << outputValue
+            << std::endl;
+  return 0;
+}
+{% endhighlight %}
+>注：可以不需要cstdlib头文件了
+
+这样修改之后，我们需要显式的在CMake代码中指定编译所需要的flag。最容易的方法就是通过使用```CMAKE_CXX_STANDARD```变量来指定相应的C++标准。在本例子中，我们可以在CMakeLists.txt文件中设置```CMAKE_CXX_STANDARD```变量的值为11，并将```CMAKE_CXX_STANDARD_REQUIRED```设置为True。注意，请确保将```CMAKE_CXX_STANDARD```声明在add_execute()命令之前。
+
+如下是修改后的CMakeList.txt:
+{% highlight string %}
+cmake_minimum_required(VERSION 3.10)
+
+# set the project name and version
+project(Tutorial VERSION 1.0)
+
+# specify the C++ standard
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+
+configure_file(TutorialConfig.h.in TutorialConfig.h)
+
+# add the executable 
+add_executable(Tutorial tutorial.cxx)
+
+target_include_directories(Tutorial PUBLIC
+                           "${PROJECT_BINARY_DIR}"
+                           )
+{% endhighlight %}
+
+###### Build and Test 
+执行```cmake```命令或者```cmake-gui```来配置工程，之后再选择指定的工具完成编译。
+
+1）创建编译目录 
+
+我们在与```Step1```平级的目录中创建构建目录```Step1_build```:
+<pre>
+# mkdir Step1_build
+# ls 
+Step1  Step1_build
+</pre>
+
+2) 产生本地构建系统
+
+进入build目录，然后执行cmake来配置工程，并产生本地构建系统：
+{% highlight string %}
+# cd Step1_build 
+# cmake ../Step1 
+# ls
+CMakeCache.txt  CMakeFiles  cmake_install.cmake  Makefile  TutorialConfig.h
+{% endhighlight %}
+
+3) 编译工程 
+
+执行如下命令来完成工程的编译和链接：
+{% highlight string %}
+# cmake --build .
+# ls
+CMakeCache.txt  CMakeFiles  cmake_install.cmake  Makefile  Tutorial  TutorialConfig.h
+{% endhighlight %}
+
+上面我们看到生成了```Tutorial```可执行文件。
+
+4) 测试验证
+
+在上面编译完成之后生成了可执行文件```Tutotial```，执行如下命令来验证：
+<pre>
+# ./Tutorial 4294967296
+The square root of 4.29497e+09 is 65536
+# ./Tutorial 10
+The square root of 10 is 3.16228
+# ./Tutorial 
+./Tutorial Version 1.0
+Usage: ./Tutorial number
+</pre>
+
 
 <br />
 <br />
