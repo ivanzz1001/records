@@ -200,7 +200,7 @@ add_executable(Tutorial tutorial.cxx)
 {% endhighlight %}
 上面的CMakeLists.txt例子中，里面的cmake命令都使用的是小写格式。事实上，使用大写、小写、或者大小写混合，cmake都是支持的。
 
-###### 增加版本号和一个用于配置的头文件
+###### 3.1.1 增加版本号和一个用于配置的头文件
 在这里，我们为可执行文件和工程添加```版本号```(version number)支持。我们可以不用修改```turorial.cxx```源代码，而是使用```CMakeLists.txt```以提供更好的灵活性：
 
 1） 使用project()命令设置工程名和版本号
@@ -225,6 +225,10 @@ target_include_directories(Tutorial PUBLIC
                            "${PROJECT_BINARY_DIR}"
                            )
 {% endhighlight %}
+>注：
+> SOURCE_DIR: The top-level source directory on which CMake was run.
+>BINARY_DIR: The top-level build directory on which CMake was run.
+
 
 这样修改完成之后，到目前为止，我们的CMakeLists.txt看起来如下：
 {% highlight string %}
@@ -287,7 +291,7 @@ int main(int argc, char* argv[])
 }
 {% endhighlight %}
 
-###### 指定C++标准
+###### 3.1.2 指定C++标准
 下面我们增加一些c++ 11的特性到工程中： 将tutorial.cxx源文件中的atof()替换为std::stod()
 {% highlight string %}
 // A simple program that computes the square root of a number
@@ -344,7 +348,7 @@ target_include_directories(Tutorial PUBLIC
                            )
 {% endhighlight %}
 
-###### Build and Test 
+###### 3.1.3 Build and Test 
 执行```cmake```命令或者```cmake-gui```来配置工程，之后再选择指定的工具完成编译。
 
 1）创建编译目录 
@@ -362,8 +366,64 @@ Step1  Step1_build
 {% highlight string %}
 # cd Step1_build 
 # cmake ../Step1 
+-- The C compiler identification is GNU 6.5.0
+-- The CXX compiler identification is GNU 6.5.0
+-- Check for working C compiler: /usr/local/bin/gcc
+-- Check for working C compiler: /usr/local/bin/gcc - works
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Check for working CXX compiler: /usr/local/bin/c++
+-- Check for working CXX compiler: /usr/local/bin/c++ - works
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/ivanzz1001/workspace/test/Step1_build
 # ls
 CMakeCache.txt  CMakeFiles  cmake_install.cmake  Makefile  TutorialConfig.h
+# tree
+.
+├── CMakeCache.txt
+├── CMakeFiles
+│   ├── 3.17.2
+│   │   ├── CMakeCCompiler.cmake
+│   │   ├── CMakeCXXCompiler.cmake
+│   │   ├── CMakeDetermineCompilerABI_C.bin
+│   │   ├── CMakeDetermineCompilerABI_CXX.bin
+│   │   ├── CMakeSystem.cmake
+│   │   ├── CompilerIdC
+│   │   │   ├── a.out
+│   │   │   ├── CMakeCCompilerId.c
+│   │   │   └── tmp
+│   │   └── CompilerIdCXX
+│   │       ├── a.out
+│   │       ├── CMakeCXXCompilerId.cpp
+│   │       └── tmp
+│   ├── cmake.check_cache
+│   ├── CMakeDirectoryInformation.cmake
+│   ├── CMakeOutput.log
+│   ├── CMakeTmp
+│   ├── Makefile2
+│   ├── Makefile.cmake
+│   ├── progress.marks
+│   ├── TargetDirectories.txt
+│   └── Tutorial.dir
+│       ├── build.make
+│       ├── cmake_clean.cmake
+│       ├── DependInfo.cmake
+│       ├── depend.make
+│       ├── flags.make
+│       ├── link.txt
+│       └── progress.make
+├── cmake_install.cmake
+├── Makefile
+└── TutorialConfig.h
+
+8 directories, 27 files
 {% endhighlight %}
 
 3) 编译工程 
@@ -371,11 +431,69 @@ CMakeCache.txt  CMakeFiles  cmake_install.cmake  Makefile  TutorialConfig.h
 执行如下命令来完成工程的编译和链接：
 {% highlight string %}
 # cmake --build .
+Scanning dependencies of target Tutorial
+[ 50%] Building CXX object CMakeFiles/Tutorial.dir/tutorial.cxx.o
+[100%] Linking CXX executable Tutorial
+[100%] Built target Tutorial
 # ls
 CMakeCache.txt  CMakeFiles  cmake_install.cmake  Makefile  Tutorial  TutorialConfig.h
-{% endhighlight %}
+# tree
+.
+├── CMakeCache.txt
+├── CMakeFiles
+│   ├── 3.17.2
+│   │   ├── CMakeCCompiler.cmake
+│   │   ├── CMakeCXXCompiler.cmake
+│   │   ├── CMakeDetermineCompilerABI_C.bin
+│   │   ├── CMakeDetermineCompilerABI_CXX.bin
+│   │   ├── CMakeSystem.cmake
+│   │   ├── CompilerIdC
+│   │   │   ├── a.out
+│   │   │   ├── CMakeCCompilerId.c
+│   │   │   └── tmp
+│   │   └── CompilerIdCXX
+│   │       ├── a.out
+│   │       ├── CMakeCXXCompilerId.cpp
+│   │       └── tmp
+│   ├── cmake.check_cache
+│   ├── CMakeDirectoryInformation.cmake
+│   ├── CMakeOutput.log
+│   ├── CMakeTmp
+│   ├── Makefile2
+│   ├── Makefile.cmake
+│   ├── progress.marks
+│   ├── TargetDirectories.txt
+│   └── Tutorial.dir
+│       ├── build.make
+│       ├── cmake_clean.cmake
+│       ├── CXX.includecache
+│       ├── DependInfo.cmake
+│       ├── depend.internal
+│       ├── depend.make
+│       ├── flags.make
+│       ├── link.txt
+│       ├── progress.make
+│       └── tutorial.cxx.o
+├── cmake_install.cmake
+├── Makefile
+├── Tutorial
+└── TutorialConfig.h
 
+8 directories, 31 files
+{% endhighlight %}
 上面我们看到生成了```Tutorial```可执行文件。
+
+对比前面，我们看到多出了如下4个文件：
+
+* Step1_build/Tutorial文件
+
+* Step1_build/Tutorial.dir/CXX.includecache文件
+
+* Step1_build/Tutorial.dir/depend.internal文件
+
+* Step1_build/Tutorial.dir/tutorial.cxx.o文件
+
+
 
 4) 测试验证
 
