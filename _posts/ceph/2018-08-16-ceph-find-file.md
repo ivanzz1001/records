@@ -16,7 +16,7 @@ description: 如何在ceph中定位文件
 
 **1) 列出当前系统下所有bucket信息** 
 <pre>
-radosgw-admin bucket list
+# radosgw-admin bucket list
 [
     "small_rd_test_bucket",    
     "mynewtest",
@@ -28,6 +28,23 @@ radosgw-admin bucket list
     "write_test_bucket",
 	"tsp_test_bucket",
 ]
+
+# ceph osd pool ls
+.rgw.root
+default.rgw.control
+default.rgw.data.root
+default.rgw.gc
+default.rgw.log
+default.rgw.users.uid
+default.rgw.users.keys
+default.rgw.buckets.index
+default.rgw.usage
+default.rgw.buckets.data
+default.rgw.buckets.non-ec
+default.rgw.users.swift
+benchmark
+default.rgw.users.email
+rbd-01
 </pre>
 上述命令展示了当前ceph对象存储系统中涉及到的所有的bucket
 
