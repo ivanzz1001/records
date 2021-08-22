@@ -8,38 +8,142 @@ description: ceph源代码分析
 ---
 
 当PG完成了Peering过程后，处于Active状态的PG就可以对外提供服务了。如果该PG的各个副本上有不一致的对象，就需要进行修复。Ceph的修复过程有两种：Recovery和Backfill。
+{% highlight string %}
+void ReplicatedPG::do_request(
+  OpRequestRef& op,
+  ThreadPool::TPHandle &handle)
+{
+	assert(!op_must_wait_for_map(get_osdmap()->get_epoch(), op));
+	if (can_discard_request(op)) {
+		return;
+	}
+	if (flushes_in_progress > 0) {
+		dout(20) << flushes_in_progress << " flushes_in_progress pending " << "waiting for active on " << op << dendl;
+		waiting_for_peered.push_back(op);
+		op->mark_delayed("waiting for peered");
+		return;
+	}
+	
+	if (!is_peered()) {
+		// Delay unless PGBackend says it's ok
+		if (pgbackend->can_handle_while_inactive(op)) {
+			bool handled = pgbackend->handle_message(op);
+			assert(handled);
+			return;
+		} else {
+			waiting_for_peered.push_back(op);
+			op->mark_delayed("waiting for peered");
+			return;
+		}
+	}
+
+	...
+}
+{% endhighlight %}
+>注：此外，根据ceph数据读写流程，OSD::dispatch_session_waiting()等阶段均有可能阻塞请求
+
 
 Recovery是仅依据PG日志中的缺失记录来修复不一致的对象。Backfill是PG通过重新扫描所有的对象，对比发现缺失的对象，通过整体拷贝来修复。当一个OSD失效时间过长导致无法根据PG日志来修复，或者新加入的OSD导致数据迁移时，就会启动Backfill过程。
 
 
 从第10章可知，PG完成Peering过程后，就处于activate状态，如果需要Recovery，就产生DoRecovery事件，触发修复操作。如果需要Backfill，机会产生RequestBackfill事件来触发Backfill操作。在PG的修复过程中，如果既有需要Recovery过程的OSD，又有需要Backfill过程的OSD，那么处理过程需要先进行Recovery过程的修复，再完成Backfill过程的修复。
+{% highlight string %}
+void ReplicatedPG::on_activate()
+{
+	// all clean?
+	if (needs_recovery()) {
+		dout(10) << "activate not all replicas are up-to-date, queueing recovery" << dendl;
+		queue_peering_event(
+		  CephPeeringEvtRef(
+			std::make_shared<CephPeeringEvt>(
+			  get_osdmap()->get_epoch(),
+			  get_osdmap()->get_epoch(),
+			  DoRecovery())));
+	} else if (needs_backfill()) {
+		dout(10) << "activate queueing backfill" << dendl;
+		queue_peering_event(
+		  CephPeeringEvtRef(
+			std::make_shared<CephPeeringEvt>(
+			  get_osdmap()->get_epoch(),
+			  get_osdmap()->get_epoch(),
+			  RequestBackfill())));
+	} else {
+		dout(10) << "activate all replicas clean, no recovery" << dendl;
+		queue_peering_event(
+		  CephPeeringEvtRef(
+			std::make_shared<CephPeeringEvt>(
+			  get_osdmap()->get_epoch(),
+			  get_osdmap()->get_epoch(),
+			  AllReplicasRecovered())));
+	}
+	
+	publish_stats_to_osd();
+	
+	if (!backfill_targets.empty()) {
+		last_backfill_started = earliest_backfill();
+		new_backfill = true;
+		assert(!last_backfill_started.is_max());
+		dout(5) << "on activate: bft=" << backfill_targets << " from " << last_backfill_started << dendl;
+		for (set<pg_shard_t>::iterator i = backfill_targets.begin(); i != backfill_targets.end(); ++i) {
+			dout(5) << "target shard " << *i << " from " << peer_info[*i].last_backfill << dendl;
+		}
+	}
+	
+	hit_set_setup();
+	agent_setup();
+}
+{% endhighlight %}
 
 本章介绍Ceph的数据修复的实现过程。首先介绍数据修复的资源预约的知识，然后通过介绍修复的状态转换图，大概了解整个数据修复的过程。最后分别详细介绍Recovery过程和Backfill过程的具体实现。
+
 
 <!-- more -->
 
 
 ## 1. 资源预约
-在数据修复的过程中，为了控制一个OSD上正在修复的PG最大数目，需要资源预约，在主OSD上和从OSD上都需要预约。如果没有预约成功，需要阻塞等待。一个OSD能同时修复的最大PG数在配置选项osd_max_backfills中设置，默认值为1。
+在数据修复的过程中，为了控制一个OSD上正在修复的PG最大数目，需要资源预约，在主OSD上和从OSD上都需要预约。如果没有预约成功，需要阻塞等待。一个OSD能同时修复的最大PG数在配置选项```osd_max_backfills```中设置，默认值为1。
 
 类AsyncReserver用来管理资源预约，其模板参数```<T>```为要预约的资源类型。该类实现了异步的资源预约。当成功完成资源预约后，就调用注册的回调函数通知调用方预约成功(src/common/AsyncReserver.h)：
 {% highlight string %}
 template <typename T>
 class AsyncReserver {
-  Finisher *f;               //当预约成功，用来执行的回调函数
-  unsigned max_allowed;      //定义允许的最大资源数量，在这里指允许修复的PG的数量
-  unsigned min_priority;     //最小的优先级
-  Mutex lock;
-
-  //优先级到待预约资源链表的映射，pair<T, Context *>定义预约的资源和注册的回调函数
-  map<unsigned, list<pair<T, Context*> > > queues;
-
-  //资源在queues链表中的位置指针
-  map<T, pair<unsigned, typename list<pair<T, Context*> >::iterator > > queue_pointers;
-
-  //预约成功，正在使用的资源
-  set<T> in_progress;
+	Finisher *f;               //当预约成功，用来执行的回调函数
+	unsigned max_allowed;      //定义允许的最大资源数量，在这里指允许修复的PG的数量
+	unsigned min_priority;     //最小的优先级
+	Mutex lock;
+	
+	//优先级到待预约资源链表的映射，pair<T, Context *>定义预约的资源和注册的回调函数（注：值越大，优先级越高）
+	
+	map<unsigned, list<pair<T, Context*> > > queues;
+	
+	//资源在queues链表中的位置指针
+	map<T, pair<unsigned, typename list<pair<T, Context*> >::iterator > > queue_pointers;
+	
+	//预约成功，正在使用的资源
+	set<T> in_progress;
 };
+{% endhighlight %}
+
+在OSDService中，我们看到执行如下操作时需要资源预约：
+{% highlight string %}
+class OSDService {
+public:
+	// -- backfill_reservation --
+	Finisher reserver_finisher;
+	AsyncReserver<spg_t> local_reserver;
+	AsyncReserver<spg_t> remote_reserver;
+
+public:
+	AsyncReserver<spg_t> snap_reserver;
+};
+
+OSDService::OSDService(OSD *osd) : 
+  reserver_finisher(cct),
+  local_reserver(&reserver_finisher, cct->_conf->osd_max_backfills, cct->_conf->osd_min_recovery_priority),
+  remote_reserver(&reserver_finisher, cct->_conf->osd_max_backfills, cct->_conf->osd_min_recovery_priority),
+  snap_reserver(&reserver_finisher,cct->_conf->osd_max_trimming_pgs),
+{
+}
 {% endhighlight %}
 
 ### 1.1 资源预约
@@ -64,6 +168,20 @@ void request_reservation(
 	queues[prio].push_back(make_pair(item, on_reserved));
 	queue_pointers.insert(make_pair(item, make_pair(prio,--(queues[prio]).end())));
 	do_queues();
+}
+
+void do_queues() {
+	typename map<unsigned, list<pair<T, Context*> > >::reverse_iterator it;
+	for (it = queues.rbegin();it != queues.rend() &&in_progress.size() < max_allowed && it->first >= min_priority;
+	  ++it) {
+		while (in_progress.size() < max_allowed &&!it->second.empty()) {
+			pair<T, Context*> p = it->second.front();
+			queue_pointers.erase(p.first);
+			it->second.pop_front();
+			f->queue(p.second);
+			in_progress.insert(p.first);
+		}
+	}
 }
 {% endhighlight %}
 
@@ -108,7 +226,7 @@ void cancel_reservation(
 
 具体处理过程如下：
 
-1） 如果该资源还在queue队列中，就删除（这属于异常情况的处理）；否则再in_progress队列中删除该资源
+1） 如果该资源还在queue队列中，就删除（这属于异常情况的处理）；否则在in_progress队列中删除该资源
 
 2） 调用do_queues()函数把该资源重新授权给其他等待的请求。
 
@@ -122,9 +240,53 @@ void cancel_reservation(
 
 **情况1：**当进入Activating状态后，如果此时所有的副本都完整，不需要修复，其状态转移过程如下：
 
+
 1） Activating状态接收到AllReplicasRecovered事件，直接转换到Recovered状态
 
 2） Recovered状态接收到GoClean事件，整个PG转入Clean状态
+
+代码参考如下：
+{% highlight string %}
+void ReplicatedPG::on_activate()
+{
+	...
+	else {
+		dout(10) << "activate all replicas clean, no recovery" << dendl;
+		queue_peering_event(
+		  CephPeeringEvtRef(
+			std::make_shared<CephPeeringEvt>(
+			  get_osdmap()->get_epoch(),
+			  get_osdmap()->get_epoch(),
+			  AllReplicasRecovered())));
+	}
+	...
+}
+
+struct Activating : boost::statechart::state< Activating, Active >, NamedState {
+typedef boost::mpl::list <
+boost::statechart::transition< AllReplicasRecovered, Recovered >,
+boost::statechart::transition< DoRecovery, WaitLocalRecoveryReserved >,
+boost::statechart::transition< RequestBackfill, WaitLocalBackfillReserved >
+> reactions;
+
+	explicit Activating(my_context ctx);
+	void exit();
+};
+
+struct Recovered : boost::statechart::state< Recovered, Active >, NamedState {
+typedef boost::mpl::list<
+boost::statechart::transition< GoClean, Clean >,
+boost::statechart::custom_reaction< AllReplicasActivated >
+> reactions;
+
+	explicit Recovered(my_context ctx);
+	void exit();
+	boost::statechart::result react(const AllReplicasActivated&) {
+		post_event(GoClean());
+		return forward_event();
+	}
+};
+{% endhighlight %}
 
 
 ----------
@@ -142,6 +304,7 @@ void cancel_reservation(
 
 5） 异常处理：当在状态WaitRemoteBackfillReserved和Backfilling接收到RemoteReservationRejected事件，表明资源预约失败，进入NotBackfilling状态，再次等待RequestBackfilling事件来重新发起Backfill过程；
 
+>注：此情况的代码分析过程，我们会在后面详细讲解
 
 ----------
 
@@ -193,9 +356,323 @@ PG::RecoveryState::Recovering::Recovering(my_context ctx)
 - 对于比较特殊的快照对象，在修复时加入了一些优化的方法；
 
 ### 3.1 触发修复
-Recovery过程由PG的主OSD来触发并控制整个修复的过程。在修复的过程中，先修复主OSD上缺失（或者不一致）的对象，然后修复从OSD上缺失的对象。由数据修复状态转换过程可知，当PG处于Activate/Recoverying状态后，该PG被加入到OSD的RecoveryWQ工作队列中。在recovery_wq里，其工作队列的线程池的处理函数调用do_recovery()函数来执行实际的数据修复操作：
+Recovery过程由PG的主OSD来触发并控制整个修复的过程。在修复的过程中，先修复主OSD上缺失（或者不一致）的对象，然后修复从OSD上缺失的对象。
+
+###### 3.1.1 Recovery触发流程
+
+下面我们给出PG从```Activating```状态进入```Recovering```状态的调用流程：
+
+1) Active/Activating产生DoRecovery()事件
 {% highlight string %}
-void OSD::do_recovery(PG *pg, ThreadPool::TPHandle &handle);
+void ReplicatedPG::on_activate()
+{
+	// all clean?
+	if (needs_recovery()) {
+		dout(10) << "activate not all replicas are up-to-date, queueing recovery" << dendl;
+		queue_peering_event(
+		  CephPeeringEvtRef(
+			std::make_shared<CephPeeringEvt>(
+			  get_osdmap()->get_epoch(),
+			  get_osdmap()->get_epoch(),
+			  DoRecovery())));
+	} 
+	...
+}
+{% endhighlight %}
+
+2) 进入WaitLocalRecoveryReserved状态
+{% highlight string %}
+struct Activating : boost::statechart::state< Activating, Active >, NamedState {
+  typedef boost::mpl::list <
+boost::statechart::transition< AllReplicasRecovered, Recovered >,
+boost::statechart::transition< DoRecovery, WaitLocalRecoveryReserved >,
+boost::statechart::transition< RequestBackfill, WaitLocalBackfillReserved >
+> reactions;
+	explicit Activating(my_context ctx);
+	void exit();
+};
+{% endhighlight %}
+上面我们看到Activating状态下接收到```DoRecovery```事件后直接进入WaitLocalRecoveryReserved状态。
+
+
+WaitLocalRecoveryReserved状态进行本地资源预约，过程如下：
+{% highlight string %}
+struct WaitLocalRecoveryReserved : boost::statechart::state< WaitLocalRecoveryReserved, Active >, NamedState {
+  typedef boost::mpl::list <
+boost::statechart::transition< LocalRecoveryReserved, WaitRemoteRecoveryReserved >
+> reactions;
+	explicit WaitLocalRecoveryReserved(my_context ctx);
+	void exit();
+};
+
+PG::RecoveryState::WaitLocalRecoveryReserved::WaitLocalRecoveryReserved(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Started/Primary/Active/WaitLocalRecoveryReserved")
+{
+	context< RecoveryMachine >().log_enter(state_name);
+	PG *pg = context< RecoveryMachine >().pg;
+	pg->state_set(PG_STATE_RECOVERY_WAIT);
+	pg->osd->local_reserver.request_reservation(
+	  pg->info.pgid,
+	  new QueuePeeringEvt<LocalRecoveryReserved>(
+		pg, pg->get_osdmap()->get_epoch(),
+		LocalRecoveryReserved()),
+	  pg->get_recovery_priority());
+
+	pg->publish_stats_to_osd();
+}
+{% endhighlight %}
+上面我们看到，当本地资源预约成功，就会产生一个LocalRecoveryReserved事件，并投递到PG的消息队列中。WaitLocalRecoveryReserved状态收到LocalRecoveryReserved事件后，直接跳转到WaitRemoteRecoveryReserved状态
+
+
+3）WaitRemoteRecoveryReserved状态进行远程资源预约
+{% highlight string %}
+struct WaitRemoteRecoveryReserved : boost::statechart::state< WaitRemoteRecoveryReserved, Active >, NamedState {
+typedef boost::mpl::list <
+boost::statechart::custom_reaction< RemoteRecoveryReserved >,
+boost::statechart::transition< AllRemotesReserved, Recovering >
+> reactions;
+
+	set<pg_shard_t>::const_iterator remote_recovery_reservation_it;
+	explicit WaitRemoteRecoveryReserved(my_context ctx);
+	boost::statechart::result react(const RemoteRecoveryReserved &evt);
+	void exit();
+};
+
+PG::RecoveryState::WaitRemoteRecoveryReserved::WaitRemoteRecoveryReserved(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Started/Primary/Active/WaitRemoteRecoveryReserved"),
+    remote_recovery_reservation_it(context< Active >().remote_shards_to_reserve_recovery.begin())
+{
+	context< RecoveryMachine >().log_enter(state_name);
+	post_event(RemoteRecoveryReserved());
+}
+
+boost::statechart::result
+PG::RecoveryState::WaitRemoteRecoveryReserved::react(const RemoteRecoveryReserved &evt) {
+	PG *pg = context< RecoveryMachine >().pg;
+	
+	if (remote_recovery_reservation_it != context< Active >().remote_shards_to_reserve_recovery.end()) {
+		assert(*remote_recovery_reservation_it != pg->pg_whoami);
+		ConnectionRef con = pg->osd->get_con_osd_cluster(
+		remote_recovery_reservation_it->osd, pg->get_osdmap()->get_epoch());
+		if (con) {
+			pg->osd->send_message_osd_cluster(
+			new MRecoveryReserve(
+			  MRecoveryReserve::REQUEST,
+			  spg_t(pg->info.pgid.pgid, remote_recovery_reservation_it->shard),
+			  pg->get_osdmap()->get_epoch()),
+			  con.get());
+		}
+		++remote_recovery_reservation_it;
+	} else {
+		post_event(AllRemotesReserved());
+	}
+	return discard_event();
+}
+PG::RecoveryState::Active::Active(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Started/Primary/Active"),
+    remote_shards_to_reserve_recovery(
+      unique_osd_shard_set(
+		context< RecoveryMachine >().pg->pg_whoami,
+		context< RecoveryMachine >().pg->actingbackfill)),
+    remote_shards_to_reserve_backfill(
+      unique_osd_shard_set(
+		context< RecoveryMachine >().pg->pg_whoami,
+		context< RecoveryMachine >().pg->backfill_targets)),
+    all_replicas_activated(false)
+{
+	...
+}
+{% endhighlight %}
+在WaitRemoteRecoveryReserved构造函数中直接抛出```RemoteRecoveryReserved```事件，之后在WaitRemoteRecoveryReserved::react(const RemoteRecoveryReserved &)函数中，逐个的向remote_shards_to_reserve_recovery中的每一个OSD副本发送```MRecoveryReserve```消息，进行远程资源预约。
+
+>注：如下是远程副本的处理
+
+远程副本OSD接收到MRecoveryReserve::REQUEST消息后，调用OSD::handle_pg_recovery_reserve()函数进行处理：
+{% highlight string %}
+void OSD::handle_pg_recovery_reserve(OpRequestRef op)
+{
+	MRecoveryReserve *m = static_cast<MRecoveryReserve*>(op->get_req());
+	assert(m->get_type() == MSG_OSD_RECOVERY_RESERVE);
+	
+	if (!require_osd_peer(op->get_req()))
+		return;
+	if (!require_same_or_newer_map(op, m->query_epoch, false))
+		return;
+	
+	PG::CephPeeringEvtRef evt;
+	if (m->type == MRecoveryReserve::REQUEST) {
+		evt = PG::CephPeeringEvtRef(
+		  new PG::CephPeeringEvt(
+			m->query_epoch,
+			m->query_epoch,
+			PG::RequestRecovery()));
+	}
+	...
+}
+{% endhighlight %}
+在handle_pg_recovery_reserve()函数中，产生PG::RequestRecovery()事件。由RepNotRecovering对该事件进行处理，直接进入RepWaitRecoveryReserved。在RepWaitRecoveryReserved状态下，进行远程资源预约，预约成功产生RemoteRecoveryReserved事件，向PG Primary报告远程资源预约成功，且该PG Replica自身进入```RepRecovering```状态：
+{% highlight string %}
+struct RepNotRecovering : boost::statechart::state< RepNotRecovering, ReplicaActive>, NamedState {
+typedef boost::mpl::list<
+boost::statechart::custom_reaction< RequestBackfillPrio >,
+boost::statechart::transition< RequestRecovery, RepWaitRecoveryReserved >,
+boost::statechart::transition< RecoveryDone, RepNotRecovering >  // for compat with pre-reservation peers
+> reactions;
+	explicit RepNotRecovering(my_context ctx);
+	boost::statechart::result react(const RequestBackfillPrio &evt);
+	void exit();
+};
+struct RepWaitRecoveryReserved : boost::statechart::state< RepWaitRecoveryReserved, ReplicaActive >, NamedState {
+typedef boost::mpl::list<
+boost::statechart::custom_reaction< RemoteRecoveryReserved >
+> reactions;
+	explicit RepWaitRecoveryReserved(my_context ctx);
+	void exit();
+	boost::statechart::result react(const RemoteRecoveryReserved &evt);
+};
+{% endhighlight %}
+
+>注：ReplicaActive状态的默认初始子状态为RepNotRecovering。
+
+4）进入Recovering状态
+
+当所有的远程资源都预约成功之后，就会进入Recovering状态。
+{% highlight string %}
+struct Recovering : boost::statechart::state< Recovering, Active >, NamedState {
+typedef boost::mpl::list <
+boost::statechart::custom_reaction< AllReplicasRecovered >,
+boost::statechart::custom_reaction< RequestBackfill >
+> reactions;
+	explicit Recovering(my_context ctx);
+	void exit();
+	void release_reservations();
+	boost::statechart::result react(const AllReplicasRecovered &evt);
+	boost::statechart::result react(const RequestBackfill &evt);
+};
+
+PG::RecoveryState::Recovering::Recovering(my_context ctx)
+  : my_base(ctx),
+    NamedState(context< RecoveryMachine >().pg->cct, "Started/Primary/Active/Recovering")
+{
+	context< RecoveryMachine >().log_enter(state_name);
+	
+	PG *pg = context< RecoveryMachine >().pg;
+	pg->state_clear(PG_STATE_RECOVERY_WAIT);
+	pg->state_set(PG_STATE_RECOVERING);
+	pg->publish_stats_to_osd();
+	pg->osd->queue_for_recovery(pg);
+}
+{% endhighlight %}
+在Recovering的构造函数中，清除PG的```PG_STATE_RECOVERY_WAIT```状态，设置PG状态为```PG_STATE_RECOVERING```状态，然后将PG加入到recovery队列：
+{% highlight string %}
+bool OSDService::queue_for_recovery(PG *pg)
+{
+	bool b = recovery_wq.queue(pg);
+	if (b)
+		dout(10) << "queue_for_recovery queued " << *pg << dendl;
+	else
+		dout(10) << "queue_for_recovery already queued " << *pg << dendl;
+	return b;
+}
+{% endhighlight %}
+
+
+##### 3.1.2 OSD::do_recovery()
+
+由数据修复状态转换过程可知，当PG处于Active/Recoverying状态后，该PG被加入到OSD的RecoveryWQ工作队列中。在recovery_wq里，其工作队列的线程池的处理函数调用do_recovery()函数来执行实际的数据修复操作：
+{% highlight string %}
+struct RecoveryWQ : public ThreadPool::WorkQueue<PG> {
+	void _process(PG *pg, ThreadPool::TPHandle &handle) override {
+		osd->do_recovery(pg, handle);
+		pg->put("RecoveryWQ");
+	}
+}recovery_wq;
+void OSD::do_recovery(PG *pg, ThreadPool::TPHandle &handle){
+	if (g_conf->osd_recovery_sleep > 0) {
+		handle.suspend_tp_timeout();
+		utime_t t;
+		t.set_from_double(g_conf->osd_recovery_sleep);
+		t.sleep();
+		handle.reset_tp_timeout();
+		dout(20) << __func__ << " slept for " << t << dendl;
+	}
+	
+	// see how many we should try to start.  note that this is a bit racy.
+	recovery_wq.lock();
+	int max = MIN(cct->_conf->osd_recovery_max_active - recovery_ops_active,
+	cct->_conf->osd_recovery_max_single_start);
+	if (max > 0) {
+		dout(10) << "do_recovery can start " << max << " (" << recovery_ops_active << "/" << cct->_conf>osd_recovery_max_active
+		  << " rops)" << dendl;
+		recovery_ops_active += max;  // take them now, return them if we don't use them.
+	} else {
+		dout(10) << "do_recovery can start 0 (" << recovery_ops_active << "/" << cct->_conf->osd_recovery_max_active
+		  << " rops)" << dendl;
+	}
+	recovery_wq.unlock();
+	
+	if (max <= 0) {
+		dout(10) << "do_recovery raced and failed to start anything; requeuing " << *pg << dendl;
+		recovery_wq.queue(pg);
+		return;
+	} else {
+		pg->lock_suspend_timeout(handle);
+		if (pg->deleting || !(pg->is_peered() && pg->is_primary())) {
+			pg->unlock();
+			goto out;
+		}
+	
+		dout(10) << "do_recovery starting " << max << " " << *pg << dendl;
+		#ifdef DEBUG_RECOVERY_OIDS
+			dout(20) << "  active was " << recovery_oids[pg->info.pgid] << dendl;
+		#endif
+		
+		int started = 0;
+		bool more = pg->start_recovery_ops(max, handle, &started);
+		dout(10) << "do_recovery started " << started << "/" << max << " on " << *pg << dendl;
+		// If no recovery op is started, don't bother to manipulate the RecoveryCtx
+		if (!started && (more || !pg->have_unfound())) {
+			pg->unlock();
+			goto out;
+		}
+	
+		PG::RecoveryCtx rctx = create_context();
+		rctx.handle = &handle;
+		
+		/*
+		* if we couldn't start any recovery ops and things are still
+		* unfound, see if we can discover more missing object locations.
+		* It may be that our initial locations were bad and we errored
+		* out while trying to pull.
+		*/
+		if (!more && pg->have_unfound()) {
+			pg->discover_all_missing(*rctx.query_map);
+			if (rctx.query_map->empty()) {
+				dout(10) << "do_recovery  no luck, giving up on this pg for now" << dendl;
+				recovery_wq.lock();
+				recovery_wq._dequeue(pg);
+				recovery_wq.unlock();
+			}
+		}
+	
+		pg->write_if_dirty(*rctx.transaction);
+		OSDMapRef curmap = pg->get_osdmap();
+		pg->unlock();
+		dispatch_context(rctx, pg, curmap);
+	}
+	
+out:
+	recovery_wq.lock();
+	if (max > 0) {
+		assert(recovery_ops_active >= max);
+		recovery_ops_active -= max;
+	}
+	recovery_wq._wake();
+	recovery_wq.unlock();
+}
 {% endhighlight %}
 
 函数do_recovery()由RecoveryWQ工作队列的线程池的线程执行。其输入的参数为要修复的PG，具体处理流程如下：
