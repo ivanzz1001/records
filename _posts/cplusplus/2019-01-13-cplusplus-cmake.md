@@ -147,6 +147,8 @@ CMake suite maintained and supported by Kitware (kitware.com/cmake).
 ## 3. cmake tutorial 
 下面我们分成12个小节，来介绍cmake的使用。
 
+>注：所有参考示例都可以在cmake源代码目录cmake-3.20.5/Help/guide/tutorial找到
+
 ### 3.1 入门案例
 
 通常，我们需要将工程(project)中的的源代码编译为一个可执行文件。对于最简单的项目来说，只需要一个3行的```CMakeList.txt```文件即可完成。
@@ -507,6 +509,422 @@ The square root of 10 is 3.16228
 ./Tutorial Version 1.0
 Usage: ./Tutorial number
 </pre>
+
+
+### 3.2 Adding a Library
+本章我们会介绍添加一个library到工程中。首先实现一个计算```平方根```的动态链接库，然后将该动态库链接到可执行程序中。
+
+在本例子中，我们会将动态链接库及相关的文件放入一个```MathFunctions```目录中。该目录包含头文件```MathFunctions.h```以及源文件```mysqrt.cxx```。在源文件中实现函数```mysqrt()```用于求一个数的平方根。
+
+创建```Step2```工程目录，然后在工程目录中创建MathFunctions目录，如下：
+<pre>
+# mkdir Step2 
+# mkdir Step2/MathFunctions 
+# cd Step2 
+</pre>
+
+接上文，此时我们在Step2目录下有如下3个文件：
+
+* Step2/turorial.cxx源文件
+{% highlight string %}
+// A simple program that computes the square root of a number
+#include <cmath>
+#include <iostream>
+#include <string>
+
+#include "TutorialConfig.h"
+
+int main(int argc, char* argv[])
+{
+  if (argc < 2) {
+    // report version
+    std::cout << argv[0] << " Version " << Tutorial_VERSION_MAJOR << "."
+              << Tutorial_VERSION_MINOR << std::endl;
+    std::cout << "Usage: " << argv[0] << " number" << std::endl;
+    return 1;
+  }
+
+  // convert input to double
+  const double inputValue = std::stod(argv[1]);
+
+  // calculate square root
+  const double outputValue = sqrt(inputValue);
+  std::cout << "The square root of " << inputValue << " is " << outputValue
+            << std::endl;
+  return 0;
+}
+{% endhighlight %}
+
+* Step2/TutorialConfig.h.in配置文件 
+{% highlight string %}
+// the configured options and settings for Tutorial
+#define Tutorial_VERSION_MAJOR @Tutorial_VERSION_MAJOR@
+#define Tutorial_VERSION_MINOR @Tutorial_VERSION_MINOR@
+{% endhighlight %}
+
+* Step2/CMakeLists.txt 
+{% highlight string %}
+cmake_minimum_required(VERSION 3.10)
+
+# set the project name and version
+project(Tutorial VERSION 1.0)
+
+# specify the C++ standard
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+
+configure_file(TutorialConfig.h.in TutorialConfig.h)
+
+# add the executable 
+add_executable(Tutorial tutorial.cxx)
+
+target_include_directories(Tutorial PUBLIC
+                           "${PROJECT_BINARY_DIR}"
+                           )
+{% endhighlight %}
+
+
+###### 3.2.1 编写库文件
+在Step2/MathFunctions目录下创建MathFunctions.h(c)。
+
+1) MathFunctions.h头文件 
+{% highlight string %}
+double mysqrt(double x);
+{% endhighlight %}
+
+
+2) MathFunctions.c源文件
+{% highlight string %}
+#include <iostream>
+
+// a hack square root calculation using simple operations
+double mysqrt(double x)
+{
+  if (x <= 0) {
+    return 0;
+  }
+
+  double result = x;
+
+  // do ten iterations
+  for (int i = 0; i < 10; ++i) {
+    if (result <= 0) {
+      result = 0.1;
+    }
+    double delta = x - (result * result);
+    result = result + 0.5 * delta / result;
+    std::cout << "Computing sqrt of " << x << " to be " << result << std::endl;
+  }
+  return result;
+}
+{% endhighlight %}
+
+
+3) 编写库文件对应的CMakeLists.txt 
+
+在Step2/MathFunctions目录下增加CMakeLists.txt文件如下:
+{% highlight string %}
+add_library(MathFunctions mysqrt.cxx)
+{% endhighlight %}
+
+###### 3.2.2 调用MathFunctions库
+为了使用上面我们编写的新库(MathFunctions)，在Step2/CMakeLists.txt文件中使用add_subdirectory()命令把相应的路径包含进来，这样就可以完成对该路径下文件的构建。
+然后调用target_link_libraries()命令将```MathFunctions```库链接到可执行文件中，最后再调用target_include_directories()将MathFunctions路径包含进binary tree搜索路径。此时Step2/CMakeLists.txt文件如下所示：
+{% highlight string %}
+cmake_minimum_required(VERSION 3.10)
+
+# set the project name and version
+project(Tutorial VERSION 1.0)
+
+# specify the C++ standard
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+configure_file(TutorialConfig.h.in TutorialConfig.h)
+
+add_subdirectory(MathFunctions)
+
+# add the executable 
+add_executable(Tutorial tutorial.cxx)
+
+target_link_libraries(Tutorial PUBLIC MathFunctions)
+
+target_include_directories(Tutorial PUBLIC
+                           "${PROJECT_BINARY_DIR}"
+                           "${PROJECT_SOURCE_DIR}/MathFunctions"
+                           )
+{% endhighlight %}
+
+
+
+下面我们将```MathFunctions```库配置为可选。
+
+1） 设置选项开关
+
+我们设置一个选项开关```USE_MYMATH```，修改Step2/CMakeLists.txt文件如下：
+{% highlight string %}
+cmake_minimum_required(VERSION 3.10)
+
+# set the project name and version
+project(Tutorial VERSION 1.0)
+
+# specify the C++ standard
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+option(USE_MYMATH "Use tutorial provided math implementation" ON)
+
+configure_file(TutorialConfig.h.in TutorialConfig.h)
+
+add_subdirectory(MathFunctions)
+
+# add the executable 
+add_executable(Tutorial tutorial.cxx)
+
+target_link_libraries(Tutorial PUBLIC MathFunctions)
+
+target_include_directories(Tutorial PUBLIC
+                           "${PROJECT_BINARY_DIR}"
+                           "${PROJECT_SOURCE_DIR}/MathFunctions"
+                           )
+{% endhighlight %}
+我们可以使用```cmake-gui```或者```ccmake```命令来对该选项进行配置。相应的配置会被保存到```cache```中，这样用户在执行```cmake```命令构建时就不必每一次都进行单独配置。
+
+2）用选项控制编译和链接
+
+在上面```步骤1)```我们设置了一个控制开关，下面我们就要用该开关来控制```MathFunctions```的编译与链接。下面我们修改Step2/CMakeLists.txt文件如下：
+{% highlight string %}
+cmake_minimum_required(VERSION 3.10)
+
+# set the project name and version
+project(Tutorial VERSION 1.0)
+
+# specify the C++ standard
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+option(USE_MYMATH "Use tutorial provided math implementation" ON)
+
+configure_file(TutorialConfig.h.in TutorialConfig.h)
+
+if(USE_MYMATH)
+	add_subdirectory(MathFunctions)
+	list(APPEND EXTRA_LIBS MathFunctions)
+	list(APPEND EXTRA_INCLUDES "${PROJECT_SOURCE_DIR}/MathFunctions")
+endif()
+
+
+# add the executable 
+add_executable(Tutorial tutorial.cxx)
+
+target_link_libraries(Tutorial PUBLIC ${EXTRA_LIBS})
+
+target_include_directories(Tutorial PUBLIC
+                           "${PROJECT_BINARY_DIR}"
+                           ${EXTRA_INCLUDES}
+                           )
+{% endhighlight %}
+上面我们使用```EXTRA_LIBS```变量来控制所要链接的库；使用```EXTRA_INCLUDES```变量来控制所使用的头文件。当有许多可选组件的时候，这是经典的方法来控制到底使用哪一个组件。
+
+
+3） 修改tutorial.cxx源代码文件
+
+接下来，我们修改turotial.cxx源代码文件如下：
+{% highlight string %}
+// A simple program that computes the square root of a number
+#include <cmath>
+#include <iostream>
+#include <string>
+
+#include "TutorialConfig.h"
+
+#ifdef USE_MYMATH
+#include "MathFunctions.h"
+#endif 
+
+int main(int argc, char* argv[])
+{
+  if (argc < 2) {
+    // report version
+    std::cout << argv[0] << " Version " << Tutorial_VERSION_MAJOR << "."
+              << Tutorial_VERSION_MINOR << std::endl;
+    std::cout << "Usage: " << argv[0] << " number" << std::endl;
+    return 1;
+  }
+
+  // convert input to double
+  const double inputValue = std::stod(argv[1]);
+
+  // calculate square root
+  #ifdef USE_MYMATH
+	const double outputValue = mysqrt(inputValue);
+  #else 
+    const double outputValue = sqrt(inputValue);
+  #endif 
+  std::cout << "The square root of " << inputValue << " is " << outputValue
+            << std::endl;
+  return 0;
+}
+{% endhighlight %}
+
+4) 在TutorialConfig.h.in中配置USE_MYMATH
+
+由于我们在源代码中需要使用```USE_MYMATH```，我们可以将其加入到TutorialConfig.h.in文件中：
+{% highlight string %}
+// the configured options and settings for Tutorial
+#define Tutorial_VERSION_MAJOR @Tutorial_VERSION_MAJOR@
+#define Tutorial_VERSION_MINOR @Tutorial_VERSION_MINOR@
+
+#cmakedefine USE_MYMATH 
+{% endhighlight %}
+
+>注：为什么我们在配置USE_MYMATH选项之后，又需要在TutorialConfig.h.in中配置？
+
+###### 3.2.3 测试验证
+
+下面我们对程序进行编译。
+
+1) 创建编译目录 
+
+首先在与Step2平级的目录创建Step2_build目录：
+<pre>
+# mkdir Step2_build
+# cd Step2_build 
+</pre>
+ 
+2）默认编译及链接
+
+* 生成编译文件 
+
+这里我们不进行任何配置，直接采用如下命令生成编译文件：
+<pre>
+# cmake ../Step2
+-- The C compiler identification is GNU 6.5.0
+-- The CXX compiler identification is GNU 6.5.0
+-- Check for working C compiler: /usr/local/bin/gcc
+-- Check for working C compiler: /usr/local/bin/gcc - works
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Check for working CXX compiler: /usr/local/bin/c++
+-- Check for working CXX compiler: /usr/local/bin/c++ - works
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/lzy/workspace/test/Step2_build
+</pre>
+此时，我们查看生成的TutorialConfig.h头文件：
+{% highlight string %}
+# // the configured options and settings for Tutorial
+#define Tutorial_VERSION_MAJOR 1
+#define Tutorial_VERSION_MINOR 0
+
+#define USE_MYMATH 
+{% endhighlight %}
+
+* 编译链接
+
+执行如下命令进行编译链接：
+<pre>
+cmake --build .
+Scanning dependencies of target MathFunctions
+[ 25%] Building CXX object MathFunctions/CMakeFiles/MathFunctions.dir/mysqrt.cxx.o
+[ 50%] Linking CXX static library libMathFunctions.a
+[ 50%] Built target MathFunctions
+Scanning dependencies of target Tutorial
+[ 75%] Building CXX object CMakeFiles/Tutorial.dir/tutorial.cxx.o
+[100%] Linking CXX executable Tutorial
+[100%] Built target Tutorial
+</pre>
+
+* 测试 
+{% highlight string %}
+# ./Tutorial 2.25
+Computing sqrt of 2.25 to be 1.625
+Computing sqrt of 2.25 to be 1.50481
+Computing sqrt of 2.25 to be 1.50001
+Computing sqrt of 2.25 to be 1.5
+Computing sqrt of 2.25 to be 1.5
+Computing sqrt of 2.25 to be 1.5
+Computing sqrt of 2.25 to be 1.5
+Computing sqrt of 2.25 to be 1.5
+Computing sqrt of 2.25 to be 1.5
+Computing sqrt of 2.25 to be 1.5
+The square root of 2.25 is 1.5
+{% endhighlight %}
+
+
+3) 使用ccmake配置，然后编译
+
+* 使用ccmake配置相应选项
+<pre>
+# ccmake ../Step2 
+</pre>
+这里我们配置```USE_MYMATH```，将对应的选项关闭
+
+>注：当配置进行了修改，需要重新按'c'键，然后就会出现'g'选项
+
+* 编译链接 
+<pre>
+# cmake --build ./
+Scanning dependencies of target Tutorial
+[ 50%] Building CXX object CMakeFiles/Tutorial.dir/tutorial.cxx.o
+[100%] Linking CXX executable Tutorial
+[100%] Built target Tutorial
+</pre>
+
+* 测试
+<pre>
+# ./Tutorial 2.25
+The square root of 2.25 is 1.5
+</pre>
+
+4） 直接使用cmake指定编译选项
+
+* 使用cmake产生编译脚本
+
+我们直接使用```cmake -D```来配置相应的选项：
+<pre>
+# cmake ../Step2 -DUSE_MYMATH=OFF 
+-- The C compiler identification is GNU 6.5.0
+-- The CXX compiler identification is GNU 6.5.0
+-- Check for working C compiler: /usr/local/bin/gcc
+-- Check for working C compiler: /usr/local/bin/gcc - works
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Check for working CXX compiler: /usr/local/bin/c++
+-- Check for working CXX compiler: /usr/local/bin/c++ - works
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/lzy/workspace/test/Step2_build
+</pre>
+
+* 编译链接 
+<pre>
+# cmake --build ./
+Scanning dependencies of target Tutorial
+[ 50%] Building CXX object CMakeFiles/Tutorial.dir/tutorial.cxx.o
+[100%] Linking CXX executable Tutorial
+[100%] Built target Tutorial
+</pre>
+
+* 测试 
+<pre>
+# ./Tutorial 2.25
+The square root of 2.25 is 1.5
+</pre>
+
 
 
 <br />
