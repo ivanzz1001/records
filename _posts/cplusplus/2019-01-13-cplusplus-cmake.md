@@ -816,7 +816,7 @@ int main(int argc, char* argv[])
 -- Detecting CXX compile features - done
 -- Configuring done
 -- Generating done
--- Build files have been written to: /home/lzy/workspace/test/Step2_build
+-- Build files have been written to: /home/ivanzz1001/workspace/test/Step2_build
 </pre>
 此时，我们查看生成的TutorialConfig.h头文件：
 {% highlight string %}
@@ -907,7 +907,7 @@ The square root of 2.25 is 1.5
 -- Detecting CXX compile features - done
 -- Configuring done
 -- Generating done
--- Build files have been written to: /home/lzy/workspace/test/Step2_build
+-- Build files have been written to: /home/ivanzz1001/workspace/test/Step2_build
 </pre>
 
 * 编译链接 
@@ -925,6 +925,123 @@ Scanning dependencies of target Tutorial
 The square root of 2.25 is 1.5
 </pre>
 
+### 3.2 为库添加使用要求(usage requirements)
+Usage requirements允许更好地控制库或可执行文件的链接和include行，同时也允许更多地控制CMake中目标的可传递属性。利用usage requirements的主要命令有：
+
+* target_compile_definitions()
+
+* target_compile_options()
+
+* target_include_directories()
+
+* target_link_libraries()
+
+这里我们修改上一节(Add a Library)中的CMakeLists.txt代码，以使用cmake的```usage requirements```功能。这里有一点需要指出的是：如果我们需要链接```MathFunctions```库的话，则需要将当前源代码目录包含进来，但是```MathFunctions```库本身不需要包含。因此，这可以看成是```INTERFACE``` usage requirement。
+
+我们可以将```INTERFACE```理解为：things that consumers require but the producer doesn't。
+
+1) 创建相应目录
+
+这里创建Step3目录，然后将上一节中Step2目录下的文件拷贝到Step3:
+<pre>
+# mkdir Step3 
+# cp -ar Step2/* Step3/
+# cd Step3 
+</pre>
+
+2）为MathFunctions库添加usage requirements 
+
+修改MathFunctions/CMakeLists.txt如下：
+{% highlight string %}
+add_library(MathFunctions mysqrt.cxx)
+target_include_directories(MathFunctions
+          INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}
+          )
+{% endhighlight %}
+
+3）修改Step3/CMakeList.txt 
+
+在上面我们为```MathFunctions```库添加了usage requirements，这里我们就可以删除Step3/CMakeLists.txt中的```EXTRA_INCLUDES```，此时Step3/CMakeLists.txt内容如下：
+{% highlight string %}
+cmake_minimum_required(VERSION 3.10)
+
+# set the project name and version
+project(Tutorial VERSION 1.0)
+
+# specify the C++ standard
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+option(USE_MYMATH "Use tutorial provided math implementation" ON)
+
+configure_file(TutorialConfig.h.in TutorialConfig.h)
+
+if(USE_MYMATH)
+        add_subdirectory(MathFunctions)
+        list(APPEND EXTRA_LIBS MathFunctions)
+endif()
+
+
+# add the executable 
+add_executable(Tutorial tutorial.cxx)
+
+target_link_libraries(Tutorial PUBLIC ${EXTRA_LIBS})
+
+target_include_directories(Tutorial PUBLIC
+                           "${PROJECT_BINARY_DIR}"
+                           )
+{% endhighlight %}
+
+4）测试验证
+<pre>
+# mkdir Step3_build
+# cd Step3_build 
+[root@compile Step3_build]# cmake ../Step3
+-- The C compiler identification is GNU 6.5.0
+-- The CXX compiler identification is GNU 6.5.0
+-- Check for working C compiler: /usr/local/bin/gcc
+-- Check for working C compiler: /usr/local/bin/gcc - works
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Check for working CXX compiler: /usr/local/bin/c++
+-- Check for working CXX compiler: /usr/local/bin/c++ - works
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/ivanzz1001/workspace/test/Step3_build
+
+# cmake --build .
+Scanning dependencies of target MathFunctions
+[ 25%] Building CXX object MathFunctions/CMakeFiles/MathFunctions.dir/mysqrt.cxx.o
+[ 50%] Linking CXX static library libMathFunctions.a
+[ 50%] Built target MathFunctions
+Scanning dependencies of target Tutorial
+[ 75%] Building CXX object CMakeFiles/Tutorial.dir/tutorial.cxx.o
+[100%] Linking CXX executable Tutorial
+[100%] Built target Tutorial
+
+# ./Tutorial 2.25
+Computing sqrt of 2.25 to be 1.625
+Computing sqrt of 2.25 to be 1.50481
+Computing sqrt of 2.25 to be 1.50001
+Computing sqrt of 2.25 to be 1.5
+Computing sqrt of 2.25 to be 1.5
+Computing sqrt of 2.25 to be 1.5
+Computing sqrt of 2.25 to be 1.5
+Computing sqrt of 2.25 to be 1.5
+Computing sqrt of 2.25 to be 1.5
+Computing sqrt of 2.25 to be 1.5
+The square root of 2.25 is 1.5
+</pre>
+
+
+
+
 
 
 <br />
@@ -939,6 +1056,8 @@ The square root of 2.25 is 1.5
 3. [cmake install](https://cmake.org/install/)
 
 4. [超详细的CMake教程](https://www.cnblogs.com/ybqjymy/p/13409050.html)
+
+5. [官方cmake命令](https://cmake.org/cmake/help/latest/manual/cmake-commands.7.html)
 
 <br />
 <br />
