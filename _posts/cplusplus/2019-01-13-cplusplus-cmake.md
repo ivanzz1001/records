@@ -511,7 +511,7 @@ Usage: ./Tutorial number
 </pre>
 
 
-### 3.2 Adding a Library
+### 3.3 Adding a Library
 本章我们会介绍添加一个library到工程中。首先实现一个计算```平方根```的动态链接库，然后将该动态库链接到可执行程序中。
 
 在本例子中，我们会将动态链接库及相关的文件放入一个```MathFunctions```目录中。该目录包含头文件```MathFunctions.h```以及源文件```mysqrt.cxx```。在源文件中实现函数```mysqrt()```用于求一个数的平方根。
@@ -925,7 +925,7 @@ Scanning dependencies of target Tutorial
 The square root of 2.25 is 1.5
 </pre>
 
-### 3.2 为库添加使用要求(usage requirements)
+### 3.3 为库添加使用要求(usage requirements)
 Usage requirements允许更好地控制库或可执行文件的链接和include行，同时也允许更多地控制CMake中目标的可传递属性。利用usage requirements的主要命令有：
 
 * target_compile_definitions()
@@ -996,7 +996,7 @@ target_include_directories(Tutorial PUBLIC
 <pre>
 # mkdir Step3_build
 # cd Step3_build 
-[root@compile Step3_build]# cmake ../Step3
+# cmake ../Step3
 -- The C compiler identification is GNU 6.5.0
 -- The CXX compiler identification is GNU 6.5.0
 -- Check for working C compiler: /usr/local/bin/gcc
@@ -1039,6 +1039,204 @@ Computing sqrt of 2.25 to be 1.5
 The square root of 2.25 is 1.5
 </pre>
 
+### 3.4 Installing and Testing 
+
+本节我们介绍一下如何向工程添加```install```规则和```testing```支持。
+
+###### 3.4.1 Install Rules
+install规则非常简单： 对于上面的```MathFunctions```，我们希望安装对应的lib库和头文件；而对于应用来说，我们希望安装对应的可执行文件和生成的配置头文件。参看下面步骤：
+
+1） 创建相应目录
+
+这里创建Step4目录，然后将上一节中Step3目录下的文件拷贝到Step4:
+<pre>
+# mkdir Step4 
+# cp -ar Step3/* Step4/
+# cd Step4 
+</pre>
+
+2） 修改Step4/MathFunctions/CMakeLists.txt文件
+{% highlight string %}
+add_library(MathFunctions mysqrt.cxx)
+target_include_directories(MathFunctions
+          INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}
+          )
+
+install(TARGETS MathFunctions DESTINATION lib)
+install(FILES MathFunctions.h DESTINATION include)
+{% endhighlight %}
+
+3) 修改Step4/CMakeLists.txt文件 
+
+{% highlight string %}
+cmake_minimum_required(VERSION 3.10)
+
+# set the project name and version
+project(Tutorial VERSION 1.0)
+
+# specify the C++ standard
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+option(USE_MYMATH "Use tutorial provided math implementation" ON)
+
+configure_file(TutorialConfig.h.in TutorialConfig.h)
+
+if(USE_MYMATH)
+        add_subdirectory(MathFunctions)
+        list(APPEND EXTRA_LIBS MathFunctions)
+endif()
+
+
+# add the executable 
+add_executable(Tutorial tutorial.cxx)
+
+target_link_libraries(Tutorial PUBLIC ${EXTRA_LIBS})
+
+target_include_directories(Tutorial PUBLIC
+                           "${PROJECT_BINARY_DIR}"
+                           )
+
+install(TARGETS Tutorial DESTINATION bin)
+install(FILES "${PROJECT_BINARY_DIR}/TutorialConfig.h"
+  DESTINATION include
+  )
+{% endhighlight %}
+
+通过上面步骤2)、步骤3)，我们就完成了一个基础的```local install```功能。
+
+4）测试验证 
+
+首先执行如下命令进行编译、构建：
+<pre>
+# mkdir Step4_build
+# cd Step4_build 
+# cmake ../Step4
+# cmake --build . 
+</pre>
+
+然后执行```cmake --install```来进行安装(注：对于老版本的cmake，需要执行make install来安装):
+<pre>
+# cmake --install . 
+</pre>
+
+CMake变量```CMAKE_INSTALL_PREFIX```控制安装的根路径，这里我们看到默认的值为```/usr/local```。我们可以使用```--prefix```参数来覆盖该变量的值：
+<pre>
+# cmake --install . --prefix "/home/myuser/installdir"               //示例
+
+# cmake --install . --prefix "/home/ivanzz1001/workspace/install"
+# cd /home/ivanzz1001/workspace/install 
+# tree
+.
+├── bin
+│   └── Tutorial
+├── include
+│   ├── MathFunctions.h
+│   └── TutorialConfig.h
+├── lib
+│   └── libMathFunctions.a
+</pre>
+
+###### 3.4.2 Testing Support 
+下面我们对应用程序进行测试。修改Step4/CMakeLists.txt文件，启用```testing```功能，并添加一些基本的测试用例：
+{% highlight string %}
+cmake_minimum_required(VERSION 3.10)
+
+# set the project name and version
+project(Tutorial VERSION 1.0)
+
+# specify the C++ standard
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+option(USE_MYMATH "Use tutorial provided math implementation" ON)
+
+configure_file(TutorialConfig.h.in TutorialConfig.h)
+
+if(USE_MYMATH)
+        add_subdirectory(MathFunctions)
+        list(APPEND EXTRA_LIBS MathFunctions)
+endif()
+
+
+# add the executable 
+add_executable(Tutorial tutorial.cxx)
+
+target_link_libraries(Tutorial PUBLIC ${EXTRA_LIBS})
+
+target_include_directories(Tutorial PUBLIC
+                           "${PROJECT_BINARY_DIR}"
+                           )
+
+install(TARGETS Tutorial DESTINATION bin)
+install(FILES "${PROJECT_BINARY_DIR}/TutorialConfig.h"
+  DESTINATION include
+  )
+
+
+enable_testing()
+
+# does the application run
+add_test(NAME Runs COMMAND Tutorial 25)
+
+# does the usage message work?
+add_test(NAME Usage COMMAND Tutorial)
+set_tests_properties(Usage
+  PROPERTIES PASS_REGULAR_EXPRESSION "Usage:.*number"
+  )
+
+# define a function to simplify adding tests
+function(do_test target arg result)
+  add_test(NAME Comp${arg} COMMAND ${target} ${arg})
+  set_tests_properties(Comp${arg}
+    PROPERTIES PASS_REGULAR_EXPRESSION ${result}
+    )
+endfunction(do_test)
+
+# do a bunch of result based tests
+do_test(Tutorial 4 "4 is 2")
+do_test(Tutorial 9 "9 is 3")
+do_test(Tutorial 5 "5 is 2.236")
+do_test(Tutorial 7 "7 is 2.645")
+do_test(Tutorial 25 "25 is 5")
+do_test(Tutorial -25 "-25 is [-nan|nan|0]")
+do_test(Tutorial 0.0001 "0.0001 is 0.01")
+{% endhighlight %}
+
+上面第一个测试只是简单的校验程序可运行，不会出现段错误或崩溃，并且返回值为0。这是CTest的基本形式。
+
+第二个test是利用```PASS_REGULAR_EXPRESSION```属性来校验输出包含指定的字符串。在这种情况下，当输入一个错误的参数导致校验失败，就会打印出相应的usage message。
+
+最后，我们定义了一个do_test()函数来运行```Tutorial```应用程序，并校验计算出来的平方根是否正确。
+
+我们执行如下的命令来看一下测试结果：
+<pre>
+# make test
+Running tests...
+Test project /home/ivanzz1001/workspace/test/Step4_build
+    Start 1: Runs
+1/9 Test #1: Runs .............................   Passed    0.00 sec
+    Start 2: Usage
+2/9 Test #2: Usage ............................   Passed    0.00 sec
+    Start 3: Comp4
+3/9 Test #3: Comp4 ............................   Passed    0.00 sec
+    Start 4: Comp9
+4/9 Test #4: Comp9 ............................   Passed    0.00 sec
+    Start 5: Comp5
+5/9 Test #5: Comp5 ............................   Passed    0.00 sec
+    Start 6: Comp7
+6/9 Test #6: Comp7 ............................   Passed    0.00 sec
+    Start 7: Comp25
+7/9 Test #7: Comp25 ...........................   Passed    0.00 sec
+    Start 8: Comp-25
+8/9 Test #8: Comp-25 ..........................   Passed    0.00 sec
+    Start 9: Comp0.0001
+9/9 Test #9: Comp0.0001 .......................   Passed    0.00 sec
+
+100% tests passed, 0 tests failed out of 9
+
+Total Test time (real) =   0.02 sec
+</pre>
 
 
 
