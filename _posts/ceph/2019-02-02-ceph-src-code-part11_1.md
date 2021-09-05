@@ -590,6 +590,7 @@ struct RecoveryWQ : public ThreadPool::WorkQueue<PG> {
 		pg->put("RecoveryWQ");
 	}
 }recovery_wq;
+
 void OSD::do_recovery(PG *pg, ThreadPool::TPHandle &handle){
 	if (g_conf->osd_recovery_sleep > 0) {
 		handle.suspend_tp_timeout();
@@ -686,7 +687,9 @@ out:
 
 4） 调用函数pg->start_recovery_ops()修复，返回值more为还需要修复的对象数目。输出参数started为已经开始修复的对象数。
 
-5） 如果more为0，也就是没有修复的对象了。但是pg->have_unfound()不为0，还有unfound对象（即缺失的对象，目前不知道在哪个OSD上能找到完整的对象），调用函数discover_all_missing()在might_have_unfound队列中的OSD上继续查找该对象，查找的方法就是给相关的OSD发送获取OSD的pg_log的消息。
+5） 如果more为0，也就是没有修复的对象了。但是pg->have_unfound()不为0，还有unfound对象（即缺失的对象，目前不知道在哪个OSD上能找到完整的对象），调用函数PG::discover_all_missing()在might_have_unfound队列中的OSD上继续查找该对象，查找的方法就是给相关的OSD发送获取OSD的pg_log的消息。
+>注：对于unfound的对象，是放到最后来进行恢复
+
 
 6） 如果rctx.query_map->empty()为空，也就是没有找到其他OSD去获取pg_log来查找unfound对象，就结束该PG的recover操作，调用函数从recovery_wq._dequeue(pg)删除PG；
 
@@ -695,29 +698,170 @@ out:
 
 由上过程分析可知，do_recovery()函数的核心功能是计算要修复对象的max值，然后调用函数start_recovery_ops()来启动修复。
 
+>注：当本次recovery完成会回调ReplicatedPG::on_global_recover()，如果该PG仍然还有数据要recovery，则在on_global_recover()中会调用PG::finish_recovery_op()将该PG重新加回recovery_wq中
+
+
 ### 3.2 ReplicatedPG
 类ReplicatedPG用于处理Replicate类型PG的相关修复操作。下面分析它用于修复的start_recovery_ops()函数及其相关函数的具体实现。
 
-###### 3.2.1 start_recovery_ops()
+###### 3.2.1 函数start_recovery_ops()
 函数start_recovery_ops()调用recovery_primary()和recovery_replicas()来修复该PG上对象的主副本和从副本。修复完成后，如果仍需要Backfill过程，则抛出相应事件触发PG状态机，开始Backfill的修复进程。
 
+>注：这里ReplicatedPG::start_recovery_ops()操作包括recovery和backfill两者，优先进行recovery操作。函数的返回结果为是否成功启动recovery/backfill操作
+
 {% highlight string %}
-bool ReplicatedPG::start_recovery_ops(
-  int max, ThreadPool::TPHandle &handle,
-  int *ops_started);
+class PG : DoutPrefixProvider {
+protected:
+	BackfillInterval backfill_info;
+	map<pg_shard_t, BackfillInterval> peer_backfill_info;
+	bool backfill_reserved;                      //当前backfill操作是否预约成功，在进入Backfilling状态时会设置为true
+	bool backfill_reserving;                     //当前是否开始了backfill操作的预约（注：从"开始预约"到"预约成功"是有一段过程的)
+};
+bool ReplicatedPG::start_recovery_ops(int max, ThreadPool::TPHandle &handle,int *ops_started)
+{
+	int& started = *ops_started;
+	started = 0;
+	bool work_in_progress = false;
+	assert(is_primary());
+	
+	if (!state_test(PG_STATE_RECOVERING) && !state_test(PG_STATE_BACKFILL)) {
+		/* TODO: I think this case is broken and will make do_recovery()
+		* unhappy since we're returning false */
+		dout(10) << "recovery raced and were queued twice, ignoring!" << dendl;
+		return false;
+	}
+	
+	const pg_missing_t &missing = pg_log.get_missing();
+	
+	int num_missing = missing.num_missing();
+	int num_unfound = get_num_unfound();
+	
+	if (num_missing == 0) {
+		info.last_complete = info.last_update;
+	}
+
+	if (num_missing == num_unfound) {
+		// All of the missing objects we have are unfound.
+		// Recover the replicas.
+		started = recover_replicas(max, handle);
+	}
+	if (!started) {
+		// We still have missing objects that we should grab from replicas.
+		started += recover_primary(max, handle);
+	}
+	if (!started && num_unfound != get_num_unfound()) {
+		// second chance to recovery replicas
+		started = recover_replicas(max, handle);
+	}
+	
+	if (started)
+		work_in_progress = true;
+
+	bool deferred_backfill = false;
+	if (recovering.empty() && state_test(PG_STATE_BACKFILL) && !backfill_targets.empty() && started < max &&
+	  missing.num_missing() == 0 && waiting_on_backfill.empty()) {
+
+		if (get_osdmap()->test_flag(CEPH_OSDMAP_NOBACKFILL)) {
+			dout(10) << "deferring backfill due to NOBACKFILL" << dendl;
+			deferred_backfill = true;
+		} else if (get_osdmap()->test_flag(CEPH_OSDMAP_NOREBALANCE) && !is_degraded())  {
+			dout(10) << "deferring backfill due to NOREBALANCE" << dendl;
+			deferred_backfill = true;
+		} else if (!backfill_reserved) {
+			dout(10) << "deferring backfill due to !backfill_reserved" << dendl;
+			if (!backfill_reserving) {
+				dout(10) << "queueing RequestBackfill" << dendl;
+				backfill_reserving = true;
+				queue_peering_event(
+				  CephPeeringEvtRef(
+					std::make_shared<CephPeeringEvt>(
+					  get_osdmap()->get_epoch(),
+					  get_osdmap()->get_epoch(),
+					  RequestBackfill())));
+			}
+			deferred_backfill = true;
+		} else {
+			started += recover_backfill(max - started, handle, &work_in_progress);
+		}
+	}
+
+	dout(10) << " started " << started << dendl;
+	osd->logger->inc(l_osd_rop, started);
+	
+	if (!recovering.empty() || work_in_progress || recovery_ops_active > 0 || deferred_backfill)
+		return work_in_progress;
+	
+	assert(recovering.empty());
+	assert(recovery_ops_active == 0);
+	
+	dout(10) << __func__ << " needs_recovery: " << missing_loc.get_needs_recovery() << dendl;
+	dout(10) << __func__ << " missing_loc: " << missing_loc.get_missing_locs() << dendl;
+	int unfound = get_num_unfound();
+	if (unfound) {
+		dout(10) << " still have " << unfound << " unfound" << dendl;
+		return work_in_progress;
+	}
+
+	if (missing.num_missing() > 0) {
+		// this shouldn't happen!
+		osd->clog->error() << info.pgid << " recovery ending with " << missing.num_missing() << ": " << missing.missing << "\n";
+		return work_in_progress;
+	}
+	
+	if (needs_recovery()) {
+		// this shouldn't happen!
+		// We already checked num_missing() so we must have missing replicas
+		osd->clog->error() << info.pgid << " recovery ending with missing replicas\n";
+		return work_in_progress;
+	}
+	
+	if (state_test(PG_STATE_RECOVERING)) {
+		state_clear(PG_STATE_RECOVERING);
+		if (needs_backfill()) {
+			dout(10) << "recovery done, queuing backfill" << dendl;
+			queue_peering_event(
+			  CephPeeringEvtRef(
+				std::make_shared<CephPeeringEvt>(
+				  get_osdmap()->get_epoch(),
+				  get_osdmap()->get_epoch(),
+				  RequestBackfill())));
+		} else {
+			dout(10) << "recovery done, no backfill" << dendl;
+			queue_peering_event(
+			  CephPeeringEvtRef(
+				std::make_shared<CephPeeringEvt>(
+				  get_osdmap()->get_epoch(),
+				  get_osdmap()->get_epoch(),
+				  AllReplicasRecovered())));
+		}
+	} else { // backfilling
+		state_clear(PG_STATE_BACKFILL);
+		dout(10) << "recovery done, backfill done" << dendl;
+		queue_peering_event(
+		  CephPeeringEvtRef(
+			std::make_shared<CephPeeringEvt>(
+			  get_osdmap()->get_epoch(),
+			  get_osdmap()->get_epoch(),
+			  Backfilled())));
+	}
+	
+	return false;
+}
 {% endhighlight %}
 
 该函数具体处理过程如下：
 
-1） 首先检查OSD，确保该OSD是PG的主OSD。如果PG已经处于PG_STATE_RECOVERING或者PG_STATE_BACKFIL的状态则退出；
+1） 首先检查OSD，确保该OSD是PG的主OSD。如果PG不处于```PG_STATE_RECOVERING```或者```PG_STATE_BACKFILL```的状态则退出；
 
-2） 从pg_log获取missing对象，它保存了主OSD缺失的对象。参数num_missing为主OSD缺失的对象数目；num_unfound为该PG上缺失的对象却没有找到该对象其他正确副本所在的OSD；如果num_missing为0，说明主OSD不缺失对象，直接设置info.last_complete为最新版本info.last_update的值；
+2） 从pg_log获取missing对象，它保存了主OSD缺失的对象。参数num_missing为```主OSD```缺失的对象数目；num_unfound为```该PG```上缺失的对象却没有找到该对象其他正确副本所在的OSD；如果num_missing为0，说明主OSD不缺失对象，直接设置info.last_complete为最新版本info.last_update的值；
 
-3） 如果num_missing等于num_unfound，说明主OSD所缺失对象都为unfound类型的对象，先调用函数recover_replicas()启动修复replica上的对象；
+>注：unfound对象是missing对象的一个子集
 
-4） 如果started为0，也就是已经启动修复的对象数量为0，调用函数recover_primary()修复主OSD上的对象；
+3） 如果num_missing等于num_unfound，说明主OSD所缺失对象都为unfound类型的对象，先调用函数ReplicatedPG::recover_replicas()启动修复replica上的对象；
 
-5） 如果started仍然为0，且num_unfound有变化，再次启动recover_replicas()修复副本；
+4） 如果started为0，也就是已经启动修复的对象数量为0，调用函数ReplicatedPG::recover_primary()修复主OSD上的对象；
+
+5） 如果started仍然为0，且num_unfound有变化，再次启动ReplicatedPG::recover_replicas()修复副本；
 
 6） 如果started不为0，设置work_in_progress的值为true;
 
@@ -725,36 +869,268 @@ bool ReplicatedPG::start_recovery_ops(
 
 &emsp; a) 如果标志get_osdmap()->test_flag(CEPH_OSDMAP_NOBACKFILL)设置了，就推迟Backfill过程；
 
-&emsp; b) 如果标志CEPH_OSDMAP_NOREBALANCE设置了，且是degrade的状态，推迟Backfill过程；
+&emsp; b) 如果标志CEPH_OSDMAP_NOREBALANCE设置了，且不是degrade的状态，推迟Backfill过程；
 
 &emsp; c) 如果backfill_reserved没有设置，就抛出RequestBackfill事件给状态机，启动Backfill过程；
 
-&emsp; d) 否则，调用函数recover_backfill()开始Backfill过程
+&emsp; d) 否则，调用函数ReplicatedPG::recover_backfill()开始Backfill过程
 
 8） 最后PG如果处于PG_STATE_RECOVERING状态，并且对象修复成功，就检查：如果需要Backfill过程，就向PG的状态机发送RequestBackfill事件；如果不需要Backfill过程，就抛出AllReplicasRecovered事件；
 
 9） 否则，PG的状态就是PG_STATE_BACKFILL状态，清除该状态，抛出Backfilled事件；
 
-###### 3.2.2 recover_primary()
+
+接下来，我们会讲述：
+
+* recover_primary()修复PG主OSD上缺失的对象
+
+* recover_replicas()修复PG副本OSD上缺失的对象
+
+* recover_backfill()执行backfill过程
+
+
+
+###### 3.2.2 函数recover_primary()
 函数recover_primary()用来修复一个PG的主OSD上缺失的对象：
 {% highlight string %}
-int ReplicatedPG::recover_primary(int max, ThreadPool::TPHandle &handle);
-{% endhighlight %}
+class ReplicatedBackend : public PGBackend {
+	struct RPGHandle : public PGBackend::RecoveryHandle {
+      map<pg_shard_t, vector<PushOp> > pushes;
+      map<pg_shard_t, vector<PullOp> > pulls;
+	};
 
+	/// @see PGBackend::open_recovery_op
+	RPGHandle *_open_recovery_op() {
+		return new RPGHandle();
+	}
+	PGBackend::RecoveryHandle *open_recovery_op() {
+		return _open_recovery_op();
+	}
+};
+
+/**
+ * do one recovery op.
+ * return true if done, false if nothing left to do.
+ */
+int ReplicatedPG::recover_primary(int max, ThreadPool::TPHandle &handle)
+{
+	assert(is_primary());
+	
+	const pg_missing_t &missing = pg_log.get_missing();
+	
+	dout(10) << "recover_primary recovering " << recovering.size()<< " in pg" << dendl;
+	dout(10) << "recover_primary " << missing << dendl;
+	dout(25) << "recover_primary " << missing.missing << dendl;
+	
+	// look at log!
+	pg_log_entry_t *latest = 0;
+	int started = 0;
+	int skipped = 0;
+	
+	PGBackend::RecoveryHandle *h = pgbackend->open_recovery_op();
+	map<version_t, hobject_t>::const_iterator p = missing.rmissing.lower_bound(pg_log.get_log().last_requested);
+	while (p != missing.rmissing.end()) {
+		handle.reset_tp_timeout();
+		hobject_t soid;
+		version_t v = p->first;
+	
+		if (pg_log.get_log().objects.count(p->second)) {
+			latest = pg_log.get_log().objects.find(p->second)->second;
+			assert(latest->is_update());
+			soid = latest->soid;
+		} else {
+			latest = 0;
+			soid = p->second;
+		}
+
+		const pg_missing_t::item& item = missing.missing.find(p->second)->second;
+		++p;
+
+		hobject_t head = soid;
+		head.snap = CEPH_NOSNAP;
+		
+		eversion_t need = item.need;
+		
+		dout(10) << "recover_primary " << soid << " " << item.need << (missing.is_missing(soid) ? " (missing)":"")
+		  << (missing.is_missing(head) ? " (missing head)":"") << (recovering.count(soid) ? " (recovering)":"")
+		  << (recovering.count(head) ? " (recovering head)":"") << dendl;
+
+		if (latest) {
+			switch (latest->op) {
+			case pg_log_entry_t::CLONE:
+			/*
+			* Handling for this special case removed for now, until we
+			* can correctly construct an accurate SnapSet from the old
+			* one.
+			*/
+			break;
+
+			case pg_log_entry_t::LOST_REVERT:
+			{
+				if (item.have == latest->reverting_to) {
+					ObjectContextRef obc = get_object_context(soid, true);
+			
+					if (obc->obs.oi.version == latest->version) {
+						// I'm already reverting
+						dout(10) << " already reverting " << soid << dendl;
+					} else {
+						dout(10) << " reverting " << soid << " to " << latest->prior_version << dendl;
+						obc->ondisk_write_lock();
+						obc->obs.oi.version = latest->version;
+			
+						ObjectStore::Transaction t;
+						bufferlist b2;
+						obc->obs.oi.encode(b2);
+						assert(!pool.info.require_rollback());
+						t.setattr(coll, ghobject_t(soid), OI_ATTR, b2);
+						
+						recover_got(soid, latest->version);
+						missing_loc.add_location(soid, pg_whoami);
+						
+						++active_pushes;
+			
+						osd->store->queue_transaction(osr.get(), std::move(t),
+						  new C_OSD_AppliedRecoveredObject(this, obc),
+						  new C_OSD_CommittedPushedObject(
+							this,
+							get_osdmap()->get_epoch(),
+							info.last_complete),
+							new C_OSD_OndiskWriteUnlock(obc));
+						continue;
+					}
+				} else {
+					/*
+					* Pull the old version of the object.  Update missing_loc here to have the location
+					* of the version we want.
+					*
+					* This doesn't use the usual missing_loc paths, but that's okay:
+					*  - if we have it locally, we hit the case above, and go from there.
+					*  - if we don't, we always pass through this case during recovery and set up the location
+					*    properly.
+					*  - this way we don't need to mangle the missing code to be general about needing an old
+					*    version...
+					*/
+					eversion_t alternate_need = latest->reverting_to;
+					dout(10) << " need to pull prior_version " << alternate_need << " for revert " << item << dendl;
+					
+					for (map<pg_shard_t, pg_missing_t>::iterator p = peer_missing.begin();p != peer_missing.end(); ++p)
+	      				if (p->second.is_missing(soid, need) && p->second.missing[soid].have == alternate_need) {
+							missing_loc.add_location(soid, p->first);
+	      				}
+
+					dout(10) << " will pull " << alternate_need << " or " << need << " from one of " << missing_loc.get_locations(soid) << dendl;
+	  			}
+			}
+
+			break;
+			}
+		}
+   
+		if (!recovering.count(soid)) {
+			if (recovering.count(head)) {
+				++skipped;
+			} else {
+				int r = recover_missing(soid, need, get_recovery_op_priority(), h);
+				switch (r) {
+				case PULL_YES:
+					++started;
+					break;
+				case PULL_OTHER:
+					++started;
+				case PULL_NONE:
+					++skipped;
+					break;
+				default:
+					assert(0);
+				}
+
+				if (started >= max)
+					break;
+			}
+		}
+		
+		// only advance last_requested if we haven't skipped anything
+		if (!skipped)
+			pg_log.set_last_requested(v);
+	}
+		
+	pgbackend->run_recovery_op(h, get_recovery_op_priority());
+	return started;
+}
+{% endhighlight %}
 其处理过程如下：
 
-1） 调用pgbackend->open_recovery_op()返回一个PG类型相关的PGBackend::RecoveryHandle。对于ReplicatedPG对应的RPGHandle，内部有两个map，保存了Push和Pull操作的封装PushOp和PullOp:
+1） 调用pgbackend->open_recovery_op()返回一个PG类型相关的PGBackend::RecoveryHandle。对于ReplicatedPG其对应的RecoveryHandle为```RPGHandle```，内部有两个map，保存了Push和Pull操作的封装PushOp和PullOp:
 {% highlight string %}
 struct RPGHandle : public PGBackend::RecoveryHandle {
 	map<pg_shard_t, vector<PushOp> > pushes;
 	map<pg_shard_t, vector<PullOp> > pulls;
 };
+
+
+//src/osd/osd_types.h
+struct PushOp {
+	hobject_t soid;
+	eversion_t version;
+	bufferlist data;
+	interval_set<uint64_t> data_included;
+	bufferlist omap_header;
+	map<string, bufferlist> omap_entries;
+	map<string, bufferlist> attrset;
+	
+	ObjectRecoveryInfo recovery_info;
+	ObjectRecoveryProgress before_progress;
+	ObjectRecoveryProgress after_progress;
+	
+	static void generate_test_instances(list<PushOp*>& o);
+	void encode(bufferlist &bl) const;
+	void decode(bufferlist::iterator &bl);
+	ostream &print(ostream &out) const;
+	void dump(Formatter *f) const;
+	
+	uint64_t cost(CephContext *cct) const;
+};
+
+struct PullOp {
+	hobject_t soid;
+	
+	ObjectRecoveryInfo recovery_info;
+	ObjectRecoveryProgress recovery_progress;
+	
+	static void generate_test_instances(list<PullOp*>& o);
+	void encode(bufferlist &bl) const;
+	void decode(bufferlist::iterator &bl);
+	ostream &print(ostream &out) const;
+	void dump(Formatter *f) const;
+	
+	uint64_t cost(CephContext *cct) const;
+};
 {% endhighlight %}
 
+2） last_requested为上次修复的指针，通过调用lower_bound()函数来获取还没有修复的对象;
 
-2） last_requested为上次修复的指针，通过调用low_bound()函数来获取还没有修复的对象。
+3） 遍历每一个未被修复的对象：```latest```为日志记录中保存的该缺失对象的最后一条日志，soid为缺失的对象。如果latest不为空：
 
-3） 遍历每一个未被修复的对象：latest为日志记录中保存的该缺失对象的最后一条日志，soid为缺失的对象。如果latest不为空：
+关于```pg_log_entry_t```相关操作的说明请参看如下：
+{% highlight string %}
+/**
+ * pg_log_entry_t - single entry/event in pg log
+ *
+ */
+struct pg_log_entry_t {
+	enum {
+		MODIFY = 1,       // some unspecified modification (but not *all* modifications)
+		CLONE = 2,        // cloned object from head
+		DELETE = 3,       // deleted object
+		BACKLOG = 4,      // event invented by generate_backlog [deprecated]
+		LOST_REVERT = 5,  // lost new version, revert to an older version.
+		LOST_DELETE = 6,  // lost new version, revert to no object (deleted).
+		LOST_MARK = 7,    // lost new version, now EIO
+		PROMOTE = 8,      // promoted object from another tier
+		CLEAN = 9,        // mark an object clean
+	};
+};
+{% endhighlight %}
 
 &emsp; a) 如果该日志记录是pg_log_entry_t::CLONE类型，这里不做任何的特殊处理，直到成功获取snapshot相关的信息SnapSet后再处理；
 
@@ -764,25 +1140,32 @@ struct RPGHandle : public PGBackend::RecoveryHandle {
 
   * 如果item.have等于latest->reverting_to，但是对象当前的版本obc->obs.io.version不等于latest->version，说明没有执行回退操作，直接修改对象的版本号为latest->version即可。
 
-  * 否则，需要拉取该reverting_to版本的对象，这里不做特殊的处理，只是检查所有OSD是否拥有该版本的对象，如果有就加入到missing_loc记录该版本的位置信息，由后续修复继续来完成。
+  * 否则，需要拉取该reverting_to版本的对象，这里不做特殊的处理，只是检查所有OSD是否拥有该版本的对象，如果有就加入到missing_loc记录该版本的位置信息，由后续修复继续来完成。（注：因为早期已经检查了各个副本OSD，因此这里只检查peering_missing即可）
 
-&emsp; c) 如果该对象在recovering过程中，表明正在修复，或者其head对象正在修复，跳过，并计数增加skipped；否则调用函数recover_missing()来修复。
+&emsp; c) 如果该对象在recovering过程中，表明正在修复，或者其head对象正在修复，跳过，并计数增加skipped；否则调用函数ReplicatedPG::recover_missing()来修复。
+
 
 4） 调用函数pgbackend->run_recovery_op()，把PullOp或者PushOp封装的消息发送出去；
 
+>注：关于PullOp或PushOp的构造是在ReplicatedPG::recover_missing()中完成的，我们后面会详细介绍。
+
+
 ----------
-下面举例说明，当最后的日志记录类型为LOST_REVERT时的修复过程：
+下面举例说明，当最后的日志记录类型为```LOST_REVERT```时的修复过程：
+
 
 ```例11-1``` 日志修复过程
 
 PG日志的记录如下： 每个单元代表一条日志记录，分别为对象的名字和版本以及操作，版本的格式为(epoch, version)。灰色的部分代表本OSD上缺失的日志记录，该日志记录是从权威日志记录中拷贝过来的，所以当前该日志记录是连续完整的。
+
 
 ![ceph-chapter11-2](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter11_2.jpg)
 
 
 **情况1：** 正常情况的修复
 
-缺失的对象列表为[obj1,obj2]。当前修复对象为obj1.由日志记录可知，对象obj1被修改过三次，分别为版本6,7,8。当前拥有的obj1对象的版本have值为4,修复时只修复到最后修改的版本8即可。
+缺失的对象列表为[obj1,obj2]。当前修复对象为obj1。由日志记录可知，对象obj1被修改过三次，分别为版本6,7,8。当前拥有的obj1对象的版本have值为4,修复时只修复到最后修改的版本8即可。
+
 
 **情况2：** 最后一个操作为LOST_REVERT类型的操作
 
@@ -798,18 +1181,81 @@ PG日志的记录如下： 每个单元代表一条日志记录，分别为对�
 
 如果回退的版本reverting_to不是版本4，而是版本6，那么最终还是需要把obj1的数据修复到版本6的数据。Ceph在这里的处理，仅仅是检查其他OSD缺失的对象中是否有版本6，如果有，就加入到missing_loc中，记录拥有该版本的OSD位置，待后续继续修复。
 
-###### 3.2.3 recover_missing()
-函数recover_missing()处理snap对象的修复。在修复snap对象时，必须首先修复head对象或者snapdir对象，获取SnapSet信息，然后才能修复快照对象自己。
+
+###### 3.2.3 函数recover_missing()
+
+函数ReplicatedPG::recover_missing()用于恢复missing对象。在修复snap对象时，必须首先修复head对象或者snapdir对象，获取SnapSet信息，然后才能修复快照对象自己。
 {% highlight string %}
+/*
+ * Return values:
+ *  NONE  - didn't pull anything
+ *  YES   - pulled what the caller wanted
+ *  OTHER - needed to pull something else first (_head or _snapdir)
+ */
+enum { PULL_NONE, PULL_OTHER, PULL_YES };
+
 int ReplicatedPG::recover_missing(
   const hobject_t &soid, eversion_t v,
   int priority,
-  PGBackend::RecoveryHandle *h);
-{% endhighlight %}
+  PGBackend::RecoveryHandle *h)
+{
+	if (missing_loc.is_unfound(soid)) {
+		dout(7) << "pull " << soid << " v " << v << " but it is unfound" << dendl;
+		return PULL_NONE;
+	}
 
+	// is this a snapped object?  if so, consult the snapset.. we may not need the entire object!
+	ObjectContextRef obc;
+	ObjectContextRef head_obc;
+	if (soid.snap && soid.snap < CEPH_NOSNAP) {
+		// do we have the head and/or snapdir?
+		hobject_t head = soid.get_head();
+
+		if (pg_log.get_missing().is_missing(head)) {
+			if (recovering.count(head)) {
+				dout(10) << " missing but already recovering head " << head << dendl;
+				return PULL_NONE;
+			} else {
+				int r = recover_missing(head, pg_log.get_missing().missing.find(head)->second.need, priority,h);
+				if (r != PULL_NONE)
+					return PULL_OTHER;
+				return PULL_NONE;
+			}
+		}
+
+		head = soid.get_snapdir();
+		if (pg_log.get_missing().is_missing(head)) {
+			if (recovering.count(head)) {
+				dout(10) << " missing but already recovering snapdir " << head << dendl;
+				return PULL_NONE;
+			} else {
+				int r = recover_missing(
+				head, pg_log.get_missing().missing.find(head)->second.need, priority,h);
+				if (r != PULL_NONE)
+					return PULL_OTHER;
+				return PULL_NONE;
+			}
+		}
+
+		// we must have one or the other
+		head_obc = get_object_context(soid.get_head(),false,0);
+		if (!head_obc)
+			head_obc = get_object_context(soid.get_snapdir(),false,0);
+		assert(head_obc);
+	}
+
+	start_recovery_op(soid);
+	assert(!recovering.count(soid));
+	recovering.insert(make_pair(soid, obc));
+
+	pgbackend->recover_object(soid,v,head_obc,obc,h);
+
+	return PULL_YES;
+}
+{% endhighlight %}
 具体实现如下：
 
-1） 检查如果对象soid时unfound，直接返回PULL_NONE值。暂时无法修复处于unfound的对象
+1） 检查如果对象soid是unfound，直接返回```PULL_NONE```值。暂时无法修复处于unfound的对象；
 
 2） 如果修复的是snap对象：
 
@@ -822,365 +1268,6 @@ int ReplicatedPG::recover_missing(
 4） 调用函数pgbackend->recover_object()把要修复的操作信息封装到PullOp或者PushOp对象中，并添加到RecoveryHandle结构中。
 
 
-### 3.3 pgbackend
-pgbackend封装了不同类型的Pool的实现。ReplicatedBackend实现了replicate类型的PG相关的底层功能，ECBackend实现了Erasure code类型的PG相关的底层功能。
-
-由上一节```3.2```的分析可知，需要调用pgbackend的recover_object()函数来实现修复对象的信息封装。这里只介绍基于副本的。
-
-函数recover_object()实现了pull操作，调用prepare_pull()函数把请求封装成PullOp结构。如果是push操作，就调用start_pushes()把请求封装成PushOp的操作。
-
-###### 3.3.1 pull操作
-prepare_pull()函数把要拉取的object相关的操作信息打包成PullOp类信息，如下所示：
-{% highlight string %}
-void ReplicatedBackend::prepare_pull(
-  eversion_t v,                     //要拉取对象的版本信息
-  const hobject_t& soid,            //要拉取的对象
-  ObjectContextRef headctx,         //拉取对象的ObjectContext信息
-  RPGHandle *h);                    //封装后保存的RecoveryHandle
-{% endhighlight %}
-
-难点在于snap对象的修复处理过程。下面先介绍PullOp数据结构。
-
-PullOp数据结构如下(src/osd/osd_types.h)：
-{% highlight string %}
-struct PullOp {
-  hobject_t soid;                                     //需要拉取的对象
-
-  ObjectRecoveryInfo recovery_info;                   //需要修复的信息
-  ObjectRecoveryProgress recovery_progress;           //对象修复进度信息
-};
-
-
-
-struct ObjectRecoveryInfo {
-  hobject_t soid;                                     //修复的对象
-  eversion_t version;                                 //修复对象的版本
-  uint64_t size;                                      //修复对象的大小
-  object_info_t oi;                                   //修复对象的object_info信息
-  SnapSet ss;                                         //修复对象的快照信息
-
-  //对象需要拷贝的集合，在修复快照对象时，需要从别的OSD拷贝到本地的对象的区段集合
-  interval_set<uint64_t> copy_subset;
-
-  //clone对象修复时，需要从本地对象拷贝来修复的区间
-  map<hobject_t, interval_set<uint64_t>, hobject_t::BitwiseComparator> clone_subset;
-};
-
-
-struct ObjectRecoveryProgress {
-  uint64_t data_recovered_to;                         //数据已经修复的位置指针
-  string omap_recovered_to;                           //omap已经修复的位置指针
-  bool first;                                         //是否是首次修复操作
-  bool data_complete;                                 //数据是否修复完成
-  bool omap_complete;                                 //omap是否修复完成
-};
-{% endhighlight %}
-
-函数prepare_pull()具体处理过程如下：
-
-1） 通过调用函数get_parent()来获取PG对象的指针。pgbackend的parent就是相应的PG对象。通过PG获取missing、peer_missing、missing_loc等信息；
-
-2） 从soid对象对应的missing_loc的map中获取该soid对象所在的OSD集合。把该集合保存在shuffle这个向量中。调用random_shuffle操作对OSD列表随机排序，然后选择向量中首个OSD作为缺失对象来拉取源OSD的值。从这一步可知，当修复主OSD上的对象，而多个从OSD上有该对象时，随机选择其中一个源OSD来拉取。
-
-3） 当选择了一个源shard之后，查看该shard对应的peer_missing来确保该OSD上不缺失该对象，即确实拥有该版本的对象。
-
-4） 确定拉取对象的数据范围：
-
-&emsp; a) 如果是head对象，直接拷贝对象的全部，在copy_subset()加入区间(0,-1)，表示全部拷贝，最后设置size为-1：
-{% highlight string %}
-recovery_info.copy_subset.insert(0, (uint64_t)-1);
-recovery_info.size = ((uint64_t)-1);
-{% endhighlight %}
-
-&emsp; b) 如果该对象是snap对象，确保head对象或者snapdir对象二者必须存在一个。如果headctx不为空，就可以获取SnapSetContext对象，它保存了snapshot相关的信息。调用函数calc_clone_subsets()来计算需要拷贝的数据范围。
-
-5） 设置PullOp的相关字段，并添加到RPGHandle中
-
-函数calc_clone_subsets()用于修复快照对象。在介绍它之前，这里需要介绍SnapSet的数据结构和clone对象的overlap概念。
-
-在SnapSet结构中，字段clone_overlap保存了clone对象和上一次clone对象的重叠部分：
-{% highlight string %}
-struct SnapSet {
-  snapid_t seq;
-  bool head_exists;
-  vector<snapid_t> snaps;                                 // 序号降序排列
-  vector<snapid_t> clones;                                // 序号升序排列
-
-  //写操作导致的和最新的克隆对象重叠的部分
-  map<snapid_t, interval_set<uint64_t> > clone_overlap;  
-
-  map<snapid_t, uint64_t> clone_size;
-};
-{% endhighlight %}
-
-下面通过一个示例来说明```clone_overlap```数据结构的概念。
-
-```例11-2``` clone_overlap数据结构如图11-2所示:
-
-![ceph-chapter11-4](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter11_4.jpg)
-
-snap3从snap2对象clone出来，并修改了区间3和4，其在对象中范围的offset和length为(4,8)和(8,12)。那么在SnapSet的clone_overlap中就记录：
-{% highlight string %}
-clone_overlap[3] = {(4,8), (8,12)}
-{% endhighlight %}
-
-函数calc_clone_subset()用于修复快照对象时，计算应该拷贝的数据区间。在修复快照对象时，并不是完全拷贝快照对象，这里用于优化的关键在于：快照对象之间是有数据重叠，数据重叠的部分可以通过已存在的本地快照对象的数据拷贝来修复；对于不能通过本地快照对象拷贝修复的部分，才需要从其他副本上拉取对应的数据。
-
-函数calc_clone_subsets()具体实现如下：
-
-1) 首先获取该快照对象的size，把(0,size)加入到data_subset中：
-{% highlight string %}
-data_subset.insert(0, size);
-{% endhighlight %}
-
-
-2） 向前查找(oldest snap)和当前快照相交的区间，直到找到一个不缺失的快照对象，添加到clone_subset中。这里找的不重叠区间，是从不缺失快照对象到当前修复的快照对象之间从没修改过的区间，所以修复时，直接从已存在的快照对象拷贝所需区间数据即可。
-
-3） 同理，向后查找（newest snap)和当前快照对象相重叠的对象，直到找到一个不缺失的对象，添加到clone_subset中。
-
-4） 去除掉所有重叠的区间，就是需要拉取的数据区间；
-{% highlight string %}
-data_subset.subtract(cloning);
-{% endhighlight %}
-
-对于上述算法，下面举例来说明：
-
-```例11-3``` 快照对象修复示例如图11-3所示：
-
-![ceph-chapter11-5](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter11_5.jpg)
-
-要修复的对象为snap4，不同长度代表各个clone对象的size是不同的，其中```深红色```的区间代表clone后修改的区间。snap2、snap3和snap5都是已经存在的非缺失对象。
-
-算法处理流程如下：
-
-1） 向前查找和snap4重叠的区间，直到遇到非缺失对象snap2为止。从snap4到snap2一直重叠的区间为1,5,8三个区间。因此，修复对象snap4时，修复1,5,8区间的数据，可以直接从已存在的本地非缺失对象snap2拷贝即可。
-
-2） 同理，向后查找和snap4重叠的区间，直到遇到非缺失对象snap5为止。snap5和snap4重叠的区间为1,2,3,4,7,8六个区间。因此，修复对象4时，直接从本地对象snap4中拷贝区间1,2,3,4,7,8即可。
-
-3） 去除上述本地就可修复的区间，对象snap4只有区间6需要从其他OSD上拷贝数据来修复。
-
-###### 3.3.2 push操作
-函数start_pushes()获取actingbackfill的OSD列表，通过peer_missing查找缺失该对象的OSD，调用prep_push_to_replica()打包PushOp请求。
-
-函数prep_push_to_replica()函数实现过程如下：
-{% highlight string %}
-void ReplicatedBackend::prep_push_to_replica(
-  ObjectContextRef obc, const hobject_t& soid, pg_shard_t peer,
-  PushOp *pop, bool cache_dont_need);
-{% endhighlight %}
-
-1) 如果需要push的对象是snap对象：检查如果head对象缺失，调用prep_push()推送head对象;如果是headdir对象缺失，则调用prep_push()推送headdir对象；
-
-2） 如果是snap对象，调用函数calc_clone_subsets()来计算需要推送的快照对象的数据区间；
-
-3） 如果是head对象，调用函数calc_head_subsets()来计算需要推送的head对象的区间，其原理和计算快照对象类似，这里就不详细说明了。最后调用prep_push()封装PushInfo信息，在函数build_push_op()里读取要push的实际数据。
-
-###### 3.3.3 处理修复操作
-函数run_recover_op()调用send_pushed()函数和send_pulls()函数把请求发送给相关的OSD，这个流程比较简单。
-
-当主OSD把对象推送给缺失该对象的从OSD后，从OSD需要调用函数handle_push()来实现数据写入工作，从而完成该对象的修复。同样，当主OSD给从OSD发起拉取对象的请求来修复自己缺失的对象时，需要调用函数handle_pulls()来处理该请求的应对。
-
-在函数ReplicatedBackend::handle_push()里处理handle_push的请求，主要调用submit_push_data()函数来写入数据。
-
-handle_pull()函数收到一个PullOp操作，返回PushOp操作，处理流程如下：
-{% highlight string %}
-void ReplicatedBackend::handle_pull(pg_shard_t peer, PullOp &op, PushOp *reply)
-{
-  const hobject_t &soid = op.soid;
-  struct stat st;
-  int r = store->stat(ch, ghobject_t(soid), &st);
-  if (r != 0) {
-    get_parent()->clog_error() << get_info().pgid << " "
-			       << peer << " tried to pull " << soid
-			       << " but got " << cpp_strerror(-r) << "\n";
-    prep_push_op_blank(soid, reply);
-  } else {
-    ObjectRecoveryInfo &recovery_info = op.recovery_info;
-    ObjectRecoveryProgress &progress = op.recovery_progress;
-    if (progress.first && recovery_info.size == ((uint64_t)-1)) {
-      // Adjust size and copy_subset
-      recovery_info.size = st.st_size;
-      recovery_info.copy_subset.clear();
-      if (st.st_size)
-        recovery_info.copy_subset.insert(0, st.st_size);
-      assert(recovery_info.clone_subset.empty());
-    }
-
-    r = build_push_op(recovery_info, progress, 0, reply);
-    if (r < 0)
-      prep_push_op_blank(soid, reply);
-  }
-}
-{% endhighlight %}
-
-1) 首先调用store->stat()函数，验证该对象是否存在，如果不存在，则调用函数prep_push_op_blank()，直接返回空值；
-
-2） 如果该对象存在，获取ObjectRecoveryInfo和ObjectRecoveryProgress结构。如果progress.first为true并且recovery_info.size为-1，说明是全拷贝修复：将recovery_info.size设置为实际对象的size，清空recovery_info.copy_subset，并把(0,size)区间添加到recovery_info.copy_subset.insert(0, st.st_size)的拷贝区间。
-
-3） 调用函数build_push_op()，构建PullOp结构。如果出错，调用prep_push_op_blank()，直接返回空值。
-
-
-----------
-
-函数build_push_op()完成构建push的请求。具体处理如下：
-{% highlight string %}
-int ReplicatedBackend::build_push_op(const ObjectRecoveryInfo &recovery_info,
-				     const ObjectRecoveryProgress &progress,
-				     ObjectRecoveryProgress *out_progress,
-				     PushOp *out_op,
-				     object_stat_sum_t *stat,
-                                     bool cache_dont_need);
-{% endhighlight %}
-
-1) 如果progress.first为true，就需要获取对象的元数据信息。通过store->omap_get_header()获取omap的header信息，通过store->getattrs()获取对象的扩展属性信息，并验证oi.version是否为recovery_info.version；否则返回-EINVAL值。如果成功，new_progress.first设置为false。
-
-2） 上一步只是获取了omap的header信息，并没有获取omap信息。这一步首先判断progress.omap_complete是否完成（初始化设置为false)，如果没有完成，就迭代获取omap的(key,value)信息，并检查一次获取信息的大小不能超过cct->_conf->osd_recovery_max_chunk设置的值（默认为8MB）。特别需要注意的是，当该配置参数的值小于一个对象的size时，一个对象的修复需要多次数据的push操作。为了保证数据的完整一致性，先把数据拷贝到PG的temp存储空间。当拷贝完成之后，再移动到该PG的实际空间中。
-
-3） 开始拷贝数据：检查recovery_info.copy_subset，也就是拷贝的区间；
-
-4） 调用函数store->fiemap()来确定有效数据的区间out_op->data_included的值，通过store->read()读取相应的数据到data里。
-
-5） 设置PullOp的相关字段，并返回。
-
-## 4. Backfill过程
-
-当PG完成了Recovery过程之后，如果backfill_targets不为空，表明有需要Backfill过程的OSD，就需要启动Backfill的任务，来完成PG的全部修复。下面介绍Backfill过程相关的数据结构和具体处理过程。
-
-
-### 4.1 相关数据结构
-数据结构BackfillInterval用来记录每个peer上的Backfill过程（src/osd/pg.h)。
-{% highlight string %}
-struct BackfillInterval {
-	//一个peer的backfill_interval信息
-	eversion_t version;                         //扫描时的最新对象版本
-
-	map<hobject_t,eversion_t,hobject_t::Comparator> objects;
-	bool sort_bitwise;
-	hobject_t begin;
-	hobject_t end;
-};
-{% endhighlight %}
-
-其字段说明如下：
-
-* version: 记录扫描对象列表时，当前PG对象更新的最新版本，一般为last_update，由于此时PG处于active状态，可能正在进行写操作。其用来检查从上次扫描到现在是否有对象写操作。如果有，完成写操作的对象在已扫描的对象列表中，进行Backfill操作时，该对象就需要更新为最新版本。
-
-* objects: 扫描到准备进行Backfill操作的对象列表；
-
-* begin: 当前处理的对象；
-
-* end: 本次扫描对象的结束，用于作为下次扫描对象的开始：
-
-
-### 4.2 Backfill的具体实现
-函数recovery_backfill()作为Backfill过程的核心函数，控制整个Backfill修复进程。其工作流程如下。
-
-1） 初始设置
-
-在函数on_activate()里设置了PG的属性值new_backfill为true，设置了last_backfill_started为earliest_backfill()的值。该函数计算需要backfill的OSD中，peer_info信息里保存的last_backfill的最小值。
-
-peer_backfill_info的map中保存各个需要backfill的OSD所对应backfillInterval对象信息。首先初始化begin和end都为peer_info.last_backfill，由PG的Peering过程可知，在函数activate()里，如果需要Backfill的OSD，设置该OSD的peer_info的last_backfill为hobject_t()，也就是MIN对象。
-
-backfills_inf_flight保存了正在进行Backfill操作的对象，pending_backfill_updates保存了需要删除的对象。
-
-2） 设置backfill_info.begin为last_backfill_started，调用函数update_range()来更新需要进行Backfill操作的对象列表；
-
-3） 根据各个peer_info的last_backfill对应的backfillInterval信息进行trim操作。根据last_backfill_started来更新backfill_info里相关字段；
-
-4） 如果backfill_info.begin小于等于earliest_peer_backfill()，说明需要继续扫描更多的对象，backfill_info重新设置，这里特别注意的是，backfill_info的version字段也重新设置为(0,0)，这会导致在随后调用的update_scan()函数再调用scan_range()函数来扫描对象；
-
-5） 进行比较，如果pbi.begin小于backfill_info.begin，需要向各个OSD发送MOSDPGScan::OP_SCAN_GET_DIGEST消息来获取该OSD目前拥有的对象列表；
-
-6） 当获取所有OSD的对象列表后，就对比当前主OSD的对象列表来进行修复。
-
-7） check对象指针，就是当前OSD中最小的需要进行Backfill操作的对象：
-
-&emsp; a) 检查check对象，如果小于backfill_info.begin，就需要在各个需要Backfill操作的OSD上删除该对象，加入到to_remove队列中；
-
-&emsp; b) 如果check对象大于或者等于backfill_info.begin，检查拥有check对象的OSD，如果版本不一致，加入need_ver_targ中。如果版本相同，就加入keep_ver_targs中。
-
-&emsp; c) 那些begin对象不是check对象的OSD，如果pinfo.last_backfill小于backfill_info.begin，那么，该对象缺失，加入missing_targs列表中；
-
-&emsp; d) 如果pinfo.last_backfill大于backfill_info.begin，说明该OSD修复的进度已经超越当前的主OSD指示的修复进度，加入skip_targs中；
-
-8） 对于keep_ver_targs列表中的OSD，不做任何操作。对于need_ver_targs和missing_targs中的OSD，该对象需要加入到to_push中去修复。
-
-9） 调用函数send_remove_op()给OSD发送删除的消息来删除to_remove中的对象；
-
-10） 调用函数prep_backfill_object_push()把操作打包成PushOp，调用函数pgbackend->run_recovery_op()把请求发送出去。其流程和Recovery流程类似。
-
-11） 最后用new_last_backfill更新各个OSD的pg_info的last_backfill值。如果pinfo.last_backfill为MAX，说明backfill操作完成，给该OSD发送MOSDPGBackfill::OP_BACKFILL_FINISH消息；否则发送MOSDPGBackfill::OP_BACKFILL_PROGRESS来更新各个OSD上的pg_info的last_backfill字段。
-
-下面举例说明。
-
-```例11-4``` 如下图11-4所示，该PG分布在5个OSD上（也就是5个副本，这里为了方便列出各种处理情况），每一行上的对象列表都是相应OSD当前对应backfillInterval的扫描对象列表。osd5为主OSD，是权威的对象列表，其他OSD都对照主OSD上的对象列表来修复。
-
-![ceph-chapter11-6](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter11_6.jpg)
-
-下面举例来说明步骤7中的不同的修复方法：
-
-1） 当前check对象指针为主OSD上保存的peer_backfill_info中begin的最小值，图中check对象应该为obj4对象；
-
-2） 比较check对象和主osd5上的backfill_info.begin对象，由于check小于obj5，所以obj4为多余的对象，所有拥有该check对象的OSD都必须删除该对象。故osd0和osd2上的obj4对象被删除，同时对应的begin指针前移。
-
-![ceph-chapter11-7](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter11_7.jpg)
-
-
-3） 当前各个OSD的状态如图11-5所示：此时check对象为obj5，比较check和backfill_info.begin的值：
-
-&emsp; a) 对于当前begin未check对象的osd0、osd1、osd4:
-
-    * 对于osd0和osd4，check对象he backfill_info.begin对象都是obj5，且版本号都为(1,4)，加入到keep_ver.targs列表中，不需要修复；
-
-    * 对于osd1，版本号不一致，加入need_ver_targs列表中，需要修复
-
-&emsp; b) 对于当前begin不是check对象的osd2和osd3:
-
-    * 对于osd2，其last_backfill小于backfill_info.begin，显然对象obj5缺失，加入missing_targs修复；
-
-    * 对于osd3，其last_backfill大于backfill_info.begin，也就是说其已经修复到obj6了，obj5应该恢复了，加入skip_targs跳过；
-
-4) 步骤3处理完成，设置last_backfill_started为当前的backfill_info.begin的值。backfill_info.begin指针前移，所有begin等于check对象的begin指针前移，重复以上步骤继续修复。
-
-函数update_range()调用函数scan_range()更新BackfillInterval修复的对象列表，同时检查上次扫描对象列表中，如果有对象发生写操作，就更新该对象修复的版本。
-
-具体实现步骤如下：
-
-1） bi->version记录了扫描要修复的对象列表时PG最新更新的版本号，一般设置为last_update_applied或者info.last_update的值。初始化时，bi->version默认设置为(0,0)，所以小于info.log_tail，就更新bi->version的设置，调用函数scan_range()扫描对象。
-
-2） 检查如果bi->version的值等于info.last_update，说明从上次扫描对象开始到当前时间，PG没有写操作，直接返回。
-
-3） 如果bi->version的值小于info.last_update，说明PG有写操作，需要检查从bi->version到log_head这段日志中的对象：如果该对象有更新操作，修复时就修复最新的版本；如果该对象已经删除，就不需要修复，在修复队列中删除。
-
-
-----------
-下面举例说明update_range()的处理过程：
-
-```例11-5``` update_range的处理过程
-
-1) 日志记录如下图所示：
-
-![ceph-chapter11-8](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter11_8.jpg)
-
-BackfillInterval的扫描的对象列表： bi->begin为对象obj1(1,3)，bi->end为对象obj6(1,6)，当前info.last_update为版本(1,6)，所以bi->version设置为(1,6)。由于本次扫描的对象列表不一定能修复完，只能等下次修复。
-
-
-2） 日志记录如下所示：
-
-![ceph-chapter11-9](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter11_9.jpg)
-
-第二次进入函数recovery_backfill，此时begin对象指向了obj2对象。说明上次只完成了对象obj1的修复。继续修复时，期间有对象发生更新操作：
-
-&emsp; a) 对象obj3有些操作，版本更新为(1,7)。此时对象列表中要修复的对象obj3版本(1,5)，需要更新为版本(1,7)的值。
-
-&emsp; b) 对象obj4发送删除操作，不需要修复了，所以需要从对象列表中删除。
-
-综上所述可知，Ceph的Backfill过程是扫描OSD上该PG的所有对象列表，和主OSD做对比，修复不存在的或版本不一致的对象，同时删除多余的对象。
-
-## 5. 小结
-本章介绍了Ceph的数据修复的过程，有两个过程：Recovery过程和Backfill过程。Recovery过程根据missing记录，先完成主副本的修复，然后完成从副本的修复。对于不能通过日志修复的OSD，Backfill过程通过扫描各个部分上的对象来全量修复。整个Ceph的数据修复过程比较清晰，比较复杂的副本可能就是涉及快照对象的修复处理。
-
-目前这部分代码时Ceph最核心的代码，除非必要，都不会轻易修改。目前社区也提出了修复时的一种优化方法。就是在日志里记录修改的对象范围，这样Recovery过程中不必拷贝整个对象来修复，只修复修改过的对象对应的范围即可，这样在某些情况下可以减少修复的数据量。
 
 
 
