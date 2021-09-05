@@ -85,8 +85,6 @@ ReplicatedPG::OpContext::op_t  -->  PGBackend::PGTransaction::write（即t->writ
 >  
 后面调用ReplicatedBackend::submit_transaction()时传入的```PGTransaction *_t```就是上面这个，通过转换成```RPGTransaction *t```，然后这个函数里用到的```ObjectStore::Transaction *op_t```就是对应到RPGTransaction里的```ObjectStore::Transaction *t```。
 
-
-
 ###### 2.1.2 PGLog序列化到transaction
 
 * 在ReplicatedPG::prepare_transaction()里调用Replicated::finish_ctx()，然后在finish_ctx()函数里就会调用ctx->log.push_back()就会构造pg_log_entry_t插入到vector log里；

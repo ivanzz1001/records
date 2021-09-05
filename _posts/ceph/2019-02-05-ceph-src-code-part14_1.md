@@ -17,8 +17,12 @@ ceph的PGLog是由PG来维护，记录了该PG的所有操作，其作用类似�
 
 <!-- more -->
 
+## 1. PGLog模块静态类图
+PGLog模块的静态类图如下图所示：
 
-## 1. PGLog的格式
+![pglog-hierarchical](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter14_1.jpg)
+
+## 2. PGLog的格式
 ceph使用版本控制的方式来标记一个PG内的每一次更新，每个版本包括一个(epoch, version)来组成。其中，epoch是osdmap的版本，每当有OSD状态变化（如增加、删除等时），epoch就递增；version是PG内每次更新操作的版本号，是递增的，由PG内的Primary OSD进行分配。
 
 PGLog在代码实现中有3个主要的数据结构来维护（相关代码位于src/osd/osd_types.h中）:
@@ -167,15 +171,15 @@ struct pg_info_t {
 因为pg的epoch在其变化的时间轴上并非是完全连续的，所以在每两个变化的pg epoch所经历的时间段我们称之为intervals。
 
 
-## 2. PGLog的存储方式
+## 3. PGLog的存储方式
 
 了解了PGLog的格式之后，我们就来分析一下PGLog的存储方式。在ceph实现里，对于写IO的处理，都是先封装成一个transaction，然后将这个transaction写到journal里。在Journal写完后，触发回调流程，经过多个线程及回调的处理后，再进行写数据到buffer cache的操作，从而完成整个写journal和本地缓存的流程（具体的流程在《OSD读写处理流程》一文中有详细描述）。
 
 总体来说，PGLog也是封装到transaction中，在写journal的时候一起写到日志磁盘上，最后在写本地缓存的时候遍历transaction里的内容，将PGLog相关的东西写到LevelDB里，从而完成该OSD上PGLog的更新操作。
 
-### 2.1 PGLog更新到journal
+### 3.1 PGLog更新到journal
 
-###### 2.1.1 写IO序列化到transaction
+###### 3.1.1 写IO序列化到transaction
 在《OSD读写流程》里描述了主OSD上的读写处理流程，这里就不说明。在ReplicatedPG::do_osd_ops()函数里根据类型CEPH_OSD_OP_WRITE就会进行封装写IO到transaction的操作（即： 将要写的数据encode到ObjectStore::Transaction::tbl里，这是个bufferlist，encode时都先将op编码进去，这样后续在处理时就可以根据op来操作。注意这里的encode其实就是序列化操作）。
 
 这个transaction经过的过程如下：
@@ -183,7 +187,7 @@ struct pg_info_t {
 ![ceph-chapter6-8](https://ivanzz1001.github.io/records/assets/img/ceph/sca/ceph_chapter6_8.jpg)
 
 
-###### 2.1.2 PGLog序列化到transaction
+###### 3.1.2 PGLog序列化到transaction
 
 * 在ReplicatedPG::do_op()中创建了一个对象修改操作的上下文OpContext，然后在ReplicatedPG::execute_ctx()中完成PGLog日志版本等的设置：
 {% highlight string %}
@@ -647,7 +651,7 @@ void ReplicatedPG::queue_transactions(vector<ObjectStore::Transaction>& tls, OpR
 
 
 
-###### 2.1.3 Trim Log
+###### 3.1.3 Trim Log
 前面说到PGLog的记录数是有限制的，正常情况下默认是3000条（由参数osd_min_pg_log_entries控制），PG降级情况下默认增加到10000条(由参数osd_max_pg_log_entries)。当达到限制时，就会trim log进行截断。
 
 
@@ -722,7 +726,7 @@ void PGLog::_write_log(
 
 {% endhighlight %}
 
-###### 2.1.4 PGLog写到journal盘
+###### 3.1.4 PGLog写到journal盘
 
 PGLog写到Journal盘上就是journal一样的流程，具体如下：
 
@@ -872,7 +876,7 @@ void FileJournal::write_thread_entry()
 }
 {% endhighlight %}
 
-###### 2.1.5 PGLog写入leveldb
+###### 3.1.5 PGLog写入leveldb
 在上面完成了journal盘的写操作之后，接着就会有另外的线程异步的将这些日志数据写成实际的object对象、pglog等。如下我们主要关注对pglog的持久化操作：
 
 在《OSD读写流程》里描述到是在FileStore::_do_op()里进行写数据到本地缓存的操作。将pglog写入到leveldb里的操作也是从这里出发的，会根据不同的op类型来进行不同的操作。
@@ -983,10 +987,10 @@ int DBObjectMap::rm_keys(const ghobject_t &oid,
 
 PGLog封装到transaction里面和journal一起写到盘上的好处： 如果osd异常崩溃时，journal写完成了，但是数据有可能没有写到磁盘上，相应的pg log也没有写到leveldb里，这样在OSD再启动起来时，就会进行journal replay，这样从journal里就能读出完整的transaction，然后再进行事务的处理，也就是将数据写到盘上，pglog写到leveldb里。
 
-## 3. PGLog的查看方法
+## 4. PGLog的查看方法
 具体的PGLog内容可以使用如下工具查看：
 
-### 3.1 某一个PG的整体pglog信息
+### 4.1 某一个PG的整体pglog信息
 
 1） 停掉运行中的osd，获取osd的挂载路径，使用如下命令获取pg列表
 {% highlight string %}
@@ -1178,7 +1182,7 @@ ead",
 
 {% endhighlight %}
 
-### 3.2 追踪单个op的pglog
+### 4.2 追踪单个op的pglog
 
 1) 查看某个object映射到的PG
 
@@ -1206,7 +1210,7 @@ osdmap e16540 pool 'oss-uat.rgw.buckets.data' (189) object '-003-KZyxg.docx.VLRH
 {% endhighlight %}
 
 
-## 4. PGLog如何参与恢复
+## 5. PGLog如何参与恢复
 
 根据PG的状态机（主要是pg 从```reset -> activte```过程中的状态转换，其中包括pg从peering到activate 以及epoch变化时pg 状态恢复的处理流程。如下图所示）我们可以看到，
 
