@@ -1702,6 +1702,8 @@ BackfillInterval的扫描的对象列表：bi->begin为对象obj1(1,3)，bi->end
 
 2. [fiemap](https://www.kernel.org/doc/Documentation/filesystems/fiemap.txt)
 
+3. [Ceph 中最严重数据不一致 BUG](https://blog.csdn.net/weixin_34211761/article/details/90542275)
+
 <br />
 <br />
 <br />
