@@ -870,36 +870,6 @@ Reporting包含了site generation阶段相关的元素。许多Maven插件都可
 {% endhighlight %}
 
 
-## 4. Maven简单使用案例
-下面我们给出一个简单的案例来演示如何使用Maven。
-
-### 4.1 安装Maven
-对于Maven的安装，我们在前面已经介绍过，这里不再细述。
-
-### 4.2 创建Project
-我们需要在某个地方创建工程，因此首先创建一个文件夹```workspace```，然后在该文件夹下执行如下命令生成一个简单的java工程：
-<pre>
-# mkdir -p workspace
-# cd workspace
-# mvn archetype:generate -DgroupId=com.mycompany.app -DartifactId=my-app -DarchetypeArtifactId=maven-archetype-quickstart -DarchetypeVersion=1.4 -DinteractiveMode=false
-</pre>
-
-执行上面的命令，Maven就会开始下载最新的artifacts到本地仓库。
->注： 上面mvn命令可能要执行多次，因为下载artifacts可能一次不能成功
-
-执行完上面的命令后，你将会看到在workspace目录下产生了一个与```artifactId```名称相同的目录```my-app```，我们进入该目录：
-<pre>
-# ls
-# cd my-app
-# ls
-
-</pre>
-
-
-
-
-
-
 
 
 
