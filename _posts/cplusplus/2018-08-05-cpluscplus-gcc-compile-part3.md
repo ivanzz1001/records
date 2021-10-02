@@ -33,19 +33,12 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 2) **GCC常用参数**
 {% highlight string %}
 -v              查看版本
-
 -o              产生目标文件
- 
 -I <目录>       指定头文件目录
-
 -O0/-O1/-O3    没有优化/缺省值/优化级别最高
-
 -Wall          提示更多警告信息
-
 -c             只编译程序
-
 -E             生成预处理文件
-
 -g             包含调试信息
 {% endhighlight %}
 
@@ -301,7 +294,7 @@ lib + 库的名字 + .so
 
 缺点：
 
-延时绑定，速度略慢
+* 延时绑定，速度略慢
 
 ### 3.1 动态库的制作与使用
 
