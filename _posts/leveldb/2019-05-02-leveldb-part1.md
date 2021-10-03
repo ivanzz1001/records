@@ -779,7 +779,7 @@ LevelDB可以被移植到其他新的平台，此时只需要实现```leveldb/po
 
 6. [LevelDB官方文档](https://github.com/google/leveldb/blob/master/doc/index.md)
 
-7. [gcc编译、静态库与动态库](https://blog.csdn.net/daidaihema/article/details/80902012)
+7. [LevelDb实现原理](https://blog.csdn.net/gdutliuyun827/article/details/70911342)
 
 <br />
 <br />
