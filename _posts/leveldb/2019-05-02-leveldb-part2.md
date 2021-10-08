@@ -191,6 +191,8 @@ DeleteObsoleteFiles()会在每次compaction结束及recovery结束后调用。�
 9. [leveldb实现细节](https://github.com/google/leveldb/blob/master/doc/impl.md)
 
 
+10. [google C++代码规范](https://google.github.io/styleguide/cppguide.html)
+
 <br />
 <br />
 <br />
