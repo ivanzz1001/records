@@ -195,8 +195,9 @@ bloom_test        CMakeFiles      crc32c_test          dbformat_test        faul
 上面我们看到生成了```libleveldb.a```静态链接库，
 
 >注：如果要对代码进行gdb调试的话，需要修改编译类型
-> # cmake -DCMAKE_BUILD_TYPE=Debug .. && cmake --build .
-
+<pre>
+# cmake -DCMAKE_BUILD_TYPE=Debug .. && cmake --build .
+</pre>
 
 3) **levelDB安装**
 
