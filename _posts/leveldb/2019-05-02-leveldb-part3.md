@@ -344,6 +344,20 @@ void MemTable::Add(SequenceNumber s, ValueType type, const Slice& key,
 
 ## 3.3 写流程的进一步分析
 
+在执行LevelDB数据写入操作时，还有一些细节我们可以介绍一下。如下图所示：
+
+![leveldb-write-detail](https://ivanzz1001.github.io/records/assets/img/leveldb/leveldb_write_detail.jpg)
+
+上面的写操作实现具有如下```亮点```:
+
+* 构造了一个写队列（合并写），提高写性能。同时也避免小数据量的写请求被长时间阻塞
+
+* 由于写队列存在，写日志和memtable这种耗时操作不需要加锁，释放锁去做其他资源同步。
+
+>注：关于LevelDB的compaction我们后面会专门进行介绍
+
+
+
 ## 4. 读数据流程
 读流程要比写流程简单一些，核心代码如下所示：
 {% highlight string %}
