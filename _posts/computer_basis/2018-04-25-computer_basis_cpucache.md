@@ -46,7 +46,89 @@ CPU缓存(cache memory)是位于CPU和内存之间的临时存储器，它的容
 使用dmidecode命令查看cache size:
 <pre>
 # dmidecode -t cache
+# dmidecode 3.0
+Scanning /dev/mem for entry point.
+SMBIOS 2.7 present.
+
+Handle 0x0014, DMI type 7, 19 bytes
+Cache Information
+        Socket Designation: CPU Internal L2
+        Configuration: Enabled, Not Socketed, Level 2
+        Operational Mode: Write Back
+        Location: Internal
+        Installed Size: 1024 kB
+        Maximum Size: 1024 kB
+        Supported SRAM Types:
+                Unknown
+        Installed SRAM Type: Unknown
+        Speed: Unknown
+        Error Correction Type: Single-bit ECC
+        System Type: Unified
+        Associativity: 8-way Set-associative
+
+Handle 0x0015, DMI type 7, 19 bytes
+Cache Information
+        Socket Designation: CPU Internal L1
+        Configuration: Enabled, Not Socketed, Level 1
+        Operational Mode: Write Back
+        Location: Internal
+        Installed Size: 256 kB
+        Maximum Size: 256 kB
+        Supported SRAM Types:
+                Unknown
+        Installed SRAM Type: Unknown
+        Speed: Unknown
+        Error Correction Type: Single-bit ECC
+        System Type: Other
+        Associativity: 8-way Set-associative
+
+Handle 0x0016, DMI type 7, 19 bytes
+Cache Information
+        Socket Designation: CPU Internal L3
+        Configuration: Enabled, Not Socketed, Level 3
+        Operational Mode: Write Back
+        Location: Internal
+        Installed Size: 8192 kB
+        Maximum Size: 8192 kB
+        Supported SRAM Types:
+                Unknown
+        Installed SRAM Type: Unknown
+        Speed: Unknown
+        Error Correction Type: Single-bit ECC
+        System Type: Unified
+        Associativity: 16-way Set-associative
+		
+# lscpu
+Architecture:          x86_64
+CPU op-mode(s):        32-bit, 64-bit
+Byte Order:            Little Endian
+CPU(s):                8
+On-line CPU(s) list:   0-7
+Thread(s) per core:    2
+Core(s) per socket:    4
+座：                 1
+NUMA 节点：         1
+厂商 ID：           GenuineIntel
+CPU 系列：          6
+型号：              60
+型号名称：        Intel(R) Xeon(R) CPU E3-1246 v3 @ 3.50GHz
+步进：              3
+CPU MHz：             1781.308
+BogoMIPS：            6984.00
+虚拟化：           VT-x
+L1d 缓存：          32K
+L1i 缓存：          32K
+L2 缓存：           256K
+L3 缓存：           8192K
+NUMA 节点0 CPU：    0-7
 </pre>
+
+通过lscpu命令我们看到，当前主机有1个CPU socket， 每个CPU socket有4个core，每个core有2个线程。上述```dmidecode```命令得出的L1、L2似乎是4个物理CPU的cache总和:
+{% highlight string %}
+sum(L1 cache) = 4 *(L1d + L1i) = 256KB
+sum(L2 cache) =  4 * L2 = 4 * 256KB = 1024KB
+{% endhighlight %}
+>Tips: 上述```L1d```和```L1i```分别为L1数据缓存(Data cache)和L1指令缓存(Instruction cache)
 
 
 ## 4. cpu与cache 内存交互的过程
@@ -63,7 +145,62 @@ Cache Line可以简单的理解为CPU Cache中的最小缓存单位。内存与�
 
 可以通过执行如下命令来查看cache line的大小：
 <pre>
-# cat /sys/devices/system/cpu/cpu1/cache/index0/coherency_line_size
+# tree /sys/devices/system/cpu/cpu0/cache
+/sys/devices/system/cpu/cpu0/cache
+├── index0
+│   ├── coherency_line_size
+│   ├── level
+│   ├── number_of_sets
+│   ├── physical_line_partition
+│   ├── shared_cpu_list
+│   ├── shared_cpu_map
+│   ├── size
+│   ├── type
+│   └── ways_of_associativity
+├── index1
+│   ├── coherency_line_size
+│   ├── level
+│   ├── number_of_sets
+│   ├── physical_line_partition
+│   ├── shared_cpu_list
+│   ├── shared_cpu_map
+│   ├── size
+│   ├── type
+│   └── ways_of_associativity
+├── index2
+│   ├── coherency_line_size
+│   ├── level
+│   ├── number_of_sets
+│   ├── physical_line_partition
+│   ├── shared_cpu_list
+│   ├── shared_cpu_map
+│   ├── size
+│   ├── type
+│   └── ways_of_associativity
+└── index3
+    ├── coherency_line_size
+    ├── level
+    ├── number_of_sets
+    ├── physical_line_partition
+    ├── shared_cpu_list
+    ├── shared_cpu_map
+    ├── size
+    ├── type
+    └── ways_of_associativity
+
+4 directories, 36 files
+
+# cat /sys/devices/system/cpu/cpu0/cache/index0/coherency_line_size
+64
+
+# cat /sys/devices/system/cpu/cpu0/cache/index0/size
+32K
+# cat /sys/devices/system/cpu/cpu0/cache/index1/size
+32K
+# cat /sys/devices/system/cpu/cpu0/cache/index2/size
+256K
+# cat /sys/devices/system/cpu/cpu0/cache/index3/size
+8192K
 </pre>
 
 
