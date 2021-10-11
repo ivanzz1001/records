@@ -31,7 +31,7 @@ Linux localhost.localdomain 3.10.0-514.el7.x86_64 #1 SMP Tue Nov 22 16:42:41 UTC
 ## 1. Linux Thread资源限制
 目前线程资源限制由以下几个系统参数共同决定：
 
-* 参数```/proc/sys/kernel/threads-max```，有直接关系，每个进程中做多创建的的线程数目
+* 参数```/proc/sys/kernel/threads-max```，有直接关系，每个进程中最多创建的的线程数目
 * 参数```/proc/sys/kernel/pid_max```，有直接关系，系统中最多分配的pid数量
 * 参数```/proc/sys/vm/max_map_count```，数量越大，能够创建的线程数目越多，目前具体关系未明
 
