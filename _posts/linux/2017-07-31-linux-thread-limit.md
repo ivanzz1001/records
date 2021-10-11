@@ -37,9 +37,9 @@ Linux localhost.localdomain 3.10.0-514.el7.x86_64 #1 SMP Tue Nov 22 16:42:41 UTC
 
 通过echo设置：
 {% highlight string %}
-# echo 204800 > /proc/sys/kernel/threads-max
-# echo 204800 > /proc/sys/kernel/pid_max
-# echo 204800 > /proc/sys/kernel/pid_max
+# echo 2061219 > /proc/sys/kernel/threads-max
+# echo 4194303 > /proc/sys/kernel/pid_max
+# echo 4194303 > /proc/sys/vm/max_map_count
 {% endhighlight %}
 
 
