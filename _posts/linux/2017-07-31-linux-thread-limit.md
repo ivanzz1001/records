@@ -213,7 +213,7 @@ root       soft    nproc     unlimited
 
 对于普通用户，我们可以修改*/etc/security/limits.d/20-nproc.conf*文件。因为普通用户是受这个文件里值的影响：
 <pre>
-# echo "* soft nproc 65536* >> /etc/security/limits.d/20-nproc.conf
+# echo "* soft nproc 65536" >> /etc/security/limits.d/20-nproc.conf
 </pre>
 然后再执行如下命令让立即生效：
 <pre>
