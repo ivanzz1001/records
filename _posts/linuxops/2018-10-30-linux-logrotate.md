@@ -404,15 +404,29 @@ logrotate命令行除了可以用来展示配置文件配置是否正确以外�
 
 ## 5. 配置的logrotate cron任务不执行问题
 在我们的使用过程中，有时会出现配置的logrotate cron任务不能正常执行。一般我们可以通过如下步骤进行排查：
+1） 查询crond运行状态
+<pre>
+# systemctl status crond                //或service crond status
+● crond.service - Command Scheduler
+   Loaded: loaded (/usr/lib/systemd/system/crond.service; enabled; vendor preset: enabled)
+   Active: active (running) since Mon 2018-05-14 14:23:39 CST; 3 years 5 months ago
+ Main PID: 1236 (crond)
+   CGroup: /system.slice/crond.service
+           └─1236 /usr/sbin/crond -n
 
-1） 检查crond权限
+May 12 18:08:01 ceph001-node1 crond[1236]: (root) RELOAD (/var/spool/cron/root)
+Sep 17 22:41:01 ceph001-node1 crond[1236]: (root) RELOAD (/var/spool/cron/root)
+Warning: Journal has been rotated since unit was started. Log output is incomplete or unavailable.
+</pre>
+
+2） 检查crond权限
 <pre>
 # cat /etc/cron.deny              //文件为空的
 # ll /usr/bin/crontab             //具备S权限位，正常
 -rwsr-xr-x 1 root root 57656 Aug  9  2019 /usr/bin/crontab
 </pre>
 
-2) 检查PAM模块
+3) 检查PAM模块
 <pre>
 # cat /etc/pam.d/crond 
 #
@@ -427,7 +441,7 @@ session    include    system-auth
 auth       include    system-auth
 </pre>
 
-3) 查看系统日志
+4) 查看系统日志
 
 我们检查/var/log/secure（或/var/log/cron):
 <pre>
@@ -489,6 +503,8 @@ ENCRYPT_METHOD MD5
 
 MD5_CRYPT_ENAB yes
 </pre>
+
+
 
 <br />
 <br />
