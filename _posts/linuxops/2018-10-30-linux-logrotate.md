@@ -414,6 +414,7 @@ logrotate命令行除了可以用来展示配置文件配置是否正确以外�
 
 2) 检查PAM模块
 <pre>
+# cat /etc/pam.d/crond 
 #
 # The PAM configuration file for the cron daemon
 #
@@ -442,7 +443,7 @@ Jun 28 17:07:01 host-01 crond[3730002]: pam_unix(crond:account): expired passwor
 Jun 28 17:08:01 host-01 crond[3743625]: pam_unix(crond:account): expired password for user root (password aged)
 Jun 28 17:09:02 host-01 crond[3757559]: pam_unix(crond:account): expired password for user root (password aged)
 Jun 28 17:09:02 host-01 crond[3757558]: pam_unix(crond:account): expired password for user root (password aged)
-<pre>
+</pre>
 
 这通常是root密码过期了。我们可以通过如下命令查看root的过期信息：
 <pre>
@@ -511,6 +512,8 @@ MD5_CRYPT_ENAB yes
 8. [CentOS 中用 Yum 安装、卸载软件](https://blog.csdn.net/sunylat/article/details/81869513)
 
 9. [logrotate man page](http://linuxconfig.org/logrotate-8-manual-page)
+
+10. [Linux权限s权限和t权限](https://www.cnblogs.com/yiyide266/p/10047340.html)
 
 <br />
 <br />
