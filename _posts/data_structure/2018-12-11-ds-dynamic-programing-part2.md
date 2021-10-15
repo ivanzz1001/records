@@ -200,68 +200,69 @@ dp[i][10011] += dp[i-1][01111]
  
 using namespace std;
  
-bool validateLines(int upper, int lower, int width){
-	for(int i=0; i<width;){
-		if(((upper>>i)&1) == 0){                  // upper line grid is 0 .
-			if(((lower>>i)&1) == 0){
-				return false;
-			}
-			i++;
-			
-		}else if(((lower>>i)&1) != 0){            // upper and current line grid is 1 .
-			if(i == width-1 || ((lower>>(i+1))&1) == 0  || ((upper>>(i+1)&1)==0) ){
-				return false;
-			}else{
-				i+=2;
-			}
-			
-		}else{                                    // upper grid is 1, current grid is 0.
-			i++;
-		}
-	}
-	return true;
+bool validateLines(int upper, int lower, int width)
+{
+  for(int i=0; i<width;){
+    if(((upper>>i)&1) == 0){                  // upper line grid is 0 .
+      if(((lower>>i)&1) == 0){
+        return false;
+      }
+      i++;
+
+    }else if(((lower>>i)&1) != 0){            // upper and current line grid is 1 .
+      if(i == width-1 || ((lower>>(i+1))&1) == 0  || ((upper>>(i+1)&1)==0) ){
+        return false;
+      }else{
+        i+=2;
+      }
+
+    }else{                                    // upper grid is 1, current grid is 0.
+      i++;
+    }
+  }
+  return true;
 }
  
-long long int  getCoverWays(int rows, int cols){
-	// the size of area must be even.
-	if((rows*cols)%2 != 0){
-		return 0;
-	}
-	// make sure columns is smaller;
-	if(cols>rows){
-		swap(rows,cols);
-	}
- 
-	const int STATE_LIMIT = 1<<cols;
-	vector<vector<long long int> > dp(2, vector<long long int>(STATE_LIMIT,0));
-	int cur = 0;
-	dp[cur][STATE_LIMIT-1] = 1;        // set the initial state before first line
-	
-	for(int i=0; i<rows; i++){
-		cur ^= 1;  // switch to current line
-		std::fill(dp[cur].begin(), dp[cur].end(), 0);   // clear the states
-		
-		for(int k=0; k<STATE_LIMIT; k++){
-			if(dp[1-cur][k] != 0){
-				for(int l=0; l<STATE_LIMIT; l++){
-					if( ((k|l) == (STATE_LIMIT-1)) && validateLines(k,l, cols)){
-						dp[cur][l] += dp[1-cur][k];
-					}
-				}
-			}
-		}
+long long int  getCoverWays(int rows, int cols)
+{
+  // the size of area must be even.
+  if((rows*cols)%2 != 0){
+    return 0;
+  }
+  // make sure columns is smaller;
+  if(cols>rows){
+    swap(rows,cols);
+  }
 
-	}
+  const int STATE_LIMIT = 1<<cols;
+  vector<vector<long long int> > dp(2, vector<long long int>(STATE_LIMIT,0));
+  int cur = 0;
+  dp[cur][STATE_LIMIT-1] = 1;        // set the initial state before first line
+
+  for(int i=0; i<rows; i++){
+    cur ^= 1;  // switch to current line
+    std::fill(dp[cur].begin(), dp[cur].end(), 0);   // clear the states
+
+    for(int k=0; k<STATE_LIMIT; k++){
+      if(dp[1-cur][k] != 0){
+        for(int l=0; l<STATE_LIMIT; l++){
+          if( ((k|l) == (STATE_LIMIT-1)) && validateLines(k,l, cols)){
+            dp[cur][l] += dp[1-cur][k];
+          }
+        }
+      }
+    }
+  }
  
-	return dp[cur][STATE_LIMIT-1];
+  return dp[cur][STATE_LIMIT-1];
 }
  
 int main(int argc, char *argv[]) {
-	int n = 4;
-	int m = 11;
-	cout<<getCoverWays(n, m)<<endl;
+  int n = 4;
+  int m = 11;
+  cout<<getCoverWays(n, m)<<endl;
 	
-	return 0;
+  return 0;
 }
 {% endhighlight %}
 
