@@ -199,24 +199,35 @@ dp[i][10011] += dp[i-1][01111]
 #include <vector>
  
 using namespace std;
- 
+
+/*
+ * Description: validate whether current line is legal or not 
+ * upper: represent a situation of last line 
+ * lower: represent a situation of current line 
+ * width: represent the column number 
+ */
 bool validateLines(int upper, int lower, int width)
 {
+  //iterator every column 
   for(int i=0; i<width;){
-    if(((upper>>i)&1) == 0){                  // upper line grid is 0 .
+    if(((upper>>i)&1) == 0){                 
+	  //retrieve every grid of last line
+	  //if the grid of last line is 0, then the corresponding grid of current line must be 1
       if(((lower>>i)&1) == 0){
         return false;
       }
       i++;
 
-    }else if(((lower>>i)&1) != 0){            // upper and current line grid is 1 .
+    }else if(((lower>>i)&1) != 0){            
+	  // upper and current line grid is 1
       if(i == width-1 || ((lower>>(i+1))&1) == 0  || ((upper>>(i+1)&1)==0) ){
         return false;
       }else{
         i+=2;
       }
 
-    }else{                                    // upper grid is 1, current grid is 0.
+    }else{     
+      // upper grid is 1, current grid is 0.	
       i++;
     }
   }
@@ -235,7 +246,11 @@ long long int  getCoverWays(int rows, int cols)
   }
 
   const int STATE_LIMIT = 1<<cols;
+  
+  //Note: represent two lines
   vector<vector<long long int> > dp(2, vector<long long int>(STATE_LIMIT,0));
+  
+  
   int cur = 0;
   dp[cur][STATE_LIMIT-1] = 1;        // set the initial state before first line
 
@@ -243,9 +258,35 @@ long long int  getCoverWays(int rows, int cols)
     cur ^= 1;  // switch to current line
     std::fill(dp[cur].begin(), dp[cur].end(), 0);   // clear the states
 
+    /*
+	 * every line has STATE_LIMIT situations(eg: col is 3, there's 8 situations
+     * 
+	 * situation 0: 0b000
+	 * situation 1: 0b001
+	 * situation 2: 0b010
+	 * situation 3: 0b011
+	 * situation 4: 0b100
+	 * situation 5: 0b101
+	 * situation 6: 0b110
+	 * situation 7: 0b111 
+     */	 
     for(int k=0; k<STATE_LIMIT; k++){
+	
+	  /*
+	   * dp[cur-cur] represent last line, so here we check last line's every situation
+	   */
       if(dp[1-cur][k] != 0){
+	  
+	    /*
+		 * check current line's every situation 
+		 */
         for(int l=0; l<STATE_LIMIT; l++){
+		
+		  /*
+		   * Note: all legal situations must match 'upline | curline == (STATE_LIMIT)')
+		   *  'k' represent a situation of last line 
+		    * 'l' represent a situation of current line 
+		   */
           if( ((k|l) == (STATE_LIMIT-1)) && validateLines(k,l, cols)){
             dp[cur][l] += dp[1-cur][k];
           }
