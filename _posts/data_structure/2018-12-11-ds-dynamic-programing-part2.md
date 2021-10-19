@@ -280,7 +280,7 @@ long long int  getCoverWays(int rows, int cols)
     for(int k=0; k<STATE_LIMIT; k++){
 	
       /*
-       * dp[cur-cur] represent last line
+       * dp[1-cur] represent last line
        * dp[1-cur][k] not zero, means that the last situation 'k' is an valid situation
        */
       if(dp[1-cur][k] != 0){
