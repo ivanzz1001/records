@@ -71,38 +71,36 @@ void MergeSort(SqList *L)
 {% highlight string %}
 void MergeSort(SqList *L)
 {
-	if(L->length <= 1)
+	if (L->length <= 1)
 		return;
 		
 	distance = 1;
-
 	src = L->r;
 	dst = TR;
 	
-	while(distance < L.length){
+	while(distance < L->length)
+	{
 	
-
-		for (i = 1; i + distance <= L->length; i = i + 2 * distance)
+		for(i = 1; i + distance <= L->length; )
 		{
-			if (i + 2 * distance -1 <= L->length)
-				Merge(src, dst, i, i+distance-1, i+2*distance-1);
-			else
-				Merge(src, dst, i, i+distance-1, L->length);
+			j = i + 2*distance - 1;
+			j = (j > L->length) ? L->length : j;
+			
+			merge(src, dst, i, i + distance -1, j);
+			
+			i = j + 1;
 		}
 		
 		if (i <= L->length)
-		{
 			copy(dst, src, i, L->length);
-		}
 		
-		src = dst;
-		dst = src;
+		src <-> dst;
 		distance *= 2;
 	}
 	
-	if(src != L.r){
-		copy(L.r, src, L.length)
-	}
+	if (src != L->r)
+		copy(L->r, src, 1, L->length);
+	
 }
 {% endhighlight %}
 
