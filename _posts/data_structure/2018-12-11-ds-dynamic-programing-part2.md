@@ -252,7 +252,12 @@ long long int  getCoverWays(int rows, int cols)
   
   
   int cur = 0;
-  dp[cur][STATE_LIMIT-1] = 1;        // set the initial state before first line
+  
+  /*
+   * set the initial state before first line  
+   * dp[cur][STATE_LIMIT-1]=1 means the last situation of last line is valid 
+   */
+  dp[cur][STATE_LIMIT-1] = 1;        
 
   for(int i=0; i<rows; i++){
     cur ^= 1;  // switch to current line
@@ -269,11 +274,14 @@ long long int  getCoverWays(int rows, int cols)
      * situation 5: 0b101
      * situation 6: 0b110
      * situation 7: 0b111 
+     *
+     * Note: here 'k' represent the last line 	 
      */	 
     for(int k=0; k<STATE_LIMIT; k++){
 	
       /*
-       * dp[cur-cur] represent last line, so here we check last line's every situation
+       * dp[cur-cur] represent last line
+       * dp[1-cur][k] not zero, means that the last situation 'k' is an valid situation
        */
       if(dp[1-cur][k] != 0){
 	  
