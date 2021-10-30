@@ -138,7 +138,7 @@ void BWInsertSort(SqList *L, SqList *D)
 				}
 			}
 			
-			for(j = first; j <= low -1; j++
+			for(j = first; j <= low -1; j++)
 				D->r[((j-1) - 1 + len) % len + 1] = D->r[(j -1 + len) % len + 1];
 	
 			D->r[((low-1) -1 + len) % len + 1] = L->r[i];	
