@@ -30,7 +30,7 @@ RFC793对TCP连接的定义：
 
 >Connections:
 >
->The reliability and flow control mechanisms described above require that >TCPs initialize and maintain certain status information for each data >stream.
+>The reliability and flow control mechanisms described above require that TCPs initialize and maintain certain status information for each data stream.
 >
 >The combination of this information, including sockets, sequence numbers, >and window sizes, is called a connection.
 
