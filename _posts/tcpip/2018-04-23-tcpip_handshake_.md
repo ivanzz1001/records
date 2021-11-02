@@ -32,7 +32,7 @@ RFC793对TCP连接的定义：
 >
 >The reliability and flow control mechanisms described above require that TCPs initialize and maintain certain status information for each data stream.
 >
->The combination of this information, including sockets, sequence numbers, >and window sizes, is called a connection.
+>The combination of this information, including sockets, sequence numbers, and window sizes, is called a connection.
 
 其大致意思是TCP连接是为了用于保证可靠性和流控制机制的，包括sockets、序列号及窗口大小。
 
