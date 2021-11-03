@@ -574,6 +574,8 @@ http {
 
 3. [OpenResty installation](http://openresty.org/cn/installation.html)
 
+4. [openresty github](https://github.com/openresty/lua-nginx-module/blob/master/src/ngx_http_lua_string.c)
+
 <br />
 <br />
 <br />
