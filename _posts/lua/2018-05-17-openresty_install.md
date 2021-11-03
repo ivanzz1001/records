@@ -576,6 +576,8 @@ http {
 
 4. [openresty github](https://github.com/openresty/lua-nginx-module/blob/master/src/ngx_http_lua_string.c)
 
+5. [openresty的unescape_uri函数处理百分号后面字符的小特性](https://www.cnxct.com/openresty-unescape_uri-feature-to-decode-char-after-percent-sign/)
+
 <br />
 <br />
 <br />
