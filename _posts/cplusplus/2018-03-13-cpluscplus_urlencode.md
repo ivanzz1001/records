@@ -372,7 +372,9 @@ http://127.0.0.1:17480/userDownload/F6678E6FD4054150BA37521FBA8A67A6/tsp_test_fi
 
 2. [c语言实现urlencode和decode](http://blog.csdn.net/lifan5/article/details/8671697)
 
+3. [在线utf-8字符编码](http://www.mytju.com/classcode/tools/encode_utf8.asp)
 
+4. [openresty的unescape_uri函数处理百分号后面字符的小特性](https://www.cnxct.com/openresty-unescape_uri-feature-to-decode-char-after-percent-sign/)
 
 
 <br />
