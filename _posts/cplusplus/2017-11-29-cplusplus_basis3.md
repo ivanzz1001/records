@@ -82,7 +82,7 @@ class X{
 public:                 //members(with implict this pointer)
 
 	X* operator&();     //prefix unary &(address of)
-    X operator&(X);     //binary &(and)
+	X operator&(X);     //binary &(and)
 	X operator++(int);  //postfix increment 
 	X operator&(X,X);   //error: ternary &
 	X operator/();      //error: unary /
