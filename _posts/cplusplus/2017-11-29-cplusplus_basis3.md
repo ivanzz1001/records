@@ -278,6 +278,14 @@ int main(int argc, char* argv[])
 (13,13)
 (14,14)
 </pre>
+注，std::for_each()函数实现其实类似如下：
+{% highlight string %}
+template<typename InputIterator, typename Function>
+Function for_each(InputIterator beg, InputIterator end, Function f) {
+	while(beg != end) 
+		f(*beg++);
+}
+{% endhighlight %}
 
 ### 2.3 Dereferencing
 解引用操作符```->```可以被定义为一个单目后置操作符(unary postfix operator)，例如：
