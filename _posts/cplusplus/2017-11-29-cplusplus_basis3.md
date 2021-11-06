@@ -196,7 +196,7 @@ public:
 	Add(double r, double i):val{{r,i}}{}
 
 	
-	void operator(complex &c) const{ c += val;}    //add value to argument
+	void operator()(complex &c) const{ c += val;}    //add value to argument
 };
 {% endhighlight %}
 上述Add类首先会使用一个complex对象来进行初始化，当Add对象通过使用```()```来调用时，其就会将该值加到对应的调用参数上。例如：
