@@ -97,7 +97,9 @@ X operator-();          //error: no operand
 X operator-(X,X,X);     //error: ternary
 X operator%(X);         //error: unary
 {% endhighlight %}
-对于操作符operator=, operator[], operator(), operator->()必须被定义为非静态成员函数。
+对于操作符```operator=```, ```operator[]```, ```operator()```, ```operator->```必须被定义为非静态成员函数。
+
+>note: operator->为dereferencing运算符
 
 对于运算符重载函数，其所支持的参数传递方法只有：
 
