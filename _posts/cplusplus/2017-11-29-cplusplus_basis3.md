@@ -269,7 +269,15 @@ int main(int argc, char* argv[])
 	return 0x0;
 }
 {% endhighlight %}
-
+编译运行：
+<pre>
+# gcc -o test test.cpp -lstdc++
+# ./test
+(3,4)
+(4,5)
+(13,13)
+(14,14)
+</pre>
 
 ### 2.3 Dereferencing
 解引用操作符```->```可以被定义为一个单目后置操作符(unary postfix operator)，例如：
