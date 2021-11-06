@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
 
 	string buf;
 	while(cin >> buf) 
-		++value[buf];
+		++values[buf];
 
 	for(auto x : values.vec)
 		cout<<'{'<<x.first<<','<<x.second<<'}'<<endl;
