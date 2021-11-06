@@ -7,7 +7,14 @@ categories: cplusplus
 description: C/C++基础
 ---
 
-本章主要记录一下C/C++基础方面的一些内容，以备后续查验。
+本章主要记录一下C/C++基础方面的一些内容，以备后续查验。当前所使用编译器版本：
+<pre>
+# gcc --version
+gcc (GCC) 4.8.5 20150623 (Red Hat 4.8.5-44)
+Copyright (C) 2015 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+</pre>
 
 
 <!-- more -->
@@ -27,6 +34,7 @@ A& operator=(A&& a);           //赋值构造函数(移动赋值)
 {% highlight string %}
 #include <stdio.h>
 #include <stdlib.h>
+#include <utility>
 
 class A{
 public:
@@ -280,9 +288,11 @@ int main(int argc, char *argv[])
 <pre>
 # gcc -o test test.cpp -lstdc++ -std=c++11
 # ./test
-address: 0xa962ecb0 point: 0x2441010 value: 200
-global address: 0xa962ecb0 point: 0x2441010 value: 200
-delete: 0xa962ecb0
+address: 0x414b3e90 point: 0x21aa010 value: 200
+移动构造
+delete: 0x414b3e90
+global address: 0x414b3e80 point: 0x21aa010 value: 200
+delete: 0x414b3e80
 </pre>
 注意： 这里移动构造赋值也只会调用一次构造函数。
 
