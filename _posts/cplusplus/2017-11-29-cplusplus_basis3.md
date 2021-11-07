@@ -376,7 +376,7 @@ void operator delete[](void *, size_t);    //use for array
 
 当我们需要在自由空间(free store)上为```X```类型的对象分配内存时，我们就可以使用new操作符，其就会调用*operator new(sizeof(X))*来分配内存；类似地，当我们需要在自由空间上通过new来为含有N个元素且类型为```X```的数组分配空间时，其就会调用```operator new[](N*sizeof(X))```。new表达式也许会分配多于参数所指定的```N*sizeof(X)```大小的内存，这在为字符串分配空间时经常会这样。
 
-通常我们并推荐对全局的operator new()与operator delete()进行重载，因为这造成的影响太大。更好的选择是，单独为某个class提供new/delete运算符重载。该class可以是多个派生类的基类。在如下的例子中，Employee类就为其本身及其派生类提供了一个特定的allocator与deallocator:
+通常我们并不推荐对全局的operator new()与operator delete()进行重载，因为这造成的影响太大。更好的选择是，单独为某个class提供new/delete运算符重载。该class可以是多个派生类的基类。在如下的例子中，Employee类就为其本身及其派生类提供了一个特定的allocator与deallocator:
 {% highlight string %}
 class Employee{
 public:
