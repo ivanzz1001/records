@@ -624,10 +624,10 @@ Systemd统一管理所有Unit的启动日志。带来的好处就是，可以只
 
 ## 7. 设置开机启动示例
 
-编写如下脚本```start@.service```:
+编写如下脚本```myapp@.service```:
 {% highlight string %}
 [Unit]
-Description=oss application server
+Description=myapp server
 After=network-online.target
 
 [Service]
@@ -645,10 +645,37 @@ WantedBy=multi-user.target
 
 将上述脚本复制到/etc/systemd/system目录下，然后通过如下方式将某个程序(例如```mytest```)设置为开机启动：
 <pre>
-# systemctl enable start@mytest.service
-# systemctl is-enabled start@mytest
+# systemctl enable myapp@mytest.service
+# systemctl is-enabled myapp@mytest
 </pre>
 
+之后编写/workspace/service.py脚本：
+{% highlight string %}
+# -*- coding: utf-8 -*-
+
+import common.util as util
+
+
+def start(name)
+  util.exe(name, True)
+
+def stop(name)
+  pid = get_pid(name)
+  str = "kill -9 " + pid
+  util.exe(str, True)
+
+
+__name__ == "__main__":
+  if len(sys.argv) != 3:
+    print -1
+
+  if sys.argv[2] == "start":
+    start(sys.argv[1])
+  elif sys.argv[2] == "stop":
+    stop(sys.argv[1])
+  else
+    return -1
+{% endhighlight %}
 
 
 
