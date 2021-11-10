@@ -49,10 +49,10 @@ public:
         return m_instance;
     }
 private:
-    Singleton();                        //私有构造函数，不允许使用者自己生成对象
+	Singleton();                        //私有构造函数，不允许使用者自己生成对象
 	~Singleton();
-    Singleton(const Singleton& other);
-	Singleton & operator=(const Singleton &other);
+	Singleton(const Singleton& other){}
+	Singleton & operator=(const Singleton &other){}
 
     static Singleton* m_instance; //静态成员变量 
 };
@@ -97,9 +97,9 @@ private:
 	static Deletor deletor;
 
 private:
-    Singleton();                        //私有构造函数，不允许使用者自己生成对象
+	Singleton();                        //私有构造函数，不允许使用者自己生成对象
 	~Singleton();
-    Singleton(const Singleton& other);
+	Singleton(const Singleton& other);
 	Singleton & operator=(const Singleton &other);
 
     static Singleton* m_instance; //静态成员变量 
