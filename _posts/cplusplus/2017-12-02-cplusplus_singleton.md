@@ -184,9 +184,11 @@ std::mutex Singleton::m_mutex;
 Singleton* Singleton::getInstance() {
     Singleton* tmp = m_instance.load(std::memory_order_relaxed);
     std::atomic_thread_fence(std::memory_order_acquire);//获取内存fence
+	
     if (tmp == nullptr) {
         std::lock_guard<std::mutex> lock(m_mutex);
         tmp = m_instance.load(std::memory_order_relaxed);
+		
         if (tmp == nullptr) {
             tmp = new Singleton;
             std::atomic_thread_fence(std::memory_order_release);//释放内存fence
