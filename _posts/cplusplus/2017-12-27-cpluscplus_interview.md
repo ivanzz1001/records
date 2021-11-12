@@ -186,13 +186,13 @@ void * operator new(size_t);
 void * operator new;
 
 void * operator delete (void * )noexcept;
-void * operator delete[](void *0）noexcept;
+void * operator delete[](void *）noexcept;
 
 //这些版本承诺不抛出异常
 void * operator new(size_t ,nothrow_t&) noexcept;
 void * operator new[](size_t, nothrow_t&);
 void * operator delete (void *,nothrow_t& )noexcept;
-void * operator delete[](void *0,nothrow_t&）noexcept;
+void * operator delete[](void *,nothrow_t&）noexcept;
 {% endhighlight %}
 我们可以自定义上面函数版本中的任意一个，前提是自定义版本必须位于```全局作用域```或者```类作用域```中。太细节的东西不在这里讲述。总之，我们知道我们有足够的自由去重载operator new/operator delete，以决定我们的new与delete如何为对象分配内存，如何回收对象。而```malloc/free```并不允许重载。
 
