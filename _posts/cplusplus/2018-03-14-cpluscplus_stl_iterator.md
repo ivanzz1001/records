@@ -257,6 +257,58 @@ int main(int argc, char *argv[])
 10
 </pre>
 
+其实对于新版stl，可以直接将一个数组类型通过```iterator_traits<_Tp *>```将其特化为random_access_iterator_tag，这也是为什么新版std::vector实现中并没有看到类似于*typedef std::forward_iterator_tag iterator_category;*的语句的原因：
+{% highlight string %}
+template <class _Iterator>
+struct iterator_traits {
+  typedef typename _Iterator::iterator_category iterator_category;
+  typedef typename _Iterator::value_type        value_type;
+  typedef typename _Iterator::difference_type   difference_type;
+  typedef typename _Iterator::pointer           pointer;
+  typedef typename _Iterator::reference         reference;
+};
+
+template <class _Tp>
+struct iterator_traits<_Tp*> {
+  typedef random_access_iterator_tag iterator_category;
+  typedef _Tp                         value_type;
+  typedef ptrdiff_t                   difference_type;
+  typedef _Tp*                        pointer;
+  typedef _Tp&                        reference;
+};
+
+template <class _Tp>
+struct iterator_traits<const _Tp*> {
+  typedef random_access_iterator_tag iterator_category;
+  typedef _Tp                         value_type;
+  typedef ptrdiff_t                   difference_type;
+  typedef const _Tp*                  pointer;
+  typedef const _Tp&                  reference;
+};
+{% endhighlight %}
+下面我们来验证一下普通数组直接调用std::accumulate()计算和：
+{% highlight string %}
+#include <stdio.h>
+#include <numeric>
+
+int main(int argc, char *argv[])
+{
+        int a[] = {1,2,3,4,5};
+
+        int sum = std::accumulate(a, a+5, 0);
+
+        printf("sum: %d\n", sum);
+
+        return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o test test.cpp -lstdc++
+# ./test
+sum: 15
+</pre>
+
 ### 3.3 迭代器的相应型别
 我们都知道```type_traits```可以萃取出类型的型别，根据不同的型别可以执行不同的处理流程。那么对于迭代器来说，是否有针对不同特性迭代器的优化方法呢？ 答案是肯定的。拿一个STL算法库中的distance()函数来说，distance函数接受两个迭代器参数，然后计算两者之间的距离。显然，对于不同的迭代器计算效率差别很大。比如对于vector容器来说，由于内存是连续分配的，因此指针直接相减即可获得两者的距离；而list容器是链表结构，内存一般都不是连续分配，因此只能通过一级一级调用next()或者其他函数，每调用一次再判断迭代器是否相等来计算距离。vector迭代器计算distance的效率为**O(1)**，而list则为**O(n)**，n为距离的大小。
 
