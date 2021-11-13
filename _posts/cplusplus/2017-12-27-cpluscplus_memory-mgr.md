@@ -393,6 +393,9 @@ int main()
     return 0;
 }
 {% endhighlight %}
+
+>注：上面拷贝构造函数一般可以不用添加防止自拷贝
+
 编译运行：
 <pre>
 # gcc -o smart_pointer smart_pointer.cpp -std=c++11 -lstdc++
