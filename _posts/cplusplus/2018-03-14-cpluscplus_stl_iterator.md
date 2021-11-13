@@ -28,6 +28,62 @@ iter = vec.erase(iter);
 
 * 由于删除元素，使得某些元素```次序```发生变化导致原本指向某元素的迭代器不再指向期望指向的元素。
 
+我们经常会看到如下代码：
+{% highlight string %}
+#incude <iostream>
+#include <vector>
+
+int main(int argc, char *argv[])
+{
+	std::vector<int> vec;
+	
+	vec.push_back(100);
+	vec.push_back(200);
+	vec.push_back(300);
+	vec.push_back(400);
+	vec.push_back(500);
+	
+	for(std::vector<int>::iterator it=vec.begin(); it != vec.end();)
+		it = vec.erase(it);
+		
+	return 0x0;
+}
+{% endhighlight %}
+我们知道，在执行vector删除操作时，删除点之后的迭代器均会失效。因此在上面的循环中，代码正确性的保证在于每一次循环都要重新调用vec.end()函数。具体是不是这样呢？我们通过如下示例来验证：
+{% highlight string %}
+#include <stdio.h>
+#include <stdlib.h>
+
+
+int getmax()
+{
+   printf("get max function\n");
+   return 5;
+}
+
+int main(int argc, char *argv[])
+{
+   int i;
+
+   for(i = 0; i<getmax(); i++)
+        printf("%d ", i);
+
+   return 0x0;
+}
+{% endhighlight %}
+编译运行：
+<pre>
+# gcc -o test test.c
+# ./test
+get max function
+0 get max function
+1 get max function
+2 get max function
+3 get max function
+4 get max function
+</pre>
+我们看到在循环时，每一次都会重新调用```getmax()```函数.
+
 ### 1.1 vector迭代器失效
 
 * 当插入(push_back)一个元素后，end操作返回的迭代器肯定失效；
