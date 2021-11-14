@@ -382,7 +382,7 @@ Local exec file:
     0x08050890 - 0x080508c8 is .rel.plt
     0x080508c8 - 0x08050948 is .plt
     ......
-	0xfef5fb58 - 0xfef5fc48 is .dynamic in /usr/lib/libc.so.1
+    0xfef5fb58 - 0xfef5fc48 is .dynamic in /usr/lib/libc.so.1
     0xfef5fc80 - 0xfef650e2 is .data in /usr/lib/libc.so.1
     0xfef650e2 - 0xfef650e2 is .bssf in /usr/lib/libc.so.1
     0xfef650e8 - 0xfef65be0 is .picdata in /usr/lib/libc.so.1
