@@ -669,6 +669,23 @@ Source directories searched: /root/workspace/../P2P_SDK/headers:/root/workspace/
 (gdb) 
 </pre>
 
+使用```info source```可以查看当前源码信息，其中也包含编译信息：
+<pre>
+(gdb) info source
+Current source file is ../../net/tools/quic/quic_simple_client_bin.cc
+Compilation directory is .
+Source language is c++.
+Producer is unknown.
+Compiled with DWARF 2 debugging format.
+Does not include preprocessor macro info.
+</pre>
+
+使用```pwd```可以看到当前目录:
+<pre>
+(gdb) pwd
+Working directory /root/chromium/src.
+</pre>
+
 ### 2.2 示例1： 设置源文件查找路径
 
 1) 程序示例
