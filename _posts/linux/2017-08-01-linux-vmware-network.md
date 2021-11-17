@@ -252,3 +252,5 @@ Host-Only模式其实就是NAT模式去除了虚拟NAT设备，然后使用VMwar
 
 2. [linux中如何重启指定网卡](https://zhidao.baidu.com/question/1900165177221518940.html)
 
+3. [vmware官方文档](https://docs.vmware.com/cn/VMware-Workstation-Pro/15.0/com.vmware.ws.using.doc/GUID-4D35D1FC-5926-45A8-96B1-42C922DA97E9.html)
+
