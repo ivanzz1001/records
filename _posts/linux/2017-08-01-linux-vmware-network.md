@@ -95,6 +95,7 @@ ONBOOT="yes"
 
 从上面我们主机与虚拟机通信正常。
 
+>注：桥接其实就是在网络网卡上安装了一个桥接协议
 
 ### 2.2 Linux下重启网络的几种方式
 
@@ -254,3 +255,4 @@ Host-Only模式其实就是NAT模式去除了虚拟NAT设备，然后使用VMwar
 
 3. [vmware官方文档](https://docs.vmware.com/cn/VMware-Workstation-Pro/15.0/com.vmware.ws.using.doc/GUID-4D35D1FC-5926-45A8-96B1-42C922DA97E9.html)
 
+4. [VMware设置桥接上网（图文详解）](https://www.jb51.net/article/103768.htm)
