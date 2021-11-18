@@ -31,52 +31,40 @@ filter表达式通常由一个或多个原语构成。而原语通常是由带�
 
 除上述之外，也有一些并不满足上述模式的```primitive```关键词： **gateway**, **broadcast**, **less**, **greater**和算术表达式。我们会在后面进行介绍。
 
-更复杂的过滤表达式可以使用**and**, **or**, **not** 来组合上述primitives。例如：```host foo and not port ftp and not port ftp-data```
-
-
-<br >
-
+更复杂的过滤表达式可以使用**and**, **or**, **not** 来组合上述primitives。例如：
+<pre>
+host foo and not port ftp and not port ftp-data
+</pre>
 
 允许的primitives有(这里只介绍一些比较常用的)：
 
 * **dst host** *host*: 假如ipv4/ipv6数据包的目标地址为```host```时，本表达式为true。 ```host```可以为主机名或者ip地址。
-
 * **src host** *host*: 假如ipv4/ipv6数据包的原地址为```host```时，本表达式为true
-
 * **host** *host*: 假若ipv4/ipv6数据包的源或目标地址为host时，本表达式为true.
 <pre>
 说明： 上述所有host表达式都可以加上前缀：ip, arp,rarp,ip6。 例如：
 
 ip host 'host' 
 </pre>
-
-
 * **dst net** *net*:
-
 * **src net** *net*:
-
 * **net** *net*:
 
 <br />
 
 * **dst port** *port*:
-
 * **src port** *port*:
-
 * **port** *port*:
 
 <br />
 
 * **dst portrange** *port1-port2*:
-
 * **src portrange** *port1-port2*:
-
 * **portrange** *port1-port2*:
 
 <br />
 
 * **less** *length*: 假如包的长度小于等于length的话，本表达式值为true.
-
 * **greater** *length*: 假如包的长度大于等于length的话，本表达式值为true.
 
 <br />
