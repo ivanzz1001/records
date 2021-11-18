@@ -102,8 +102,69 @@ Alternation (`||' or `or').
 {% endhighlight %}
 
 
+### 1.3 示例
+
+1) To select all packets arriving at or departing from `sundown'
+{% highlight string %}
+host sundown 
+{% endhighlight %}
+
+2) To select traffic between `helios' and either `hot' or `ace'
+{% highlight string %}
+host helios and (hot or ace)
+{% endhighlight %}
+
+3) To select all IPv4 packets between `ace' and any host except `helios'
+{% highlight string %}
+ip host ace and not helios
+{% endhighlight %}
+
+4) To select all traffic between local hosts and hosts at Berkeley
+{% highlight string %}
+net ucb-ether
+{% endhighlight %}
+
+5) To select all FTP traffic through Internet gateway `snup':
+{% highlight string %}
+gateway snup and (port ftp or ftp-data)
+{% endhighlight %}
+
+6) To select IPv4 traffic neither sourced from nor destined for local hosts (if you gateway to one other net, this stuff should never make it onto your local net).
+{% highlight string %}
+ip and not net localnet
+{% endhighlight %}
 
 
+7) To select the start and end packets (the SYN and FIN packets) of each TCP conversation that involves a non-local host.
+{% highlight string %}
+tcp[tcpflags] & (tcp-syn|tcp-fin) != 0 and not src and dst net localnet
+{% endhighlight %}
+
+8) To select the TCP packets with flags RST and ACK both set. (i.e. select only the RST and ACK flags in the flags field, and if the result is "RST and ACK both set", match)
+{% highlight string %}
+tcp[tcpflags] & (tcp-rst|tcp-ack) == (tcp-rst|tcp-ack)
+{% endhighlight %}
+
+9) To select all IPv4 HTTP packets to and from port 80, i.e. print only packets that contain data, not, for example, SYN and FIN packets and ACK-only packets. (IPv6 is left as an exercise for the reader.)
+{% highlight string %}
+tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)
+{% endhighlight %}
+
+10) To select IPv4 packets longer than 576 bytes sent through gateway `snup':
+{% highlight string %}
+gateway snup and ip[2:2] > 576
+{% endhighlight %}
+
+11) To select IPv4 broadcast or multicast packets that were not sent via Ethernet broadcast or multicast:
+{% highlight string %}
+ether[0] & 1 = 0 and ip[16] >= 224
+{% endhighlight %}
+
+12) To select all ICMP packets that are not echo requests/replies (i.e., not ping packets):
+{% highlight string %}
+icmp[icmptype] != icmp-echo and icmp[icmptype] != icmp-echoreply
+icmp6[icmp6type] != icmp6-echo and icmp6[icmp6type] != icmp6-echoreply
+{% endhighlight %}
 
 
 <br />
