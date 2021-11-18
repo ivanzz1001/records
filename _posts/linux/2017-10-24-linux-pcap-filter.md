@@ -21,13 +21,16 @@ description: Linux pcap filter的使用
 
 filter表达式通常由一个或多个原语构成。而原语通常是由带一个或多个带前缀修饰符的id(name or number)所构成。有三种不同类型的修饰符：
 
-* *type** 
+* *type*
+ 
 type限定符用于指明当前要引用哪一种类型的id name 或 id number。可选值有： **host**, **net**, **port**, **portrange**。例如: ```host foo```, ```net 128.3```, ```port 20```, ```portrange 6000-6008```。 假如没有指定类型限定符的话，默认值为host。
 
 * *dir*
+
 dir限定符用于指明传输方向。可选的方向有： **src**, **dst**, **src or dst**, **src and dst**, **ra**, **ta**, **addr1**, **addr2**, **addr3**, **addr4**。 例如：```src foo```, ```dst net 128.3```, ```src or dst port ftp-data```。 假若并没有指定方向限定符的话，默认值为**src or dst**。而**ra**, **ta**, **addr1**, **addr2**, **addr3**, 和**addr4**限定符只在IEEE 802.11无线网络链路层有效。
 
 * *proto*
+
 proto限定符用于设置匹配的协议类型。可选值有： **ether**, **fddi**, **tr**, **wlan**, **ip**, **ip6**, **arp**, **rarp**, **decnet**, **tcp**和**udp**。 例如： ```ether src foo```, ```arp net 128.3```, ```tcp port 21```, ```udp portrange 7000-7009```, ```wlan addr2 0:2:3:4:5:6```。 假如没有指定proto限定符，则默认值为所有兼容该**type**的协议类型。 例如：```src foo```表示为```(ip or arp or rarp) src foo```; ```net bar```表示为```(ip or arp or rarp) net bar```; ```port 53```表示为```(tcp or udp) port 53```。
 
 
