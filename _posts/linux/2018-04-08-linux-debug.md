@@ -123,6 +123,8 @@ Thread 10 (Thread 0x7fa92f5fe700 (LWP 22970)):
 
 3. [LD_PRELOAD作用](https://blog.csdn.net/chen_jianjian/article/details/80627693)
 
+4. [LD_PRELOAD基础用法](http://work.loidair.com/index.php/2020/07/19/ld_preload%E5%9F%BA%E7%A1%80%E7%94%A8%E6%B3%95/)
+
 <br />
 <br />
 <br />
