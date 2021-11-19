@@ -119,6 +119,10 @@ Thread 10 (Thread 0x7fa92f5fe700 (LWP 22970)):
 
 1. [Linux下top+pstack+gdb的组合拳定位程序进程线程问题并调试](http://www.yihaomen.com/article/linux/715.htm)
 
+2. [gdb如何确定内存 已经释放](https://blog.csdn.net/weixin_36356040/article/details/112432311)
+
+3. [LD_PRELOAD作用](https://blog.csdn.net/chen_jianjian/article/details/80627693)
+
 <br />
 <br />
 <br />
