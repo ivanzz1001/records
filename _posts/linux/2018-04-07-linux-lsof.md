@@ -132,6 +132,7 @@ init          1      root  mem       REG              253,0   145720    5521406 
 (4) UNIX: 表示unix域套接字
 (5) FIFO: 先进先出(fifo)队列
 (6) IPv4: 网际协议(IP)套接字
+(7) REG: regular file
 {% endhighlight %}
 
 * DEVICE: 文件所属设备。对于字符设备和块设备，其表示方法是主设备号，次设备号。更多其他类型的设备编码，请参看[Linux官方设备](http://www.kernel.org/pub/linux/docs/lanana/device-list/devices-2.6.txt)。对于FIFO类型的文件，比如管道和socket，该字段将显示一个内核引用目标文件的地址，或者是其i节点号
@@ -227,6 +228,8 @@ tail      6499 tde    3r   REG    253,3   4514722     417798 /opt/applog/open/lo
 **[参看]:**
 
 1. [linux tools](https://linuxtools-rst.readthedocs.io/zh_CN/latest/tool/readelf.html)
+
+2. [lsof(8) — Linux manual page](https://man7.org/linux/man-pages/man8/lsof.8.html)
 
 <br />
 <br />
