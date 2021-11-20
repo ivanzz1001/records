@@ -1204,7 +1204,7 @@ add.o
 
 
 ## 3. nm命令
-nm命令用于列出目标文件(object files)的symbols。其基本使用方法如下：
+nm命令用于列出目标文件的symbols(Lists symbols from object files)。其基本使用方法如下：
 <pre>
 nm [-A|-o|--print-file-name] [-a|--debug-syms]
   [-B|--format=bsd] [-C|--demangle[=style]]
