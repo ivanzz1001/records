@@ -37,7 +37,7 @@ access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
 -h 输出简要的帮助信息.
 -i 输出系统调用的入口指针.
 -q 禁止输出关于attach/detach消息.
--r 打印出相对时间关于,,每一个系统调用.
+-r 打印出执行每个系统调用时的相对时间戳
 -t 在输出中的每一行前加上时间信息.
 -tt 在输出中的每一行前加上时间信息,微秒级.
 -ttt 微秒级输出,以秒了表示时间.
