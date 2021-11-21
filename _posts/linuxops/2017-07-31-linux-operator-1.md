@@ -368,6 +368,11 @@ Long (extended) Self Test duration: 47220 seconds [787.0 minutes]
 
 上面我们看到采用的是```SAS```接口的希捷硬盘。
 
+>注：
+>  8,001,563,222,016 bytes = 7.277379356324672698974609375 TB
+>  
+> SEAGATE中文名“希捷”
+
 接着使用```lsblk```或```fdisk -l```命令来查看分区信息：
 <pre>
 # lsblk
