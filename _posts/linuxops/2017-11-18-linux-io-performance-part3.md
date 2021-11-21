@@ -21,25 +21,25 @@ description: 简单理解磁盘结构
 
 传统的硬盘盘结构是像下面这个样子的，它有一个或多个盘片，用于存储数据。盘片多采用铝合金材料；中间有一个主轴，所有的盘片都绕着这个主轴转动。一个组合臂上面有多个磁头臂，每个磁头臂上面都有一个磁头，负责读写数据。
 
-![linuxops-disk-details1](https://ivanzz1001.github.io/records/assets/img/linux/linuxops_disk_details1.jpg)
+![linuxops-disk-details1](https://ivanzz1001.github.io/records/assets/img/linuxops/linuxops_disk_details1.jpg)
 
 磁盘一般有一个或多个盘片。每个盘片可以有两面，即第一个盘片的正面为0面，反面为 1 面；第二个盘片的正面为 2 面…依次类推。磁头的编号也和盘面的编号是一样的，因此有多少个盘面就有多少个磁头。盘面正视图如下图，磁头的传动臂只能在盘片的内外磁道之间移动。因此不管开机还是关机，磁头总是在盘片上面。关机时，磁头停在盘片上面，抖动容易划伤盘面造成数据损失，为了避免这样的情况，所以磁头都是停留在起停区的，起停区是没有数据的。
 
-![linuxops-disk-details2](https://ivanzz1001.github.io/records/assets/img/linux/linuxops_disk_details2.jpg)
+![linuxops-disk-details2](https://ivanzz1001.github.io/records/assets/img/linuxops/linuxops_disk_details2.jpg)
 
 每个盘片的盘面被划分成多个狭窄的同心圆环，数据就存储在这样的同心圆环上面，我们将这样的圆环称为```磁道``` (Track)。每个盘面可以划分多个磁道，最外圈的磁道是0号磁道，向圆心增长依次为1磁道、2磁道…磁盘的数据存放就是从最外圈开始的。
 
-![linuxops-disk-details3](https://ivanzz1001.github.io/records/assets/img/linux/linuxops_disk_details3.jpg)
+![linuxops-disk-details3](https://ivanzz1001.github.io/records/assets/img/linuxops/linuxops_disk_details3.jpg)
 
 根据硬盘的规格不同，磁道数可以从几百到成千上万不等。每个磁道可以存储数 Kb 的数据，但是计算机不必要每次都读写这么多数据。因此，再把每个磁道划分为若干个弧段，每个弧段就是一个扇区 (Sector)。扇区是硬盘上存储的物理单位，现在每个扇区可存储 512 字节数据已经成了业界的约定。也就是说，即使计算机只需要某一个字节的数据，但是也得把这个 512 个字节的数据全部读入内存，再选择所需要的那个字节。
 
-![linuxops-disk-details4](https://ivanzz1001.github.io/records/assets/img/linux/linuxops_disk_details4.jpg)
+![linuxops-disk-details4](https://ivanzz1001.github.io/records/assets/img/linuxops/linuxops_disk_details4.jpg)
 
 ```柱面```是我们抽象出来的一个逻辑概念，简单来说就是处于同一个垂直区域的磁道称为柱面 ，即各盘面上面相同位置磁道的集合。需要注意的是，磁盘读写数据是按柱面进行的，磁头读写数据时首先在同一柱面内从 0 磁头开始进行操作，依次向下在同一柱面的不同盘面(即磁头上)进行操作，只有在同一柱面所有的磁头全部读写完毕后磁头才转移到下一柱面。因为选取磁头只需通过电子切换即可，而选取柱面则必须通过机械切换。数据的读写是按柱面进行的，而不是按盘面进行，所以把数据存到同一个柱面是很有价值的。
 
 磁盘被磁盘控制器所控制（可控制一个或多个），它是一个小处理器，可以完成一些特定的工作。比如将磁头定位到一个特定的半径位置；从磁头所在的柱面选择一个扇区；读取数据等。
 
-![linuxops-disk-details5](https://ivanzz1001.github.io/records/assets/img/linux/linuxops_disk_details5.jpg)
+![linuxops-disk-details5](https://ivanzz1001.github.io/records/assets/img/linuxops/linuxops_disk_details5.jpg)
 
 现代硬盘寻道都是采用CHS(Cylinder Head Sector)的方式，硬盘读取数据时，读写磁头沿径向移动，移到要读取的扇区所在磁道的上方，这段时间称为寻道时间(seek time)。因读写磁头的起始位置与目标位置之间的距离不同，寻道时间也不同。磁头到达指定磁道后，然后通过盘片的旋转，使得要读取的扇区转到读写磁头的下方，这段时间称为旋转延迟时间(rotational latencytime)。然后再读写数据，读写数据也需要时间，这段时间称为传输时间（transfer time）。
 
