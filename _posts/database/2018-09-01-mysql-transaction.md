@@ -17,6 +17,8 @@ description: 数据库事务的隔离级别
 ## 1. 数据库事务的隔离级别
 数据库事务的隔离级别有4个，由低到高依次为```Read Uncommited```、```Read Committed```、```Repeatable Read```和```Serializable```，这四个级别可以逐个解决脏读、不可重复读、幻读这几类问题。
 
+>注：脏读又称无效数据的读出，是指在数据库访问中，事务T1将某一值修改，然后事务T2读取该值，此后T1因为某种原因撤销对该值的修改，这就导致了T2所读取到的数据是无效的，值得注意的是，脏读一般是针对于update操作的
+
 ![db-transaction-isolation](https://ivanzz1001.github.io/records/assets/img/db/db_transaction_isolation.jpg)
 
 注意： 我们讨论隔离级别的场景，主要是在多个事务并发的情况下，因此接下来的讲解都围绕事务并发。
