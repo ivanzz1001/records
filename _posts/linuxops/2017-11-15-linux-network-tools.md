@@ -1286,7 +1286,16 @@ KiB Swap:  4095996 total,  4095996 free,        0 used. 14957729+avail Mem
   988   988 ?        00:00:00 lightdm
   988  1019 ?        00:00:00 gmain
   988  1021 ?        00:00:00 gdbus
+
+# ps -T -p 17664 | grep ms_accepter
+17664 32713 ?        00:02:54 ms_accepter
+17664 32716 ?        00:00:03 ms_accepter
+17664 32723 ?        00:00:00 ms_accepter
+17664 32726 ?        00:00:00 ms_accepter
+# strace -p 32726 -e trace=accept
 </pre>
+>注：上面17664就是我们所要查看的进程pid，而32713、32716、32723、32726为该进程的若干个线程
+
 
 还可以通过```ps -o nlwp <pid>```命令来统计某一个进程所创建的线程数(这里,nlwp是number of light-weight process的缩写）：
 <pre>
