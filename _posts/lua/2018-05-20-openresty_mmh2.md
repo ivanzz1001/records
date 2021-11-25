@@ -47,6 +47,8 @@ local h = mmh2(str)
 print("hash(str): ", h)
 {% endhighlight %}
 
+>注：如果用到外部的动态链接库，可以将其拷贝到/usr/lib64/、/usr/local/openresty/lualib/ 目录下，或者拷贝到/usr/local/openresty/luajit/lib/ 目录下
+
 
 <br />
 <br />
