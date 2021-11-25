@@ -875,7 +875,9 @@ server {
 
 9. [nginx的十一个阶段处理](https://blog.csdn.net/esion23011/article/details/24057633)
 
+10. [lua-resty-string官网](https://github.com/openresty/lua-resty-string)
 
+11. [Lua-HMAC-SHA256](https://github.com/jqqqi/Lua-HMAC-SHA256/blob/master/test.lua)
 
 <br />
 <br />
