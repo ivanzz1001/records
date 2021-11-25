@@ -879,6 +879,8 @@ server {
 
 11. [Lua-HMAC-SHA256](https://github.com/jqqqi/Lua-HMAC-SHA256/blob/master/test.lua)
 
+12. [lua-resty-hmac](https://github.com/jkeys089/lua-resty-hmac)
+
 <br />
 <br />
 <br />
