@@ -753,11 +753,11 @@ MAC verified OK
     example2: 用dss1算法验证file.txt的数字签名dsasign.bin，验证的private key为DSA算法产生的文件dsakey.pem
     openssl dgst -dss1 -prverify dsakey.pem -signature dsasign.bin file.txt
 	
-	example3: 用sha256算法计算文件uploadfile的哈希值，输出到stdout
-	openssl dgst -sha256 ./uploadfile
+    example3: 用sha256算法计算文件uploadfile的哈希值，输出到stdout
+    openssl dgst -sha256 ./uploadfile
 	
-	example4: hmac-sha256算法
-	openssl dgst -sha256 -hmac keystr ./uploadfile
+    example4: hmac-sha256算法
+    openssl dgst -sha256 -hmac keystr ./uploadfile
 
     2) sha1: 用于进行RSA处理
     openssl sha1 [args] 
