@@ -461,6 +461,9 @@ Content-Type: 表示客户端发送给服务器端的数据格式
 4. [Ethernet IP TCP UDP 协议头部格式及大小](http://blog.csdn.net/winbobob/article/details/41475959)
 
 5. [理解TCP序列号（Sequence Number）和确认号（Acknowledgment Number）](http://blog.csdn.net/a19881029/article/details/38091243/)
+
+6. [CURL命令详解及@&特殊字符处理](https://www.cnblogs.com/eternityz/p/14392214.html)
+
 <br />
 <br />
 <br />
