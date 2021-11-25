@@ -727,6 +727,7 @@ MAC verified OK
     http://blog.csdn.net/as3luyuan123/article/details/16105407
     https://www.openssl.org/docs/apps/pkcs7.html
  
+ 
 2. openssl list-message-digest-commands(消息摘要命令)
     1) dgst: dgst用于计算消息摘要 
     openssl dgst [args]
@@ -746,10 +747,17 @@ MAC verified OK
             1.6.2) -md4: MD4         
             1.6.3) -sha1: SHA1 
             1.6.4) -ripemd160
-    example1: 用SHA1算法计算文件file.txt的哈西值，输出到stdout
+    example1: 用SHA1算法计算文件file.txt的哈希值，输出到stdout
     openssl dgst -sha1 file.txt
+	
     example2: 用dss1算法验证file.txt的数字签名dsasign.bin，验证的private key为DSA算法产生的文件dsakey.pem
     openssl dgst -dss1 -prverify dsakey.pem -signature dsasign.bin file.txt
+	
+	example3: 用sha256算法计算文件uploadfile的哈希值，输出到stdout
+	openssl dgst -sha256 ./uploadfile
+	
+	example4: hmac-sha256算法
+	openssl dgst -sha256 -hmac keystr ./uploadfile
 
     2) sha1: 用于进行RSA处理
     openssl sha1 [args] 
@@ -765,6 +773,7 @@ MAC verified OK
     openssl sha1 -out digest.txt file.txt
     example2: 用sha1算法为文件file.txt签名,输出到文件rsasign.bin，签名的private key为RSA算法产生的文件rsaprivate.pem
     openssl sha1 -sign rsaprivate.pem -out rsasign.bin file.txt
+
 
 3. openssl list-cipher-commands (Cipher命令的列表)
     1) aes-128-cbc
