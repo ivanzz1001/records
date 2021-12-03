@@ -28,6 +28,11 @@ description: linux kernel基本介绍
 2. [The Linux Kernel](https://www.kernel.org/doc/html/latest/admin-guide/index.html)
 
 3. [Linux kernel labs](https://linux-kernel-labs.github.io/refs/heads/master/lectures/fs.html#lecture-objectives)
+
+4. [kernel官网](https://www.kernel.org/)
+
+5. [kernel加速下载](http://ftp.sjtu.edu.cn/sites/ftp.kernel.org/pub/linux/kernel/)
+
 <br />
 <br />
 <br />
