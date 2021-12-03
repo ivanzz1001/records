@@ -108,6 +108,7 @@ FIN位：终止标志，置1时，表明数据已经发送完，请求释放连�
 
 ![transfer-flow](https://ivanzz1001.github.io/records/assets/img/tcpip/transfer_flow.jpg)
 
+>mss: Maxitum Segment Size 最大分段大小
 
 1) **TCP连接的建立**
 
