@@ -29,6 +29,8 @@ description: new vs operator new
 
 4. [All about “new” operator in C++](https://aticleworld.com/dynamic-memory-and-new-operator-c/)
 
+5. [C++中使用placement new](https://blog.csdn.net/linuxheik/article/details/80449059)
+
 <br />
 <br />
 <br />
