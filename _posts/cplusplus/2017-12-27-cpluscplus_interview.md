@@ -179,20 +179,26 @@ void operator delete(void *mem) noexcept{
 
 **8) 是否可以被重载**
 
-operator new/operator delete可以被重载。标准库是定义了operator new函数和operator delete函数的8个重载版本：
+operator new/operator delete可以被重载。标准库(C++11)是定义了operator new函数和operator delete函数的12个重载版本：
 {% highlight string %}
-//这些版本可能抛出异常
-void * operator new(size_t);
-void * operator new;
+throwing (1)	void* operator new (std::size_t size);
+nothrow (2)	    void* operator new (std::size_t size, const std::nothrow_t& nothrow_value) noexcept;
+placement (3)	void* operator new (std::size_t size, void* ptr) noexcept;
 
-void * operator delete (void * )noexcept;
-void * operator delete[](void *）noexcept;
 
-//这些版本承诺不抛出异常
-void * operator new(size_t ,nothrow_t&) noexcept;
-void * operator new[](size_t, nothrow_t&);
-void * operator delete (void *,nothrow_t& )noexcept;
-void * operator delete[](void *,nothrow_t&）noexcept;
+ordinary (1)	void operator delete (void* ptr) noexcept;
+nothrow (2)	    void operator delete (void* ptr, const std::nothrow_t& nothrow_constant) noexcept;
+placement (3)	void operator delete (void* ptr, void* voidptr2) noexcept;
+
+
+throwing (1)	void* operator new[] (std::size_t size);
+nothrow (2)	    void* operator new[] (std::size_t size, const std::nothrow_t& nothrow_value) noexcept;
+placement (3)	void* operator new[] (std::size_t size, void* ptr) noexcept;
+
+
+ordinary (1)	void operator delete[] (void* ptr) noexcept;
+nothrow (2)	    void operator delete[] (void* ptr, const std::nothrow_t& nothrow_constant) noexcept;
+placement (3)	void operator delete[] (void* ptr, void* voidptr2) noexcept;
 {% endhighlight %}
 我们可以自定义上面函数版本中的任意一个，前提是自定义版本必须位于```全局作用域```或者```类作用域```中。太细节的东西不在这里讲述。总之，我们知道我们有足够的自由去重载operator new/operator delete，以决定我们的new与delete如何为对象分配内存，如何回收对象。而```malloc/free```并不允许重载。
 
