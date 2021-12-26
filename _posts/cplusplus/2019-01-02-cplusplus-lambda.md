@@ -1,10 +1,10 @@
 ---
 layout: post
-title: C++11: lambda表达式
+title: lambda表达式(C++11)
 tags:
 - cplusplus
 categories: cplusplus
-description: C++11： lambda表达式
+description: lambda表达式(C++11)
 ---
 
 
