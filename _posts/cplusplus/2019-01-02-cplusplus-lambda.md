@@ -32,7 +32,7 @@ lambda表达式是一种匿名函数，即没有函数名的函数；该匿名�
 
 * noexcept: 修饰符（可选）
 
-* ->return-type: 用于指定函数的返回类型（可选）
+* ```->return-type```: 用于指定函数的返回类型（可选）
 
 * body: 指明要执行的代码
 
@@ -161,17 +161,17 @@ void f(vector<int> &v)
 {% endhighlight %}
 上面我们使用了lambda表达式的introducer ```[]```。这是最简单的lambda introducer，在调用环境中并不允许引用任何本地局部变量。一个lambda表达式的introducer可以有多种形式：
 
-* []: 空capture list。这意味着在lambda的body中不能引用当前上下文环境中的任何局部名称。对于这种lambda表达式，数据就只能从参数或者是非局部变量中来获取。
+* ```[]```: 空capture list。这意味着在lambda的body中不能引用当前上下文环境中的任何局部名称。对于这种lambda表达式，数据就只能从参数或者是非局部变量中来获取。
 
-* [&]: 指示通过引用的方式来capture。当前上下文的所有local names都可以在body中使用，所有的局部变量都通过引用的方式来进行访问
+* ```[&]```: 指示通过引用的方式来capture。当前上下文的所有local names都可以在body中使用，所有的局部变量都通过引用的方式来进行访问
 
-* [=]: 指示通过value的方式来capture。当前上下文的所有local names都可以在body中使用，并且所有的变量都以按值传递的方式传递到body中去。
+* ```[=]```: 指示通过value的方式来capture。当前上下文的所有local names都可以在body中使用，并且所有的变量都以按值传递的方式传递到body中去。
 
-* [capture-list]: 显式的指明需要capture哪些环境；capture-list是需要捕获的本地变量名称列表，可以通过```按值```或```按引用```的方式来捕获。capture-list也可以包含this。
+* ```[capture-list]```: 显式的指明需要capture哪些环境；capture-list是需要捕获的本地变量名称列表，可以通过```按值```或```按引用```的方式来捕获。capture-list也可以包含this。
 
-* [&, capture-list]: 指示通过引用的方式来capture所有局部变量，而capture-list中的变量只能采用按值传递，不能按引用。
+* ```[&, capture-list]```: 指示通过引用的方式来capture所有局部变量，而capture-list中的变量只能采用按值传递，不能按引用。
 
-* [=, capture-list]: 指示通过按值的方式来capture所有局部变量，而capture-list中的变量只能采用按引用传递，不能按值
+* ```[=, capture-list]```: 指示通过按值的方式来capture所有局部变量，而capture-list中的变量只能采用按引用传递，不能按值
 
 默认情况下，总是按值来capture一个local name，如果要按引用来capture，则必须加上```&```符号。只有按引用传递的变量才允许在调用环境中修改变量的值。如下：
 {% highlight string %}
