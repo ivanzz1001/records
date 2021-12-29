@@ -182,6 +182,7 @@ On failure, it throws a bad_alloc exception.
 Same as above (1), except that on failure it returns a null pointer instead of throwing an exception.
 
 **(3) placement**
+
 Simply returns ptr (no storage is allocated).
 
 Notice though that, if the function is called by a new-expression, the proper initialization will be performed (for class objects, this includes calling its default constructor).
@@ -251,7 +252,6 @@ int main()
 Output:
 <pre>
 Overloading new operator with size: 16
-Constructor is called
 Name:Yash
 Age:24
 Overloading delete operator 

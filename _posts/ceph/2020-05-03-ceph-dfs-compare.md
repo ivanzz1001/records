@@ -117,7 +117,7 @@ Because the NameNode is implemented in Java, depending on the pre-allocated heap
 HDFS also lacks mature non-Java clients, making it challenging to use in scenarios (such as deep learning) other than big data (such as Hadoop).
 
 
-## 2.5 MooseFS
+### 2.5 MooseFS
 
 MooseFS is an open source distributed POSIX file system from Poland. It also inspired by the architecture of GFS. It implements most of the POSIX semantics and APIs. It can be accessed like a local file system after being mounted by a very mature FUSE client. The architecture of MooseFS is shown below:
 
