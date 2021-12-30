@@ -201,6 +201,78 @@ int main(int argc, char *argv[])
 0 1 2 3 4 
 </pre>
 
+“只能有限度搭配PJ STL”是因为，PJ STL未完全遵循STL规格，其所供应的许多容器都需要一个非标准的空间配置器接口allocator::_Charalloc()。“只能有限度的搭配RW STL”则是因为，RW STL在许多容器上运用了缓冲区，情况复杂得多，JJ::allocator无法与之兼容。至于完全无法应用于SGI STL，是因为SGI STL在这个项目上根本就逸脱了STL标准规格，使用一个专属的、拥有次层(sub-allocation)能力的、效率优越的特殊配置器，稍后有详细介绍。
+
+>注：对比新版SGI STL v3.3中allocator的实现，JJ::allocator应该是可以兼容的。
+
+我想我可以提前先做一点说明。事实上SGI STL仍然提供了一个标准的配置器接口，只是把它做了一层隐藏。这个标准的配置器名为```simple_alloc```，稍后便会提到。
+
+
+## 2.2 具备次配置力(sub-allocation)的SGI空间配置器
+SGI STL的配置器与众不同，也与标准规范不同，其名称为```alloc```而非allocator，而且不接受任何参数。换句话说，如果你要在程序中明白采用SGI配置器，则不能采用标准写法：
+{% highlight string %}
+vector<int, std::allocator<int> > iv;            //in VC or CB
+{% endhighlight %}
+
+必须这么写：
+{% highlight string %}
+vector<int, std::alloc> iv;                     //in GCC
+{% endhighlight %}
+
+>说明：在SGI STL v3.3版本stl_config.h中，默认是采用std::alloc而非std::allocator
+>// Use standard-conforming allocators if we have the necessary language
+>// features.  __STL_USE_SGI_ALLOCATORS is a hook so that users can 
+>// disable new-style allocators, and continue to use the same kind of
+>// allocators as before, without having to edit library headers.
+># if defined(__STL_CLASS_PARTIAL_SPECIALIZATION) && \
+>     defined(__STL_MEMBER_TEMPLATES) && \
+>     defined(__STL_MEMBER_TEMPLATE_CLASSES) && \
+>    !defined(__STL_NO_BOOL) && \
+>    !defined(__STL_NON_TYPE_TMPL_PARAM_BUG) && \
+>    !defined(__STL_LIMITED_DEFAULT_TEMPLATES) && \
+>    !defined(__STL_USE_SGI_ALLOCATORS) 
+>#   define __STL_USE_STD_ALLOCATORS
+># endif
+>
+># ifndef __STL_DEFAULT_ALLOCATOR
+>#   ifdef __STL_USE_STD_ALLOCATORS
+>#     define __STL_DEFAULT_ALLOCATOR(T) allocator< T >
+>#   else
+>#     define __STL_DEFAULT_ALLOCATOR(T) alloc
+>#   endif
+># endif
+
+
+SGI STL allocator未能符合标准规格（注：新版SGI STL v3.3中allocator似乎已经符合了标准规格），这个事实通常不会给我们带来困扰，因为通常我们使用缺省的空间配置器，很少需要自行指定配置器名称，而SGI STL的每一个容器都已经指定其缺省的空间配置器为```alloc```。例如下面的vector声明：
+{% highlight string %}
+template <class _Tp, class _Alloc = __STL_DEFAULT_ALLOCATOR(_Tp) >
+class vector : protected _Vector_base<_Tp, _Alloc> 
+{
+  // requirements:
+};
+{% endhighlight %}
+
+### 2.2.1 SGI标准的空间配置器std::allocator
+在SGI STL v3.3版本中，SGI提供的std::allocator似乎已经已经符合了标准，这里不再对其进行说明。
+
+### 2.2.2 SGI特殊的空间配置器std::alloc
+
+一般而言，我们所习惯的C++内存配置操作和释放操作是这样的：
+{% highlight string %}
+class Foo{...};
+
+Foo *pf = new Foo;                       //内存配置，然后构造对象
+delete pf;                               //将对象析构，然后释放内存
+{% endhighlight %}
+
+
+这其中的```new```算式内含两阶段操作：1） 调用```::operator new```配置内存；2) 调用Foo::Foo()构造对象内容。```delete```算式也内含两阶段操作：1）调用Foo::~Foo()将对象析构；2）调用```::operator delete```释放内存。
+
+为了精密分工，STL allocator决定将这两阶段操作区分开来。内存配置操作由alloc::allocate()负责，内存释放操作由alloc::deallocate()负责；对象构造操作由::construct()负责，对象析构由::destroy()负责。
+
+
+STL标准规格告诉我们，配置器定义于```<memory>```之中，SGI ```<memory>```内含以下两个文件：
+
 
 
 
