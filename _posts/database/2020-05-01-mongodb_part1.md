@@ -73,7 +73,11 @@ MongoDB提供了本地部署与云(cloud-hosted)部署两种选项：
 	
 * MongoDB Atlas是云中托管的 MongoDB Enterprise 服务选项，无需安装开销，并提供免费层级来开始使用。
 
-### 2.1 
+### 2.1 文档数据库(Document Database)
+在MongoDB中一条记录(record)就是一个文档(document)，其是由field/value对所组成的一个数据结构。MongoDB documents与JSON Objects类似。values字段可以为其他documents、arrays或arrays of documents。如下所示：
+
+![mongodb-documents](https://ivanzz1001.github.io/records/assets/img/db/mongodb/crud-annotated-document.bakedsvg.svg)
+
 
 
 
