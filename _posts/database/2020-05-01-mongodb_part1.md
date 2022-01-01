@@ -78,6 +78,70 @@ MongoDB提供了本地部署与云(cloud-hosted)部署两种选项：
 
 ![mongodb-documents](https://ivanzz1001.github.io/records/assets/img/db/mongodb/crud-annotated-document.bakedsvg.svg)
 
+使用documents具有如下优点：
+
+* 在许多编程语言中，documents对应于原生数据类型(native data types)
+
+* 内嵌documents和数组可以降低昂贵连接(join)的需求
+
+* 动态schema可以更好的支持多种形态
+
+1） **集合/视图/按需实例化视图**
+
+MongoDB将文档存储在集合中。集合类似于关系数据库中的表。另外，对于集合(collections)，MongoDB还支持：
+
+* Read-only Views(Staring in MongoDB 3.4)
+
+* On-Demand Materialized Views (Starting in MongoDB 4.2)
+
+### 2.2 Key Features 
+1) **High Performance¶**
+
+MongoDB提供了高性能的数据持久化能力。特别是：
+
+* 支持内嵌数据模型以降低数据库系统IO活动
+
+* 通过索引实现高效的数据查询，并且索引的keys可以来自于内嵌documents与arrays
+
+2) **Rich Query Language**
+
+MongoDB提供了丰富的查询语言(query language)以支持读写操作(CRUD)，另外还支持如下：
+
+* [Data Aggregation](https://docs.mongodb.com/manual/core/aggregation-pipeline/)
+
+* [Text Search](https://docs.mongodb.com/manual/text-search/)和[Geospatial Queries](https://docs.mongodb.com/manual/tutorial/geospatial-tutorial/)
+
+>注：请参看如下
+> [SQL to MongoDB Mapping Chart](https://docs.mongodb.com/manual/reference/sql-comparison/)
+> [SQL to Aggregation Mapping Chart](https://docs.mongodb.com/manual/reference/sql-aggregation-comparison/)
+
+3) **High Availability**
+
+MongoDB中实现的复制设施，称为[replica set](https://docs.mongodb.com/manual/replication/)，实现了：
+
+* automatic failover
+
+* data redundancy
+
+一个```replica set```是一组维护相同数据集的MongoDB服务器，提供数据冗余，并增强数据的可用性。
+
+4） **Horizontal Scalability**
+
+MongoDB在核心功能层面提供水平扩展能力：
+
+* 通过Sharding方式将数据存放到集群中
+
+* 从3.4版本开始，MongoDB支持基于shard key的方式来创建zone。在一个平衡的集群中，MongoDB将zone所覆盖的读取和写入操作仅定向到zone中对应的分片。
+
+5) **Support for Multiple Storage Engines**
+
+MongoDB支持多存储引擎:
+
+* [WiredTiger Storage Engine](https://docs.mongodb.com/manual/core/wiredtiger/) (including support for [Encryption at Rest](https://docs.mongodb.com/manual/core/security-encryption-at-rest/))
+
+* [In-Memory Storage Engine](https://docs.mongodb.com/manual/core/inmemory/)
+
+另外，MongoDB提供可插拔的存储引擎API以支持第三方开发新的存储引擎。
 
 
 
