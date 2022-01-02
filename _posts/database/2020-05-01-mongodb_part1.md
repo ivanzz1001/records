@@ -144,6 +144,529 @@ MongoDB支持多存储引擎:
 另外，MongoDB提供可插拔的存储引擎API以支持第三方开发新的存储引擎。
 
 
+## 3. Getting Started 
+
+在本节我们会介绍向MongoDB中插入数据以及查询数据。可以使用[MongoDB Web Shell](https://mws.mongodb.com/?version=latest)控制台来进行实验，暂时无需安装MongoDB。
+
+1) **Switch Database**
+
+当我们连接上```MongoDB Web Shell```控制台后，默认会有一个当前数据库。输入```db```命令就可以显示当前数据库：
+{% highlight string %}
+>>> db 
+test 
+test>
+>>>
+{% endhighlight %}
+从上面我们看到，返回结果为```test```，这是当前所连MongoDB的默认数据库。
+
+如果想要切换到其他数据库，可以使用```use <db>```命令来进行切换。例如，切换到```examples```数据库：
+{% highlight string %}
+>>> use examples 
+switched to db examples 
+examples>
+>>>
+{% endhighlight %}
+值得指出的是，在你进行切换(switch)之前并不需要创建数据库。MongoDB会在你第一次存入数据时自动的创建相应的库。
+
+为了检验我们确实切换到了```examples```数据库，我们可以在```MongoDB Web Shell```控制台继续输入```db```命令：
+{% highlight string %}
+>>> db 
+examples 
+examples>
+>>>
+{% endhighlight %}
+
+2) **Populate a Collection (Insert)**
+
+MongoDB将documents存放到[collections](https://docs.mongodb.com/manual/core/databases-and-collections/)中。collections与传统关系型数据库中的表(tables)类似。假如一个collection不存在，MongoDB会在你第一次将数据存放到该collection时进行创建。
+
+下面的例子使用[db.collection.insertMany()](https://docs.mongodb.com/manual/reference/method/db.collection.insertMany/#mongodb-method-db.collection.insertMany)方法插入新的documents到```movies```集合中。你可以拷贝如下示例到```MongoDB Web Shell```:
+{% highlight string %}
+>>> use examples 
+switched to db examples 
+examples>
+>>> db.movies.insertMany([
+   {
+      title: 'Titanic',
+      year: 1997,
+      genres: [ 'Drama', 'Romance' ],
+      rated: 'PG-13',
+      languages: [ 'English', 'French', 'German', 'Swedish', 'Italian', 'Russian' ],
+      released: ISODate("1997-12-19T00:00:00.000Z"),
+      awards: {
+         wins: 127,
+         nominations: 63,
+         text: 'Won 11 Oscars. Another 116 wins & 63 nominations.'
+      },
+      cast: [ 'Leonardo DiCaprio', 'Kate Winslet', 'Billy Zane', 'Kathy Bates' ],
+      directors: [ 'James Cameron' ]
+   },
+   {
+      title: 'The Dark Knight',
+      year: 2008,
+      genres: [ 'Action', 'Crime', 'Drama' ],
+      rated: 'PG-13',
+      languages: [ 'English', 'Mandarin' ],
+      released: ISODate("2008-07-18T00:00:00.000Z"),
+      awards: {
+         wins: 144,
+         nominations: 106,
+         text: 'Won 2 Oscars. Another 142 wins & 106 nominations.'
+      },
+      cast: [ 'Christian Bale', 'Heath Ledger', 'Aaron Eckhart', 'Michael Caine' ],
+      directors: [ 'Christopher Nolan' ]
+   },
+   {
+      title: 'Spirited Away',
+      year: 2001,
+      genres: [ 'Animation', 'Adventure', 'Family' ],
+      rated: 'PG',
+      languages: [ 'Japanese' ],
+      released: ISODate("2003-03-28T00:00:00.000Z"),
+      awards: {
+         wins: 52,
+         nominations: 22,
+         text: 'Won 1 Oscar. Another 51 wins & 22 nominations.'
+      },
+      cast: [ 'Rumi Hiiragi', 'Miyu Irino', 'Mari Natsuki', 'Takashi Naitè' ],
+      directors: [ 'Hayao Miyazaki' ]
+   },
+   {
+      title: 'Casablanca',
+      genres: [ 'Drama', 'Romance', 'War' ],
+      rated: 'PG',
+      cast: [ 'Humphrey Bogart', 'Ingrid Bergman', 'Paul Henreid', 'Claude Rains' ],
+      languages: [ 'English', 'French', 'German', 'Italian' ],
+      released: ISODate("1943-01-23T00:00:00.000Z"),
+      directors: [ 'Michael Curtiz' ],
+      awards: {
+         wins: 9,
+         nominations: 6,
+         text: 'Won 3 Oscars. Another 6 wins & 6 nominations.'
+      },
+      lastupdated: '2015-09-04 00:22:54.600000000',
+      year: 1942
+   }
+])
+{
+  acknowledged: true,
+  insertedIds:{
+    '0': ObjectId("61d11d5c168ab70a91d75c6b"),
+	'1': ObjectId("61d11d5c168ab70a91d75c6c"),
+	'2': ObjectId("61d11d5c168ab70a91d75c6d"),
+	'3': ObjectId("61d11d5c168ab70a91d75c6e")
+  }
+}
+examples>
+>>>
+{% endhighlight %}
+上面的插入操作返回结果为一个document，其包含应答标识```acknowledged```及数组，数组的每一个元素为成功插入的document所对应的```_id```。
+
+
+3） **Select All Documents**
+
+要从一个collection中查询documents，我们可以使用[ db.collection.find()](https://docs.mongodb.com/manual/reference/method/db.collection.find/#mongodb-method-db.collection.find)方法。要查询collection中的所有documents，可以传递一个empty document作为查询过滤条件.
+
+>查询过滤条件，请参看[query filter document](https://docs.mongodb.com/manual/core/document/#std-label-document-query-filter)
+
+在```MongoDB Web Shell```中，输入如下命令查询上面```步骤2）```所插入到**movies**这个collection中的数据：
+{% highlight string %}
+>>> db.movies.find( { } )
+[
+   {
+      _id: ObjectId("61d11d5c168ab70a91d75c6b"),
+      title: 'Titanic',
+      year: 1997,
+      genres: [ 'Drama', 'Romance' ],
+      rated: 'PG-13',
+      languages: [ 'English', 'French', 'German', 'Swedish', 'Italian', 'Russian' ],
+      released: ISODate("1997-12-19T00:00:00.000Z"),
+      awards: {
+         wins: 127,
+         nominations: 63,
+         text: 'Won 11 Oscars. Another 116 wins & 63 nominations.'
+      },
+      cast: [ 
+        'Leonardo DiCaprio',
+        'Kate Winslet',
+        'Billy Zane', 
+        'Kathy Bates' 
+	  ],
+      directors: [ 'James Cameron' ]
+   },
+   {
+      _id: ObjectId("61d11d5c168ab70a91d75c6c"),
+      title: 'The Dark Knight',
+      year: 2008,
+      genres: [ 'Action', 'Crime', 'Drama' ],
+      rated: 'PG-13',
+      languages: [ 'English', 'Mandarin' ],
+      released: ISODate("2008-07-18T00:00:00.000Z"),
+      awards: {
+         wins: 144,
+         nominations: 106,
+         text: 'Won 2 Oscars. Another 142 wins & 106 nominations.'
+      },
+      cast: [ 
+        'Christian Bale', 
+        'Heath Ledger',
+        'Aaron Eckhart', 
+        'Michael Caine' 
+      ],
+      directors: [ 'Christopher Nolan' ]
+   },
+   {
+      _id: ObjectId("61d11d5c168ab70a91d75c6d"),
+      title: 'Spirited Away',
+      year: 2001,
+      genres: [ 'Animation', 'Adventure', 'Family' ],
+      rated: 'PG',
+      languages: [ 'Japanese' ],
+      released: ISODate("2003-03-28T00:00:00.000Z"),
+      awards: {
+         wins: 52,
+         nominations: 22,
+         text: 'Won 1 Oscar. Another 51 wins & 22 nominations.'
+      },
+      cast: [ 
+        'Rumi Hiiragi',
+        'Miyu Irino', 
+        'Mari Natsuki',
+        'Takashi Naitè' 
+      ],
+      directors: [ 'Hayao Miyazaki' ]
+   },
+   {
+      _id: ObjectId("61d11d5c168ab70a91d75c6e"),
+      title: 'Casablanca',
+      genres: [ 'Drama', 'Romance', 'War' ],
+      rated: 'PG',
+      cast: [ 
+        'Humphrey Bogart', 
+        'Ingrid Bergman', 
+        'Paul Henreid',
+        'Claude Rains' 
+      ],
+      languages: [ 'English', 'French', 'German', 'Italian' ],
+      released: ISODate("1943-01-23T00:00:00.000Z"),
+      directors: [ 'Michael Curtiz' ],
+      awards: {
+         wins: 9,
+         nominations: 6,
+         text: 'Won 3 Oscars. Another 6 wins & 6 nominations.'
+      },
+      lastupdated: '2015-09-04 00:22:54.600000000',
+      year: 1942
+   }
+]
+{% endhighlight %}
+
+
+4) **Filter Data with Comparison Operators**
+
+对于相等匹配(<field> equals <value>)，可以向db.collection.find()方法中传入```<field>: <value>```查询条件：
+
+* 在MongoDB Web Shell中，执行如下命令查询由```Christopher Nolan```所导演的movies
+{% highlight string %}
+>>> db.movies.find( { "directors": "Christopher Nolan" } );
+[
+   {
+      _id: ObjectId("61d11d5c168ab70a91d75c6c"),
+      title: 'The Dark Knight',
+      year: 2008,
+      genres: [ 'Action', 'Crime', 'Drama' ],
+      rated: 'PG-13',
+      languages: [ 'English', 'Mandarin' ],
+      released: ISODate("2008-07-18T00:00:00.000Z"),
+      awards: {
+         wins: 144,
+         nominations: 106,
+         text: 'Won 2 Oscars. Another 142 wins & 106 nominations.'
+      },
+      cast: [ 
+        'Christian Bale', 
+        'Heath Ledger',
+        'Aaron Eckhart', 
+        'Michael Caine' 
+      ],
+      directors: [ 'Christopher Nolan' ]
+   }
+]
+{% endhighlight %}
+
+此外，我们也可以使用比较操作符([comparison operators](https://docs.mongodb.com/manual/reference/operator/query-comparison/#std-label-query-selectors-comparison))来执行更高级的查询。
+
+* 执行如下命令查询在2000年之前所上映的movies
+{% highlight string %}
+>>> db.movies.find( { "released": { $lt: ISODate("2000-01-01") } } );
+[
+   {
+      _id: ObjectId("61d11d5c168ab70a91d75c6b"),
+      title: 'Titanic',
+      year: 1997,
+      genres: [ 'Drama', 'Romance' ],
+      rated: 'PG-13',
+      languages: [ 'English', 'French', 'German', 'Swedish', 'Italian', 'Russian' ],
+      released: ISODate("1997-12-19T00:00:00.000Z"),
+      awards: {
+         wins: 127,
+         nominations: 63,
+         text: 'Won 11 Oscars. Another 116 wins & 63 nominations.'
+      },
+      cast: [ 
+        'Leonardo DiCaprio',
+        'Kate Winslet',
+        'Billy Zane', 
+        'Kathy Bates' 
+	  ],
+      directors: [ 'James Cameron' ]
+   },
+   {
+      _id: ObjectId("61d11d5c168ab70a91d75c6e"),
+      title: 'Casablanca',
+      genres: [ 'Drama', 'Romance', 'War' ],
+      rated: 'PG',
+      cast: [ 
+        'Humphrey Bogart', 
+        'Ingrid Bergman', 
+        'Paul Henreid',
+        'Claude Rains' 
+      ],
+      languages: [ 'English', 'French', 'German', 'Italian' ],
+      released: ISODate("1943-01-23T00:00:00.000Z"),
+      directors: [ 'Michael Curtiz' ],
+      awards: {
+         wins: 9,
+         nominations: 6,
+         text: 'Won 3 Oscars. Another 6 wins & 6 nominations.'
+      },
+      lastupdated: '2015-09-04 00:22:54.600000000',
+      year: 1942
+   }
+]
+{% endhighlight %}
+
+* 执行如下命令查询获得超过100个奖项的movies
+{% highlight string %}
+>>> db.movies.find( { "awards.wins": { $gt: 100 } } );
+[
+   {
+      _id: ObjectId("61d11d5c168ab70a91d75c6b"),
+      title: 'Titanic',
+      year: 1997,
+      genres: [ 'Drama', 'Romance' ],
+      rated: 'PG-13',
+      languages: [ 'English', 'French', 'German', 'Swedish', 'Italian', 'Russian' ],
+      released: ISODate("1997-12-19T00:00:00.000Z"),
+      awards: {
+         wins: 127,
+         nominations: 63,
+         text: 'Won 11 Oscars. Another 116 wins & 63 nominations.'
+      },
+      cast: [ 
+        'Leonardo DiCaprio',
+        'Kate Winslet',
+        'Billy Zane', 
+        'Kathy Bates' 
+	  ],
+      directors: [ 'James Cameron' ]
+   },
+   {
+      _id: ObjectId("61d11d5c168ab70a91d75c6c"),
+      title: 'The Dark Knight',
+      year: 2008,
+      genres: [ 'Action', 'Crime', 'Drama' ],
+      rated: 'PG-13',
+      languages: [ 'English', 'Mandarin' ],
+      released: ISODate("2008-07-18T00:00:00.000Z"),
+      awards: {
+         wins: 144,
+         nominations: 106,
+         text: 'Won 2 Oscars. Another 142 wins & 106 nominations.'
+      },
+      cast: [ 
+        'Christian Bale', 
+        'Heath Ledger',
+        'Aaron Eckhart', 
+        'Michael Caine' 
+      ],
+      directors: [ 'Christopher Nolan' ]
+   }
+]
+{% endhighlight %}
+
+* 执行如下命令，查询语言为```Japanese```或```Mandarin```的movies
+{% highlight string %}
+>>> db.movies.find( { "languages": { $in: [ "Japanese", "Mandarin" ] } } )
+[
+   {
+      _id: ObjectId("61d11d5c168ab70a91d75c6c"),
+      title: 'The Dark Knight',
+      year: 2008,
+      genres: [ 'Action', 'Crime', 'Drama' ],
+      rated: 'PG-13',
+      languages: [ 'English', 'Mandarin' ],
+      released: ISODate("2008-07-18T00:00:00.000Z"),
+      awards: {
+         wins: 144,
+         nominations: 106,
+         text: 'Won 2 Oscars. Another 142 wins & 106 nominations.'
+      },
+      cast: [ 
+        'Christian Bale', 
+        'Heath Ledger',
+        'Aaron Eckhart', 
+        'Michael Caine' 
+      ],
+      directors: [ 'Christopher Nolan' ]
+   },
+   {
+      _id: ObjectId("61d11d5c168ab70a91d75c6d"),
+      title: 'Spirited Away',
+      year: 2001,
+      genres: [ 'Animation', 'Adventure', 'Family' ],
+      rated: 'PG',
+      languages: [ 'Japanese' ],
+      released: ISODate("2003-03-28T00:00:00.000Z"),
+      awards: {
+         wins: 52,
+         nominations: 22,
+         text: 'Won 1 Oscar. Another 51 wins & 22 nominations.'
+      },
+      cast: [ 
+        'Rumi Hiiragi',
+        'Miyu Irino', 
+        'Mari Natsuki',
+        'Takashi Naitè' 
+      ],
+      directors: [ 'Hayao Miyazaki' ]
+   }
+]
+{% endhighlight %}
+
+>Tips: [Query and Projection Operators](https://docs.mongodb.com/manual/reference/operator/query/#std-label-query-projection-operators-top)
+
+5) **Specify Fields to Return (Projection)**
+
+我们可以通过向db.collection.find(<query document>, <projection document>)方法传递```projection document```的方式来指定查询结果所要返回的字段。在```projection document```中指定：
+
+* ```<field>: 1```表示需要在结果中返回对应的字段
+
+* ```<field>: 0```表示在结果中不返回对应的字段
+
+在MongoDB Web Shell中执行如下查询，返回movies集合中的```id```、```title```、```directors```以及```year```字段：
+{% highlight string %}
+>>> db.movies.find( { }, { "title": 1, "directors": 1, "year": 1 } );
+[
+   {
+      _id: ObjectId("61d11d5c168ab70a91d75c6b"),
+      title: 'Titanic',
+      year: 1997,
+      directors: [ 'James Cameron' ]
+   },
+   {
+      _id: ObjectId("61d11d5c168ab70a91d75c6c"),
+      title: 'The Dark Knight',
+      year: 2008,
+      directors: [ 'Christopher Nolan' ]
+   },
+   {
+      _id: ObjectId("61d11d5c168ab70a91d75c6d"),
+      title: 'Spirited Away',
+      year: 2001,
+      directors: [ 'Hayao Miyazaki' ]
+   },
+   {
+      _id: ObjectId("61d11d5c168ab70a91d75c6e"),
+      title: 'Casablanca',
+      directors: [ 'Michael Curtiz' ],
+      year: 1942
+   }
+]
+{% endhighlight %}
+默认情况下会自动返回```_id```，因此我们并不需要在查询中特别指定```_id```。如果我们不想返回该字段的话，那么将该字段设置为0即可。例如，执行如下查询命令返回所匹配的```title```和```genres```字段：
+{% highlight string %}
+>>> db.movies.find( { }, { "_id": 0, "title": 1, "genres": 1 } );
+[
+   { title: 'Titanic', genres: [ 'Drama', 'Romance' ] },
+   { title: 'The Dark Knight', genres: [ 'Action', 'Crime', 'Drama' ] },
+   {
+      title: 'Spirited Away',
+      genres: [ 'Animation', 'Adventure', 'Family' ]
+   },
+   { title: 'Casablanca', genres: [ 'Drama', 'Romance', 'War' ] }
+]
+{% endhighlight %}
+
+6) **Aggregate Data ($group)**
+
+可以使用聚集(aggregation)来对documents中的值进行分组，然后返回结果。在MongoDB中Aggregation是由[aggregation pipeline](https://docs.mongodb.com/manual/aggregation/#std-label-aggregation-framework)。
+
+我们可以使用find()操作来获取数据，然而如果想做一些比[CRUD operations](https://docs.mongodb.com/manual/crud/#std-label-crud)更复杂的操作的话，比如manipulate data、perform calculations、write more expressive queries，我们可以使用aggregation pipeline。
+
+在Shell中，执行如下的aggregation pipeline可以统计每一个```genres```值的出现次数。
+{% highlight string %}
+>>> db.movies.aggregate( [
+   { $unwind: "$genres" },
+   {
+     $group: {
+       _id: "$genres",
+       genreCount: { $count: { } }
+     }
+   },
+   { $sort: { "genreCount": -1 } }
+] )
+[
+   { _id: 'Drama', genreCount: 3 },
+   { _id: 'Romance', genreCount: 2 },
+   { _id: 'Action', genreCount: 1 },
+   { _id: 'Adventure', genreCount: 1 },
+   { _id: 'Animation', genreCount: 1 },
+   { _id: 'Crime', genreCount: 1 },
+   { _id: 'Family', genreCount: 1 },
+   { _id: 'War', genreCount: 1 }
+   
+]
+{% endhighlight %}
+
+上面命令在pipeline中使用了：
+
+* ```$unwind```为genres数组中的每一个元素输出一个document
+
+* ```$group```与```$count```累加器计算genres中元素的出现次数，次数会被存放在```genreCount```字段中；
+
+* ```$sort```用于对输出结果根据genreCount字段按降序返回
+
+## 4. Databases and Collections
+
+1) **Overview**
+
+MongoDB将数据记录作为documents方式来进行存储（特别是[BSON documents](https://docs.mongodb.com/manual/core/document/#std-label-bson-document-format))，集中起来保存在一个[collections](https://docs.mongodb.com/manual/reference/glossary/#std-term-collection)中。一个数据库可以一个或多个documents collections。
+
+2） **Databases**
+
+在MongoDB中，database可以保存一个或多个documents集合。在[mongosh](https://docs.mongodb.com/mongodb-shell/#mongodb-binary-bin.mongosh)中，要选择一个数据库的话，可以使用```use <db>```语句，参看如下示例：
+{% highlight string %}
+>>> use myDB
+{% endhighlight %}
+
+3) **Create a Database**
+
+假如一个数据库不存在的话，则当你第一次存入数据时，MongoDB就会自动创建。因此，你可以switch到一个不存在的database，然后再mongosh中执行如下下命令：
+{% highlight string %}
+>>> use myNewDB
+
+>>> db.myNewCollection1.insertOne( { x: 1 } )
+{% endhighlight %}
+上面的insertOne()操作会同时创建```myNewDB```数据库与```myNewCollection1```集合（假如相应数据库和集合不存在的话）。请确保database与collection的名称遵循MongoDB [Naming Restrictions](https://docs.mongodb.com/manual/reference/limits/#std-label-restrictions-on-db-names)。
+
+3） **Collections**
+
+MongoDB会将documents存放再collections中。collections与关系型数据库中的tables类似。
+
+![mongodb-documents](https://ivanzz1001.github.io/records/assets/img/db/mongodb/crud-annotated-collection.bakedsvg.svg)
+
+
 
 
 
