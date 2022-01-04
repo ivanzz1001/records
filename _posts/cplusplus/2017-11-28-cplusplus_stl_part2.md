@@ -272,11 +272,501 @@ delete pf;                               //将对象析构，然后释放内存
 
 
 STL标准规格告诉我们，配置器定义于```<memory>```之中，SGI ```<memory>```内含以下两个文件：
+{% highlight string %}
+#include <stl_alloc.h>                      //负责内存空间的配置与释放
+#include <stl_construct.h>                  //负责对象内容的构造与析构
+{% endhighlight %}
+
+内存空间的配置/释放与对象内容的构造/析构，分别落在这两个文件身上。其中<stl_construct.h>定义有两个基本函数：构造用的construct()和析构用的destroy()。在一头栽进复杂的内存动态配置与释放之前，让我们先看清楚这两个函数如何完成对象的构造和析构。
+
+![cpp-stl](https://ivanzz1001.github.io/records/assets/img/cplusplus/stl/stl_part2_1.jpg)
 
 
 
+### 2.2.3 构造和析构基本工具: construct()和destory()
+下面是<stl_construct.h>的部分内容：
+{% highlight string %}
+#include <new.h>                             //欲使用placement new，需先包含此文件
 
 
+template <class _T1, class _T2>
+inline void _Construct(_T1* __p, const _T2& __value) {
+  new ((void*) __p) _T1(__value);
+}
+
+template <class _T1>
+inline void _Construct(_T1* __p) {
+  new ((void*) __p) _T1();
+}
+
+
+template <class _Tp>
+inline void _Destroy(_Tp* __pointer) {
+  __pointer->~_Tp();
+}
+
+template <class _ForwardIterator>
+void
+__destroy_aux(_ForwardIterator __first, _ForwardIterator __last, __false_type)
+{
+  for ( ; __first != __last; ++__first)
+    destroy(&*__first);
+}
+
+template <class _ForwardIterator> 
+inline void __destroy_aux(_ForwardIterator, _ForwardIterator, __true_type) {}
+
+
+//如果元素的数值型别(value type)有non-trival destructor...
+template <class _ForwardIterator, class _Tp>
+inline void 
+__destroy(_ForwardIterator __first, _ForwardIterator __last, _Tp*)
+{
+  typedef typename __type_traits<_Tp>::has_trivial_destructor
+          _Trivial_destructor;
+  __destroy_aux(__first, __last, _Trivial_destructor());
+}
+
+template <class _ForwardIterator>
+inline void _Destroy(_ForwardIterator __first, _ForwardIterator __last) {
+  __destroy(__first, __last, __VALUE_TYPE(__first));
+}
+
+inline void _Destroy(char*, char*) {}
+inline void _Destroy(int*, int*) {}
+inline void _Destroy(long*, long*) {}
+inline void _Destroy(float*, float*) {}
+inline void _Destroy(double*, double*) {}
+#ifdef __STL_HAS_WCHAR_T
+inline void _Destroy(wchar_t*, wchar_t*) {}
+#endif /* __STL_HAS_WCHAR_T */
+{% endhighlight %}
+这两个作为构造、析构之用的函数被设计为全局函数，符合STL的规范。此外，STL还规定配置器必须拥有名为construct()和destroy()的两个成员函数，然而真正在SGI STL中大显身手的那个名为std::alloc的配置器并未遵守这一规则（稍后可见）
+
+上述construct()接受一个指针p和一个初值value，该函数的用途就是将初值设定到指针所指的空间上。C++的placement new运算子可用来完成这一任务。
+
+destroy()有两个版本，第一个版本接受一个指针，准备将该指针所指之物析构掉。这很简单，直接调用该对象的析构函数即可。第二版本接受first和last两个迭代器（所谓迭代器，我们会在后面第3章进行详细介绍），准备将[first, last)范围内的所有对象析构掉。我们不知道这个范围有多大，万一很大，而每个对象的析构函数都无关痛痒(所谓trival destructor)，那么一次次调用这些无关痛痒的析构函数，对效率是一种伤害。因此，这里首先利用```__VALUE_TYPE()```获得迭代器所指对象的型别，再利用```__type_traits<T>```判断该型别的析构函数是否无关痛痒。若是(```__true_type```)，则什么也不做就结束；否则(```__false_type```)，这才以循环方式巡访整个范围，并在循环中每经历一个对象就调用第一个版本的destroy()。
+
+这样的观念很好，但C++本身并不支持对“指针所指之物”的型别判断，也不支持对“对象析构函数是否为trivial”的判断，因此，上述的```__VALUE_TYPE()```和```__type_traits<>```该如何实现呢？我们会在第3.7节有详细介绍。
+
+### 2.2.4 空间的配置与释放
+看完了内存配置后的对象构造行为和内存释放前的对象析构行为，现在我们来看看内存的配置和释放。
+
+对象构造前的空间配置和对象析构后的空间释放，由```<stl_alloc.h>```负责，SGI对此的设计哲学如下：
+
+* 向system heap要求空间；
+
+* 考虑多线程(multi-threads)状态；
+
+* 考虑内存不足时的应变措施；
+
+* 考虑过多“小型区块”可能造成的内存碎片(fragment)问题；
+
+为了将问题控制在一定的复杂度内，以下的讨论以及所摘录的源代码，皆排除多线程状态的处理。
+
+C++的内存配置基本操作是```::operator new()```，内存释放基本操作是```::operator delete()```。这两个全局函数相当于C的malloc()和free()函数。是的，正是如此，SGI正是以malloc()和free()完成内存的配置与释放。
+
+考虑到小型区块所可能造成的内存破碎问题，SGI设计了双层级配置器，第一级配置器直接使用malloc()和free()，第二级配置器则视情况采用不同的策略：当配置区块超过128bytes时，视之为“足够大”，便调用第一级配置器；当配置区块小于128bytes时，视之为“过小”，为了降低额外负担(overhead，见2.2.6节)，便采用复杂的memory pool整理方式，而不再求助于第一级配置器。整个设计究竟只开放第一级配置器，或是同时开放第二级配置器，取决于```__USE_MALLOC```是否被定义（唔，我们可以轻易测试出来，SGI STL并未定义```__USE_MALLOC```):
+{% highlight string %}
+# ifdef __USE_MALLOC
+
+typedef __malloc_alloc_template<0> malloc_alloc;
+typedef malloc_alloc alloc;                                             //令alloc为第一级配置器
+typedef malloc_alloc single_client_alloc;
+
+# else
+
+...
+typedef __default_alloc_template<__NODE_ALLOCATOR_THREADS, 0> alloc;    //令alloc为第二级配置器
+typedef __default_alloc_template<false, 0> single_client_alloc;
+
+#endif
+{% endhighlight %}
+其中```__malloc_alloc_template```就是第一级配置器，```__default_alloc_template```就是第二级配置器。稍后分别有详细分析。再次提醒你注意，alloc并不接受任何templete型别参数。
+
+无论alloc被定义为第一级或第二级配置器，SGI还为它再包装一个接口如下，使配置器的接口能够符合STL规格：
+{% highlight string %}
+template<class _Tp, class _Alloc>
+class simple_alloc {
+
+public:
+    static _Tp* allocate(size_t __n)
+      { return 0 == __n ? 0 : (_Tp*) _Alloc::allocate(__n * sizeof (_Tp)); }
+
+    static _Tp* allocate(void)
+      { return (_Tp*) _Alloc::allocate(sizeof (_Tp)); }
+
+    static void deallocate(_Tp* __p, size_t __n)
+      { if (0 != __n) _Alloc::deallocate(__p, __n * sizeof (_Tp)); }
+
+    static void deallocate(_Tp* __p)
+      { _Alloc::deallocate(__p, sizeof (_Tp)); }
+};
+{% endhighlight %}
+其内部四个成员函数其实都是单纯的转调用，调用传递给配置器（可能是第一级也可能是第二级）的成员函数。这个接口使配置器的配置单位从bytes转为个别元素的大小(sizeof(T))。SGI STL容器全都使用这个```simple_alloc```接口，例如：
+{% highlight string %}
+//stl_config.h
+# ifndef __STL_DEFAULT_ALLOCATOR
+#   ifdef __STL_USE_STD_ALLOCATORS
+#     define __STL_DEFAULT_ALLOCATOR(T) allocator< T >
+#   else
+#     define __STL_DEFAULT_ALLOCATOR(T) alloc
+#   endif
+# endif
+
+
+template <class _Tp, class _Alloc> 
+class _Vector_base {
+	...
+
+protected:
+  typedef simple_alloc<_Tp, _Alloc> _M_data_allocator;
+  _Tp* _M_allocate(size_t __n)
+    { return _M_data_allocator::allocate(__n); }
+  void _M_deallocate(_Tp* __p, size_t __n) 
+    { _M_data_allocator::deallocate(__p, __n); }	
+};
+
+template <class _Tp, class _Alloc = __STL_DEFAULT_ALLOCATOR(_Tp) >
+class vector : protected _Vector_base<_Tp, _Alloc> 
+{
+
+};
+{% endhighlight %}
+
+一、二级配置器的关系，接口包装，及实际运用方式，可于图2-2略见端倪。
+
+![cpp-stl](https://ivanzz1001.github.io/records/assets/img/cplusplus/stl/stl_part2_2a.jpg)
+
+![cpp-stl](https://ivanzz1001.github.io/records/assets/img/cplusplus/stl/stl_part2_2b.jpg)
+
+
+### 2.2.5 第一级配置器__malloc_alloc_template剖析
+首先我们观察第一级配置器：
+{% highlight string %}
+//malloc-based allocator. 通常比稍后介绍的default alloc速度慢
+//一般而言是thread-safe，并且对于空间的运用比较高效(efficient)
+//以下是第一级配置器
+//注意，无“template型别参数”。至于“非型别参数”inst，则完全没有派上用场。
+
+template <int __inst>
+class __malloc_alloc_template {
+
+private:
+
+  //以下函数用来处理内存不足的情况（oom: out of memory)
+  static void* _S_oom_malloc(size_t);
+  static void* _S_oom_realloc(void*, size_t);
+
+#ifndef __STL_STATIC_TEMPLATE_MEMBER_BUG
+  static void (* __malloc_alloc_oom_handler)();
+#endif
+
+public:
+
+  static void* allocate(size_t __n)
+  {
+    void* __result = malloc(__n);
+    if (0 == __result) __result = _S_oom_malloc(__n);    //当无法满足需求时，改用oom_malloc()
+    return __result;
+  }
+
+  static void deallocate(void* __p, size_t /* __n */)
+  {
+    free(__p);
+  }
+
+  static void* reallocate(void* __p, size_t /* old_sz */, size_t __new_sz)
+  {
+    void* __result = realloc(__p, __new_sz);
+    if (0 == __result) __result = _S_oom_realloc(__p, __new_sz);
+    return __result;
+  }
+
+  static void (* __set_malloc_handler(void (*__f)()))()
+  {
+    void (* __old)() = __malloc_alloc_oom_handler;
+    __malloc_alloc_oom_handler = __f;
+    return(__old);
+  }
+
+};
+
+
+// malloc_alloc out-of-memory handling
+
+#ifndef __STL_STATIC_TEMPLATE_MEMBER_BUG
+template <int __inst>
+void (* __malloc_alloc_template<__inst>::__malloc_alloc_oom_handler)() = 0;
+#endif
+
+
+template <int __inst>
+void*
+__malloc_alloc_template<__inst>::_S_oom_malloc(size_t __n)
+{
+    void (* __my_malloc_handler)();
+    void* __result;
+
+    for (;;) {                                                //不断尝试释放、配置、在释放、再配置....
+        __my_malloc_handler = __malloc_alloc_oom_handler;
+        if (0 == __my_malloc_handler) { __THROW_BAD_ALLOC; }
+        (*__my_malloc_handler)();                             //调用处理例程，企图释放内存
+        __result = malloc(__n);                               //再次尝试配置内存
+        if (__result) return(__result);
+    }
+}
+
+
+template <int __inst>
+void* __malloc_alloc_template<__inst>::_S_oom_realloc(void* __p, size_t __n)
+{
+    void (* __my_malloc_handler)();
+    void* __result;
+
+    for (;;) {                                                  //不断尝试释放、配置、在释放、再配置....
+        __my_malloc_handler = __malloc_alloc_oom_handler;
+        if (0 == __my_malloc_handler) { __THROW_BAD_ALLOC; }
+        (*__my_malloc_handler)();                               //调用处理例程，企图释放内存
+        __result = realloc(__p, __n);                           //再次尝试配置内存
+        if (__result) return(__result);
+    }
+}
+
+
+//注意，以下直接将参数inst指定为0
+typedef __malloc_alloc_template<0> malloc_alloc;
+{% endhighlight %}
+
+第一级配置器以malloc()，free()，realloc()等C函数执行实际的内存配置、释放、重配置操作，并实现出类似C++ new-handler的机制。是的，它不能直接运用C++ new-handler机制，因为它并非使用::operator new来配置内存。
+
+所谓C++ new handler机制是，你可以要求系统在内存配置需求无法被满足时，调用一个所指定的函数。换句话说，一旦::operator new无法完成任务，在丢出std::bad_alloc异常状态之前，会先调用由客端指定的处理例程。该处理例程通常即被称为new-handler。new-handler解决内存不足的做法有特定的模式，请参考<<Effective C++>> 2e条款7。
+
+注意，SGI以malloc而非::operator new来配置内存（我所能够想象的一个原因是历史因素，另一个原因是C++并未提供相应于realloc()的内存配置操作），因此，SGI不能直接使用C++的set_new_handler()，必须仿真一个类似的set_malloc_handler()。
+
+请注意，SGI第一级配置器的allocate()和reallocate()都是在调用malloc()和realloc()不成功后，改调用oom_malloc()和oom_realloc()。后两者都有内循环，不断调用“内存不足处理例程”，期望在某次调用之后，获得足够的内存而圆满完成任务。但如果“内存不足例程”并未被客端设定，oom_alloc()和oom_realloc()便老实不客气地调用__THROW_BAD_ALLOC，丢出bad_alloc异常信息，并利用exit(1)硬生生终止程序。
+
+
+记住，设计“内存不足处理例程”是客端地责任，设定“内存不足处理例程”也是客端的责任。再一次提醒你，“内存不足处理例程”解决问题的做法有着特定的模式，请参考[Meyers98]条款7.
+
+
+### 2.2.6 第二级配置器__default_alloc_template剖析
+第二级配置器多了一些机制，避免太多小额区块造成内存的碎片。小额区块带来的其实不仅是内存碎片，配置时的额外负担(overhead)也是一个大问题。额外负担永远无法避免，毕竟系统要靠这多出来的空间来管理内存，如下图2-3所示。但是区块愈小，额外负担所占的比例就愈大，愈显得浪费。
+
+![cpp-stl](https://ivanzz1001.github.io/records/assets/img/cplusplus/stl/stl_part2_3.jpg)
+
+SGI第二级配置器的做法是，如果区块够大，超过128bytes时，就移交第一级配置器处理。当区块小于128bytes时，则以内存池(memory pool)管理，此法又称为次层配置(sub-allocation)：每次配置一大块内存，并维护对应之自由链表(free-list)。下次若再有相同大小的内存需求，就直接从free-lists中拔出。如果客端释还小额区块，就由配置器回收到free-lists中————是的，别忘了，配置器除了负责配置，也负责回收。为了方便管理，SGI第二级配置器会主动将任何小额区块的内存需求量上调至8的倍数（例如客端要求30bytes，就自动调整为32bytes)，并维护16个free-lists，各自管理大小分别为8，16，24，32，40，48，56， 64， 72， 80， 88， 96， 104， 112， 120， 128bytes的小额区块。free-lists的节点结构如下：
+{% highlight string %}
+union _Obj {
+    union _Obj* _M_free_list_link;
+    char _M_client_data[1];    /* The client sees this.        */
+};
+{% endhighlight %}
+
+诸君或许会想，为了维护链表(lists)，每个节点需要额外的指针（指向下一个节点），这不又造成另一种额外负担吗？你的顾虑是对的，但早已有好的解决办法。注意，上述obj所用的是union，由于union之故，从其第一字段观之，obj可被视为一个指针，指向相同形式的另一个obj；从其第二字段观之，obj可被视为一个指针，指向实际区块。如图2-4所示。一物二用的结果是，不会为了维护链表所必须的指针而造成内存的另一种浪费（我们正在努力节省内存的开销呢）。这种技巧在强型(strongly typed)语言如Java中行不通，但是在非强型语言如C++中十分普遍。
+
+![cpp-stl](https://ivanzz1001.github.io/records/assets/img/cplusplus/stl/stl_part2_4.jpg)
+
+
+下面是第二级配置器的部分实现内容：
+{% highlight string %}
+#if defined(__SUNPRO_CC) || defined(__GNUC__)
+// breaks if we make these template class members:
+  enum {_ALIGN = 8};                                  //小型区块的上调边界
+  enum {_MAX_BYTES = 128};                            //小型区块的上限
+  enum {_NFREELISTS = 16};                            //free-lists个数
+#endif
+
+
+//以下是第二级配置器
+//注意，无“template型别参数”，且第二参数完全没派上用场
+//第一参数用于多线陈环境下。本书不讨论多线程环境
+template <bool threads, int inst>
+class __default_alloc_template {
+
+  //ROUND_UP将bytes上调至8的倍数
+  static size_t _S_round_up(size_t __bytes) 
+    { return (((__bytes) + (size_t) _ALIGN-1) & ~((size_t) _ALIGN - 1)); }
+
+
+__PRIVATE:
+  union _Obj {
+        union _Obj* _M_free_list_link;
+        char _M_client_data[1];    /* The client sees this.        */
+  };
+
+
+private:
+  //16个free-lists
+# if defined(__SUNPRO_CC) || defined(__GNUC__) || defined(__HP_aCC)
+    static _Obj* __STL_VOLATILE _S_free_list[]; 
+        // Specifying a size results in duplicate def for 4.1
+# else
+    static _Obj* __STL_VOLATILE _S_free_list[_NFREELISTS]; 
+# endif  
+
+
+  //以下函数根据区块大小，决定使用第n号free-list。n从0起算
+  static  size_t _S_freelist_index(size_t __bytes) {
+        return (((__bytes) + (size_t)_ALIGN-1)/(size_t)_ALIGN - 1);
+
+
+  // 返回一个大小为n的对象，并可能加入到free-list(Returns an object of size __n, and optionally adds to size __n free list)
+  static void* _S_refill(size_t __n);
+
+
+  // Allocates a chunk for nobjs of size size.  nobjs may be reduced
+  // if it is inconvenient to allocate the requested number.
+  static char* _S_chunk_alloc(size_t __size, int& __nobjs);
+
+
+  // Chunk allocation state.
+  static char* _S_start_free;                      //内存池起始位置。只在chunk_alloc()中变化
+  static char* _S_end_free;                        //内存池结束位置。只在chunk_alloc()中变化
+  static size_t _S_heap_size;
+
+
+public:
+  /* __n must be > 0      */
+  static void* allocate(size_t __n)
+
+  /* __p may not be 0 */
+  static void deallocate(void* __p, size_t __n);
+
+  static void* reallocate(void* __p, size_t __old_sz, size_t __new_sz);
+};
+
+
+//以下是static data member的定义与初值设定
+template <bool __threads, int __inst>
+char* __default_alloc_template<__threads, __inst>::_S_start_free = 0;
+
+template <bool __threads, int __inst>
+char* __default_alloc_template<__threads, __inst>::_S_end_free = 0;
+
+template <bool __threads, int __inst>
+size_t __default_alloc_template<__threads, __inst>::_S_heap_size = 0;
+
+template <bool __threads, int __inst>
+typename __default_alloc_template<__threads, __inst>::_Obj* __STL_VOLATILE
+__default_alloc_template<__threads, __inst> ::_S_free_list[
+# if defined(__SUNPRO_CC) || defined(__GNUC__) || defined(__HP_aCC)
+    _NFREELISTS
+# else
+    __default_alloc_template<__threads, __inst>::_NFREELISTS
+# endif
+] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, };
+{% endhighlight %}
+
+
+### 2.2.7 空间配置函数allocate()
+身为一个配置器，```__default_alloc_template```拥有配置器的标准接口函数allocate()。此函数首先判断区块大小，大于128bytes就调用第一级配置器，小于128bytes就检查对应的free-list。如果free-list之内有可用的区块，就直接拿来用；如果没有可用区块，就将区块大小上调至8倍数边界，然后调用refill()，准备为free list重新填充空间。refill()将于稍后介绍。
+{% highlight string %}
+static void* allocate(size_t __n)
+{
+	void* __ret = 0;
+	
+	if (__n > (size_t) _MAX_BYTES) {
+		__ret = malloc_alloc::allocate(__n);
+	}
+	else {
+		_Obj* __STL_VOLATILE* __my_free_list = _S_free_list + _S_freelist_index(__n);
+
+		// Acquire the lock here with a constructor call.
+		// This ensures that it is released in exit or during stack
+		// unwinding.
+		#     ifndef _NOTHREADS
+			/*REFERENCED*/
+			_Lock __lock_instance;
+		#     endif
+
+		_Obj* __RESTRICT __result = *__my_free_list;
+		if (__result == 0)
+			__ret = _S_refill(_S_round_up(__n));              //没找到可用的free list，准备重新填充free list
+		else {
+			*__my_free_list = __result -> _M_free_list_link;
+			__ret = __result;
+		}
+	}
+	
+	return __ret;
+};
+{% endhighlight %}
+
+区块自free list调出的操作，如下图2-5所示。
+
+![cpp-stl](https://ivanzz1001.github.io/records/assets/img/cplusplus/stl/stl_part2_5.jpg)
+
+### 2.2.8 空间释放函数deallocate()
+身为一个配置器，```__default_alloc_template```拥有配置器的标准接口函数deallocate()。该函数首先判断区块大小，大于128bytes就调用第一级配置器，小于128bytes就找出对应的free list，将区块回收。
+
+{% highlight string %}
+/* __p may not be 0 */
+static void deallocate(void* __p, size_t __n)
+{
+	if (__n > (size_t) _MAX_BYTES)
+		malloc_alloc::deallocate(__p, __n);
+	else {
+		_Obj* __STL_VOLATILE*  __my_free_list = _S_free_list + _S_freelist_index(__n);
+		_Obj* __q = (_Obj*)__p;
+	
+		// acquire lock
+		#       ifndef _NOTHREADS
+		/*REFERENCED*/
+		_Lock __lock_instance;
+		#       endif /* _NOTHREADS */
+
+
+		//调整free list，回收区块
+		__q -> _M_free_list_link = *__my_free_list;
+		*__my_free_list = __q;
+		// lock is released here
+	}
+}
+{% endhighlight %}
+
+区块回收纳入free list的操作，如下图2-6所示。
+
+![cpp-stl](https://ivanzz1001.github.io/records/assets/img/cplusplus/stl/stl_part2_6.jpg)
+
+
+### 2.2.9 重新填充free lists
+回头讨论先前说过的allocate()。当它发现free list中没有可用区块了时，就调用refill()，准备为free list重新填充空间。新的空间将取自内存池（经由chunk_alloc()完成）。缺省取得20个新节点（新区块），但万一内存池空间不足，获得的节点数（区块数）可能小于20：
+{% highlight string %}
+
+//返回一个大小为n的对象，并且有时候会为适当的free list增加节点
+//假设n已经适当上调至8的倍数
+template <bool __threads, int __inst>
+void* __default_alloc_template<__threads, __inst>::_S_refill(size_t __n)
+{
+	int __nobjs = 20;
+	char* __chunk = _S_chunk_alloc(__n, __nobjs);
+	_Obj* __STL_VOLATILE* __my_free_list;
+	_Obj* __result;
+	_Obj* __current_obj;
+	_Obj* __next_obj;
+	int __i;
+	
+	if (1 == __nobjs) return(__chunk);
+	__my_free_list = _S_free_list + _S_freelist_index(__n);
+	
+	/* Build free list in chunk */
+	__result = (_Obj*)__chunk;
+	*__my_free_list = __next_obj = (_Obj*)(__chunk + __n);
+	for (__i = 1; ; __i++) {
+		__current_obj = __next_obj;
+		__next_obj = (_Obj*)((char*)__next_obj + __n);
+
+		if (__nobjs - 1 == __i) {
+			__current_obj -> _M_free_list_link = 0;
+			break;
+		} else {
+			__current_obj -> _M_free_list_link = __next_obj;
+		}
+	}
+	return(__result);
+}
+{% endhighlight %}
 
 
 <br />
