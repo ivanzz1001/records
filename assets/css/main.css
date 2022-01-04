@@ -1129,7 +1129,8 @@ article .article-content blockquote cite {
 article .article-content ul, article .article-content ol {
   padding-left: 1.5em;
   font-size: 100%;
-  padding-top: .1em;
+  /*padding-top: .1em;*/
+  padding-top: .6em;             /*modified 2022-1-4*/
 }
 
 @media only screen and (min-width:768px) {
