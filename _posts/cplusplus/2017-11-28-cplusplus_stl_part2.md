@@ -66,7 +66,7 @@ public:
 {% endhighlight %}
 
 
-## 2. 设计一个简单的空间配置器
+### 1.1 设计一个简单的空间配置器
 根据前述的标准接口，我们可以自行完成一个功能简单、接口不怎么齐全的allocator如下(```jjalloc.h```):
 {% highlight string %}
 #ifndef _JJALLOC_
@@ -170,7 +170,6 @@ public:
 
 {% endhighlight %}
 
-
 将```JJ::allocator```应用于程序之中，我们发现，它只能有限度地搭配PJ STL和RW STL，例如(```jjalloc.cpp```)：
 {% highlight string %}
 #include "jjalloc.h"
@@ -208,7 +207,7 @@ int main(int argc, char *argv[])
 我想我可以提前先做一点说明。事实上SGI STL仍然提供了一个标准的配置器接口，只是把它做了一层隐藏。这个标准的配置器名为```simple_alloc```，稍后便会提到。
 
 
-## 2.2 具备次配置力(sub-allocation)的SGI空间配置器
+## 2. 具备次配置力(sub-allocation)的SGI空间配置器
 SGI STL的配置器与众不同，也与标准规范不同，其名称为```alloc```而非allocator，而且不接受任何参数。换句话说，如果你要在程序中明白采用SGI配置器，则不能采用标准写法：
 {% highlight string %}
 vector<int, std::allocator<int> > iv;            //in VC or CB
@@ -220,27 +219,29 @@ vector<int, std::alloc> iv;                     //in GCC
 {% endhighlight %}
 
 >说明：在SGI STL v3.3版本stl_config.h中，默认是采用std::alloc而非std::allocator
->// Use standard-conforming allocators if we have the necessary language
->// features.  __STL_USE_SGI_ALLOCATORS is a hook so that users can 
->// disable new-style allocators, and continue to use the same kind of
->// allocators as before, without having to edit library headers.
-># if defined(__STL_CLASS_PARTIAL_SPECIALIZATION) && \
->     defined(__STL_MEMBER_TEMPLATES) && \
->     defined(__STL_MEMBER_TEMPLATE_CLASSES) && \
->    !defined(__STL_NO_BOOL) && \
->    !defined(__STL_NON_TYPE_TMPL_PARAM_BUG) && \
->    !defined(__STL_LIMITED_DEFAULT_TEMPLATES) && \
->    !defined(__STL_USE_SGI_ALLOCATORS) 
->#   define __STL_USE_STD_ALLOCATORS
-># endif
->
-># ifndef __STL_DEFAULT_ALLOCATOR
->#   ifdef __STL_USE_STD_ALLOCATORS
->#     define __STL_DEFAULT_ALLOCATOR(T) allocator< T >
->#   else
->#     define __STL_DEFAULT_ALLOCATOR(T) alloc
->#   endif
-># endif
+{%highlight string %}
+// Use standard-conforming allocators if we have the necessary language
+// features.  __STL_USE_SGI_ALLOCATORS is a hook so that users can 
+// disable new-style allocators, and continue to use the same kind of
+// allocators as before, without having to edit library headers.
+# if defined(__STL_CLASS_PARTIAL_SPECIALIZATION) && \
+     defined(__STL_MEMBER_TEMPLATES) && \
+     defined(__STL_MEMBER_TEMPLATE_CLASSES) && \
+    !defined(__STL_NO_BOOL) && \
+    !defined(__STL_NON_TYPE_TMPL_PARAM_BUG) && \
+    !defined(__STL_LIMITED_DEFAULT_TEMPLATES) && \
+    !defined(__STL_USE_SGI_ALLOCATORS) 
+#   define __STL_USE_STD_ALLOCATORS
+# endif
+
+# ifndef __STL_DEFAULT_ALLOCATOR
+#   ifdef __STL_USE_STD_ALLOCATORS
+#     define __STL_DEFAULT_ALLOCATOR(T) allocator< T >
+#   else
+#     define __STL_DEFAULT_ALLOCATOR(T) alloc
+#   endif
+# endif
+{% endhighlight %}
 
 
 SGI STL allocator未能符合标准规格（注：新版SGI STL v3.3中allocator似乎已经符合了标准规格），这个事实通常不会给我们带来困扰，因为通常我们使用缺省的空间配置器，很少需要自行指定配置器名称，而SGI STL的每一个容器都已经指定其缺省的空间配置器为```alloc```。例如下面的vector声明：
@@ -252,10 +253,10 @@ class vector : protected _Vector_base<_Tp, _Alloc>
 };
 {% endhighlight %}
 
-### 2.2.1 SGI标准的空间配置器std::allocator
+### 2.1 SGI标准的空间配置器std::allocator
 在SGI STL v3.3版本中，SGI提供的std::allocator似乎已经已经符合了标准，这里不再对其进行说明。
 
-### 2.2.2 SGI特殊的空间配置器std::alloc
+### 2.2 SGI特殊的空间配置器std::alloc
 
 一般而言，我们所习惯的C++内存配置操作和释放操作是这样的：
 {% highlight string %}
@@ -283,7 +284,7 @@ STL标准规格告诉我们，配置器定义于```<memory>```之中，SGI ```<m
 
 
 
-### 2.2.3 构造和析构基本工具: construct()和destory()
+### 2.3 构造和析构基本工具: construct()和destory()
 下面是<stl_construct.h>的部分内容：
 {% highlight string %}
 #include <new.h>                             //欲使用placement new，需先包含此文件
@@ -349,7 +350,7 @@ destroy()有两个版本，第一个版本接受一个指针，准备将该指�
 
 这样的观念很好，但C++本身并不支持对“指针所指之物”的型别判断，也不支持对“对象析构函数是否为trivial”的判断，因此，上述的```__VALUE_TYPE()```和```__type_traits<>```该如何实现呢？我们会在第3.7节有详细介绍。
 
-### 2.2.4 空间的配置与释放
+### 2.4 空间的配置与释放
 看完了内存配置后的对象构造行为和内存释放前的对象析构行为，现在我们来看看内存的配置和释放。
 
 对象构造前的空间配置和对象析构后的空间释放，由```<stl_alloc.h>```负责，SGI对此的设计哲学如下：
@@ -441,7 +442,7 @@ class vector : protected _Vector_base<_Tp, _Alloc>
 ![cpp-stl](https://ivanzz1001.github.io/records/assets/img/cplusplus/stl/stl_part2_2b.jpg)
 
 
-### 2.2.5 第一级配置器__malloc_alloc_template剖析
+### 2.5 第一级配置器__malloc_alloc_template剖析
 首先我们观察第一级配置器：
 {% highlight string %}
 //malloc-based allocator. 通常比稍后介绍的default alloc速度慢
@@ -550,7 +551,7 @@ typedef __malloc_alloc_template<0> malloc_alloc;
 记住，设计“内存不足处理例程”是客端地责任，设定“内存不足处理例程”也是客端的责任。再一次提醒你，“内存不足处理例程”解决问题的做法有着特定的模式，请参考[Meyers98]条款7.
 
 
-### 2.2.6 第二级配置器__default_alloc_template剖析
+### 2.6 第二级配置器__default_alloc_template剖析
 第二级配置器多了一些机制，避免太多小额区块造成内存的碎片。小额区块带来的其实不仅是内存碎片，配置时的额外负担(overhead)也是一个大问题。额外负担永远无法避免，毕竟系统要靠这多出来的空间来管理内存，如下图2-3所示。但是区块愈小，额外负担所占的比例就愈大，愈显得浪费。
 
 ![cpp-stl](https://ivanzz1001.github.io/records/assets/img/cplusplus/stl/stl_part2_3.jpg)
@@ -659,7 +660,7 @@ __default_alloc_template<__threads, __inst> ::_S_free_list[
 {% endhighlight %}
 
 
-### 2.2.7 空间配置函数allocate()
+### 2.7 空间配置函数allocate()
 身为一个配置器，```__default_alloc_template```拥有配置器的标准接口函数allocate()。此函数首先判断区块大小，大于128bytes就调用第一级配置器，小于128bytes就检查对应的free-list。如果free-list之内有可用的区块，就直接拿来用；如果没有可用区块，就将区块大小上调至8倍数边界，然后调用refill()，准备为free list重新填充空间。refill()将于稍后介绍。
 {% highlight string %}
 static void* allocate(size_t __n)
@@ -697,7 +698,7 @@ static void* allocate(size_t __n)
 
 ![cpp-stl](https://ivanzz1001.github.io/records/assets/img/cplusplus/stl/stl_part2_5.jpg)
 
-### 2.2.8 空间释放函数deallocate()
+### 2.8 空间释放函数deallocate()
 身为一个配置器，```__default_alloc_template```拥有配置器的标准接口函数deallocate()。该函数首先判断区块大小，大于128bytes就调用第一级配置器，小于128bytes就找出对应的free list，将区块回收。
 
 {% highlight string %}
@@ -730,7 +731,7 @@ static void deallocate(void* __p, size_t __n)
 ![cpp-stl](https://ivanzz1001.github.io/records/assets/img/cplusplus/stl/stl_part2_6.jpg)
 
 
-### 2.2.9 重新填充free lists
+### 2.9 重新填充free lists
 回头讨论先前说过的allocate()。当它发现free list中没有可用区块了时，就调用refill()，准备为free list重新填充空间。新的空间将取自内存池（经由chunk_alloc()完成）。缺省取得20个新节点（新区块），但万一内存池空间不足，获得的节点数（区块数）可能小于20：
 {% highlight string %}
 
@@ -747,6 +748,7 @@ void* __default_alloc_template<__threads, __inst>::_S_refill(size_t __n)
 	_Obj* __next_obj;
 	int __i;
 	
+	//如果只获得一个区块，这个区块就分配给调用者用，free list无新节点
 	if (1 == __nobjs) return(__chunk);
 	__my_free_list = _S_free_list + _S_freelist_index(__n);
 	
@@ -767,6 +769,97 @@ void* __default_alloc_template<__threads, __inst>::_S_refill(size_t __n)
 	return(__result);
 }
 {% endhighlight %}
+
+### 2.10 内存池(memory pool)
+从内存池中取空间给free list使用，是chunk_alloc()的工作：
+{% highlight string %}
+
+//假设size已经适当上调至8的倍数。请注意参数nobjs是paas by reference
+template <bool __threads, int __inst>
+char*
+__default_alloc_template<__threads, __inst>::_S_chunk_alloc(size_t __size, 
+                                                            int& __nobjs)
+{
+	char* __result;
+	size_t __total_bytes = __size * __nobjs;
+	size_t __bytes_left = _S_end_free - _S_start_free;                 //内存池剩余空间
+	
+	if (__bytes_left >= __total_bytes) {
+ 		
+		//内存池剩余空间完全满足需求量
+		__result = _S_start_free;
+		_S_start_free += __total_bytes;
+		return(__result);
+	} else if (__bytes_left >= __size) {
+
+		//内存池剩余空间不能完全满足需求量，但足够供应一个（含）以上的区块
+		__nobjs = (int)(__bytes_left/__size);
+		__total_bytes = __size * __nobjs;
+		__result = _S_start_free;
+		_S_start_free += __total_bytes;
+		return(__result);
+	} else {
+
+		//内存池剩余空间连一个区块的大小都无法提供
+		size_t __bytes_to_get = 2 * __total_bytes + _S_round_up(_S_heap_size >> 4);
+ 
+		// 以下试着让内存池中的残余零头还有利用价值
+		if (__bytes_left > 0) {
+			_Obj* __STL_VOLATILE* __my_free_list = _S_free_list + _S_freelist_index(__bytes_left);
+	
+			((_Obj*)_S_start_free) -> _M_free_list_link = *__my_free_list;
+			*__my_free_list = (_Obj*)_S_start_free;
+		}
+
+		//配置heap空间，用来补充内存池
+		_S_start_free = (char*)malloc(__bytes_to_get);
+		if (0 == _S_start_free) {
+
+			//heap空间不足，malloc()失败
+			size_t __i;
+			_Obj* __STL_VOLATILE* __my_free_list;
+			_Obj* __p;
+
+	
+			//试着检视我们手上拥有的东西。这不会造成伤害。我们不打算尝试配置较小的区块，因为那在多进程(multi-process)机器上容易导致
+			//灾难。以下搜寻适当的free list，所谓适当是指“尚有未用区块，且区块足够大”之free list
+			for (__i = __size; __i <= (size_t) _MAX_BYTES; __i += (size_t) _ALIGN) {
+				__my_free_list = _S_free_list + _S_freelist_index(__i);
+				__p = *__my_free_list;
+
+				if (0 != __p) {                                //free list尚有未用区块
+					*__my_free_list = __p -> _M_free_list_link;
+					_S_start_free = (char*)__p;
+					_S_end_free = _S_start_free + __i;
+
+					return(_S_chunk_alloc(__size, __nobjs));
+					//注意，任何残余零头终将被编入适当的free-list中备用
+				}
+			}
+
+			_S_end_free = 0;	                              //如果出现意外（山穷水尽，到处都没内存可用了）
+
+			//调用第一级配置器，看看out-of-memory机制能否尽点力
+			_S_start_free = (char*)malloc_alloc::allocate(__bytes_to_get);
+
+			//这会导致抛出异常(exception)，或内存不足的情况获得改善
+		}
+
+		_S_heap_size += __bytes_to_get;
+		_S_end_free = _S_start_free + __bytes_to_get;
+
+		//递归调用自己，为了修正nobjs
+		return(_S_chunk_alloc(__size, __nobjs));
+	}
+}
+{% endhighlight %}
+上述的chunck_alloc()函数以end_free - start_free来判断内存池的水量。如果水量充足，就直接调出20个区块返回给free list。
+
+
+
+
+
+
 
 
 <br />
