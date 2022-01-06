@@ -853,10 +853,280 @@ __default_alloc_template<__threads, __inst>::_S_chunk_alloc(size_t __size,
 	}
 }
 {% endhighlight %}
-上述的chunck_alloc()函数以end_free - start_free来判断内存池的水量。如果水量充足，就直接调出20个区块返回给free list。
+上述的chunck_alloc()函数以end_free - start_free来判断内存池的水量。如果水量充足，就直接调出20个区块返回给free list。如果水量不足以提供20个区块，但还足够供应一个以上的区块，就拔出这不足20个区块的空间出去。这时候其pass by reference的nobjs参数将被修改为实际能够供应的区块数。如果内存池连一个区块空间都无法供应，对客端显然无法交代，此时便利用malloc()从heap中配置内存，为内存池注入源头活水以应付需求。新水量的大小为需求量的两倍，再加上一个随着配置次数增加而愈来愈大的附加量。
+
+举个例子，见图2-7，假设程序一开始，客端就调用chunk_alloc(32,20)，于是malloc()配置40个32bytes区块，其中第1个交出，另19个交给free_list[3]维护，余20个留给内存池。接下来客端调用chunk_alloc(64, 20)，此时free_list[7]空空如也，必须向内存池要求支持。内存池只够供应(32 x 20)/64 = 10个64bytes区块，就把这10个区块返回，第1个交给客端，余9个由free_list[7]维护。此时内存池全空。接下来调用chunk_alloc(96,20)，此时free_list[11]空空如也，必须向内存池要求支持，而内存池此时也是空的，于是以malloc()配置40+n(附加量）个96bytes区块，其中第1个交出，剩余19个交给free_list[11]维护，余20+n（附加量）个区块留给内存池...
+
+万一山穷水尽，整个system heap空间都不够了（以至无法为内存注入源头活水），malloc()行动失败，chunk_alloc()就四处寻找有无“尚有未用区块，且区块够大”之free_list。找到了就挖一块交出，找不到就调用第一级配置器。第一级配置器其实也是使用malloc()来配置内存，但它有out-of-memory处理机制（类似new-handler机制），或许有机会释放其他的内存拿来此处使用。如果可以，就成功，否则发出bad_alloc异常。
+
+以上便是整个第二级空间配置器的设计。
+
+![cpp-stl](https://ivanzz1001.github.io/records/assets/img/cplusplus/stl/stl_part2_7.jpg)
+
+回想一下2.2.4节最后提到的那个提供配置器标准接口的simple_alloc:
+{% highlight string %}
+
+template<class _Tp, class _Alloc>
+class simple_alloc {
+  ...
+};
+{% endhighlight %}
+
+SGI容器通常以这种方式来使用配置器：
+{% highlight string %}
+template <class T, class Alloc = alloc>                    //缺省使用alloc配置器
+class vector{
+public:
+  typedef T value_type;
+  ...
+
+protected:  
+  //专属之空间配置器，每次配置一个元素大小
+  typedef simple_alloc<value_type, Alloc> data_allocator;
+  ... 
+};
+{% endhighlight %}
+
+其中第二个template参数所接受的缺省参数alloc，可以是第一级配置器，也可以是第二级配置器。不过，SGI STL已经把它设为第二级配置器，见2.2.4节及图2-2b。
 
 
+## 3. 内存基本处理工具
+STL定义有五个全局函数，作用于未初始化空间上。这样的功能对于容器的实现很有帮助，我们会在第4章容器实现代码中，看到它们肩负的重任。前两个函数是2.2.3节说过的，用于构造的construct()和用于析构的destroy()，另三个函数是uninitialized_copy(), uninitialized_fill(), uninitialized_fill_n()，分别对应于高层次函数copy()、fill()、fill_n()————这些都是STL算法，将在第6章介绍。如果你要使用本节的三个低层次函数，应该包含<memory>，不过SGI把它们实际定义于<stl_uninitialized>。
 
+### 3.1 uninitialized_copy
+{% highlight string %}
+template <class _InputIter, class _ForwardIter>
+inline _ForwardIter
+  uninitialized_copy(_InputIter __first, _InputIter __last,
+                     _ForwardIter __result);
+{% endhighlight %}
+uninitialized_copy()使我们能够将内存的配置与对象的构造行为分离开来。如果作为输出目的地的[result, result + (last -first))范围内的每一个迭代器都指向未初始化区域，则uninitialized_copy()会使用copy constructor，给身为输入来源之[first, last)范围内的每一个对象产生一份复制品，放进输出范围中。换句话说，针对输入范围内的每一个迭代器i，该函数会调用```construct(&*(result + (i - first)), *i)```，产生```*i```的复制品，放置于输出范围的相对位置上。式中的construct()已于2.2.3节讨论过。
+
+如果你需要实现一个容器，uninitialized_copy()这样的函数会为你带来很大的帮助，因为容器的全区间构造函数(range constructor)通常以两个步骤完成：
+
+* 配置内存区块，足以包含范围内的所有元素
+
+* 使用uninitialized_copy()，在该内存区块上构造元素
+
+C++标准规格书要求uninitialized_copy()具有“commit or rollback”语义，意思就是要么“构造出所有必要元素”，要么（当有任何一个copy constructor失败时）“不构造任何东西”。
+
+### 3.2 uninitialized_fill
+{% highlight string %}
+template <class _ForwardIter, class _Tp>
+inline void uninitialized_fill(_ForwardIter __first,
+                               _ForwardIter __last, 
+                               const _Tp& __x);
+{% endhighlight %}
+uninitialized_fill()也能够使我们将内存配置与对象的构造行为分离开来。如果[first, last)范围内的每个迭代器都指向未初始化的内存，那么uninitialized_fill()会在该范围内产生x(上式第三参数）的复制品。换句话说，uninitialized_fill()会针对操作范围内的每个迭代器i，调用```construct(&*i, x)```，在i所指之处产生x的复制品。式中construct()已于2.2.3节讨论过。
+
+与uninitialized_copy()一样，uninitialized_fill()具有“commit or rollback”语义，它要么产生出所有必要元素，要么不产生任何元素。如果有任何一个copy constructor丢出异常(exception)，uninitialized_fill()必须能够将已产生的所有元素析构掉。
+
+### 3.3 uninitialized_fill_n
+{% highlight string %}
+template <class _ForwardIter, class _Size, class _Tp>
+inline _ForwardIter 
+uninitialized_fill_n(_ForwardIter __first, _Size __n, const _Tp& __x);
+{% endhighlight %}
+
+uninitialized_fill_n()能够使我们将内存配置与对象行为分离开来，它会为指定范围内的所有元素设定相同的值。
+
+如果[first, first+n)范围内的每一个迭代器都指向未初始化的内存，那么uninitialized_fill_n()会调用copy constructor，在该范围内产生x(上式第三参数）的复制品。也就是说，面对[first, first+n)范围内的每个迭代器i，uninitialized_fill_n()会调用```construct(&*i, x)```，在对应位置处产生x的复制品。式中construct()已于2.2.3节讨论过。
+
+uninitialized_fill_n()也具有“commit or rollback”语义：要么产生出所有必要元素，否则不产生任何元素。如果有任何一个copy constructor丢出异常(exception)，uninitialized_fill_n()必须析构已产生的所有元素。
+
+
+以下分别介绍这三哥函数的实现法。其中所呈现的iterators（迭代器）、value_type()、__type_traits、__true_type、__false_type、is_POD_type等实现技术，都将于第3章介绍。
+
+1) uninitialized_fill_n
+
+首先是uninitialized_fill_n()的源代码，本函数接受三个参数：
+* 迭代器first指向欲初始化空间的起始处
+* n表示欲初始化空间的大小
+* x表示初值
+{% highlight string %}
+template <class _ForwardIter, class _Size, class _Tp>
+inline _ForwardIter 
+uninitialized_fill_n(_ForwardIter __first, _Size __n, const _Tp& __x)
+{
+  return __uninitialized_fill_n(__first, __n, __x, __VALUE_TYPE(__first));
+}
+{% endhighlight %}
+>注：上面利用__VALUE_TYPE()取出first的value type
+
+这个函数的进行逻辑是，首先萃取出迭代器first的value type（详见第3章），然后判断该型别是否为POD型别：
+{% highlight string %}
+template <class _ForwardIter, class _Size, class _Tp, class _Tp1>
+inline _ForwardIter 
+__uninitialized_fill_n(_ForwardIter __first, _Size __n, const _Tp& __x, _Tp1*)
+{
+  typedef typename __type_traits<_Tp1>::is_POD_type _Is_POD;
+  return __uninitialized_fill_n_aux(__first, __n, __x, _Is_POD());
+}
+{% endhighlight %}
+>注：关于__type_traits的用法，详见3.7节
+
+**POD**意指**Plain Old Data**，也就是标量型别(scalar types)或传统的C struct型别。POD型别必然拥有trival ctor/dtor/copy/assignment，因此，我们可以对POD型别采用最有效率的初值填写手法，而对non-POD型别采用最保险安全的做法：
+{% highlight string %}
+//如果copy construction等同于assignment，而且destructor是trival，以下就有效。
+//如果是POD型别，执行流程就会转进到以下函数。这是藉由function template的参数推导机制而得
+template <class _ForwardIter, class _Size, class _Tp>
+inline _ForwardIter
+__uninitialized_fill_n_aux(_ForwardIter __first, _Size __n,
+                           const _Tp& __x, __true_type)
+{
+  return fill_n(__first, __n, __x);
+}
+
+//如果不是POD型别，执行流程就会转进到以下函数。这是藉由function template的参数推导机制而得
+template <class _ForwardIter, class _Size, class _Tp>
+_ForwardIter
+__uninitialized_fill_n_aux(_ForwardIter __first, _Size __n,
+                           const _Tp& __x, __false_type)
+{
+  _ForwardIter __cur = __first;
+  __STL_TRY {
+    for ( ; __n > 0; --__n, ++__cur)
+      _Construct(&*__cur, __x);
+    return __cur;
+  }
+  __STL_UNWIND(_Destroy(__first, __cur));
+}
+{% endhighlight %}
+
+2) uninitialized_copy
+
+下面列出uninitialized_copy()的源代码，本函数接受三个参数：
+* 迭代器first指向输入端的起始位置
+* 迭代器last指向输入端的结束位置（前闭后开区间）
+* 迭代器result指向输出端(欲初始化空间）的起始处
+
+{% highlight string %}
+template <class _InputIter, class _ForwardIter>
+inline _ForwardIter
+  uninitialized_copy(_InputIter __first, _InputIter __last,
+                     _ForwardIter __result)
+{
+  return __uninitialized_copy(__first, __last, __result,
+                              __VALUE_TYPE(__result));
+}
+{% endhighlight %}
+这个函数的进行逻辑是，首先萃取出迭代器result的value type(详见第3章），然后判断型别是否为POD型别：
+{% highlight string %}
+template <class _InputIter, class _ForwardIter, class _Tp>
+inline _ForwardIter
+__uninitialized_copy(_InputIter __first, _InputIter __last,
+                     _ForwardIter __result, _Tp*)
+{
+  typedef typename __type_traits<_Tp>::is_POD_type _Is_POD;
+  return __uninitialized_copy_aux(__first, __last, __result, _Is_POD());
+}
+{% endhighlight %}
+**POD**意指**Plain Old Data**，也就是标量型别(scalar types)或传统的C struct型别。POD型别必然拥有trival ctor/dtor/copy/assignment，因此，我们可以对POD型别采用最有效率的复制手法，而对non-POD型别采用最保险安全的做法：
+{% highlight string %}
+//如果copy construction等同于assignment，而且destructor是trival，以下就有效。
+//如果是POD型别，执行流程就会转进到以下函数。这是藉由function template的参数推导机制而得
+template <class _InputIter, class _ForwardIter>
+inline _ForwardIter 
+__uninitialized_copy_aux(_InputIter __first, _InputIter __last,
+                         _ForwardIter __result,
+                         __true_type)
+{
+  return copy(__first, __last, __result);
+}
+
+
+//如果不是POD型别，执行流程就会转进到以下函数。这是藉由function template的参数推导机制而得
+template <class _InputIter, class _ForwardIter>
+_ForwardIter 
+__uninitialized_copy_aux(_InputIter __first, _InputIter __last,
+                         _ForwardIter __result,
+                         __false_type)
+{
+  _ForwardIter __cur = __result;
+  __STL_TRY {
+    for ( ; __first != __last; ++__first, ++__cur)
+      _Construct(&*__cur, *__first);
+    return __cur;
+  }
+  __STL_UNWIND(_Destroy(__result, __cur));
+}
+{% endhighlight %}
+
+针对```char *```和```wchar_t *```两种型别，可以采用最具效率的做法memmove(直接移动内存内容)来复制行为。因此SGI得以为这两种型别设计一份特化版本。
+{% highlight string %}
+//以下是针对const char *的特化版本
+inline char* uninitialized_copy(const char* __first, const char* __last,
+                                char* __result) {
+  memmove(__result, __first, __last - __first);
+  return __result + (__last - __first);
+}
+
+//以下是针对const wchar_t *的特化版本
+inline wchar_t* 
+uninitialized_copy(const wchar_t* __first, const wchar_t* __last,
+                   wchar_t* __result)
+{
+  memmove(__result, __first, sizeof(wchar_t) * (__last - __first));
+  return __result + (__last - __first);
+}
+{% endhighlight %}
+
+3) uninitialized_fill
+
+下面列出uninitialized_fill的源代码，本函数接受三个参数：
+* 迭代器first指向输出端（欲初始化空间）的起始处
+* 迭代器first指向输出端（欲初始化空间）的结束处（前闭后开区间）
+* x表示初值
+
+{% highlight string %}
+template <class _ForwardIter, class _Tp>
+inline void uninitialized_fill(_ForwardIter __first,
+                               _ForwardIter __last, 
+                               const _Tp& __x)
+{
+  __uninitialized_fill(__first, __last, __x, __VALUE_TYPE(__first));
+}
+{% endhighlight %}
+这个函数的进行逻辑是，首先萃取出迭代器result的value type(详见第3章），然后判断型别是否为POD型别：
+{% highlight string %}
+template <class _ForwardIter, class _Tp, class _Tp1>
+inline void __uninitialized_fill(_ForwardIter __first, 
+                                 _ForwardIter __last, const _Tp& __x, _Tp1*)
+{
+  typedef typename __type_traits<_Tp1>::is_POD_type _Is_POD;
+  __uninitialized_fill_aux(__first, __last, __x, _Is_POD());
+                   
+}
+{% endhighlight %}
+**POD**意指**Plain Old Data**，也就是标量型别(scalar types)或传统的C struct型别。POD型别必然拥有trival ctor/dtor/copy/assignment，因此，我们可以对POD型别采用最有效率的初值填写手法，而对non-POD型别采用最保险安全的做法：
+{% highlight string %}
+//如果copy construction等同于assignment，而且destructor是trival，以下就有效。
+//如果是POD型别，执行流程就会转进到以下函数。这是藉由function template的参数推导机制而得
+template <class _ForwardIter, class _Tp>
+inline void
+__uninitialized_fill_aux(_ForwardIter __first, _ForwardIter __last, 
+                         const _Tp& __x, __true_type)
+{
+  fill(__first, __last, __x);
+}
+
+
+//如果不是POD型别，执行流程就会转进到以下函数。这是藉由function template的参数推导机制而得
+template <class _ForwardIter, class _Tp>
+void
+__uninitialized_fill_aux(_ForwardIter __first, _ForwardIter __last, 
+                         const _Tp& __x, __false_type)
+{
+  _ForwardIter __cur = __first;
+  __STL_TRY {
+    for ( ; __cur != __last; ++__cur)
+      _Construct(&*__cur, __x);
+  }
+  __STL_UNWIND(_Destroy(__first, __cur));
+}
+{% endhighlight %}
+
+图2-8以图形显式本节三个函数对效率的特殊考虑。
 
 
 
