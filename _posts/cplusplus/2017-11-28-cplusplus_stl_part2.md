@@ -1128,7 +1128,7 @@ __uninitialized_fill_aux(_ForwardIter __first, _ForwardIter __last,
 
 图2-8以图形显式本节三个函数对效率的特殊考虑。
 
-
+![cpp-stl](https://ivanzz1001.github.io/records/assets/img/cplusplus/stl/stl_part2_8.jpg)
 
 
 
