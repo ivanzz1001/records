@@ -357,7 +357,6 @@ double mysqrt(double x)
 
 执行如下命令进行验证测试：
 <pre>
-<pre>
 # mkdir Step6_build
 # cd Step6_build 
 # cmake ../Step6
