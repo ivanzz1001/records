@@ -729,7 +729,8 @@ listening on ens33, link-type EN10MB (Ethernet), capture size 65535 bytes
  
 ## 6. 补充
 很多时候keepalived/fwmark还会搭配iptables来使用。一般我们可以先在iptables的mangle表对数据流量进行标记，然后在keepalived中根据相应的标记进行流量转发。例如：
-<pre>
+{% highlight string %}
+# iptables -t mangle -D PREROUTING 1          //删除规则
 # iptables -A PREROUTING -d 10.4.18.69/32 -p tcp -m tcp --dport 17443 -m mac ! --mac-source F8:98:EF:7E:9E:8B -j MARK --set-xmark 0x96be3/0xffffffff
 
 # iptables -t mangle -L
@@ -741,8 +742,12 @@ MARK       tcp  --  anywhere             server-ceph01         tcp dpt:https MAC
 MARK       tcp  --  anywhere             server-ceph01         tcp dpt:17480 MAC ! F8:98:EF:7E:9E:8B MARK set 0x96c08
 MARK       tcp  --  anywhere             server-ceph01         tcp dpt:irdmi MAC ! F8:98:EF:7E:9E:8B MARK set 0x109a0
 MARK       tcp  --  anywhere             server-ceph01         tcp dpt:http MAC ! F8:98:EF:7E:9E:8B MARK set 0x2a8
-</pre>
+# iptables-save > /etc/sysconfig/iptables
+# systemctl status iptables
+{% endhighlight %}
 上面第一条表示： 对于发送到目标端口为17443的数据流量（源网卡地址不为F8:98:EF:7E:9E:8B，通常为另一个副本lvs的网卡地址)，将其标志为617443(0x96be3)
+
+>注：上面10.4.18.69应该是需要设置的vip地址
 
 那么此时，我们可以在keepalived做如下配置以处理带有该标志的流量：
 {% highlight string %}
@@ -773,11 +778,17 @@ virtual_server fwmark 617443 17443 {
 
 1. [keepalived官网](https://www.keepalived.org/)
 
-2. [](https://blog.csdn.net/liupeifeng3514/article/details/79018116)
+2. [Keepalived 服务器安装与配置](https://blog.csdn.net/liupeifeng3514/article/details/79018116)
 
 3. [keepalived实现双机热备](https://www.cnblogs.com/jefflee168/p/7442127.html)
 
 4. [VRRP协议与keepalived原理及功能实例演示](https://blog.51cto.com/13322786/2162618)
+
+5. [LVS + keepalived问题](https://blog.csdn.net/qq_32523587/article/details/83931550)
+
+6. [Keepalived部署与配置详解](https://www.cnblogs.com/rexcheny/p/10778567.html)
+
+7. [Keepalived LVS+DR合设配置方法以及存在的问题](https://www.jianshu.com/p/612a55652ae8)
 
 <br />
 <br />
