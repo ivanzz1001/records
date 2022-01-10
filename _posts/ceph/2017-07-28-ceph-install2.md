@@ -101,7 +101,42 @@ cmake version 2.8.12.2
 # cmake -DCMAKE_C_FLAGS="-O0 -g3 -gdwarf-4" -DCMAKE_CXX_FLAGS="-O0 -g3 -gdwarf-4"  -DWITH_TESTS=ON -DWITH_FUSE=OFF -DWITH_DPDK=OFF -DWITH_RDMA=OFF -DCMAKE_INSTALL_PREFIX=/opt/ceph ..
 </pre>
 
+### 1.3 补充
+可能需要修改```install-deps.sh```:
+{% highlight string %}
+function activate_virtualenv() {
+    local top_srcdir=$1
+    local interpreter=$2
+    local env_dir=$top_srcdir/install-deps-$interpreter
 
+    if ! test -d $env_dir ; then
+        # Make a temporary virtualenv to get a fresh version of virtualenv
+        # because CentOS 7 has a buggy old version (v1.10.1)
+        # https://github.com/pypa/virtualenv/issues/463
+        virtualenv ${env_dir}_tmp
+        ${env_dir}_tmp/bin/pip install --upgrade pip==20.2.4
+        ${env_dir}_tmp/bin/pip install --upgrade setuptools
+        ${env_dir}_tmp/bin/pip install --upgrade virtualenv
+        ${env_dir}_tmp/bin/virtualenv --python $interpreter $env_dir
+        rm -rf ${env_dir}_tmp
+
+        . $env_dir/bin/activate
+        if ! populate_wheelhouse install ; then
+            rm -rf $env_dir
+            return 1
+        fi
+    fi
+    . $env_dir/bin/activate
+}
+
+{% endhighlight %}
+在activate_virtualenv()中增加了如下两行：
+{% highlight string %}
+${env_dir}_tmp/bin/pip install --upgrade pip==20.2.4
+${env_dir}_tmp/bin/pip install --upgrade setuptools
+{% endhighlight %}
+
+>注：python包索引网址https://mirrors.bfsu.edu.cn/pypi/web/simple/
 
 <br />
 <br />
