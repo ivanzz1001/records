@@ -442,7 +442,13 @@ aggregation pipeline的```$out```阶段不能将结果写到capped collection.
 
 ###### 1.3.4 Procedures
 
+1) **Create a Capped Collection**
 
+你必须显式的使用[ db.createCollection()](https://docs.mongodb.com/manual/reference/method/db.createCollection/#mongodb-method-db.createCollection)方法来创建capped collection，这是一个mongosh create命令的帮助函数。当创建capped collection时，你必须指定collection所占用的最大字节数，MongoDB会为所创建的capped collection预分配对应的空间。capped collection内部也会占用少量额外的空间。
+
+{% highlight string %}
+db.createCollection( "log", { capped: true, size: 100000 } )
+{% endhighlight %}
 
 
 
