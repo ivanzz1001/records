@@ -378,7 +378,73 @@ updateMonthlySales(new ISODate("2019-01-01"));
 ### 1.3 Capped Collections
 
 ###### 1.3.1 Overview
-[capped collections](https://docs.mongodb.com/manual/reference/glossary/#std-term-capped-collection)是一种固定大小的collection，其支持
+[capped collections](https://docs.mongodb.com/manual/reference/glossary/#std-term-capped-collection)是一种固定大小的collection，其支持高吞吐量，并可以根据插入顺序来获取document。Capped collections工作方式类似于循环buffers: 一旦一个collection填充满了所分配的空间，那么新插入的documents就会覆盖原来最旧的document数据。
+
+参看[createCollection()](https://docs.mongodb.com/manual/reference/method/db.createCollection/#mongodb-method-db.createCollection)或[create()](https://docs.mongodb.com/manual/reference/command/create/#mongodb-dbcommand-dbcmd.create)以获得更多关于创建capped collections的信息。
+
+###### 1.3.2 Behavior
+1) **Insertion Order**
+
+Capped Collection会确保维持document的插入顺序。因此，在查询时并不需要通过一个索引来返回documents的插入顺序。没有了indexing的额外负担后，capped collection就可以支持更高的插入吞吐量。
+
+2）**Automatic Removal of Oldest Documents**
+
+为了给新插入的documents腾出空间，capped collections会自动的移除collection中最旧的documents，而不需要其他额外的脚本或移除操作。
+
+考虑capped collections如下潜在的使用场景：
+
+* 存储其他high-volume系统所产生的日志信息。插入documents到一个无索引的capped collection可获得与直接写文件相近的速度。更为重要的是，内置的先进先出属性确保了事件的先后顺序。
+
+* 通过capped collections来缓存少量的数据。
+
+例如，```oplog.rs```使用capped collection将日志信息存放到一个[副本集(replica set)](https://docs.mongodb.com/manual/reference/glossary/#std-term-replica-set)中。从MongoDB 4.0版本开始，不像是其他capped collection，oplog增长可以超过所配置的限额，以此来避免删除[majority commit point](https://docs.mongodb.com/manual/reference/command/replSetGetStatus/#mongodb-data-replSetGetStatus.optimes.lastCommittedOpTime).
+
+3) **_id Index**
+
+Capped collections有一个```_id```字段，并且默认在该字段上有索引。
+
+###### 1.3.3 Restrictions and Recommendations
+
+1） **Reads**
+
+从MongoDB 5.0开始，当从capped collection中读取documents时，不能使用读相关的```snapshot```。
+
+2) **Updates**
+
+假如你打算更新capped collection中的documents，请创建一个索引，这样相应的更新操作就不需要扫描整个collection。
+
+3） **Document Size**
+
+>Changed in version 3.2
+
+假如一个更新或替换操作会改变document size，那么对应的操作会失败。
+
+4） **Document Deletion**
+
+你不能够从capped collection中删除documents。要移除collection中所有documents的话，请使用[drop()](https://docs.mongodb.com/manual/reference/method/db.collection.drop/#mongodb-method-db.collection.drop)直接删除整个collection，然后再重新创建capped collection。
+
+5）**Sharding**
+
+不能对capped collection做shard。
+
+6）**Query Efficiency**
+
+使用自然(nature)顺序来从集合中获取最新插入的元素是最高效的。这有点类似于在一个日志文件上做```tail```命令。
+
+7）**Aggregation $out**
+
+aggregation pipeline的```$out```阶段不能将结果写到capped collection.
+
+8) **Transactions**
+
+从MongoDB 4.2开始，不能以事务(transactions)的方式向capped collection写入数据。
+
+
+###### 1.3.4 Procedures
+
+
+
+
 
 <br />
 <br />
