@@ -449,6 +449,67 @@ aggregation pipeline的```$out```阶段不能将结果写到capped collection.
 {% highlight string %}
 db.createCollection( "log", { capped: true, size: 100000 } )
 {% endhighlight %}
+假如size字段小于等于4096，那么该collection的容量为4096字节。否则，MongoDB会将size上调为256的倍数。
+
+
+另外，你也可以使用```max```字段来指定一个collection所含有的documents的数量：
+{% highlight string %}
+db.createCollection("log", { capped : true, size : 5242880, max : 5000 } )
+{% endhighlight %}
+
+>Important:
+>
+> 即使在指定了max字段时，size字段也是必需的。在documents所占用的字节数达到了size大小，即使documents本身的数量未达到max，此时MongoDB也是会移除其中最旧的document数据。
+
+
+2） **Query a Capped Collection**
+
+假如你对capped collection执行find()操作，并且未指定查询顺序(ordering)，此时MongoDB会确保按插入顺序返回查询结果。
+
+如果要与插入相反的顺序返回查询结果的话，那么在执行find()时搭配[sort()](https://docs.mongodb.com/manual/reference/method/cursor.sort/#mongodb-method-cursor.sort)方法，并向sort()传递```$natural```为-1的参数。参看如下示例：
+{% highlight string %}
+db.cappedCollection.find().sort( { $natural: -1 } )
+{% endhighlight %}
+
+3) **Check if a Collection is Capped**
+
+执行如下方法检查一个collection是否是capped:
+{% highlight string %}
+db.collection.isCapped()
+{% endhighlight %}
+
+4) **Convert a Collection to Capped**
+
+我们可以将一个non-capped collection转变为capped collection。使用[convertToCapped](https://docs.mongodb.com/manual/reference/command/convertToCapped/#mongodb-dbcommand-dbcmd.convertToCapped)命令：
+{% highlight string %}
+db.runCommand({"convertToCapped": "mycoll", size: 100000});
+{% endhighlight %}
+
+其中size参数指定capped collection可以占用的字节数。
+
+在执行上述转换操作时，需要获得数据库的互斥锁。其他需要锁database的操作此时将会被阻塞，直到转换操作完成。参看[What locks are taken by some common client operations](What locks are taken by some common client operations)以了解更多关于数据库锁的信息。
+
+
+5） **Tailable Cursor**
+
+可以在capped collection上使用[tailable cursor](https://docs.mongodb.com/manual/reference/glossary/#std-term-tailable-cursor)。与Unix系统中的```tail -f```命令类似，tailable cursor可以获取capped collection的尾部documents。当一个新的document插入到capped collection，你可以使用tailable cursor来继续获取documents。
+
+
+### 1.4 Time Series Collections
+>New in version 5.0
+
+[Time series collections](https://docs.mongodb.com/manual/reference/glossary/#std-term-time-series-collection)能够高效的存储时序度量数据。时序数据是任何随时间而变化而收集的数据，并唯一的由一个或多个unchanging参数所标识。通常保持不变(unchanging)的那一部分为数据的```元数据```。
+
+<pre>
+Example                      Measurement                     Metadata
+----------------------------------------------------------------------------------
+Weather data                Temperature           Sensor identifier, location
+
+Stock data                  Stock price           Stock ticker, exchange
+
+Website visitors            View count            URL
+</pre>
+
 
 
 
