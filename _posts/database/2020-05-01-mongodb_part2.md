@@ -495,20 +495,6 @@ db.runCommand({"convertToCapped": "mycoll", size: 100000});
 可以在capped collection上使用[tailable cursor](https://docs.mongodb.com/manual/reference/glossary/#std-term-tailable-cursor)。与Unix系统中的```tail -f```命令类似，tailable cursor可以获取capped collection的尾部documents。当一个新的document插入到capped collection，你可以使用tailable cursor来继续获取documents。
 
 
-### 1.4 Time Series Collections
->New in version 5.0
-
-[Time series collections](https://docs.mongodb.com/manual/reference/glossary/#std-term-time-series-collection)能够高效的存储时序度量数据。时序数据是任何随时间而变化而收集的数据，并唯一的由一个或多个unchanging参数所标识。通常保持不变(unchanging)的那一部分为数据的```元数据```。
-
-<pre>
-Example                      Measurement                     Metadata
-----------------------------------------------------------------------------------
-Weather data                Temperature           Sensor identifier, location
-
-Stock data                  Stock price           Stock ticker, exchange
-
-Website visitors            View count            URL
-</pre>
 
 
 
