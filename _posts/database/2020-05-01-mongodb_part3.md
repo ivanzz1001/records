@@ -74,7 +74,11 @@ timeseries.metaField           string             (Optional)用于指定时序do
 
 
 
-timeseries.granularity        string              (Optional)
+timeseries.granularity        string              (Optional)可选值可以为'seconds','minutes',或'hours'。默认情况下，
+                                                  MongoDB会将granularity设置为'seconds'以应对高频的数据存储。
+
+
+                                                  
 
 </pre>
 
