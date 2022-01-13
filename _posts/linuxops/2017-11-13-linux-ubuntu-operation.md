@@ -720,6 +720,12 @@ abcdefg
 # nohup ./test_program > /dev/null &
 {% endhighlight %}
 
+**34) 修改root密码不过期**
+<pre>
+# sudo chage -M 9999 root
+# sudo chage -I root
+</pre>
+
 
 <br />
 <br />
