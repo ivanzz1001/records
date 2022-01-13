@@ -12,6 +12,9 @@ description:  MongoDB介绍
 
 <!-- more -->
 
+MongoDB将数据记录作为BSON documents来进行存储。BSON是[JSON](https://docs.mongodb.com/manual/reference/glossary/#std-term-JSON) documents的一种二进制表示方式，但是其具有比JSON更多的数据类型(data types)。参看[bsonspec.org](http://bsonspec.org/)与[BSON Types](https://docs.mongodb.com/manual/reference/bson-types/).
+
+![mongodb-bson](https://ivanzz1001.github.io/records/assets/img/db/mongodb/crud-annotated-document.bakedsvg.svg)
 
 
 
