@@ -506,6 +506,7 @@ net.ipv4.tcp_retries2=7
 
 net.ipv4.tcp_max_tw_buckets = 5000
 
+kernel.threads-max = 4194303
 kernel.pid_max = 4194303
 vm.min_free_kbytes = 3145728
 
@@ -522,6 +523,11 @@ kernel.watchdog_thresh=20
 
 vm.max_map_count=4194303
 </pre>
+上面我们主要修改：
+>kernel.threads-max
+>kernel.pid_max
+>vm.max_map_count
+
 
 ## 3. 建立集群
 
