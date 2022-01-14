@@ -1584,6 +1584,19 @@ default.rgw.buckets.non-ec
 注意： 执行上述更新命令时，会更新epoch，然后确保其他的zone也会收到该配置。
 
 
+
+----------
+总结：创建realm为```oss```, master zone group为```cn```，  master zone为```cn-oss```执行步骤如下
+{% highlight string %}
+# radosgw-admin realm create --rgw-realm=oss --default
+# radosgw-admin zonegroup create --rgw-zonegroup=cn --rgw-realm=oss --master --default
+# radosgw-admin zone create --rgw-zonegroup=cn --rgw-zone=cn-oss --master --default 
+# radosgw-admin period update --commit
+{% endhighlight %}
+创建好zone后，默认会创建cn-oss.rgw.control、cn-oss.rgw.meta、cn-oss.rgw.rgw.log这三个pool
+
+
+
 ### 4.2 在ceph001-node1上部署RGW
 
 1) 创建存储池
