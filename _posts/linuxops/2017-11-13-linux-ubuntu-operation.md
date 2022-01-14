@@ -726,6 +726,16 @@ abcdefg
 # sudo chage -I root
 </pre>
 
+**35) 创建用户，并赋予用户sudo操作权限**
+{% highlight string %}
+# useradd -d /home/ivan1001 -m ivan1001
+# passwd ivan1001
+
+# echo "ivan1001 ALL = (root) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/ivan1001
+# chmod 0440 /etc/sudoers.d/ivan1001
+{% endhighlight %}
+
+
 
 <br />
 <br />
