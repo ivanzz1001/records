@@ -74,6 +74,34 @@ BSON格式本身是小端格式(little-endian)，timestamp以及counter value是
 
 MongoDB客户端应该为```_id```字段添加一个唯一的ObjectId。此外，使用ObjectId来为```_id```赋值还具有如下好处：
 
+* 在[mongosh](https://docs.mongodb.com/mongodb-shell/#mongodb-binary-bin.mongosh)中，你可以使用[ObjectId.getTimestamp()](https://docs.mongodb.com/manual/reference/method/ObjectId.getTimestamp/#mongodb-method-ObjectId.getTimestamp)方法来获取ObjectId的创建时间
+
+* 当```_id```字段存放的值为ObjectId时，如果对```_id```字段排序时，等价于按创建时间进行排序。
+
+>注：由于ObjectId的值应该随时间而增长，但它们却并没有必要保持是单调的。原因如下
+>
+> 1) 由于创建ObjectId时时间的分辨率是秒，因此在同一秒内的ObjectId并不能保证顺序
+> 
+> 2) ObjectId可能是由客户端产生的，不同的客户端也可能有不同的系统时钟
+
+
+### 1.2 String 
+BSON字符串是采用UTF-8编码。通常来说，每一种编程语言的驱动都会在序列化与反序列化BSON时，将对应语言的字符串编码转换成UTF-8编码格式。这使得采用BSON字符串可以很容易的存储大部分的国际化字符。另外，MongoDB的正则表达式查询([$regex queries](https://docs.mongodb.com/manual/reference/operator/query/regex/#mongodb-query-op.-regex))也支持UTF-8格式的正则字串。
+
+给定UTF-8字符集的字串，使用[sort()](https://docs.mongodb.com/manual/reference/method/cursor.sort/#mongodb-method-cursor.sort)来进行排序，通常是合理的、正确的。然而，由于内部sort()使用C++的strcmp api，因此在排序时对于某一些字符可能有误。
+
+### 1.3 Timestamps
+BSON有一种特别的timestamp类型供MongoDB内部使用，并且与通常的[Date类型](https://docs.mongodb.com/manual/reference/bson-types/#std-label-document-bson-type-date)没有关系。该内部的时间戳是一个64位的值：
+
+* 数字的高32位是一个time_t类型的值(seconds since the Unix epoch)
+
+* 数字的低32位是在一秒内操作的增量值(incrementing ordinal)
+
+由于BSON采用小端格式(little-endian)，因此首先存放的是低有效位。[mongod实例](https://docs.mongodb.com/manual/reference/program/mongod/#mongodb-binary-bin.mongod)在所有平台上，不管是大端还是小端，在比较两个内部timestamps时，总是先比较time_t部分，然后再是ordinal部分。
+
+在单个[mongod实例](https://docs.mongodb.com/manual/reference/program/mongod/#mongodb-binary-bin.mongod)内，timestamp值总是唯一的。
+
+在执行复制(replication)操作时，[oplog](https://docs.mongodb.com/manual/reference/glossary/#std-term-oplog)有一个```ts```字段。该字段的值反映了操作时间(operation time)，其也是一个BSON timestamp类型的值。
 
 
 
