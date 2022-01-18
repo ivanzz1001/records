@@ -153,6 +153,102 @@ mydate1.getMonth()
 {% endhighlight %}
 
 ## 2. Comparison/Sort Order 
+当比较不同[BSON types](https://docs.mongodb.com/manual/reference/bson-types/#std-label-bson-types)之间的值时，MongoDB按如下的顺序来进行比较（从低到高）：
+<pre>
+MinKey (internal type)
+Null
+Numbers (ints, longs, doubles, decimals)
+Symbol, String
+Object
+Array
+BinData
+ObjectId
+Boolean
+Date
+Timestamp
+Regular Expression
+MaxKey (internal type)
+</pre>
+
+### 2.1 Numeric Types
+在进行比较操作时，MongoDB会将一些类型做同等看待。例如，数字类型(numeric types)在进行比较之前会进行转换。
+
+### 2.2 Strings
+
+1) **Binary Comparison**
+
+默认情况下，在进行字符串比较时，MongoDB会使用简单的二进制比较。
+
+2） **Collation**
+
+>New in version 3.4
+
+[Collation](https://docs.mongodb.com/manual/reference/collation/)允许用户在进行字符串比较时，使用语言特定的规则。比如，字母大小写(lettercase)以及音调(accent)标识。
+
+校正手册有如下的一些语法：
+{% highlight string %}
+{
+   locale: <string>,
+   caseLevel: <boolean>,
+   caseFirst: <string>,
+   strength: <int>,
+   numericOrdering: <boolean>,
+   alternate: <string>,
+   maxVariable: <string>,
+   backwards: <boolean>
+}
+{% endhighlight %}
+
+当指定collation时，```locale```字段是强制性必须有的，所有其他字段是可选的。对这些字段的描述，请参看[Collation Document](https://docs.mongodb.com/manual/reference/collation/#std-label-collation-document-fields).
+
+假如并未给collection指定collation，或者并未给对应的操作(operation)指定collation，那么MongoDB会使用简单的二进制比较法。
+
+### 2.3 Arrays
+对于数组(arrays)来说，less-than比较或者升序(ascending sort)会比较数组元素的最小值；greater-than比较或降序(decending sort)会比较数组元素的最大值。假如某个字段的值是一个只拥有一个元素的数组（例如```[1]```)，当其与非数组字段(例如```2```)进行比较时，则是将1与2进行比较。
+
+>A comparison of an empty array (e.g. [ ]) treats the empty array as less than null or a missing field.
+
+### 2.4 Objects
+MongoDB在比较BSON对象时，使用如下的顺序：
+
+1. 递归地比较按出现顺序在BSON对象中的key-value对
+
+2. 比较字段的类型。对于字段类型，MongoDB使用如下的比较顺序(从低到高）：
+<pre>
+a. MinKey (internal type)
+b. Null
+c. Numbers (ints, longs, doubles, decimals)
+d. Symbol, String
+e. Object
+f. Array
+g. BinData
+h. ObjectId
+i. Boolean
+j. Date
+k. Timestamp
+l. Regular Expression
+m. MaxKey (internal type)
+</pre>
+
+3. 假如字段类型相同，比较[key field names](https://docs.mongodb.com/manual/core/document/#std-label-document-field-names)
+
+4. 假如key field names相同，比较field values
+
+5. 假如field values也相同，比较下一个key/value对（返回到第1步)。An object without further pairs is less than an object with further pairs.
+
+### 2.5 Dates and Timestamps
+
+Date对象排在Timestamp对象之前。
+
+### 2.6 Non-existent Fields
+当比较一个不存在的字段时，会将其看作是一个empty BSON object。因此，如果比较```{}```与```{a: null}```这两个document中的```a```字段时，则会认为它们是相等的。
+
+### 2.7 BinData
+MongoDB采用如下的顺序来对BinData进行排序：
+
+1. First, the length or size of the data.
+2. Then, by the BSON one-byte subtype.
+3. Finally, by the data, performing a byte-by-byte comparison.
 
 ## 3. MongoDB Extended JSON(v2)
 
