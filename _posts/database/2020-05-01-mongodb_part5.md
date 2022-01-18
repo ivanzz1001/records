@@ -103,6 +103,62 @@ BSON有一种特别的timestamp类型供MongoDB内部使用，并且与通常的
 
 在执行复制(replication)操作时，[oplog](https://docs.mongodb.com/manual/reference/glossary/#std-term-oplog)有一个```ts```字段。该字段的值反映了操作时间(operation time)，其也是一个BSON timestamp类型的值。
 
+>Note:
+>
+> BSON timestamp是MongoDB内部使用的。在大多数情况下，进行应用程序开发时，我们都是使用BSON date类型。参看[Date](https://docs.mongodb.com/manual/reference/bson-types/#std-label-document-bson-type-date)以了解更多信息。
+
+当插入一个document到collection时，如果top-level fields中有空时间戳值(empty timestamp values)的话，MongoDB会将对应的空时间戳值替换为当前时间，除非遇到如下场景。假如```_id```字段的值也是一个empty timestamp的话，其总是会被原模原样的被插入进去。
+
+示例：插入一个empty timestamp值的document到collection中
+{% highlight string %}
+db.test.insertOne( { ts: new Timestamp() } );
+{% endhighlight %}
+然后执行[db.test.find()](https://docs.mongodb.com/manual/reference/method/db.collection.find/#mongodb-method-db.collection.find)方法，返回的查询结果 类似如下：
+{% highlight string %}
+{ "_id" : ObjectId("542c2b97bac0595474108b48"), "ts" : Timestamp(1412180887, 1) }
+{% endhighlight %}
+从上面的结果我们看到，服务器已经将```ts```替换成了该document插入时的时间戳值。
+
+### 1.4 Date
+BSON Date是一个64位的整数，用于表示从Unix epoch(1970年1月1日）到当前的毫秒(milliseconds)数。这样一个64bit的整数可以表示的时间范围有290000000年。
+
+BSON Date是signed类型，负值表示1970年以前的日期。
+
+1) 示例1
+
+在[mongosh](https://docs.mongodb.com/mongodb-shell/#mongodb-binary-bin.mongosh)中使用new Date()构造函数来创建一个Date对象
+{% highlight string %}
+var mydate1 = new Date()
+{% endhighlight %}
+
+2) 示例2 
+
+在[mongosh](https://docs.mongodb.com/mongodb-shell/#mongodb-binary-bin.mongosh)中使用ISODate()构造函数创建Date对象：
+{% highlight string %}
+var mydate2 = ISODate()
+{% endhighlight %}
+
+3) 示例3 
+
+以字符串形式返回Date对象：
+{% highlight string %}
+mydate1.toString()
+{% endhighlight %}
+
+4) 示例4 
+
+返回Date对象的month部分。month是从0开始的，因此January的month值为0：
+{% highlight string %}
+mydate1.getMonth()
+{% endhighlight %}
+
+## 2. Comparison/Sort Order 
+
+## 3. MongoDB Extended JSON(v2)
+
+
+
+
 
 
 
