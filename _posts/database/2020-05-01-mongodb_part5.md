@@ -343,6 +343,27 @@ Canonical                                        Relaxed
 
 * ```"<payload>"```: Base64编码payload字符串
 
+* ```<ts>```: 对应BSON binary子类型的16进制字符串表示。参看[bson spec](http://bsonspec.org/spec.html)以了解subtypes.
+
+3） **Date**
+
+For dates between years 1970 and 9999, inclusive:
+<pre>
+Canonical                                             Relaxed
+-------------------------------------------------------------------------------------
+{"$date": {"$numberLong": "<millis>"}}         {"$date": "<ISO-8601 Date/Time Format>"}
+</pre>
+
+For dates before year 1970 or after year 9999:
+{% highlight string %}
+Canonical                                             Relaxed
+-------------------------------------------------------------------------------------
+{"$date": {"$numberLong": "<millis>"}}         <Same as Canonical>
+{% endhighlight %}
+
+
+
+
 ### 3.3 Examples
 {% highlight string %}
 Example Field Name                         Canonical Format                              Relaxed Format
