@@ -252,10 +252,111 @@ MongoDB采用如下的顺序来对BinData进行排序：
 
 ## 3. MongoDB Extended JSON(v2)
 
+JSON只能够表示[BSON](https://docs.mongodb.com/manual/reference/glossary/#std-term-BSON)类型的一个子集。为了保持类型信息(type information)，MongoDB针对JSON格式添加了如下扩展。
+
+* Canonical Mode
+
+一种字符串格式，会重点保留类型信息，但是可能会降低可读性(readability)和交互性。即，从```canonical```模式转变成BSON可以保留类型信息（极少数特殊情况除外）。
+
+* Relaxed Mode
+
+一种字符串格式，着重强调可读性(readability)与交互性(interoperability)，但可能会丧失类型信息。即，从relaxed格式转换成BSON格式可能会丢失类型信息。
+
+两种格式都符合[JSON RFC](http://www.json.org/)，并且可以被众多MongoDB drivers及tools所解析。
+
+### 3.1 MongoDB Extended JSON v2 Usage
+
+1） **Drivers**
+
+如下的drivers使用Extended JSON v2.0:
+<pre>
+C             Java             PHPC
+C++           Node             Python
+Go            Perl             Scala
+</pre>
+
+2) **MongoDB Database Tools**
+
+从MongoDB 2.2版本开始：
 
 
+* bsondump： 使用Extended JSON v2.0(Canonical mode) format
+
+* mongodump： 对于元数据使用Extended JSON v2.0(Canonical mode)格式。要求[mongorestore](https://docs.mongodb.com/database-tools/mongorestore/#mongodb-binary-bin.mongorestore)的版本为4.2或更高，并支持Extended JSON v2.0(Canonical mode 或 Relax mode)格式。
+
+>注：通常来说，mongodump与mongorestore的版本要相匹配。
+
+* mongoexport: 默认情况下，以Extended JSON v2.0(Relax mode)方式输出。如果要以Extended JSON v2.0(canonical mode)方式输出，请使用```--jsonFormat```指定
+
+* mongoimport: 默认情况下导入的数据应该为Extended JSON v2.0(Relaxed或Canonical模式）格式。如果要识别Extended JSON v1.0格式的话，我们可以通过```--legacy```选项。
+
+>注：通常来说，mongoexport与mongoimport的版本要相匹配。
 
 
+### 3.2 BSON Data Types and Associated Representations
+
+
+如下列出了一些常用的BSON数据类型，以及Canonical模式、Relaxed模式下用Extended JSON如何表示。
+
+* [Array](https://docs.mongodb.com/manual/reference/mongodb-extended-json/#mongodb-bsontype-Array)
+* [Decimal128](https://docs.mongodb.com/manual/reference/mongodb-extended-json/#mongodb-bsontype-Decimal128)
+* [Int32](https://docs.mongodb.com/manual/reference/mongodb-extended-json/#mongodb-bsontype-Int32)
+* [MinKey](https://docs.mongodb.com/manual/reference/mongodb-extended-json/#mongodb-bsontype-MinKey)
+* [Binary](https://docs.mongodb.com/manual/reference/mongodb-extended-json/#mongodb-bsontype-Binary)
+* [Document](https://docs.mongodb.com/manual/reference/mongodb-extended-json/#mongodb-bsontype-Document)
+* [Int64](https://docs.mongodb.com/manual/reference/mongodb-extended-json/#mongodb-bsontype-Int64)
+* [ObjectId](https://docs.mongodb.com/manual/reference/mongodb-extended-json/#mongodb-bsontype-ObjectId)
+* [Date](https://docs.mongodb.com/manual/reference/mongodb-extended-json/#mongodb-bsontype-Date)
+* [Double](https://docs.mongodb.com/manual/reference/mongodb-extended-json/#mongodb-bsontype-Double)
+* [MaxKey](https://docs.mongodb.com/manual/reference/mongodb-extended-json/#mongodb-bsontype-MaxKey)
+* [Regular Expression](https://docs.mongodb.com/manual/reference/mongodb-extended-json/#mongodb-bsontype-Regular-Expression)
+* [Timestamp](https://docs.mongodb.com/manual/reference/mongodb-extended-json/#mongodb-bsontype-Timestamp)
+
+完整的扩展JSON列表，请参看[extended-json](https://github.com/mongodb/specifications/blob/master/source/extended-json.rst#conversion-table)
+
+1) **Array**
+
+{% highlight string %}
+Canonical                                     Relaxed
+-------------------------------------------------------------------------------------
+[<elements>]                              <same as Canonical>
+{% endhighlight %}
+
+数组元素如下：
+
+* ```<elements>```
+  * 数组元素使用Extended JSON
+  * 如果要指定一个空数组，使用[]
+
+2) **Binary**
+{% highlight string %}
+Canonical                                        Relaxed
+-------------------------------------------------------------------------------------
+{ "$binary":                                    <Same as Canonical>
+   {
+      "base64": "<payload>",
+      "subType": "<t>"
+   }
+}
+{% endhighlight %}
+相关说明如下：
+
+* ```"<payload>"```: Base64编码payload字符串
+
+### 3.3 Examples
+{% highlight string %}
+Example Field Name                         Canonical Format                              Relaxed Format
+-------------------------------------------------------------------------------------------------------------------
+    "_id:"                         {"$oid":"5d505646cf6d4fe581014ab2"}               {"$oid":"5d505646cf6d4fe581014ab2"}
+
+  "arrayField":                    ["hello",{"$numberInt":"10"}]                     ["hello",10]
+
+  "dateField":                     {"$date":{"$numberLong":"1565546054692"}}         {"$date":"2019-08-11T17:54:14.692Z"}
+
+  "dateBefore1970":                {"$date":{"$numberLong":"-1577923200000"}}        {"$date":{"$numberLong":"-1577923200000"}}
+
+  "decimal128Field":               {"$numberDecimal":"10.99"}                        {"$numberDecimal":"10.99"}
+{% endhighlight %}
 
 
 <br />
