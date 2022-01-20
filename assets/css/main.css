@@ -84,9 +84,8 @@ a img {
 
 body {
   background: #ddd;
-  /*font-family: "Helvetica Neue", "Helvetica", "Microsoft YaHei", "WenQuanYi Micro Hei", Arial, sans-serif;*/
   font-family: "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Source Han Sans", "WenQuanYi Micro Hei", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  font-size: 100%;
+  font-size: 85%;
   color: #817c7c;
   line-height: 1.5
 }
