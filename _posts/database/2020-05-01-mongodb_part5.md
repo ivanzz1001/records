@@ -348,11 +348,11 @@ Canonical                                        Relaxed
 3） **Date**
 
 For dates between years 1970 and 9999, inclusive:
-<pre>
+{% highlight string %}
 Canonical                                             Relaxed
 -------------------------------------------------------------------------------------
 {"$date": {"$numberLong": "<millis>"}}         {"$date": "<ISO-8601 Date/Time Format>"}
-</pre>
+{% endhighlight %}
 
 For dates before year 1970 or after year 9999:
 {% highlight string %}
