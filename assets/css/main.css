@@ -2418,7 +2418,7 @@ footer {
   background: #2d5163;
   margin: .5em 0;
   padding: .5em 2%;
-  color: #e1eae1;
+  color: #aaaaaa;
   line-height: 1.5;
   font-size: .8em;
   -webkit-border-radius: .35em;
@@ -2430,7 +2430,7 @@ footer {
 
 @media only screen and (min-width:568px) {
   .article-content pre, .article-content .highlight, .article-content .highlight pre {
-    font-size: .85em
+    font-size: 1em
   }
 }
 
@@ -2449,7 +2449,7 @@ footer {
 .article-content pre {
   font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
   background: #2d2e2e;
-  color: #d6d6d6;
+  color: #aaaaaa;
   border: 1px solid #ccc;
 }
 
