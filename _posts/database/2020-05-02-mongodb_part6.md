@@ -384,16 +384,17 @@ For mongosh info see: https://docs.mongodb.com/mongodb-shell/
 
 MongoDB社区版有自己专用的仓库(repository)，官方支持如下一些安装包：
 
-1. mongodb-org： 是一个metapackage，用于自动的安装如下的一些组件(component packages)
+* mongodb-org： 是一个metapackage，用于自动的安装如下的一些组件(component packages)
 
-2. mongodb-org-database: 是一个metapackage，用于自动的安装如下组件
+* mongodb-org-database: 是一个metapackage，用于自动的安装如下组件
+
   * mongodb-org-server: 含有mongod守护进程，相关的初始化脚本，以及一个配置文件(/etc/mongod.conf)。你可以使用初始化脚本，以默认配置文件的方式来启动mongod
   * mongodb-org-mongos: 包含mongos守护进程
   * mongodb-org-shell: 包含经典mongo shell
 
-3. mongodb-mongosh: 包含MongoDB Shell(mongosh)
+* mongodb-mongosh: 包含MongoDB Shell(mongosh)
 
-4. mongodb-org-tools: 是一个metapackage，用于自动安装如下组件
+* mongodb-org-tools: 是一个metapackage，用于自动安装如下组件
 
   * mongodb-database-tools: 包含如下一些数据库工具
    
