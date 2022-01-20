@@ -37,6 +37,8 @@ description: github pages
 ## 4. 自动生成博客
 
 
+## 5. 主题参考
+请参看[jekyllthemes](http://jekyllthemes.org/)
 
 <br />
 <br />
