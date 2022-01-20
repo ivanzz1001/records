@@ -2429,6 +2429,14 @@ footer {
   overflow: auto
 }
 
+/*ivanzz1001 2022-01-20*/
+.article-content .highlight pre::-webkit-scrollbar {
+      width: 20px;                   /* 纵向滚动条 宽度 */
+      height: 10px;                  /* 横向滚动条 高度 */
+      /*background: pink;*/          /* 整体背景 */
+      border-radius: 10px;           /* 整体 圆角 */
+}
+
 @media only screen and (min-width:568px) {
   .article-content pre, .article-content .highlight, .article-content .highlight pre {
     font-size: .9em
