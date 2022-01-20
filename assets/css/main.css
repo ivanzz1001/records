@@ -2455,6 +2455,15 @@ footer {
   border: 1px solid #ccc;
 }
 
+.article-content pre::-webkit-scrollbar {
+	width: 4px;    
+	height: 4px;
+}
+
+.article-content pre::-webkit-scrollbar-thumb {
+	background: #605f5a;
+}
+
 .article-content pre code {
   background: none;
   text-shadow: none;
