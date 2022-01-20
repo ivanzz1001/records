@@ -38,7 +38,12 @@ description: github pages
 
 
 ## 5. 主题参考
-请参看[jekyllthemes](http://jekyllthemes.org/)
+请参看:
+
+* [jekyllthemes](http://jekyllthemes.org/)
+
+* [exchangerate](https://www.exchangerate-api.com/docs/java-currency-api)
+
 
 <br />
 <br />
