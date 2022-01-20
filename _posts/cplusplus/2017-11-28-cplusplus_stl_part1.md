@@ -37,21 +37,21 @@ STL提供六大组件，彼此可以组合套用：
 
 当前最新版SGI STL v3.3头文件如下：
 <pre>
-algo.h                hash_map.h     numeric	          stdexcept	              stl_heap.h               stl_slist.h
-algobase.h            hash_set       pair.h	              stl_algo.h	          stl_iterator.h           stl_stack.h
-algorithm             hash_set.h     pthread_alloc        stl_algobase.h          stl_iterator_base.h      stl_string_fwd.h
-alloc.h               hashtable.h    pthread_alloc.h      stl_alloc.h	          stl_list.h               stl_tempbuf.h
-bitset                heap.h         queue                stl_bvector.h	          stl_map.h                stl_threads.h
-bvector.h	          iterator       rope                 stl_config.h	          stl_multimap.h           stl_tree.h
-char_traits.h         iterator.h     rope.h               stl_construct.h         stl_multiset.h           stl_uninitialized.h
-concept_checks.h      limits         ropeimpl.h           stl_ctraits_fns.h	      stl_numeric.h            stl_vector.h
-container_concepts.h  list           sequence_concepts.h  stl_deque.h             stl_pair.h               string
-defalloc.h            list.h         set	              stl_exception.h         stl_queue.h              tempbuf.h
-deque                 map            set.h	              stl_function.h	      stl_range_errors.h       tree.h
-deque.h	              map.h          slist                stl_hash_fun.h	      stl_raw_storage_iter.h   type_traits.h
-function.h            memory         slist.h	          stl_hash_map.h          stl_relops.h	           utility
-functional            multimap.h     stack	              stl_hash_set.h          stl_rope.h	           valarray
-hash_map              multiset.h     stack.h	          stl_hashtable.h         stl_set.h                vector
+algo.h                hash_map.h     numeric               stdexcept              stl_heap.h               stl_slist.h
+algobase.h            hash_set       pair.h	               stl_algo.h	          stl_iterator.h           stl_stack.h
+algorithm             hash_set.h     pthread_alloc         stl_algobase.h         stl_iterator_base.h      stl_string_fwd.h
+alloc.h               hashtable.h    pthread_alloc.h       stl_alloc.h            stl_list.h               stl_tempbuf.h
+bitset                heap.h         queue                 stl_bvector.h          stl_map.h                stl_threads.h
+bvector.h             iterator       rope                  stl_config.h	          stl_multimap.h           stl_tree.h
+char_traits.h         iterator.h     rope.h                stl_construct.h        stl_multiset.h           stl_uninitialized.h
+concept_checks.h      limits         ropeimpl.h            stl_ctraits_fns.h      stl_numeric.h            stl_vector.h
+container_concepts.h  list           sequence_concepts.h   stl_deque.h            stl_pair.h               string
+defalloc.h            list.h         set                   stl_exception.h        stl_queue.h              tempbuf.h
+deque                 map            set.h                 stl_function.h         stl_range_errors.h       tree.h
+deque.h	              map.h          slist                 stl_hash_fun.h         stl_raw_storage_iter.h   type_traits.h
+function.h            memory         slist.h	           stl_hash_map.h         stl_relops.h	           utility
+functional            multimap.h     stack                 stl_hash_set.h         stl_rope.h	           valarray
+hash_map              multiset.h     stack.h	           stl_hashtable.h        stl_set.h                vector
 </pre>
 
 如何在当前自己的Linux操作系统上找到stl头文件的位置呢？ 我们可以简单编写一个测试代码```test.cpp```:
