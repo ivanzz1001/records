@@ -2418,7 +2418,6 @@ footer {
   background: #2d5163;
   margin: .5em 0;
   padding: .5em 2%;
-  /*color: #050505;*/
   color: #e1eae1;
   line-height: 1.5;
   font-size: .8em;
@@ -2449,9 +2448,8 @@ footer {
 
 .article-content pre {
   font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
-  background: #2f2b2b;
-  color: #39d21f;
-  /*background: #f5f5f5; (ivanzz1001)*/
+  background: #2d2e2e;
+  color: #d6d6d6;
   border: 1px solid #ccc;
 }
 
