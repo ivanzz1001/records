@@ -949,7 +949,8 @@ header nav ul li a:hover {
 }
 
 .post a, .page a, .link a, .photo a {
-  color: {{ site.colors.primary }};
+  /*color: {{ site.colors.primary }};*/
+  color: #0f66dc
 }
 
 .post a:hover, .page a:hover, .link a:hover, .photo a:hover {
