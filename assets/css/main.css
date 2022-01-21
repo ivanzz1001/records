@@ -1154,13 +1154,14 @@ article .article-content dl dt {
 }
 
 article .article-content ul li>code, article .article-content ol li>code, article .article-content p code, article .article-content strong code, article .article-content em code, article .article-content table th>code, article .article-content table td>code {
-  font-family: Monaco, Menlo, Consolas, Courier New, monospace;
+  font-family: SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
   background: #eee;
   color: #d14;
   border: 1px solid #d6d6d6;
   padding: 0 5px;
   margin: 0 2px;
   font-size: 90%;
+  font-weight: bold;
   white-space: nowrap;
   text-shadow: 0 1px #fff;
   -webkit-border-radius: .25em;
