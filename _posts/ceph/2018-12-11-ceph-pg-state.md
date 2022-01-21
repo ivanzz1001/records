@@ -897,6 +897,11 @@ pg 7.123 OSD 2 存在1,2,3,7   object
 
 4. [分布式存储Ceph之PG状态详解](https://www.jianshu.com/p/36c2d5682d87)
 
+5. [pg-states](https://docs.ceph.com/en/latest/rados/operations/pg-states/)
+
+6. [PG 异常状态- active+undersized+degraded](https://blog.csdn.net/chenwei8280/article/details/80785595)
+
+
 <br />
 <br />
 <br />
