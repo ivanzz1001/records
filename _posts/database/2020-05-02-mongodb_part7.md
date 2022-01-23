@@ -667,8 +667,131 @@ db.inventory.find( { status: "A" }, { item: 1, status: 1, instock: { $slice: -1 
 从MongoDB 4.4版本开始，针对projection MongoDB会强制一些额外的限制，请参看[Projection Restrictions](https://docs.mongodb.com/manual/reference/limits/#mongodb-limit-Projection-Restrictions)。
 
 ### 3.5 Query for Null or Missing Fields
+在MongoDB中不同的query operators对待```null```值的方式也不同。
+
+本文提供一些使用[db.collection.find()](https://docs.mongodb.com/manual/reference/method/db.collection.find/#mongodb-method-db.collection.find)方法查询```null```值的示例。例子使用```inventory```这个collection，我们向该collection填充一些数据：
+
+{% highlight string %}
+db.inventory.insertMany([
+   { _id: 1, item: null },
+   { _id: 2 }
+])
+{% endhighlight %}
+
+
+###### Equality Filter
+```{item: null}```查询匹配```item```字段的值为```null```或者不含```item```的document。
+
+{% highlight string %}
+db.inventory.find( { item: null } )
+{% endhighlight %}
+
+上述查询会返回```inventory```集合中的两个元素。
+
+###### Type Check
+```{ item : { $type: 10 } }```查询匹配含有```item```字段且该字段值为```null```的documents。比如，```item```字段的值为[BSON Type](https://docs.mongodb.com/manual/reference/bson-types/) Null(其对应的type number为10）：
+{% highlight string %}
+db.inventory.find( { item : { $type: 10 } } )
+{% endhighlight %}
+
+上述查询只返回item字段值为```null```的document。
+
+###### Existence Check
+下面的示例查询不含某一字段的documents。
+
+>注：从MongoDB 4.2版本开始，用户不能使用query filter```$type: 0```作为```$exists: false```的等价。
+
+```{ item : { $exists: false } }```匹配不含```item```字段的documents:
+{% highlight string %}
+db.inventory.find( { item : { $exists: false } } )
+{% endhighlight %}
+上述例子只返回不含```item```字段的documents。
+
+
 
 ### 3.6 Iterate a Cursor in mongosh
+[db.collection.find()](https://docs.mongodb.com/manual/reference/method/db.collection.find/#mongodb-method-db.collection.find)会返回一个```游标```(cursor)。要访问这些documents，你需要遍历该cursor。然而，在[mongosh](https://docs.mongodb.com/mongodb-shell/#mongodb-binary-bin.mongosh)中，假如返回的cursor没有赋值给一个使用```var```关键字定义的变量时，则cursor会自动的遍历20次以打印结果集中最开头的20个documents。
+
+下面的例子描述了一种方法可以手动(manually)的遍历cursor从而访问结果集中的documents，或者使用iterator index来访问结果集中的元素。
+
+###### Manually Iterate the Cursor
+在[mongosh](https://docs.mongodb.com/mongodb-shell/#mongodb-binary-bin.mongosh)中，当你将[find()](https://docs.mongodb.com/manual/reference/method/db.collection.find/#mongodb-method-db.collection.find)方法返回的结果集赋值给一个由```var```关键字定义的变量时，则cursor将不会自动的遍历。
+
+你可以在mongosh中遍历该cursor多达20次，以打印结果集中的元素，请参看如下示例：
+
+>Note: You can set the ```DBQuery.shellBatchSize``` attribute to change the number of documents from the default value of 20.
+
+{% highlight string %}
+var myCursor = db.users.find( { type: 2 } );
+
+myCursor
+{% endhighlight %}
+
+你也可以使用cursor method[next()](https://docs.mongodb.com/manual/reference/method/cursor.next/#mongodb-method-cursor.next)来访问结果集中的元素，参看如下示例：
+{% highlight string %}
+var myCursor = db.users.find( { type: 2 } );
+
+while (myCursor.hasNext()) {
+   print(tojson(myCursor.next()));
+}
+{% endhighlight %}
+
+作为另一种打印方式，考虑```printjson()```帮助方法以代替```print(tojson())```:
+{% highlight string %}
+var myCursor = db.users.find( { type: 2 } );
+
+while (myCursor.hasNext()) {
+   printjson(myCursor.next());
+}
+{% endhighlight %}
+
+另外，你也可以使用[forEach()](https://docs.mongodb.com/manual/reference/method/cursor.forEach/#mongodb-method-cursor.forEach)来遍历cursor，并访问其中的documents，参看如下示例：
+{% highlight string %}
+var myCursor =  db.users.find( { type: 2 } );
+
+myCursor.forEach(printjson);
+{% endhighlight %}
+
+###### Iterator Index
+在mongosh中，你可以使用[toArray()](https://docs.mongodb.com/manual/reference/method/cursor.toArray/#mongodb-method-cursor.toArray)方法来遍历cursor，并通过一个数组来返回documents，参看如下：
+{% highlight string %}
+var myCursor = db.inventory.find( { type: 2 } );
+var documentArray = myCursor.toArray();
+var myDocument = documentArray[3];
+{% endhighlight %}
+[toArray](https://docs.mongodb.com/manual/reference/method/cursor.toArray/#mongodb-method-cursor.toArray)方法会将cursor所返回的所有documents加载到RAM。[toArray()](https://docs.mongodb.com/manual/reference/method/cursor.toArray/#mongodb-method-cursor.toArray)会exhausts cursor。
+
+另外有一些[Driver](https://docs.mongodb.com/drivers/)会针对cursor提供索引(index)来访问其中的documents（比如：```cursor[index]```）。这仅仅知识调用[toArray()](https://docs.mongodb.com/manual/reference/method/cursor.toArray/#mongodb-method-cursor.toArray)的一种简写形式，然后在结果集数组上使用索引。
+
+考虑下面的示例：
+{% highlight string %}
+var myCursor = db.users.find( { type: 2 } );
+var myDocument = myCursor[1];
+{% endhighlight %}
+
+其中```myCursor[1]```等价于如下：
+{% highlight string %}
+myCursor.toArray() [1];
+{% endhighlight %}
+
+###### Cursor Behaviors
+1) **Cursors Opened Within a Session**
+
+从MongoDB 5.0(以及4.4.8)版本开始，在一个[client session](https://docs.mongodb.com/manual/core/read-isolation-consistency-recency/)中所创建的cursors会在对应的[server session](https://docs.mongodb.com/manual/reference/server-sessions/)接收到[killSessions](https://docs.mongodb.com/manual/reference/command/killSessions/#mongodb-dbcommand-dbcmd.killSessions)命令后被关闭，或者遇到session超时，或者client已经exhausted对应的cursor。
+
+默认情况下，server session的超时时间为30分钟。要改变该值，在启动mongod时请设置[localLogicalSessionTimeoutMinutes](https://docs.mongodb.com/manual/reference/parameters/#mongodb-parameter-param.localLogicalSessionTimeoutMinutes)参数。
+
+2) **Cursors Opened Outside of a Session**
+
+3) **Cursor Isolation**
+
+4) **Cursor Batches**
+
+###### Cursor Information
+
+
+
+
 
 
 <br />
