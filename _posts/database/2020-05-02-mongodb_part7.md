@@ -317,7 +317,358 @@ db.inventory.find(  { size: { w: 21, h: 14, uom: "cm" } }  )
 
 ###### Query on Nested Field
 
+如果要使用内嵌document中某个字段作为查询条件来查询的话，使用[dot notation](https://docs.mongodb.com/manual/reference/glossary/#std-term-dot-notation)(```"field.nestedField"```)。
 
+>Note: 当使用dot notation来执行查询的话，查询字段必须在双引号内
+
+1） **Specify Equality Match on a Nested Field**
+
+下面的例子查询```size```中的内嵌字段```uom```等于```in```的所有document:
+{% highlight string %}
+db.inventory.find( { "size.uom": "in" } )
+{% endhighlight %}
+
+2) **Specify Match using Query Operator**
+
+一个[query filter document](https://docs.mongodb.com/manual/core/document/#std-label-document-query-filter)可以使用[query operators](https://docs.mongodb.com/manual/reference/operator/query/#std-label-query-selectors)来指定查询条件，形式如下：
+{% highlight string %}
+{ <field1>: { <operator1>: <value1> }, ... }
+{% endhighlight %}
+
+下面的示例使用less than operator ([$lt](https://docs.mongodb.com/manual/reference/operator/query/lt/#mongodb-query-op.-lt))在```size```的内嵌字段```h```上做查询：
+{% highlight string %}
+db.inventory.find( { "size.h": { $lt: 15 } } )
+{% endhighlight %}
+
+3) **Specify AND Condition**
+
+如下查询内嵌字段```h```小于15，内嵌字段```uom```等于```in```，且```status```等于```D```的documents:
+{% highlight string %}
+db.inventory.find( { "size.h": { $lt: 15 }, "size.uom": "in", status: "D" } )
+{% endhighlight %}
+
+###### Additional Query Tutorials
+其他查询示例，请参看：
+
+* [Query Documents](https://docs.mongodb.com/manual/tutorial/query-documents/)
+* [Query an Array](https://docs.mongodb.com/manual/tutorial/query-arrays/)
+* [Query an Array of Embedded Documents](https://docs.mongodb.com/manual/tutorial/query-array-of-documents/)
+
+### 3.2 Query an Array
+
+本节我们提供一些示例，使用[db.collection.find()](https://docs.mongodb.com/manual/reference/method/db.collection.find/#mongodb-method-db.collection.find)方法在数组字段上做查询。例子使用```inventory```这个collection。下面我们先向该collection填充一些数据：
+{% highlight string %}
+db.inventory.insertMany([
+   { item: "journal", qty: 25, tags: ["blank", "red"], dim_cm: [ 14, 21 ] },
+   { item: "notebook", qty: 50, tags: ["red", "blank"], dim_cm: [ 14, 21 ] },
+   { item: "paper", qty: 100, tags: ["red", "blank", "plain"], dim_cm: [ 14, 21 ] },
+   { item: "planner", qty: 75, tags: ["blank", "red"], dim_cm: [ 22.85, 30 ] },
+   { item: "postcard", qty: 45, tags: ["blue"], dim_cm: [ 10, 15.25 ] }
+]);
+{% endhighlight %}
+
+###### Match an Array
+要在一个数组上指定equality condition，使用query document ```{ <field>: <value>}```，其中```<value>```与数组严格匹配，包含数组顺序也要匹配。
+
+如下的例子查询的字段```tags```的值为数组，且按顺序值为```red```和```blank```的document:
+{% highlight string %}
+db.inventory.find( { tags: ["red", "blank"] } )
+{% endhighlight %}
+
+另外，假如你仅仅只想查询一个数组中含有```red```及```blank```元素（不关心顺序，也不关心是否有其他元素），请使用[$all](https://docs.mongodb.com/manual/reference/operator/query/all/#mongodb-query-op.-all) operator。
+
+{% highlight string %}
+db.inventory.find( { tags: { $all: ["red", "blank"] } } )
+{% endhighlight %}
+
+###### Query an Array for an Element
+如果要查询数组中```至少```包含某一指定值，使用filter ```{<field>: <value>}```，其中```<value>```为数组元素的值。
+
+如下的例子查询```tags```字段至少含有```red```元素的documents:
+{% highlight string %}
+db.inventory.find( { tags: "red" } )
+{% endhighlight %}
+
+如果要在数组字段的elements上指定查询条件的话，可以在[query filter document](https://docs.mongodb.com/manual/core/document/#std-label-document-query-filter)上使用[query operators](https://docs.mongodb.com/manual/reference/operator/query/#std-label-query-selectors):
+{% highlight string %}
+{ <array field>: { <operator1>: <value1>, ... } }
+{% endhighlight %}
+
+例如，下面的操作查询```dim_cm```数组中至少包含一个元素，该元素的值大于25:
+{% highlight string %}
+db.inventory.find( { dim_cm: { $gt: 25 } } )
+{% endhighlight %}
+
+
+###### Specify Multiple Conditions for Array Elements
+
+当需要在数组元素上指定复合条件的话，你可以为```单个```数组元素指定查询条件，也可以为```多个```数组元素指定查询条件.
+
+
+1) **Query an Array with Compound Filter Conditions on the Array Elements**
+
+下面的例子查询```dim_cm```数组中元素满足匹配条件的documents。例如，数组中有一个元素大于15且有另一个元素小于20， 或者某一个元素同时满足这两个条件的documents:
+{% highlight string %}
+db.inventory.find( { dim_cm: { $gt: 15, $lt: 20 } } )
+{% endhighlight %}
+
+2) **Query for an Array Element that Meets Multiple Criteria**
+
+使用[$elemMatch](https://docs.mongodb.com/manual/reference/operator/query/elemMatch/#mongodb-query-op.-elemMatch)操作符来为数组中的元素指定多个准则(criteria)，要求数组中至少有一个元素匹配所有准则。
+
+如下的示例查询```dim_cm```数组中至少有一个元素同时满足：大于([$gt](https://docs.mongodb.com/manual/reference/operator/query/gt/#mongodb-query-op.-gt))22，且小于([$lt](https://docs.mongodb.com/manual/reference/operator/query/lt/#mongodb-query-op.-lt))30
+
+{% highlight string %}
+db.inventory.find( { dim_cm: { $elemMatch: { $gt: 22, $lt: 30 } } } )
+{% endhighlight %}
+
+3) **Query for an Element by the Array Index Position**
+
+使用[dot notation](https://docs.mongodb.com/manual/reference/glossary/#std-term-dot-notation)，你可以为某一特定index上的数组元素指定查询条件。数组下表从0开始索引。
+
+>Note: 当使用dot notation执行查询时，所查询的field(包括内嵌field)必须在双引号中
+
+下面的示例查询```dim_cm```数组中第二个元素大于25的所有documents:
+{% highlight string %}
+db.inventory.find( { "dim_cm.1": { $gt: 25 } } )
+{% endhighlight %}
+
+4) **Query an Array by Array Length**
+
+使用[$size](https://docs.mongodb.com/manual/reference/operator/query/size/#mongodb-query-op.-size)操作符来查询一个数组中数组元素的个数。例如，下面查询```tags```数组有3个元素的documents:
+{% highlight string %}
+db.inventory.find( { "tags": { $size: 3 } } )
+{% endhighlight %}
+
+###### Additional Query Tutorials
+
+更多查询示例，请参看：
+
+* [Query Documents](https://docs.mongodb.com/manual/tutorial/query-documents/)
+* [Query on Embedded/Nested Documents](https://docs.mongodb.com/manual/tutorial/query-embedded-documents/)
+* [Query an Array of Embedded Documents](https://docs.mongodb.com/manual/tutorial/query-array-of-documents/)
+
+### 3.3 Query an Array of Embedded Documents
+
+本节提供一些示例，使用[db.collection.find()](https://docs.mongodb.com/manual/reference/method/db.collection.find/#mongodb-method-db.collection.find)方法查询数组元素为```内嵌```(nested) documents的记录。例子基于```inventory```这个collection，这里我们首先向该collection填充一些数据：
+{% highlight string %}
+db.inventory.insertMany( [
+   { item: "journal", instock: [ { warehouse: "A", qty: 5 }, { warehouse: "C", qty: 15 } ] },
+   { item: "notebook", instock: [ { warehouse: "C", qty: 5 } ] },
+   { item: "paper", instock: [ { warehouse: "A", qty: 60 }, { warehouse: "B", qty: 15 } ] },
+   { item: "planner", instock: [ { warehouse: "A", qty: 40 }, { warehouse: "B", qty: 5 } ] },
+   { item: "postcard", instock: [ { warehouse: "B", qty: 15 }, { warehouse: "C", qty: 35 } ] }
+]);
+{% endhighlight %}
+
+###### Query for a Document Nested in an Array
+下面的例子查询```instock```数组中匹配指定条件的documents:
+{% highlight string %}
+db.inventory.find( { "instock": { warehouse: "A", qty: 5 } } )
+{% endhighlight %}
+
+对整个内嵌(embeded/nested)document的Equality匹配要求对指定的document严格匹配，包括字段的顺序。例如，如下的查询将匹配不上```inventory```这个collection中的任何document:
+{% highlight string %}
+db.inventory.find( { "instock": { qty: 5, warehouse: "A" } } )
+{% endhighlight %}
+
+###### Specify a Query Condition on a Field in an Array of Documents
+
+1) **Specify a Query Condition on a Field Embedded in an Array of Documents**
+
+假如你不知道某一document在内嵌数组中的索引位置，那么可以使用```.```(dot)将将数组字段的名称(array-field-name)与内嵌document字段名称(nested-document-field-name)连接起来。
+
+如下的示例查询```instock```数组至少有一个内嵌元素含有```qty```字段，且该字段的值小于等于20：
+{% highlight string %}
+db.inventory.find( { 'instock.qty': { $lte: 20 } } )
+{% endhighlight %}
+
+2) **Use the Array Index to Query for a Field in the Embedded Document**
+
+使用[dot notation](https://docs.mongodb.com/manual/reference/glossary/#std-term-dot-notation)，你可以为数组中某个索引(position)位置上的内嵌document字段指定查询条件。数组的索引从0开始。
+
+>Note: 当使用dot notation时，字段(field)与索引(index)必须在双引号中
+
+下面的例子查询```instock```数组中第一个document元素含有内嵌```qtr```字段，并且该字段的值小于等于20:
+{% highlight string %}
+db.inventory.find( { 'instock.0.qty': { $lte: 20 } } )
+{% endhighlight %}
+
+###### Specify Multiple Conditions for Array of Documents
+当需要对一个数组内嵌document的多个field指定查询条件时，你可以为内嵌的```单个```document指定多个匹配条件，也可以为```多个```document指定多个匹配条件。
+
+1） **A Single Nested Document Meets Multiple Query Conditions on Nested Fields**
+
+使用[$elemMatch](https://docs.mongodb.com/manual/reference/operator/query/elemMatch/#mongodb-query-op.-elemMatch) operator为数组中的内嵌document指定多个```准则```(criteria)，要求数组中至少有一个内嵌document匹配所有准则。
+
+下面的示例查询```instock```数组中至少有一个内嵌document同时含有字段```qty```等于5，且含有字段```warehouse```等于```A```:
+{% highlight string %}
+db.inventory.find( { "instock": { $elemMatch: { qty: 5, warehouse: "A" } } } )
+{% endhighlight %}
+
+2) **Combination of Elements Satisfies the Criteria**
+
+假如对于数组字段(field)执行复合条件查询时```不使用```[$elemMatch](https://docs.mongodb.com/manual/reference/operator/query/elemMatch/#mongodb-query-op.-elemMatch)的话，则只要数组中的内嵌document的任何组合(可以多个内嵌documents组合在一起）满足查询条件即匹配成功。
+
+例如，下面查询```instock```数组中任何内嵌document含有```qty```字段大于10，以及数组中任何内嵌document(没必要是同一个内嵌document)含有```qty```字段小于等于20:
+{% highlight string %}
+db.inventory.find( { "instock.qty": { $gt: 10,  $lte: 20 } } )
+{% endhighlight %}
+
+下面的例子查询```instock```数组中至少一个内嵌document含有字段```qty```等于5，且至少一个内嵌document(没必要是同一内嵌document)含有字段```warehouse```等于```A```:
+{% highlight string %}
+db.inventory.find( { "instock.qty": 5, "instock.warehouse": "A" } )
+{% endhighlight %}
+
+###### Additional Query Tutorials
+
+更多查询示例，请参看:
+
+* [Query an Array](https://docs.mongodb.com/manual/tutorial/query-arrays/)
+* [Query Documents](https://docs.mongodb.com/manual/tutorial/query-documents/)
+* [Query on Embedded/Nested Documents](https://docs.mongodb.com/manual/tutorial/query-embedded-documents/)
+
+
+### 3.4 Project Fields to Return from Query
+>Note: projection这里可以翻译为“字段筛选”
+
+默认情况下，在MongoDB中执行查询会返回所匹配的documents中的所有字段。为了限制返回给应用程序的数据量，我们可以使用一个[projection](https://docs.mongodb.com/manual/reference/glossary/#std-term-projection) document来指定(specify)或限制(restrict)返回的字段(field)。
+
+本节提供一些查询示例，使用[db.collection.find()](https://docs.mongodb.com/manual/reference/method/db.collection.find/#mongodb-method-db.collection.find)方法执行查询，并返回指定的字段。例子基于```inventory```这个collection，这里我们首先向该collection填充一些数据：
+{% highlight string %}
+db.inventory.insertMany( [
+  { item: "journal", status: "A", size: { h: 14, w: 21, uom: "cm" }, instock: [ { warehouse: "A", qty: 5 } ] },
+  { item: "notebook", status: "A",  size: { h: 8.5, w: 11, uom: "in" }, instock: [ { warehouse: "C", qty: 5 } ] },
+  { item: "paper", status: "D", size: { h: 8.5, w: 11, uom: "in" }, instock: [ { warehouse: "A", qty: 60 } ] },
+  { item: "planner", status: "D", size: { h: 22.85, w: 30, uom: "cm" }, instock: [ { warehouse: "A", qty: 40 } ] },
+  { item: "postcard", status: "A", size: { h: 10, w: 15.25, uom: "cm" }, instock: [ { warehouse: "B", qty: 15 }, { warehouse: "C", qty: 35 } ] }
+]);
+{% endhighlight %}
+
+
+###### Return All Fields in Matching Documents
+假如不指定一个[projection](https://docs.mongodb.com/manual/reference/glossary/#std-term-projection) document的话，则[db.collection.find()](https://docs.mongodb.com/manual/reference/method/db.collection.find/#mongodb-method-db.collection.find)会返回匹配字段的所有元素。
+
+下面的示例返回```inventory```这个collection中```status```等于```"A"```的document的所有字段：
+{% highlight string %}
+db.inventory.find( { status: "A" } )
+{% endhighlight %}
+上面的查询语句等价于如下SQL语句：
+<pre>
+SELECT * from inventory WHERE status = "A"
+</pre>
+
+###### Return the Specified Fields and the ```_id``` Field Only
+可以通过projection显式的指定返回哪些字段，方法是将返回的```<field>```设置为1。如下的操作返回匹配查询条件的所有documents。在返回的结果集中，只包含```item```及```status```字段，以及默认情况下的```_id```字段。
+{% highlight string %}
+db.inventory.find( { status: "A" }, { item: 1, status: 1 } )
+{% endhighlight %}
+
+上述查询语句对应于如下SQL语句：
+<pre>
+SELECT _id, item, status from inventory WHERE status = "A"
+</pre>
+
+###### Suppress ```_id``` Field
+我们可以在projection中将```_id```字段设置为0，从而返回结果中不含有```_id```字段：
+{% highlight string %}
+db.inventory.find( { status: "A" }, { item: 1, status: 1, _id: 0 } )
+{% endhighlight %}
+
+例子中查询语句对应于如下SQL语句：
+<pre>
+SELECT item, status from inventory WHERE status = "A"
+</pre>
+
+>Note: 除了```_id```字段外，你不能在projection document中同时使用inclusion与exclusion
+
+###### Return All But the Excluded Fields
+我们可以使用projection来排除返回某些字段。下面的示例会返回除```status```及```instock```字段外的所有其他字段：
+{% highlight string %}
+db.inventory.find( { status: "A" }, { status: 0, instock: 0 } )
+{% endhighlight %}
+
+
+>Note: 除了```_id```字段外，你不能在projection document中同时使用inclusion与exclusion
+
+
+###### Return Specific Fields in Embedded Documents
+
+我们可以返回内嵌document的指定字段。可以在projection document中使用[dot noation](https://docs.mongodb.com/manual/core/document/#std-label-document-dot-notation)来引用指定的内嵌字段。
+
+如下的示例返回：
+
+* ```_id```字段（默认会返回)
+* ```item```字段
+* ```status```字段
+* ```size```中的```uom```字段
+
+{% highlight string %}
+db.inventory.find(
+   { status: "A" },
+   { item: 1, status: 1, "size.uom": 1 }
+)
+{% endhighlight%}
+
+从MongoDB 4.4版本开始，针对内嵌字段我们也可以使用内嵌形式，例如：
+<pre>
+{ item: 1, status: 1, size: { uom: 1 } }
+</pre>
+
+###### Suppress Specific Fields in Embedded Documents
+我们可以抑制内嵌document的指定字段。使用[dot notation](https://docs.mongodb.com/manual/core/document/#std-label-document-dot-notation)来引用对应的字段，并将对应的字段值设置为0.
+
+下面的例子指定一个projection，排除返回```size```document中的```uom```字段，而其他的字段均返回：
+{% highlight string %}
+db.inventory.find(
+   { status: "A" },
+   { "size.uom": 0 }
+)
+{% endhighlight %}
+
+从MongoDB 4.4版本开始，针对内嵌字段我们也可以使用内嵌形式，例如：
+<pre>
+{ item: 1, status: 1, size: { uom: 0 } }
+</pre>
+
+###### Projection on Embedded Documents in an Array
+
+使用[dot notation](https://docs.mongodb.com/manual/core/document/#std-label-document-dot-notation)数组中内嵌document的指定字段。
+
+如下的例子返回指定字段：
+
+
+* ```_id```字段（默认会返回)
+* ```item```字段
+* ```status```字段
+* ```instock```数组中内嵌document的```qty```字段
+
+{% highlight string %}
+db.inventory.find( { status: "A" }, { item: 1, status: 1, "instock.qty": 1 } )
+{% endhighlight %}
+
+###### Project Specific Array Elements in the Returned Array
+对于包含数组的字段，MongoDB提供了如下的projection operator来操作数组：
+
+* [$elemMatch](https://docs.mongodb.com/manual/reference/operator/projection/elemMatch/#mongodb-projection-proj.-elemMatch)
+
+* [$slice](https://docs.mongodb.com/manual/reference/operator/projection/slice/#mongodb-projection-proj.-slice)
+
+* [$](https://docs.mongodb.com/manual/reference/operator/projection/positional/#mongodb-projection-proj.-)
+
+如下的例子使用[$slice](https://docs.mongodb.com/manual/reference/operator/projection/slice/#mongodb-projection-proj.-slice)这一projection operator来返回```instock```数组中最后一个元素。
+{% highlight string %}
+db.inventory.find( { status: "A" }, { item: 1, status: 1, instock: { $slice: -1 } } )
+{% endhighlight %}
+
+[$elemMatch](https://docs.mongodb.com/manual/reference/operator/projection/elemMatch/#mongodb-projection-proj.-elemMatch)、[$slice](https://docs.mongodb.com/manual/reference/operator/projection/slice/#mongodb-projection-proj.-slice)、[$](https://docs.mongodb.com/manual/reference/operator/projection/positional/#mongodb-projection-proj.-)是仅有的三种可以筛选特定数组元素的方法。比如，你不能使用数组索引来筛选特定元素，eg: ```{"instock.0": 1}```这一projection```不能```筛选数组的第一个元素。
+
+###### Additional Considerations
+从MongoDB 4.4版本开始，针对projection MongoDB会强制一些额外的限制，请参看[Projection Restrictions](https://docs.mongodb.com/manual/reference/limits/#mongodb-limit-Projection-Restrictions)。
+
+### 3.5 Query for Null or Missing Fields
+
+### 3.6 Iterate a Cursor in mongosh
 
 
 <br />
