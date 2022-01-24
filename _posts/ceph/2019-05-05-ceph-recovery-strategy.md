@@ -99,6 +99,7 @@ backfill recovery: 是说无法通过pg log回放找全数据，只能通过全�
 * osd_recovery_max_single_start: OSD在某个时刻会为一个PG启动恢复操作数；
 
 >上面两个参数，网上解释大多有误导，结合代码以及官方材料分析为：
+>
 >a.假设我们配置osd_recovery_max_single_start为1，osd_recovery_max_active为3，那么，这意味着OSD在某个时刻会为一个PG最多启动1个恢复操作，而且最多可以有3个恢复操作同时处于活动状态。
 >
 >b.假设我们配置osd_recovery_max_single_start为2，osd_recovery_max_active为3，那么，这意味着OSD在某个时刻会为一个PG最多启动2个恢复操作，而且最多可以有3个恢复操作同时处于活动状态。例如第一个pg启动2个恢复操作，第二个pg启动1个恢复操作，第三个pg等待前两个pg 恢复操作完进行新的恢复。
