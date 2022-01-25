@@ -46,6 +46,7 @@ ceph中OSD节点因LevelDB频繁出现：
 
 2. [leveldb 产生大量ldb文件，导致IO error](https://www.oschina.net/question/2848189_2187722?p=1)
 
+3. [Ceph蹚坑笔记](https://blog.csdn.net/jeegnchen/article/details/50827154)
 
 <br />
 <br />
