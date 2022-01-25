@@ -64,6 +64,7 @@ description: CMake的使用
 
 1. [cmake documents](https://cmake.org/cmake/help/v3.22/)
 
+2. [cmake运行原理](https://blog.csdn.net/ztemt_sw2/article/details/81384538)
 
 <br />
 <br />
