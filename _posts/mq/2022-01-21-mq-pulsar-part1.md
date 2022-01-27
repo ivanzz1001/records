@@ -63,6 +63,16 @@ clusters之间可以基于[geo-replication](https://pulsar.apache.org/docs/en/co
 ## 4. Metadata store
 Pulsar metadata store维持着```一个```pulsar集群的所有元数据信息，比如topic元数据、schema、broker负载信息等等。Pulsar使用[Apache Zookeeper](https://zookeeper.apache.org/)来做元数据存储、配置集群信息以及协调操作。Pulsar metadata store可以部署到一个单独的Zookeeper集群上，也可以部署到一个已存在的Zookeeper集群上。你可以使用一个Zookeeper集群来同时存放Pulsar metadata store以及[BookKeeper metadata sotre](https://bookkeeper.apache.org/docs/latest/getting-started/concepts/#metadata-storage)。假如想要部署Pulsar brokers连接到已存在的BookKeeper集群，你需要各自单独的为Pulsar metadata store及BookKeeper metadata store分别部署一个Zookeeper集群。
 
+在一个Pulsar instance中：
+
+* configuration store quorum存放tenants、namespaces和其他一些需要全局一致性的配置信息；
+
+* 每一个cluster都有其自己的本地Zookeeper，用于存储特定集群(cluster-specific)的配置和协调信息，比如哪些brokers负责某个topic、报告broker load等。
+
+## 5. Configuration store
+configuration store维护着一个pulsar实例(instance)的所有配置信息，比如clusters、tenants、namespaces、partitioned topic相关的配置信息等等。一个Pulsar实例可以是单独一个local cluster，也可以是多个local clusters，还可以是多个跨区域clusters。因此，在一个Pulsar实例中，configuration store可以跨clusters共享配置信息。configuration store可以被部署到一个单独的Zookeeper集群，也可以被部署到一个已存在的Zookeeper集群。
+
+## 6. Persistent storage
 
 
 
