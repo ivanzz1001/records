@@ -1,6 +1,6 @@
 ---
 layout: post
-title: MongoDB的安装及使用(1)
+title: MongoDB的介绍及简单使用
 tags:
 - database
 categories: database

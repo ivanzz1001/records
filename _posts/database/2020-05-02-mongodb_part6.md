@@ -1,6 +1,6 @@
 ---
 layout: post
-title: MongoDB的安装(1)
+title: MongoDB的安装
 tags:
 - database
 categories: database
@@ -557,6 +557,8 @@ sudo chown `whoami` /var/log/mongodb   # Or substitute another user
 **[参看]**:
 
 1. [mongodb官网](https://www.mongodb.com/)
+
+2. [mongodb manual](https://docs.mongodb.com/manual/)
 
 2. [mongodb method](https://docs.mongodb.com/manual/reference/method/)
 
