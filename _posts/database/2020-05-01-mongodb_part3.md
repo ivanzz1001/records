@@ -1,6 +1,6 @@
 ---
 layout: post
-title: MongoDB数据库与集合
+title: MongoDB数据库与集合(2)
 tags:
 - database
 categories: database
