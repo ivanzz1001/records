@@ -28,7 +28,7 @@ Array                         4                "array"
 Binary data                   5                "binData"
 Undefined                     6                "undefined"                   Deprecated
 ObjectId                      7                "objectId"
-Boolean  	                  8                "bool"
+Boolean                       8                "bool"
 Date                          9                "date"
 Null                          10               "null"
 Regular Expression            11               "regex"
