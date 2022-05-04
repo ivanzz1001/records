@@ -354,6 +354,31 @@ description: 驾照考试相关资料
 
 
  
+## 2. 交通标志大全
+
+* 警告标志
+
+![logo-1](https://ivanzz1001.github.io/records/assets/img/misc/traffic_logo_1.jpg)
+
+
+* 禁令标志
+
+![logo-2](https://ivanzz1001.github.io/records/assets/img/misc/traffic_logo_2.jpg)
+
+
+* 指示标志
+
+![logo-3](https://ivanzz1001.github.io/records/assets/img/misc/traffic_logo_3.jpg)
+
+
+* 交通标线
+
+![logo-4](https://ivanzz1001.github.io/records/assets/img/misc/traffic_logo_4.jpg)
+
+* 高速公路指示标志
+
+![logo-5](https://ivanzz1001.github.io/records/assets/img/misc/traffic_logo_5.jpg)
+
 
 <br />
 <br />
