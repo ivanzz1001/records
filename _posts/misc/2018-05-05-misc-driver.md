@@ -419,6 +419,93 @@ description: 驾照考试相关资料
 ![logo-5](https://ivanzz1001.github.io/records/assets/img/misc/traffic_logo_5.jpg)
 
 
+
+## 3. 图解8种交警手势
+1) **停止信号**
+
+![stop](https://ivanzz1001.github.io/records/assets/img/misc/traffic-stop.jpg)
+
+
+手势：左臂向前上方直伸过肩，掌心朝前。
+
+速记：左手过肩是停止 （左手动）
+
+
+2) **靠边停车信号**
+
+![stop-side](https://ivanzz1001.github.io/records/assets/img/misc/traffic-stop-side.jpg)
+
+手势：左臂向前上方直伸过肩，掌心朝前，右臂向前向下直伸，掌心朝左，水平摆动。
+
+速记：左手过肩右手平摆靠边停 （双手动）
+
+
+
+3) **左转弯信号**
+
+![turn-left](https://ivanzz1001.github.io/records/assets/img/misc/traffic-turn-left.jpg)
+
+手势：右臂向前平伸，掌心朝前，左臂向前向下直伸，掌心朝右，水平摆动。
+
+速记：右手平伸左手平摆是左转 （双手动）
+
+
+4) **右转弯信号**
+
+
+![turn-right](https://ivanzz1001.github.io/records/assets/img/misc/traffic-turn-right.jpg)
+
+手势：左臂向前平伸，掌心朝前，右臂向前向下直伸，掌心朝左，水平摆动。
+
+速记：左手平伸右手平摆是右转 （双手动）
+
+
+
+5) **左转弯待转信号**
+
+![wait-left](https://ivanzz1001.github.io/records/assets/img/misc/traffic-wait-left.jpg)
+
+手势：左臂向左斜向下方直伸成45°，掌心朝下，上下摆动。
+
+速记：左手侧摆待左转 （左手动）
+
+6) **减速慢行信号**
+
+![traffic-slow](https://ivanzz1001.github.io/records/assets/img/misc/traffic-slow.jpg)
+
+手势：右臂向右前方平伸，掌心朝下，由齐肩处下摆至腰部。
+
+速记：右手下摆减速行 （右手动）
+
+
+7) **直行信号**
+
+![traffic-strait](https://ivanzz1001.github.io/records/assets/img/misc/traffic-strait.jpg)
+
+手势：双手平伸，掌心朝前，右臂折向胸前。
+
+速记：双手平伸右手前折是直行 （双手动）
+
+
+8) **变道信号**
+
+![traffic-change](https://ivanzz1001.github.io/records/assets/img/misc/traffic-change.jpg)
+
+手势：右臂向前平伸，掌心朝左，向左水平摆动。
+
+速记：右臂横摆是变道 （右手动）
+
+
+----------
+
+
+**总结：**
+
+* 遇有交警现场指挥时，应优先按照交通警察的指挥通行；
+
+* 交警面向哪边就是在指挥哪边的车辆，其他车辆应停车等待。
+
+* 一共8种手势，其中4种需要动双手完成，2种需要动左手完成，还有2种需要动右手完成。
 <br />
 <br />
 
