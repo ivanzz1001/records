@@ -137,7 +137,10 @@ Tcpdump会打印出一个网络接口上匹配布尔表达式```expression```的
 # tcpdump -i eth0 tcp and port 80 -vvv -XX -n
 </pre>
 
-
+* 打印目标端口为11208上的tcp数据包
+<pre> 
+sudo tcpdump -i eth1 -nnXlps0 tcp and dst port 11208
+</pre> 
 
 <br />
 <br />
