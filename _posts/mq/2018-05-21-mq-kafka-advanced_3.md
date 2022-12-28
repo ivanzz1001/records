@@ -290,7 +290,7 @@ Topic: test_topic Partition: 2 Leader: 1003 Replicas: 1003,1004 Isr: 1003,1004
 
 1. [kafka数据迁移实践](https://blog.csdn.net/mnasd/article/details/82772714)
 
-
+2. [kafka消费偏移](https://blog.csdn.net/CoderTnT/article/details/121108260)
 <br />
 <br />
 <br />
