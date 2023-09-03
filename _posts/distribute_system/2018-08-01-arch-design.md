@@ -81,8 +81,44 @@ public:
 
 下面对有锁和无锁版本进行简单的性能比较，分别执行 1000,000 次 push 操作。测试代码如下：
 {% highlight string %}
+int main()
+{
+    const int SIZE = 1000000;
+    //有锁测试
+    auto start = chrono::steady_clock::now();
+    WithLockList<int> wlList;
+    for(int i = 0; i < SIZE; ++i)
+    {
+        wlList.pushFront(i);
+    }
+    auto end = chrono::steady_clock::now();
+    chrono::duration<double, std::micro> micro = end - start;
+    cout << "with lock list costs micro:" << micro.count() << endl;
 
+    //无锁测试
+    start = chrono::steady_clock::now();
+    LockFreeList<int> lfList;
+    for(int i = 0; i < SIZE; ++i)
+    {
+        lfList.pushFront(i);
+    }
+    end = chrono::steady_clock::now();
+    micro = end - start;
+    cout << "free lock list costs micro:" << micro.count() << endl;
+
+    return 0;
+}
 {% endhighlight %}
+三次输出如下，可以看出无锁版本有锁版本性能高一些:
+<pre>
+with lock list costs micro:548118 
+free lock list costs micro:491570
+with lock list costs micro:556037 
+free lock list costs micro:476045 
+with lock list costs micro:557451 
+free lock list costs micro:481470
+</pre>
+
 
 
 
