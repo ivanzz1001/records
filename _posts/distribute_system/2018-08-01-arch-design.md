@@ -145,7 +145,7 @@ buffer = mmap(filefd);      //将文件映射到进程空间
 write(sockfd, buffer);      //将buffer中的内容发送到网络
 {% endhighlight %}
 使用内存映射后数据拷贝流如下图所示:
-![内存映射](https://ivanzz1001.github.io/records/assets/img/distri-arch-mmap.webp)
+![内存映射](https://ivanzz1001.github.io/records/assets/img/distribute/distri-arch-mmap.webp)
 从图中可以看出，采用内存映射后数据拷贝减少为 3 次，不再经过应用程序直接将内核缓冲区中的数据拷贝到 Socket 缓冲区中。RocketMQ 为了消息存储高性能，就使用了内存映射机制，将存储文件分割成多个大小固定的文件，基于内存映射执行顺序写
 
 ### 3.2 零拷贝
@@ -157,13 +157,13 @@ sendfile(sockfd, filefd);    //将文件内容发送到网络
 {% endhighlight %}
 
 使用零拷贝后流程如下图：
-![零拷贝](https://ivanzz1001.github.io/records/assets/img/distri-arch-zerocopy.webp)
+![零拷贝](https://ivanzz1001.github.io/records/assets/img/distribute/distri-arch-zerocopy.webp)
 
 零拷贝的步骤为: 1）DMA 将数据拷贝到 DMA 引擎的内核缓冲区中；2）将数据位置和长度信息的描述符加到套接字缓冲区；3）DMA 引擎直接将数据从内核缓冲区传递到协议引擎；
 
 可以看出，零拷贝并非真正的没有拷贝，还是有 2 次内核缓冲区的 DMA 拷贝，只是消除了内核缓冲区和用户缓冲区之间的 CPU 拷贝。Linux 中主要的零拷贝函数有 sendfile、splice、tee 等。下图是来住 IBM 官网上普通传输和零拷贝传输的性能对比，可以看出零拷贝比普通传输快了 3 倍左右，Kafka 也使用零拷贝技术。
 
-![普通读写和零拷贝性能对比](https://ivanzz1001.github.io/records/assets/img/distri-arch-cmpcopy.webp)
+![普通读写和零拷贝性能对比](https://ivanzz1001.github.io/records/assets/img/distribute/distri-arch-cmpcopy.webp)
 
 ### 4. 序列化
 当将数据写入文件、发送到网络、写入到存储时通常需要序列化（serialization）技术，从其读取时需要进行反序列化（deserialization），又称编码（encode）和解码（decode）。序列化作为传输数据的表示形式，与网络框架和通信协议是解耦的。如网络框架 taf 支持 jce、json 和自定义序列化，HTTP 协议支持 XML、JSON 和流媒体传输等。
@@ -184,13 +184,13 @@ sendfile(sockfd, filefd);    //将文件内容发送到网络
 
 下图是一些常见的序列化框架性能对比：
 
-![序列化与反序列化速度对比](https://ivanzz1001.github.io/records/assets/img/distri-arch-serializable1.webp)
+![序列化与反序列化速度对比](https://ivanzz1001.github.io/records/assets/img/distribute/distri-arch-serializable1.webp)
 
-![序列化与反序列化字节占用对比](https://ivanzz1001.github.io/records/assets/img/distri-arch-serializable2.webp)
+![序列化与反序列化字节占用对比](https://ivanzz1001.github.io/records/assets/img/distribute/distri-arch-serializable2.webp)
 
 可以看出 Protobuf 无论是在序列化速度上还是字节占比上可以说是完爆同行。不过人外有人，天外有天，听说 FlatBuffer 比 Protobuf 更加无敌，下图是来自 Google 的 FlatBuffer 和其他序列化性能对比，光看图中数据 FB 貌似秒杀 PB 的存在:
 
-![FlatBuffer性能对比](https://ivanzz1001.github.io/records/assets/img/distri-arch-serializable3.webp)
+![FlatBuffer性能对比](https://ivanzz1001.github.io/records/assets/img/distribute/distri-arch-serializable3.webp)
 
 ### 4.3 选型考量
 在设计和选择序列化技术时，要进行多方面的考量，主要有以下几个方面：
@@ -218,11 +218,11 @@ sendfile(sockfd, filefd);    //将文件内容发送到网络
 
 下面是来自网上的三种 malloc 的比较图，tcmalloc 和 jemalloc 性能差不多，ptmalloc 的性能不如两者，我们可以根据需要选用更适合的 malloc，如 redis 和 mysql 都可以指定使用哪个 malloc。至于三者的实现和差异，可以网上查阅。
 
-![内存分配性能对比](https://ivanzz1001.github.io/records/assets/img/distri-arch-memalloc.webp)
+![内存分配性能对比](https://ivanzz1001.github.io/records/assets/img/distribute/distri-arch-memalloc.webp)
 
 虽然标准库的实现在操作系统内存管理的基础上再加了一层内存管理，但应用程序通常也会实现自己特定的内存池，如为了引用计数或者专门用于小对象分配。所以看起来内存管理一般分为三个层次。
 
-![内存管理三个层次](https://ivanzz1001.github.io/records/assets/img/distr-arch-memlayer.webp)
+![内存管理三个层次](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-memlayer.webp)
 
 
 ### 5.2 线程池
@@ -295,7 +295,7 @@ void handleRequest(const Request &req)
 
 一个业务流程往往伴随着调用链路长、后置依赖多等特点，这会同时降低系统的可用性和并发处理能力。可以采用对非关键依赖进行异步化解决。如企鹅电竞开播服务，除了开播写节目存储以外，还需要将节目信息同步到神盾推荐平台、App 首页和二级页等。由于同步到外部都不是开播的关键逻辑且对一致性要求不是很高，可以对这些后置的同步操作进行异步化，写完存储即向 App 返回响应，如下图所示：
 
-![企鹅电竞开播流程异步化](https://ivanzz1001.github.io/records/assets/img/distri-arch-async.webp)
+![企鹅电竞开播流程异步化](https://ivanzz1001.github.io/records/assets/img/distribute/distri-arch-async.webp)
 
 ## 8. 缓存
 从单核 CPU 到分布式系统，从前端到后台，缓存无处不在。古有朱元璋“缓称王”而终得天下，今有不论是芯片制造商还是互联网公司都同样采取了“缓称王”（缓存称王）的政策才能占据一席之地。缓存是原始数据的一个复制集，其本质就是空间换时间，主要是为了解决高并发读。
@@ -328,7 +328,7 @@ void handleRequest(const Request &req)
 
 * 多级缓存：指在系统中的不同层级的进行数据缓存，以提高访问效率和减少对后端存储的冲击。以下图的企鹅电竞的一个多级缓存应用，根据我们的现网统计，在第一级缓存的命中率就已经达 94%，穿透到 grocery 的请求量很小。
 
-![企鹅电竞首页多级缓存](https://ivanzz1001.github.io/records/assets/img/distr-arch-cache.webp)
+![企鹅电竞首页多级缓存](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-cache.webp)
 
 整体工作流程如下：
 
@@ -341,7 +341,7 @@ void handleRequest(const Request &req)
 
 * Cache-Aside：旁路缓存，这应该是最常见的缓存模式了。对于读，首先从缓存读取数据，如果没有命中则回源 SoR 读取并更新缓存。对于写操作，先写 SoR，再写缓存。这种模式架构图如下：
 
-![Cache-Aside结构图](https://ivanzz1001.github.io/records/assets/img/distr-arch-cache-aside.webp)
+![Cache-Aside结构图](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-cache-aside.webp)
 
 逻辑代码：
 {% highlight string %}
@@ -363,13 +363,13 @@ if(SoR.save(key, data))
 
 1）在并发写时，可能出现数据不一致。如下图所示，user1 和 user2 几乎同时进行读写。在 t1 时刻 user1 写 db，t2 时刻 user2 写 db，紧接着在 t3 时刻 user2 写缓存，t4 时刻 user1 写缓存。这种情况导致 db 是 user2 的数据，缓存是 user1 的数据，两者不一致。
 
-![Cache-Aside并发读写](https://ivanzz1001.github.io/records/assets/img/distr-arch-cache-asidep1.webapp)
+![Cache-Aside并发读写](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-cache-asidep1.webapp)
 
 2）先写数据源成功，但是接着写缓存失败，两者数据不一致。对于这两种情况如果业务不能忍受，可简单的通过先 delete 缓存然后再写 db 解决，其代价就是下一次读请求的 cache miss。
 
 * Cache-As-SoR：缓存即数据源，该模式把 Cache 当作 SoR，所以读写操作都是针对 Cache，然后 Cache 再将读写操作委托给 SoR，即 Cache 是一个代理。如下图所示：
 
-![Cache-As-SoR结构图](https://ivanzz1001.github.io/records/assets/img/distr-arch-cache-sor.webapp)
+![Cache-As-SoR结构图](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-cache-sor.webapp)
 
 Cache-As-SoR 有三种实现：
 
@@ -449,11 +449,11 @@ Cache-As-SoR 有三种实现：
 
 * 区间分片: 基于一段连续关键字的分片，保持了排序，适合进行范围查找，减少了垮分片读写。区间分片的缺点是容易造成数据分布不均匀，导致热点。如直播平台，如果按 ID 进行区间分片，通常短位 ID 都是一些大主播，如在 100-1000 内 ID 的访问肯定比十位以上 ID 频繁。常见的还有按时间范围分片，则最近时间段的读写操作通常比很久之前的时间段频繁。
 
-![区间分片](https://ivanzz1001.github.io/records/assets/img/distr-arch-prange.webapp)
+![区间分片](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-prange.webapp)
 
 * 随机分片: 按照一定的方式（如哈希取模）进行分片，这种方式数据分布比较均匀，不容易出现热点和并发瓶颈。缺点就是失去了有序相邻的特性，如进行范围查询时会向多个节点发起请求。
 
-![随机分片](https://ivanzz1001.github.io/records/assets/img/distr-arch-prandom.webapp)
+![随机分片](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-prandom.webapp)
 
 
 * 组合分片：对区间分片和随机分片的一种折中，采取了两种方式的组合。通过多个键组成复合键，其中第一个键用于做哈希随机，其余键用于进行区间排序。如直播平台以主播 id+开播时间（anchor_id,live_time）作为组合键，那么可以高效的查询某主播在某个时间段内的开播记录。社交场景，如微信朋友圈、QQ 说说、微博等以用户 id+发布时间(user_id,pub_time)的组合找到用户某段时间的发表记录。
@@ -466,13 +466,13 @@ Cache-As-SoR 有三种实现：
 
 索引存储在与关键字相同的分区中，即索引和记录在同一个分区，这样对于写操作时都在一个分区里进行，不需要跨分区操作。但是对于读操作，需要聚合其他分区上的数据。如以王者荣耀短视频为例，以视频 vid 作为关键索引，视频标签（如五杀、三杀、李白、阿珂）作为二级索引，本地索引如下图所示：
 
-![本地索引](https://ivanzz1001.github.io/records/assets/img/distr-arch-local-index.webapp)
+![本地索引](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-local-index.webapp)
 
 * 全局索引
 
 按索引值本身进行分区，与关键字所以独立。这样对于读取某个索引的数据时，都在一个分区里进行，而对于写操作，需要跨多个分区。仍以上面的例子为例，全局索引如下图所示：
 
-![全局索引](https://ivanzz1001.github.io/records/assets/img/distr-arch-global-index.webapp)
+![全局索引](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-global-index.webapp)
 
 
 ### 9.3 路由策略
@@ -481,18 +481,18 @@ Cache-As-SoR 有三种实现：
 * 客户端路由
 
 客户端直接操作分片逻辑，感知分片和节点的分配关系并直接连接到目标节点。Memcache 就是采用这种方式实现的分布式，如下图所示:
-![memcache客户端路由](https://ivanzz1001.github.io/records/assets/img/distr-arch-route1.webapp)
+![memcache客户端路由](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-route1.webapp)
 
 * 代理层路由
 
 客户端的请求到发送到代理层，由其将请求转发到对应的数据节点上。很多分布式系统都采取了这种方式，如业界的基于 redis 实现的分布式存储 codis（codis-proxy 层），公司内如 CMEM（Access 接入层）、DCache（Proxy+Router）等。如下图所示 CMEM 架构图，红色方框内的 Access 层就是路由代理层。
-![cmem接入层路由](https://ivanzz1001.github.io/records/assets/img/distr-arch-route2.webapp)
+![cmem接入层路由](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-route2.webapp)
 
 * 集群路由
 
 由集群实现分片路由，客户端连接任意节点，如果该节点存在请求的分片，则处理；否则将请求转发到合适的节点或者告诉客户端重定向到目标节点。如 redis cluster 和公司的 CKV+采用了这种方式，下图的 CKV+集群路由转发。
 
-![CKV+集群路由](https://ivanzz1001.github.io/records/assets/img/distr-arch-route3.webapp)
+![CKV+集群路由](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-route3.webapp)
 
 以上三种路由方式都各优缺点，客户端路由实现相对简单但对业务入侵较强。代理层路由对业务透明，但增加了一层网络传输，对性能有一定影响，同时在部署维护上也相对复杂。集群路由对业务透明，且比代理路由少了一层结构，节约成本，但实现更复杂，且不合理的策略会增加多次网络传输。
 
@@ -509,7 +509,7 @@ Cache-As-SoR 有三种实现：
 
 * 固定分区: 创建远超节点数的分区数，为每个节点分配多个分区。如果新增节点，可从现有的节点上均匀移走几个分区从而达到平衡，删除节点反之，如下图所示。典型的就是一致性哈希，创建 2^32-1 个虚拟节点（vnode）分布到物理节点上。该模式比较简单，需要在创建的时候就确定分区数，如果设置太小，数据迅速膨胀的话再平衡的代价就很大。如果分区数设置很大，则会有一定的管理开销。
 
-![固定分区再平衡](https://ivanzz1001.github.io/records/assets/img/distr-arch-rebalance1.webapp)
+![固定分区再平衡](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-rebalance1.webapp)
 
 
 * 动态分区
@@ -527,7 +527,7 @@ Cache-As-SoR 有三种实现：
 
 * 垂直切分：按照一定规则，如业务或模块类型，将一个数据库中的多个表分布到不同的数据库上。以直播平台为例，将直播节目数据、视频点播数据、用户关注数据分别存储在不同的数据库上，如下图所示：
 
-![垂直切分](https://ivanzz1001.github.io/records/assets/img/distr-arch-split1.webapp)
+![垂直切分](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-split1.webapp)
 
 ```优点：```
 
@@ -559,7 +559,7 @@ Cache-As-SoR 有三种实现：
 大多数业务都是读多写少，为了提高系统处理能力，可以采用读写分离的方式将主节点用于写，从节点用于读，如下图所示。
 
 
-![读写分离架构](https://ivanzz1001.github.io/records/assets/img/distr-arch-rwseprate.webapp)
+![读写分离架构](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-rwseprate.webapp)
 
 读写分离架构有以下几个特点：1）数据库服务为主从架构，可以为一主一从或者一主多从；2）主节点负责写操作，从节点负责读操作；3）主节点将数据复制到从节点；基于基本架构，可以变种出多种读写分离的架构，如主-主-从、主-从-从。主从节点也可以是不同的存储，如 mysql+redis。
 
@@ -585,7 +585,7 @@ Cache-As-SoR 有三种实现：
 
 冷热分离可以说是每个存储产品和海量业务的必备功能，Mysql、ElasticSearch、CMEM、Grocery 等都直接或间接支持冷热分离。将热数据放到性能更好的存储设备上，冷数据下沉到廉价的磁盘，从而节约成本。企鹅电竞为了节省在腾讯云成本，直播回放按照主播粉丝数和时间等条件也采用了冷热分离，下图是 ES 冷热分离的一个实现架构图。
 
-![ES冷热分离架构图](https://ivanzz1001.github.io/records/assets/img/distr-arch-chseprate.webapp)
+![ES冷热分离架构图](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-chseprate.webapp)
 
 ### 10.4 重写轻读
 
@@ -595,7 +595,7 @@ Cache-As-SoR 有三种实现：
 
 仿照 Actor 模型，为用户建立一个信箱，用户发朋友圈后写完自己的信箱就返回，然后异步的将消息推送到其朋友的信箱，这样朋友读取他的信箱时就是其朋友圈的消息列表，如下图所示：
 
-![重写轻读流程](https://ivanzz1001.github.io/records/assets/img/distr-arch-heavywrite.webapp)
+![重写轻读流程](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-heavywrite.webapp)
 
 上图仅仅是为了展示重写轻度的思路，在实际应用中还有些其他问题。如：1）写扩散：这是个写扩散的行为，如果一个大户的朋友很多，这写扩散的代价也是很大的，而且可能有些人万年不看朋友圈甚至屏蔽了朋友。需要采取一些其他的策略，如朋友数在某个范围内是才采取这种方式，数量太多采取推拉结合和分析一些活跃指标等。2）信箱容量：一般来说查看朋友圈不会不断的往下翻页查看，这时候应该限制信箱存储条目数，超出的条目从其他存储查询。
 
@@ -618,7 +618,7 @@ Cache-As-SoR 有三种实现：
 
 * 柔性事务：传统的分布式事务采用两阶段协议或者其优化变种实现，当事务执行时都需要争抢锁资源和等待，在高并发场景下会严重降低系统的性能和吞吐量，甚至出现死锁。互联网的核心是高并发和高可用，一般将传统的事务问题转换为柔性事务。下图是阿里基于消息队列的一种分布式事务实现（详情查看：企业 IT 架构转型之道 阿里巴巴中台战略思想与架构实战，微信读书有电子版）：
 
-![基于MQ的分布式柔性事务](https://ivanzz1001.github.io/records/assets/img/distr-arch-base.webapp)
+![基于MQ的分布式柔性事务](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-base.webapp)
 
 其核心原理和流程是：
 
@@ -637,21 +637,21 @@ c）检查本地事务结果后 ⑥，如果事务执行成功，则将之前保
 ### 11.2 应用分类
 * 缓冲队列：队列的基本功能就是缓冲排队，如 TCP 的发送缓冲区，网络框架通常还会再加上应用层的缓冲区。使用缓冲队列应对突发流量时，使处理更加平滑，从而保护系统，上过 12306 买票的都懂。
 
-![缓冲队列](https://ivanzz1001.github.io/records/assets/img/distr-arch-queue1.webapp)
+![缓冲队列](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-queue1.webapp)
 
 在大数据日志系统中，通常需要在日志采集系统和日志解析系统之间增加日志缓冲队列，以防止解析系统高负载时阻塞采集系统甚至造成日志丢弃，同时便于各自升级维护。下图天机阁数据采集系统中，就采用 Kafka 作为日志缓冲队列。
 
-![天机阁数据采集系统](https://ivanzz1001.github.io/records/assets/img/distr-arch-queue2.webapp)
+![天机阁数据采集系统](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-queue2.webapp)
 
 * 请求队列：对用户的请求进行排队，网络框架一般都有请求队列，如 spp 在 proxy 进程和 work 进程之间有共享内存队列，taf 在网络线程和 Servant 线程之间也有队列，主要用于流量控制、过载保护和超时丢弃等。
 
-![TAF请求接收队列](https://ivanzz1001.github.io/records/assets/img/distr-arch-queue3.webapp)
+![TAF请求接收队列](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-queue3.webapp)
 
 * 任务队列：将任务提交到队列中异步执行，最常见的就是线程池的任务队列。
 
 * 消息队列：用于消息投递，主要有点对点和发布订阅两种模式，常见的有 RabbitMQ、RocketMQ、Kafka 等，下图是常用消息队列的对比：
 
-![常用消息队列](https://ivanzz1001.github.io/records/assets/img/distr-arch-queue4.webapp)
+![常用消息队列](https://ivanzz1001.github.io/records/assets/img/distribute/distr-arch-queue4.webapp)
 
 
 

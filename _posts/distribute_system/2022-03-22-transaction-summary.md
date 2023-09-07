@@ -22,7 +22,7 @@ CAP理论可以说是分布式系统的基石，它说的是一个分布式系�
 
 >2000年7月，加州大学伯克利分校的Eric Brewer教授在98年提出CAP猜想，99年发表(Harvest, Yield and Scalable Tolerant Systems)，2000年在ACM PODC主题演讲(CAP keynote)。2年后，麻省理工学院的Seth Gilbert和Nancy Lynch从理论上证明了CAP。之后，CAP理论正式成为分布式计算领域的公认定理。
 
-![cap](https://ivanzz1001.github.io/records/assets/img/distri-summary-1.jpg)
+![cap](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-1.jpg)
 
 * C：一致性，所有客户端看到都是同一份数据，即使在数据更新和删除之后
 
@@ -78,7 +78,7 @@ Base 理论是对 CAP 中一致性和可用性权衡的结果，其来源于对�
 
 二阶段提交的操作时序图如下:
 
-![2pc](https://ivanzz1001.github.io/records/assets/img/distri-summary-2.jpg)
+![2pc](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-2.jpg)
 
 以上这两个过程被称为“两段式提交”（2 Phase Commit，2PC）协议，而它能够成功保证一致性还需要一些其他前提条件。
 
@@ -140,7 +140,7 @@ Base 理论是对 CAP 中一致性和可用性权衡的结果，其来源于对�
 
 三段式提交的操作时序如下图所示:
 
-![3pc](https://ivanzz1001.github.io/records/assets/img/distri-summary-3.jpg)
+![3pc](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-3.jpg)
 
 可以看出，3PC可以解决单点故障问题，并减少阻塞，因为一旦参与者无法及时收到来自协调者的信息之后，他会默认执行commit，而不会一直持有事务资源并处于阻塞状态。
 
@@ -153,7 +153,7 @@ Base 理论是对 CAP 中一致性和可用性权衡的结果，其来源于对�
 
 DTP 规范中主要包含了 AP、RM、TM 三个部分，如下图所示：
 
-![xa](https://ivanzz1001.github.io/records/assets/img/distri-summary-4.webp)
+![xa](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-4.webp)
 
 它定义了三大组件：
 
@@ -190,7 +190,7 @@ XA是资源层面的分布式事务，强一致性，在两阶段提交的整个
 
 如下图所示:
 
-![本地事务状态表](https://ivanzz1001.github.io/records/assets/img/distri-summary-5.webp)
+![本地事务状态表](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-5.webp)
 
 其中本地事务表的设计由业务方自己来定，可以是如上图中所示拆分为多个子事务来管理，简单点也可以只有一条记录，然后通过状态的流转来控制程序调用不同的外部系统。
 
@@ -199,7 +199,7 @@ XA是资源层面的分布式事务，强一致性，在两阶段提交的整个
 
 此方案是利用消息中间件完成，如下图：
 
-![可靠消息队列](https://ivanzz1001.github.io/records/assets/img/distri-summary-6.png)
+![可靠消息队列](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-6.png)
 
 事务发起方（消息生产方）将消息发给消息中间件，事务参与方从消息中间件接收消息，事务发起方和消息中间件之间，事务参与方（消息消费方）和消息中间件之间都是通过网络通信，由于网络通信的不确定性会导致分布式事务问题。
 
@@ -216,7 +216,7 @@ XA是资源层面的分布式事务，强一致性，在两阶段提交的整个
 #### 4.2.1 本地消息表
 如果是使用 Kafka(< 0.11.0) 这类不支持事务消息的消息中间件，参与事务的系统需要在给消息中间件发送消息之前，把消息的信息和状态存储到本地的消息表中，如下图所示：
 
-![本地消息表](https://ivanzz1001.github.io/records/assets/img/distri-summary-7.jpg)
+![本地消息表](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-7.jpg)
 
 主要流程如下：
 
@@ -228,7 +228,7 @@ XA是资源层面的分布式事务，强一致性，在两阶段提交的整个
 
 #### 4.2.2 事务消息方案
 如果是基于RocketMQ或Kafka（>=0.11.0）这类的支持事务操作的消息中间件，上述的方案则可以简化，此时上面的的定时任务的工作将交给消息中间件来提供，如下图所示:
-![事务消息方案](https://ivanzz1001.github.io/records/assets/img/distri-summary-8.webp)
+![事务消息方案](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-8.webp)
 
 流程比较简单不再赘述，需要说明的是，消息中间件如果收到Comfirm消息，则会将消息转为对消费者可见，并开始投递；如果收到Rollback消息，则会删除之前的事务消息；如果未收到确认消息，则会通过事务回查机制定时检查本地事务的状态，决定是否可以提交投递。
 
@@ -242,7 +242,7 @@ XA是资源层面的分布式事务，强一致性，在两阶段提交的整个
 
 比如充值的一个例子：
 
-![充值例子](https://ivanzz1001.github.io/records/assets/img/distri-summary-9.webp)
+![充值例子](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-9.webp)
 
 **与可靠消息队列方案区别:**
 
@@ -258,7 +258,7 @@ XA是资源层面的分布式事务，强一致性，在两阶段提交的整个
 
 但在有些业务中，一旦缺乏了隔离性，就会带来许多麻烦，比如下面一个简化版的订销存交易流程：
 
-![订销存交易流程](https://ivanzz1001.github.io/records/assets/img/distri-summary-10.png)
+![订销存交易流程](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-10.png)
 
 用户在电商网站下订单后通知库存服务扣减库存，最后通过积分服务给用户增加积分。整个交易操作应该具有原子性，这些交易步骤要么一起成功，要么一起失败，必须是一个整体性的事务。
 
@@ -279,7 +279,7 @@ XA是资源层面的分布式事务，强一致性，在两阶段提交的整个
 TCC是基于BASE理论的类2PC方案，根据业务的特性对2PC的流程进行了优化，与2PC的区别在一些步骤的细节上，如下图:
 
 
-![TCC与2PC的区别](https://ivanzz1001.github.io/records/assets/img/distri-summary-11.webp)
+![TCC与2PC的区别](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-11.webp)
 
 可以看出，不同于2PC第一阶段的Prepare，TCC在Try阶段主要是对资源的预留操作这类的轻量级操作，比如冻结部分库存数量，它不需要像2PC在第二阶段完成之后才释放整个资源，也就是它不需要等待整个事务完成后才进行提交，这时其它用户的购买操作可以继续正常进行，因此它的阻塞范围小时间短暂，性能上比2PC方案要有很大的提升。
 
@@ -302,13 +302,13 @@ SAGA 事务模式的历史十分悠久，比分布式事务的概念提出还要
 
 如果 Ti 事务提交失败，则一直对 Ti 进行重试，直至成功为止（最大努力交付）。这种恢复方式不需要补偿，适用于事务最终都要成功的场景，比如在别人的银行账号中扣了款，就一定要给别人发货。正向恢复的执行模式为：T1，T2，…，Ti（失败），Ti（重试）…，Ti+1，…，Tn，该情况下不需要Ci。
 
-![SAGA向前恢复](https://ivanzz1001.github.io/records/assets/img/distri-summary-12.webp)
+![SAGA向前恢复](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-12.webp)
 
 
 #### 4.5.2 向后恢复（Backward Recovery）
 如果 Ti 事务提交失败，则一直执行 Ci 对 Ti 进行补偿，直至成功为止（最大努力交付）。这里要求 Ci 必须（在持续重试后）执行成功。向后恢复的执行模式为：T1，T2，…，Ti（失败），Ci（补偿），…，C2，C1。
 
-![SAGA向后恢复](https://ivanzz1001.github.io/records/assets/img/distri-summary-13.webp)
+![SAGA向后恢复](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-13.webp)
 
 Saga 事务常见的有两种不同的实现方式。
 
@@ -316,7 +316,7 @@ Saga 事务常见的有两种不同的实现方式。
 
 这种模式由中央协调器（Orchestrator，简称 OSO）集中处理事件的决策和业务逻辑排序，以命令/回复的方式与每项服务进行通信，全权负责告诉每个参与者该做什么以及什么时候该做什么。
 
-![命令协调模式](https://ivanzz1001.github.io/records/assets/img/distri-summary-14.webp)
+![命令协调模式](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-14.webp)
 
 以电商订单的例子为例：
 
@@ -341,7 +341,7 @@ Saga 事务常见的有两种不同的实现方式。
 
 当最后一个服务执行本地事务并且不发布任何事件时，意味着分布式事务结束，或者它发布的事件没有被任何 Saga 参与者听到都意味着事务结束。
 
-![事件编排模式](https://ivanzz1001.github.io/records/assets/img/distri-summary-15.webp)
+![事件编排模式](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-15.webp)
 
 电商订单的例子为例：
 
@@ -396,7 +396,7 @@ SAGA的适用场景主要是以下几种：
 
 但是我们可以依据实际的电商购物场景进行取舍：```允许少卖，但不能超卖```。于是我们可以先扣库存，库存扣减成功后才创建订单并关联库存，若扣库存失败则不创建订单。有以下几种情况:
 
-![基于状态的补偿](https://ivanzz1001.github.io/records/assets/img/distri-summary-16.png)
+![基于状态的补偿](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-16.png)
 
 对于第2种情况，会出现多扣库存的情况，这时可以基于状态进行补偿，就不会出现超卖的问题了：根据库存流水记录查找那些一段时间内未关联订单的库存记录进行撤销操作。这个和我们在12306上的买车票，如果30分钟内未支付的话车票会被释放，是一个道理。
 
@@ -461,7 +461,7 @@ Seata（Simple Extensible Autonomous Transaction Architecture，一站式分布�
 
 如下图所示，Seata 中有三大模块，分别是 TM、RM 和 TC。 其中 TM 和 RM 是作为 Seata 的客户端与业务系统集成在一起，TC 作为 Seata 的服务端独立部署。
 
-![seata](https://ivanzz1001.github.io/records/assets/img/distri-summary-17.webp)
+![seata](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-17.webp)
 
 在 Seata 中，分布式事务的执行流程：
 
@@ -494,7 +494,7 @@ DTM是一款golang开发的分布式事务管理器(https://github.com/dtm-labs/
 
 与其他框架对比(非Java语言类的，暂未看到除dtm之外的成熟框架，因此这里将DTM和Java中最成熟的Seata对比)：
 
-![dtm与其他框架对比](https://ivanzz1001.github.io/records/assets/img/distri-summary-18.webp)
+![dtm与其他框架对比](https://ivanzz1001.github.io/records/assets/img/distribute/distri-summary-18.webp)
 
 
 
