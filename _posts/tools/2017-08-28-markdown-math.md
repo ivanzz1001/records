@@ -78,10 +78,10 @@ $(\sqrt{1 \over 2})^2$加大括号后 $\left(\sqrt{1 \over 2}\right)^2$
 
 例如：
 <pre>
-$\frac{du}{dx} | _{x=0}$加大后 $ \left. \frac{du}{dx} \right| _{x=0}$
+$\frac{du}{dx} \mid _{x=0}$ 加大后 $ \left. \frac{du}{dx} \right\| _{x=0}$
 </pre>
 
-$\frac{du}{dx} | _{x=0}$  加大后变成 $ \left. \frac{du}{dx} \right| _{x=0} $
+$\frac{du}{dx} \mid _{x=0}$  变成 $\left. \frac{du}{dx} \right\| _{x=0}$
 
 * 大括号用```\begin{cases}```表示开始，用```\end{cases}```表示结束，中间```\\```来换行
 例如：
