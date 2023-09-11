@@ -78,11 +78,10 @@ $(\sqrt{1 \over 2})^2$加大括号后 $\left(\sqrt{1 \over 2}\right)^2$
 
 例如：
 <pre>
-$\frac{du}{dx} \mid _{x=0}$加大后 $\left. \frac{du}{dx} \right| _{x=0}$
+$\frac{du}{dx} | _{x=0}$加大后 $\left. \frac{du}{dx} \right| _{x=0}$
 </pre>
 
-$\frac{du}{dx} \mid _{x=0}$ 变成了 $\left. \frac{du}{dx} \right| _{x=0}$
-
+$\frac{du}{dx} \mid _{x=0}$  加大后变成 $\left. \frac{du}{dx} \right| _{x=0}$
 
 * 大括号用```\begin{cases}```表示开始，用```\end{cases}```表示结束，中间```\\```来换行
 例如：
@@ -90,7 +89,7 @@ $\frac{du}{dx} \mid _{x=0}$ 变成了 $\left. \frac{du}{dx} \right| _{x=0}$
 $f(x,y)=\begin{cases} x^2+y^2=1 \\ x-y = 0 \end{cases}$
 </pre>
 
-结果：$f(x,y)=\begin{cases} x^2+y^2=1\\x-y =0 \end{cases}$
+结果：$f(x,y)=\begin{cases} x^2+y^2=1 \\ x-y =0 \end{cases}$
 
 
 5） **向量**
@@ -147,7 +146,7 @@ $\lim_{n\rightarrow+\infty}\frac{1}{n}$
 
 10) **省略号**
 
-公式```\ldots`````` 表示底线对其的省略号，```\cdots`````` 表示中线对其的省略号，```\cdot```点乘号。
+公式```\ldots``` 表示底线对其的省略号，```\cdots``` 表示中线对其的省略号，```\cdot```点乘号。
 
 例如：
 <pre>
