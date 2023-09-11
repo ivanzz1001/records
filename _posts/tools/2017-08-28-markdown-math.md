@@ -87,10 +87,10 @@ $\frac{du}{dx} \| _{x=0}$ 变成了 $\left. \frac{du}{dx} \right\| _{x=0}$
 * 大括号用```\begin{cases}```表示开始，用```\end{cases}```表示结束，中间```\\```来换行
 例如：
 <pre>
-$f(x,y):\begin{cases} x^2+y^2=1 \\ x-y = 0 \end{cases}$
+$f(x,y)=\begin{cases} x^2+y^2=1 \\ x-y = 0 \end{cases}$
 </pre>
 
-结果：$f(x,y):\begin{cases} x^2+y^2=1 \\ x-y = 0 \end{cases}$
+结果：$f(x,y)=\begin{cases} x^2+y^2=1\\x-y =0 \end{cases}$
 
 
 5） **向量**
