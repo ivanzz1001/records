@@ -64,7 +64,7 @@ $\frac{1+x}{y-1}$ 或 $x \over x+y$
 <pre>
 $f(x, y) = x^2 + y^2, x \epsilon [0, 100], y \epsilon \{1,2,3\}$
 </pre>
-结果：$f(x, y) = x^2 + y^2, x \epsilon [0, 100], y \epsilon \{1,2,3\}$
+结果：$f(x, y) = x^2 + y^2, x \epsilon [0, 100], y \epsilon\{1,2,3\}$
 
 * 长括号，需要左括号前加```\left```和右括号前加```\right```，（此大括号非彼大括号）
 
@@ -81,16 +81,16 @@ $(\sqrt{1 \over 2})^2$加大括号后 $\left(\sqrt{1 \over 2}\right)^2$
 $\frac{du}{dx} | _{x=0}$加大后 $\left. \frac{du}{dx} \right| _{x=0}$
 </pre>
 
-$\frac{du}{dx} | _{x=0}$ 变成了 $\left. \frac{du}{dx} \right| _{x=0}$
+$\frac{du}{dx} \| _{x=0}$ 变成了 $\left. \frac{du}{dx} \right\| _{x=0}$
 
 
 * 大括号用```\begin{cases}```表示开始，用```\end{cases}```表示结束，中间```\\```来换行
 例如：
 <pre>
-$f(x,y):\begin{cases} x^2+y^2=1\\ x-y = 0 \end{cases}$
+$f(x,y):\begin{cases} x^2+y^2=1 \\ x-y = 0 \end{cases}$
 </pre>
 
-结果：$f(x,y):\begin{cases} x^2+y^2=1\\ x-y = 0 \end{cases}$
+结果：$f(x,y):\begin{cases} x^2+y^2=1 \\ x-y = 0 \end{cases}$
 
 
 5） **向量**
