@@ -64,7 +64,7 @@ $\frac{1+x}{y-1}$ 或 $x \over x+y$
 <pre>
 $f(x, y) = x^2 + y^2, x \epsilon [0, 100], y \epsilon \{1,2,3\}$
 </pre>
-结果：$f(x, y) = x^2 + y^2, x \epsilon [0, 100], y \epsilon {1,2,3}$
+结果：$f(x, y) = x^2 + y^2, x \epsilon [0, 100], y \epsilon \{1,2,3\}$
 
 * 长括号，需要左括号前加```\left```和右括号前加```\right```，（此大括号非彼大括号）
 
