@@ -16,7 +16,7 @@ description: 算法及数据结构
 
 ## 1. 常用算法分类
 
-* 基础技巧： [分治](https://baike.baidu.com/item/分治算法/3263297?fr=ge_ala)、二分、[贪心]()
+* 基础技巧： [分治](https://tanqingbo.cn/Divide-and-conquer-algorithm/)、[二分](https://blog.csdn.net/lovesummerforever/article/details/24588989)、[贪心](https://tanqingbo.cn/Greedy-Algorithm/)、[动态规划](https://tanqingbo.cn/Dynamic-programming-algorithm/)、[分支限界法](https://tanqingbo.cn/Branch-and-bound/)
 
 * 排序算法： 快速排序、归并排序、计数排序
 
