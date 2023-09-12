@@ -45,6 +45,9 @@ TinyTcp 栈是TCP/IP的一个非常小和简单的实现，它包括一个FTP客
 
 1. [几种开放源码的TCPIP协议栈](http://m.weizhi.cc/tech/detail-243328.html)
 
+2. [源码 4.4BSD-Lite](https://blog.csdn.net/ljyljyok/article/details/126953803)
+
+3. [TCP/IP协议栈理论学习、源码阅读与动手实现](https://zhuanlan.zhihu.com/p/483609597?utm_id=0)
 
 <br />
 <br />
