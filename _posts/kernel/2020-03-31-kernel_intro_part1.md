@@ -37,6 +37,8 @@ description: linux kernel基本介绍
 
 7. [Linux 3.2中回写机制的变革](https://www.cnblogs.com/youngerchina/p/5624457.html)
 
+8. [从零开始学习linux内核](https://www.zhihu.com/question/439985037)
+
 <br />
 <br />
 <br />

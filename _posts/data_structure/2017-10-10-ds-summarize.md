@@ -54,6 +54,8 @@ description: 算法及数据结构
 
 4. [Java互联网面试指南](https://author.baidu.com/home?from=bjh_article&app_id=1629953002982671)
 
+5. [Github 算法](https://github.com/TheAlgorithms)
+
 <br />
 <br />
 <br />
