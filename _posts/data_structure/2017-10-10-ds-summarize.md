@@ -16,7 +16,7 @@ description: 算法及数据结构
 
 ## 1. 常用算法分类
 
-* 基础技巧： 分治、二分、贪心
+* 基础技巧： [分治](https://baike.baidu.com/item/分治算法/3263297?fr=ge_ala)、二分、[贪心]()
 
 * 排序算法： 快速排序、归并排序、计数排序
 
@@ -55,6 +55,8 @@ description: 算法及数据结构
 4. [Java互联网面试指南](https://author.baidu.com/home?from=bjh_article&app_id=1629953002982671)
 
 5. [Github 算法](https://github.com/TheAlgorithms)
+
+6. [五大常用算法](https://www.zhihu.com/question/23148377/answer/1847634304)
 
 <br />
 <br />
