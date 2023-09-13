@@ -464,6 +464,45 @@ void postorder_tranverse(struct BSTNode *root)
 }
 {% endhighlight %}
 
+后序遍历算法实现2：
+{% highlight string %}
+void postorder_tranverse(struct BSNode *root)
+{
+    Stack s;
+    struct BSNode *tp, *q;
+    int traceback = 0;
+
+    InitStack(&s);
+    push(s, root);
+
+    while(!StackEmpty(s)){
+
+        GetTop(s, &tp);
+        if(tp){
+            if(traceback == 0){
+                push(tp->right);
+                push(tp->left);
+            }else{
+                pop(s, &tp);
+                print_node(tp);
+
+                GetTop(s, q);
+                if(q){
+                    if (q->left == tp && q->right == tp){
+                        //
+                    }else{
+                        traceback = 0;
+                    }
+                }
+            }
+        }else{
+            pop(s, &tp);
+            traceback = 1;
+        }
+    }
+}
+{% endhighlight %}
+
 
 <br />
 <br />
