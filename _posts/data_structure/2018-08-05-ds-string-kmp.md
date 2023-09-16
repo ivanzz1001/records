@@ -336,6 +336,8 @@ void get_nextval(SString T, int nextval[])
 ![ds-string-kmp4](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_string_kmp4.jpg)
 
 
+![ds-string-kmp6](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_string_kmp6.png)
+
 
 <br />
 <br />

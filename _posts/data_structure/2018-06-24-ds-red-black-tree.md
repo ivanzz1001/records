@@ -691,6 +691,9 @@ static int rbtree_delete_fixup(rb_tree_t *root, rb_node_t *node, rb_node_t *pare
 5. [数据结构与算法](https://blog.csdn.net/hello_world_lvlcoder/article/category/6655685/1)
 
 6. [红黑树(一)之 原理和算法详细介绍](http://www.cnblogs.com/skywang12345/p/3245399.html)
+
+7. [关于AVL树和红黑树的一点看法](https://zhuanlan.zhihu.com/p/93369069)
+
 <br />
 <br />
 <br />
