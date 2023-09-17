@@ -92,7 +92,7 @@ Status PreOrderTraverse(BiTree T, Status (*Visit)(TElemType e))
           a + b * (c - d) - e / f
 </pre>
 
-![ds-tree-exp](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_tree_exp.jpg)
+![ds-tree-exp](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_tree_exp.bmp)
 
 若先序遍历此二叉树，按访问结点的先后次序将结点排列起来，可得到二叉树的先序序列为：
 <pre>
