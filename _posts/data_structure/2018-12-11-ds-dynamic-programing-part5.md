@@ -43,7 +43,7 @@ $
 
 由于下标不能是负数，所以上述递推公式要求$j \ge w[i]$。当$j \lt w[i]$时，意味着第i个物品无法装进背包, 此时dp[i][j]=dp[i-1][j]。综合以上可以得出：
 $
-dp[i][j] = \begin{cases} dp[i-1][j], \qquad \qquad \qquad \qquad  \qquad \qquad \qquad \qquad j<w[i] \\\ max(dp[i-1][j], dp[i-1][j-w[i]] + v[i]), \qquad j \ge w[i] \end{cases}
+dp[i][j] = \begin{cases} dp[i-1][j], \qquad \qquad \qquad \qquad \qquad j<w[i] \\\ max(dp[i-1][j], dp[i-1][j-w[i]] + v[i]), \qquad j \ge w[i] \end{cases}
 $
 
 dp数组应当如何初始化呢？当背包承重为0时，显然装不下任何物品，所以$dp[i][0]=0 \;(1 \leq i \leq N)$; 若一个物品也不选（即从前0个物品中选），此时最大价值也是0，所以$dp[0][j]=0 \; (0 \leq j\leq M)$。由此可知， dp数组应当全0初始化，即声明为全局变量。
@@ -106,7 +106,7 @@ $
 如果j从小到大遍历，那么会先更新dp[j], 再更新dp[j+w[i]]，这就导致在更新dp[j+w[i]] 时使用的是第i行的dp[j] 而非第```i-1```行的dp[j]，即当j从小到大遍历时，二维数组的递推式变成了：
 
 $
-dp[i][j] = \begin{cases} dp[i-1][j], \qquad \qquad \qquad \qquad  \qquad \qquad \qquad \qquad j<w[i] \\\ max(dp[i-1][j], dp[i][j-w[i]] + v[i]), \qquad j \ge w[i] \end{cases}
+dp[i][j] = \begin{cases} dp[i-1][j], \qquad \qquad \qquad \qquad \qquad j<w[i] \\\ max(dp[i-1][j], dp[i][j-w[i]] + v[i]), \qquad j \ge w[i] \end{cases}
 $
 
 >PS: 请牢记该式，后续讲解完全背包时会提到它。
