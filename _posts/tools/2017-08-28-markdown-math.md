@@ -214,7 +214,7 @@ $$\begin{matrix}
 
 17) **空格**
 
-![markdown-blank](https://ivanzz1001.github.io/records/assets/img/tools/markdown-blank.png)
+![markdown-blank](https://ivanzz1001.github.io/records/assets/img/tools/markdown_blank.png)
 
 
 <br />
