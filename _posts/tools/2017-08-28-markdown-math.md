@@ -212,6 +212,9 @@ $$\begin{matrix}
 
 ![markdown-matrix](https://ivanzz1001.github.io/records/assets/img/tools/markdown-matrix.png)
 
+17) **空格**
+
+![markdown-blank](https://ivanzz1001.github.io/records/assets/img/tools/markdown-blank.png)
 
 
 <br />
