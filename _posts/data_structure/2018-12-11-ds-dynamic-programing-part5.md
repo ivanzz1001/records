@@ -95,7 +95,7 @@ int main() {
 去掉dp数组的第一维后，递推公式变成:
 
 $
-dp[j] = \begin{cases} dp[j], \qquad \qquad \qquad \qquad \qquad j<w[i] \\\ max(dp[j], dp[j-w[i]] + v[i]), \qquad j \ge w[i] \end{cases}
+dp[j] = \begin{cases} dp[j], \qquad \quad \qquad \qquad \qquad \qquad \qquad j<w[i] \\\ max(dp[j], dp[j-w[i]] + v[i]), \qquad j \ge w[i] \end{cases}
 $
 
 原先j是从1遍历至m的，现在只需从w[i] 遍历至m。但，这个遍历顺序真的对吗？
@@ -233,6 +233,11 @@ int main() {
 若将t的值改为$\min(1,\,j/w[i])$，则完全背包将退化为01背包。
 
 上述代码的时间复杂度为$O(m^2\sum_iw_i^{-1})\approx O(m^2n)$, TLE是必然的。
+
+### 2.1 使用滚动数组优化
+考虑$dp[i][j]$，此时第```i```种
+
+
 
 
 
