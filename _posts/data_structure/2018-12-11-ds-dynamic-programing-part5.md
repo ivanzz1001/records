@@ -42,6 +42,7 @@ dp[i][j] = max(dp[i−1][j],dp[i−1][j−w[i]]+v[i])
 $
 
 由于下标不能是负数，所以上述递推公式要求$j \ge w[i]$。当$j \lt w[i]$时，意味着第i个物品无法装进背包, 此时dp[i][j]=dp[i-1][j]。综合以上可以得出：
+
 $
 dp[i][j] = \begin{cases} dp[i-1][j], \qquad \qquad \qquad \qquad \qquad j<w[i] \\\ max(dp[i-1][j], dp[i-1][j-w[i]] + v[i]), \qquad j \ge w[i] \end{cases}
 $
@@ -189,6 +190,7 @@ int main() {
 * ...
 
 上述过程并不会无限进行下去，因为背包承重是有限的。设第i种物品最多能选t个，于是可知$t=\lfloor \frac{j}{w[i]}\rfloor$ 从而得到递推式：
+
 $
 dp[i][j]=\max_{0 \le k \le t} dp[i-1][j - k\cdot w[i]] + k \cdot v[i]
 $
