@@ -107,7 +107,7 @@ $
 
 红色箭头表示，在二维数组中，$dp[i][j]$由$dp[i-1][j-w[i]]和dp[i-1][j]$得来，$dp[i][j+w[i]]$由$dp[i−1][j]$和$dp[i−1][j+w[i]]$得来。用一维数组的话来讲就是，第i行的$dp[j]$由第```i-1```行的$dp[j−w[i]]$和$dp[j]$得来，第```i```行的$dp[j+w[i]]$由第```i-1```行的$dp[j]$和$dp[j+w[i]]$得来。
 
-如果j从小到大遍历，那么会先更新dp[j], 再更新dp[j+w[i]]，这就导致在更新dp[j+w[i]] 时使用的是第i行的dp[j] 而非第```i-1```行的dp[j]，即当j从小到大遍历时，二维数组的递推式变成了：
+如果```j```从小到大遍历，那么会先更新$dp[j]$, 再更新$dp[j+w[i]]$，这就导致在更新$dp[j+w[i]]$时使用的是第i行的$dp[j]$而非第```i-1```行的dp[j]，即当j从小到大遍历时，二维数组的递推式变成了：
 
 $
 dp[i][j] = \begin{cases} dp[i-1][j], \qquad \qquad \qquad \qquad \qquad \qquad \qquad j<w[i] \\\ max(dp[i-1][j], dp[i][j-w[i]] + v[i]), \qquad j \ge w[i] \end{cases}
