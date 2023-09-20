@@ -221,7 +221,7 @@ void DFS(Graph G, int v)
 
 下面先介绍普里姆算法。
 
-假设N=(V,{E})是连通网，TE是N上最小生成树中边的集合。算法从U={u0}(u0∈V)， TE={}开始，重复执行下述操作： 在所有u∈U，v∈V-U的边(u,v)∈E中找一条代价最小的边(u0,v0)并入集合TE，同时v0并入U，直至U=V为止。此时TE中必有n-1条边，则T=(V, {TE})为N的最小生成树。
+假设N=(V,{E})是连通网，TE是N上最小生成树中边的集合。算法从$U={u_0}(u_0∈V)$， TE={}开始，重复执行下述操作： 在所有u∈U，v∈V-U的边(u,v)∈E中找一条代价最小的边$(u_0,v_0)$并入集合TE，同时$v_0$并入U，直至U=V为止。此时TE中必有n-1条边，则T=(V, {TE})为N的最小生成树。
 
 为实现这个算法需附设一个辅助数组closedge，以记录从U到V-U具有最小代价的边。对每个顶点```vi ∈ V-U```，在辅助数组中存在一个相应的分量closedge[i-1]，它包括两个域，其中lowcost存储该边上的权。显然：
 <pre>
@@ -359,7 +359,7 @@ void MiniSpanTree_KRUSKAL(MGraph G){
 ![ds-graph-articul](https://ivanzz1001.github.io/records/assets/img/data_structure/ds_graph_articul.jpg)
 
 
->注： low[v]的含义可理解为顶点v可获得的最低访问顺序
+>注： low[v]的含义可理解为访问顶点v时可遇见的最低访问顺序
 
 若对于某个顶点v，存在孩子节点w且low[w]>=visited[v]，则该顶点v必为关节点。因为w是v的孩子节点时，low[w]>=visited[v]，表明w及其子孙均无指向v的祖先的回边。
 
