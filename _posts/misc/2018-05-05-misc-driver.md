@@ -429,29 +429,63 @@ description: 驾照考试相关资料
 
 画于路段中时，用以分隔同向行驶的机动车和非机动车，或指示车行道的边缘；画于路口时，可用作导向车道线或停止线。
 
-3) 黄色虚线
+3) 双白实线
 
-画于路段中时，用以分隔对向行驶的交通流；画于路侧或缘石上时，用以禁止车辆长时在路边停放。
+画于路口时，作为停车让行线。
 
-4) 黄色实线
+4) 白色虚实线
 
-画于路段中时，用以分隔对向行驶的交通流；画于路侧或缘石上时，用以禁止车辆长时或临时在路边停放。
+白色虚实线是指并列施划的一条白色实线和一条白色虚线，虚线一侧允许车辆越线变道，而实线一侧禁止车辆越线变道。
 
 5) 双白虚线
 
 画于路口时，作为减速让行线；画于路段中时，作为行车方向随时间改变之可变车道线。
 
-6) 双黄实线
+6) 黄色虚线
+
+画于路段中时，用以分隔对向行驶的交通流；画于路侧或缘石上时，用以禁止车辆长时在路边停放。
+
+7) 黄色实线
+
+画于路段中时，用以分隔对向行驶的交通流；画于路侧或缘石上时，用以禁止车辆长时或临时在路边停放。
+
+8) 双黄实线
 
 画于路段中时，用以分隔对向行驶的交通流。
 
-7) 黄色虚实线
+9) 黄色虚实线
 
 画于路段中时，用以分隔对向行驶的交通流；黄色实线一侧禁止车辆超车、跨越或回转，黄色虚线一侧在保证安全的情况下准许车辆超车、跨越或回转。
 
-8) 双白实线
+10) 双黄色虚线 
 
-画于路口时，作为停车让行线。
+路中两条双黄色虚线是潮汐车道线，潮汐车道行车方向可随需要变化，提高车道使用效率。
+
+
+11) 导流线 
+一般在交通情况复杂的路口、匝道或者是掉头车道等位置会看到鱼纹一样的标识，这一路面标识其实是导流线。导流线上不能停车，也不能压线或者越线行驶。
+
+大家如果记不住这么多的，那就要记住不管是白线还是黄线，只要是实线，那就得提高警惕了。希望每一位驾驶员朋友都能安全文明出行，避免不必要的压线违章。
+
+![driver-line](https://ivanzz1001.github.io/records/assets/img/misc/driver_line_0.webp)
+
+![driver-line](https://ivanzz1001.github.io/records/assets/img/misc/driver_line_1.webp)
+
+![driver-line](https://ivanzz1001.github.io/records/assets/img/misc/driver_line_2.webp)
+
+![driver-line](https://ivanzz1001.github.io/records/assets/img/misc/driver_line_3.webp)
+
+![driver-line](https://ivanzz1001.github.io/records/assets/img/misc/driver_line_4.webp)
+
+![driver-line](https://ivanzz1001.github.io/records/assets/img/misc/driver_line_5.webp)
+
+![driver-line](https://ivanzz1001.github.io/records/assets/img/misc/driver_line_6.webp)
+
+![driver-line](https://ivanzz1001.github.io/records/assets/img/misc/driver_line_7.webp)
+
+![driver-line](https://ivanzz1001.github.io/records/assets/img/misc/driver_line_8.webp)
+
+
 
 >ps:在道路标识方面，虚线和实线在不同情境中有着不同的意义。
 >
