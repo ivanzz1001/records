@@ -430,6 +430,8 @@ description: 驾照考试相关资料
 
 ![logo-3](https://ivanzz1001.github.io/records/assets/img/misc/traffic_logo_3.jpg)
 
+>ps: 蓝色圆圈的表示"指示"，蓝色方框的表示“指路"
+
 
 * 交通标线
 
