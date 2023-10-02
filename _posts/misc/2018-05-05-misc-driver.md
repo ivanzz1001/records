@@ -416,6 +416,8 @@ description: 驾照考试相关资料
  
 ## 2. 交通标志大全
 
+>ps: 参考[路交通标志和标线(GB5768-2022)](https://download.csdn.net/download/qq_36235279/88389798)
+
 * 警告标志
 
 ![logo-1](https://ivanzz1001.github.io/records/assets/img/misc/traffic_logo_1.jpg)
@@ -705,6 +707,8 @@ description: 驾照考试相关资料
 ###### 6.1.3 罚款200元
 
 1） 初次领证的驾驶人在实习期内独自驾驶机动车上高速公路行驶的；
+
+>ps: 根据[《机动车驾驶证申领和使用规定》](https://www.gov.cn/gongbao/content/2022/content_5679696.htm)第七十七条，驾驶人在实习期内驾驶机动车上高速公路行驶，应当由持相应或者包含其准驾车型驾驶证三年以上的驾驶人陪同。其中，驾驶残疾人专用小型自动挡载客汽车的，可以由持有小型自动挡载客汽车以上准驾车型驾驶证的驾驶人陪同。
 
 2） 在道路上发生轻微交通事故，应当自行撤离而未撤离，造成交通堵塞的；
 
@@ -1038,6 +1042,10 @@ P档是驻车档，这个档位是在停车熄火时使用。P档有锁止机构
 6. [最新最全科目一扣分罚款汇总](https://zhuanlan.zhihu.com/p/500157274)
 
 7. [科目一考试扣分罚款技巧口诀表](https://baike.pcauto.com.cn/426965/824605.html)
+
+8. [路交通标志和标线(GB5768-2022)](https://download.csdn.net/download/qq_36235279/88389798)
+
+9. [机动车驾驶证申领和使用规定](https://www.gov.cn/gongbao/content/2022/content_5679696.htm)
 
 <br />
 <br />
