@@ -105,6 +105,10 @@ description: 驾照考试其他补充内容
 
 3. [刑法](https://www.66law.cn/tiaoli/9.aspx)
 
+4. [全国标准信息公共服务平台](https://std.samr.gov.cn)
+
+5. [道路交通标志和标线(GB5768-2022)](https://openstd.samr.gov.cn/bzgk/gb/newGbInfo?hcno=15B1FC09EE1AE92F1A9EC97BA3C9E451)
+
 <br />
 <br />
 <br />
