@@ -99,7 +99,7 @@ description: 驾照考试其他补充内容
 
 **[参考]**
 
-1. [路交通标志和标线(GB5768-2022)](https://download.csdn.net/download/qq_36235279/88389798)
+1. [道路交通标志和标线(GB5768-2022)](https://download.csdn.net/download/qq_36235279/88389798)
 
 2. [机动车驾驶证申领和使用规定](https://www.gov.cn/gongbao/content/2022/content_5679696.htm)
 

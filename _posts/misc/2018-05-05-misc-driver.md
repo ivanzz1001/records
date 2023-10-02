@@ -416,7 +416,7 @@ description: 驾照考试相关资料
  
 ## 2. 交通标志大全
 
->ps: 参考[路交通标志和标线(GB5768-2022)](https://download.csdn.net/download/qq_36235279/88389798)
+>ps: 参考[道路交通标志和标线(GB5768-2022)](https://download.csdn.net/download/qq_36235279/88389798)
 
 * 警告标志
 
@@ -1083,7 +1083,7 @@ P档是驻车档，这个档位是在停车熄火时使用。P档有锁止机构
 
 7. [科目一考试扣分罚款技巧口诀表](https://baike.pcauto.com.cn/426965/824605.html)
 
-8. [路交通标志和标线(GB5768-2022)](https://download.csdn.net/download/qq_36235279/88389798)
+8. [道路交通标志和标线(GB5768-2022)](https://download.csdn.net/download/qq_36235279/88389798)
 
 9. [机动车驾驶证申领和使用规定](https://www.gov.cn/gongbao/content/2022/content_5679696.htm)
 
