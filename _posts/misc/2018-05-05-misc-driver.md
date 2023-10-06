@@ -427,6 +427,9 @@ description: 驾照考试相关资料
 
 ![logo-2](https://ivanzz1001.github.io/records/assets/img/misc/traffic_logo_2.jpg)
 
+> Note
+> a) 正八边形: 用于禁令标志中的停车让行标志
+> b) 倒等边三角形: 用于禁令标志中的减速让行标志
 
 * 指示标志
 
