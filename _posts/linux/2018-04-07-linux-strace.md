@@ -193,6 +193,39 @@ access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
 跟踪28979进程的所有系统调用(-e trace=all)，并统计系统调用的花费时间，以及开始时间（并以可视化的时分秒格式显示），最后将记录结果存在output.txt文件里面。
 
 
+## 2. strace工作原理
+strace底层用ptrace可以很容易做到，ptrace有一个拦截syscall的功能```PTRACE_SYSCALL```:
+{% highlight string %}
+#include <sys/ptrace.h>
+
+long ptrace(enum __ptrace_request request, pid_t pid,
+            void *addr, void *data);
+
+[ptrace_request]
+PTRACE_TRACEME = 0,	           //被调试进程调用
+PTRACE_PEEKDATA = 2,	       //查看内存
+PTRACE_PEEKUSER = 3,	       //查看struct user 结构体的值
+PTRACE_POKEDATA = 5,	       //修改内存
+PTRACE_POKEUSER = 6,	       //修改struct user 结构体的值
+PTRACE_CONT = 7,		       //让被调试进程继续
+PTRACE_SINGLESTEP = 9,	       //让被调试进程执行一条汇编指令
+PTRACE_GETREGS = 12,	       //获取一组寄存器(struct user_regs_struct)
+PTRACE_SETREGS = 13,	       //修改一组寄存器(struct user_regs_struct)
+PTRACE_ATTACH = 16,		       //附加到一个进程
+PTRACE_DETACH = 17,		       //解除附加的进程
+PTRACE_SYSCALL = 24,	       //让被调试进程在系统调用前和系统调用后暂停 【你需要这个】
+
+PTRACE_SYSCALL 拦截之后，可以用PTRACE_GETREGS获取栈和寄存器的数据，从而获取syscall的详细数据。
+
+新版本 PTRACE_GET_SYSCALL_INFO (since Linux 5.3) ，太新了不推荐，个人还是更推荐直接PTRACE_GETREGS显得专业。
+{% endhighlight %}
+
+要在linux拦截syscall除了调试器的办法，还有以下两种深入到系统内核的办法: 
+
+* 写一个linux内核module 拦截sys_call_table;
+
+* 用 linux ebpf 接口。
+
 
 
 <br />
@@ -202,6 +235,8 @@ access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
 1. [linux tools](https://linuxtools-rst.readthedocs.io/zh_CN/latest/tool/readelf.html)
 
 2. [strace工具使用手册](https://blog.csdn.net/Huangxiang6/article/details/81295752)
+
+3. [strace工作原理](https://www.zhihu.com/question/263682345)
 
 <br />
 <br />
