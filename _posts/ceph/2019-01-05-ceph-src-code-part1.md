@@ -683,8 +683,9 @@ void SafeTimer::timer_thread();
 
 1. [非常详细的 Ceph 介绍、原理、架构](https://blog.csdn.net/mingongge/article/details/100788388)
 
+2. [pg peering官方说明](https://docs.ceph.com/en/latest/dev/peering/)
 
-
+3. [11个你不得不浏览的ceph学习网站](https://zhuanlan.zhihu.com/p/468792223)
 
 
 <br />
