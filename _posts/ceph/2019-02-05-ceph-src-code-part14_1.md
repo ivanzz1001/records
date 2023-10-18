@@ -144,7 +144,9 @@ struct pg_info_t {
 
 其中：
 
-* last_complete: 在该指针```之前```的版本都已经在所有的OSD上完成更新（只表示内存更新完成）；
+* last_complete: 表示从[0, last_complete]这段区间的所有object均在本PG副本上已经存在，而(last_complete, last_update]这段区间的object可能还不存在。
+
+>ps: 在写PGLog时也会写pg_info，参看PG::write_if_dirty()中调用prepare_write_info()部分
 
 * last_update: PG内最近一次更新的对象的版本，还没有在所有OSD上完成更新。在last_update与last_complete之间的操作表示该操作已在部分OSD上完成，但是还没有全部完成。
 
@@ -510,8 +512,9 @@ void PG::write_if_dirty(ObjectStore::Transaction& t)
 	if (!km.empty())
 		t.omap_setkeys(coll, pgmeta_oid, km);
 }
-
 {% endhighlight %}
+>ps: 注意到在这里调用write_if_dirty()前已经将dirty_info置为了true，因此会调用prepare_write_info()将pg_info也一并打包到transaction中，随PGLog一起写到journal日志中。
+
 在PG::write_if_dirty()中，由于在PG::append_log()时将dirty_info设置为了true，因此肯定先调用prepare_write_info()函数，该函数可能会将当前的epoch信息、pg_info信息打包放入```km```中。之后如果km不为空，则调用t.omap_setkeys()将相关信息打包进transaction中。
 
 >注：通过上面我们可以看到，PGLog中除了包含当前所更新的object信息外，还可能包含如下：
