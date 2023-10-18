@@ -28,6 +28,7 @@ PGLog在代码实现中有3个主要的数据结构来维护：pg_info_t、pg_lo
 其中：
 
 * last_complete： 在该指针之前的版本都已经在所有OSD上完成更新（只表示内存更新完成）；
+>ps: 含义应该是last_complete之前的所有object在本PG副本上是存在的
 
 * last_update: PG内最近一次更新的对象版本，还没有在所有OSD上完成更新，在last_update和last_complete之间的操作表示该操作已在部分OSD上完成但是还没有全部完成；
 
