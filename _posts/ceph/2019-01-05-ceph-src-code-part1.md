@@ -687,6 +687,10 @@ void SafeTimer::timer_thread();
 
 3. [11个你不得不浏览的ceph学习网站](https://zhuanlan.zhihu.com/p/468792223)
 
+4. [ceph的一个相对宏观总结](https://zhuanlan.zhihu.com/p/360355168)
+
+5. [分布式存储专栏](https://www.zhihu.com/column/c_1175452658096476160)
+
 
 <br />
 <br />
