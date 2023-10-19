@@ -431,7 +431,7 @@ eversion_t get_next_version() const {
 
 ###### 4.2 last_complete介绍
 
-表示该PG确定已经完成的最后一个对象的版本号，在该指针之前的版本都已经在所有的OSD上完成更新（只表示内存更新完成）。 这意味着在last_complete时刻：
+表示该```PG副本```在last_complete之前的所有object均存在(注：表示内存中更新完成)，在(last_complete, last_update]之间的对象可能在本PG副本上存在丢失。 这意味着在last_complete时刻：
 
 * all objects that existed as of that stamp
 
