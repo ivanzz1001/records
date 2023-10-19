@@ -846,7 +846,83 @@ if (info.history.same_interval_since) {
 
 1） start的值设置为info.history.last_epoch_clean值，其值为8
 
-2） end值从14开始计算，检查当前已经计算好的past_intervals的值。past_interval的计算是从后往前计算。如果第一个past interval的first小于等于8，也就是past_interval 1已经计算过了，那么后面的past_interval 2和past_interval 3都已经计算过，就直接退出。否则就继续查找没有计算过的past_interval的值。
+2） end值从14开始计算，检查当前已经计算好的past_intervals的值。*past_interval的计算是从后往前计算*。如果第一个past interval的first小于等于8，也就是past_interval 1已经计算过了，那么后面的past_interval 2和past_interval 3都已经计算过，就直接退出。否则就继续查找没有计算过的past_interval的值。
+
+**说明:**  
+1) 上面讲述*past_interval的计算是从后往前计算*，但是实际看PG::generate_past_intervals()的实现，貌似并非如此(ps: 代码版本```ceph 10.2.10```)
+
+2) 对于上图，假如刚跨入epoch 14(还没来得及完成peering), 那么对于本PG副本来说会在收到epoch 14这个版本的OSDMap时，触发peering操作然后调用PG::start_peering_interval()，在该函数中会将info.history.same_interval_since设置为14，之后进入GetInfo()重新计算past_interval
+{% highlight string %}
+boost::statechart::result PG::RecoveryState::Reset::react(const AdvMap& advmap)
+{
+  ...
+  if (pg->should_restart_peering(
+	advmap.up_primary,
+	advmap.acting_primary,
+	advmap.newup,
+	advmap.newacting,
+	advmap.lastmap,
+	advmap.osdmap)) {
+    dout(10) << "should restart peering, calling start_peering_interval again"
+	     << dendl;
+    pg->start_peering_interval(
+      advmap.lastmap,
+      advmap.newup, advmap.up_primary,
+      advmap.newacting, advmap.acting_primary,
+      context< RecoveryMachine >().get_cur_transaction());
+  }
+  ...
+}
+
+/* Called before initializing peering during advance_map */
+void PG::start_peering_interval(
+  const OSDMapRef lastmap,
+  const vector<int>& newup, int new_up_primary,
+  const vector<int>& newacting, int new_acting_primary,
+  ObjectStore::Transaction *t)
+{
+  ...
+
+  // did acting, up, primary|acker change?
+  if (!lastmap) {
+    dout(10) << " no lastmap" << dendl;
+    dirty_info = true;
+    dirty_big_info = true;
+    info.history.same_interval_since = osdmap->get_epoch();
+  } else {
+    std::stringstream debug;
+    assert(info.history.same_interval_since != 0);
+    boost::scoped_ptr<IsPGRecoverablePredicate> recoverable(
+      get_is_recoverable_predicate());
+    bool new_interval = pg_interval_t::check_new_interval(
+      old_acting_primary.osd,
+      new_acting_primary,
+      oldacting, newacting,
+      old_up_primary.osd,
+      new_up_primary,
+      oldup, newup,
+      info.history.same_interval_since,
+      info.history.last_epoch_clean,
+      osdmap,
+      lastmap,
+      info.pgid.pgid,
+      recoverable.get(),
+      &past_intervals,
+      &debug);
+    dout(10) << __func__ << ": check_new_interval output: "
+	     << debug.str() << dendl;
+    if (new_interval) {
+      dout(10) << " noting past " << past_intervals.rbegin()->second << dendl;
+      dirty_info = true;
+      dirty_big_info = true;
+      info.history.same_interval_since = osdmap->get_epoch();
+    }
+  }
+  ...
+}
+{% endhighlight %}
+
+
 
 ###### 5.2 构建OSD列表
 函数build_prior()根据past_intervals来计算probe_targets列表，也就是要去获取pg_info的OSD列表。
