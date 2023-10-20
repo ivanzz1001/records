@@ -91,6 +91,8 @@ Infomation消息会被打印到名称为```LOG```和```LOG.old```文件中。
 
 1) 将前一个memtable中的数据写入到sstable中；
 
+>ps: sst是sorted string table的缩写
+
 2）丢弃该memtable;
 
 3) 删除旧的log file以及旧的memtable;
