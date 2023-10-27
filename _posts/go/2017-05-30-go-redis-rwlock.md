@@ -398,7 +398,7 @@ func (wlock *RWriteLock)Unlock()(error){
 
 1. [Redis Eval 命令](https://www.runoob.com/redis/scripting-eval.html)
 
-
+2. [redis分布式锁](https://redis.io/docs/manual/patterns/distributed-locks/)
 
 
 <br />
