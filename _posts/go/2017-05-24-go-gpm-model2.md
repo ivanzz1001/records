@@ -13,7 +13,7 @@ goroutine调度器的实现主要是如下3个文件:
 
 * runtime/proc.go
 
-* runtime/asm_arm64.s
+* runtime/asm_amd64.s
 
 花了一天的时间了阅读这部分代码实现，主要目的是了解goroutine调度器的基本运作过程和整体实现原理，并不对细节进行过多深入，但即便是如此“不求甚解”的阅读，在很多地方仍然是感到一头雾水，比如：
 
