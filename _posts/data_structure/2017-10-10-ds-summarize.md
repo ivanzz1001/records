@@ -58,6 +58,8 @@ description: 算法及数据结构
 
 6. [五大常用算法](https://www.zhihu.com/question/23148377/answer/1847634304)
 
+7. [相关面经](https://blog.csdn.net/weixin_42335835/article/details/122971831)
+
 <br />
 <br />
 <br />
