@@ -864,13 +864,13 @@ int main(int argc, char *argv[])
 }
 {% endhighlight %}
 编译运行：
-<pre>
+{% highlight string %}
 # gcc -o test test.cpp -lstdc++
 # ./test
 hash<T>
 hash<char>
 hash<unsigned char>
-</pre>
+{% endhighlight %}
 
 ## 3. 临时对象地产生与运用
 所谓临时对象，就是一种无名对象(unnamed objects)。它的出现如果不在程序员的预期之下（例如任何pass by value操作都会引发copy操作，于是形成一个临时对象），往往造成效率上的负担。但有时候可以制造一些临时对象，却又是使程序干净清爽的技巧。刻意制造临时对象的方法是，在型别名称之后直接加一对小括号，并可指定初值，例如Shape(3,5)或int(8)，其意义相当于调用相应的constructor且不指定对象名称。STL最常将此技巧应用于仿函数(functor)与算法的搭配上。例如：
@@ -925,6 +925,7 @@ int main(int argc, char *argv[])
 
 **[参看]:**
 
+1. [cpluscpus reference](https://cplusplus.com/reference/algorithm/sort/)
 
 
 <br />
