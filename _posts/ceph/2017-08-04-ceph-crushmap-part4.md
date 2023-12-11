@@ -41,6 +41,16 @@ description: crushmap算法详解
 
 8. [机器学习中的统计学基础](https://zhuanlan.zhihu.com/p/99910209)
 
+9. [自然对数(LN)](https://upimg.baike.so.com/doc/315890-334445.html) ps: 本链接对于理解此算法很有效
+
+10. [kernel_awsome_feature](https://github.com/0voice/kernel_awsome_feature/blob/main/「核心」Ceph学习三部曲之一:A%20First%20Glance%20At%20CRUSH.md)
+
+11. [understanding bucket_straw2_choose](https://www.spinics.net/lists/ceph-devel/msg36979.html)
+
+12. [通俗易懂理解指数分布](https://www.cnblogs.com/Renyi-Fan/p/13948742.html)
+
+13. [泊松分布和指数分布：10分钟教程](https://mp.weixin.qq.com/s?__biz=MzU0MDQ1NjAzNg==&mid=2247534580&idx=3&sn=96b21a6d77194db5dd94b01b0c7ff214&chksm=fb3ae2ffcc4d6be90e38d7069dcf055ebfb2b4f14cad2164fa2383401e0d4f86fc3faa9b3278&scene=27)
+
 <br />
 <br />
 <br />
