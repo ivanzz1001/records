@@ -75,7 +75,7 @@ undo log主要分为两种：
 
 对MVCC有帮助的实质是update undo log ，undo log实际上就是存在rollback segment中旧记录链，它的执行流程如下:
 
-1) 比如一个有个事务插入person表插入了一条新记录，记录如下，name为Jerry, age为24岁，隐式主键是1，事务ID和回滚指针，我们假设为NULL
+1) 比如一个有个事务向person表插入了一条新记录，记录如下，name为Jerry, age为24岁，隐式主键是1，事务ID和回滚指针，我们假设为NULL
 
 ![mvcc-2](https://ivanzz1001.github.io/records/assets/img/db/db_mysql_mvcc2.webp)
 
@@ -180,7 +180,6 @@ insert into t(id, k) values(1,1),(2,2);
 这样，事务A的视图数组就是[99,100], 事务B的视图数组是[99,100,101], 事务C的视图数组是[99,100,101,102]。
 
 为了简化分析，我先把其他干扰语句去掉，只画出跟事务A查询逻辑有关的操作:
-
 
 ![图4 事务A查询数据逻辑图](https://ivanzz1001.github.io/records/assets/img/db/db_mysql_mvcc8.webp)
 
