@@ -1049,6 +1049,145 @@ func TestThrottleQueue_Exit(t *testing.T){
 }
 {% endhighlight %}
 
+
+## 7. 嵌套数组扁平化
+{% highlight string %}
+package main
+ 
+import "fmt"
+ 
+type NestedInteger struct {
+	IsInteger bool
+	Value     int
+	List      []*NestedInteger
+}
+ 
+type NestedIterator struct {
+	FlattenedList []int // 扁平化后的列表
+	Index         int   // 当前迭代位置的索引
+}
+ 
+func Constructor(nestedList []*NestedInteger) *NestedIterator {
+	flattenedList := make([]int, 0)
+	dfs(nestedList, &flattenedList)
+	return &NestedIterator{FlattenedList: flattenedList, Index: -1}
+}
+ 
+// 使用深度优先搜索将嵌套列表扁平化
+func dfs(nestedList []*NestedInteger, flattenedList *[]int) {
+	for _, ni := range nestedList {
+		if ni.IsInteger {
+			*flattenedList = append(*flattenedList, ni.Value)
+		} else {
+			dfs(ni.List, flattenedList)
+		}
+	}
+}
+ 
+func (it *NestedIterator) HasNext() bool {
+	return it.Index+1 < len(it.FlattenedList)
+}
+ 
+func (it *NestedIterator) Next() int {
+	it.Index++
+	return it.FlattenedList[it.Index]
+}
+ 
+func main() {
+	nestedList := []*NestedInteger{
+		&NestedInteger{
+			IsInteger: false,
+			List: []*NestedInteger{
+				&NestedInteger{IsInteger: true, Value: 1},
+				&NestedInteger{IsInteger: true, Value: 2},
+				&NestedInteger{IsInteger: true, Value: 2},
+			},
+		},
+		&NestedInteger{
+			IsInteger: false,
+			List: []*NestedInteger{
+				&NestedInteger{IsInteger: true, Value: 3},
+				&NestedInteger{IsInteger: true, Value: 4},
+				&NestedInteger{IsInteger: true, Value: 5},
+				&NestedInteger{IsInteger: true, Value: 6},
+			},
+		},
+		&NestedInteger{
+			IsInteger: false,
+			List: []*NestedInteger{
+				&NestedInteger{IsInteger: true, Value: 6},
+				&NestedInteger{IsInteger: true, Value: 7},
+				&NestedInteger{IsInteger: true, Value: 8},
+				&NestedInteger{IsInteger: true, Value: 9},
+				&NestedInteger{
+					IsInteger: false,
+					List: []*NestedInteger{
+						&NestedInteger{IsInteger: true, Value: 11},
+						&NestedInteger{IsInteger: true, Value: 12},
+						&NestedInteger{
+							IsInteger: false,
+							List: []*NestedInteger{
+								&NestedInteger{IsInteger: true, Value: 12},
+								&NestedInteger{IsInteger: true, Value: 13},
+								&NestedInteger{
+									IsInteger: false,
+									List: []*NestedInteger{
+										&NestedInteger{IsInteger: true, Value: 14},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		&NestedInteger{IsInteger: true, Value: 10},
+	}
+
+	iterator := Constructor(nestedList)
+	result := make([]int, 0)
+	for iterator.HasNext() {
+		result = append(result, iterator.Next())
+	}
+	fmt.Println(result)
+
+	// nestedList := []*NestedInteger{
+	// 	&NestedInteger{IsInteger: false, List: []*NestedInteger{
+	// 		&NestedInteger{IsInteger: true, Value: 1},
+	// 		&NestedInteger{IsInteger: true, Value: 1},
+	// 	}},
+	// 	&NestedInteger{IsInteger: true, Value: 2},
+	// 	&NestedInteger{IsInteger: false, List: []*NestedInteger{
+	// 		&NestedInteger{IsInteger: true, Value: 1},
+	// 		&NestedInteger{IsInteger: true, Value: 1},
+	// 	}},
+	// }
+	// iterator := Constructor(nestedList)
+	// result := make([]int, 0)
+	// for iterator.HasNext() {
+	// 	result = append(result, iterator.Next())
+	// }
+	// fmt.Println(result)
+ 
+	// nestedList = []*NestedInteger{
+	// 	&NestedInteger{true, 1, nil},
+	// 	&NestedInteger{false, 0, []*NestedInteger{
+	// 		&NestedInteger{true, 4, nil},
+	// 		&NestedInteger{false, 0, []*NestedInteger{
+	// 			&NestedInteger{true, 6, nil},
+	// 		}},
+	// 	}},
+	// }
+	// iterator = Constructor(nestedList)
+	// result = make([]int, 0)
+	// for iterator.HasNext() {
+	// 	result = append(result, iterator.Next())
+	// }
+	// fmt.Println(result)
+ 
+}
+{% endhighlight %}
+
 <br />
 <br />
 **[参看]：**
