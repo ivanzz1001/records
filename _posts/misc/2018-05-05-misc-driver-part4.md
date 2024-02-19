@@ -229,6 +229,9 @@ ps: 参看[道路交通事故处理程序规定](https://gat.hunan.gov.cn/gat/zt
 
 ![logo-3](https://ivanzz1001.github.io/records/assets/img/misc/driver_yicuo_2.jpg)
 
+
+![logo-4](https://ivanzz1001.github.io/records/assets/img/misc/driver_yicuo_4.png)
+
 5） **汽车哪些部位要用到机油？**
 
 答：机油，即发动机润滑油，密度约为0.91×10立方（kg/m立方）能对发动机起到润滑减磨、辅助冷却降温、密封防漏、防锈防蚀、减震缓冲等作用。被誉为汽车的“血液”。机油由基础油和添加剂两部分组成。基础油是润滑油的主要成分，决定着润滑油的基本性质，添加剂则可弥补和改善基础油性能方面的不足，赋予某些新的性能，是润滑油的重要组成部分。
