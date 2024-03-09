@@ -478,7 +478,7 @@ $
 
 1. [动态规划专题——背包问题](https://blog.csdn.net/raelum/article/details/128996521)
 
-
+2. [数学公式的插入](https://ivanzz1001.github.io/records/post/tools/2017/08/28/markdown-math)
 
 <br />
 <br />
