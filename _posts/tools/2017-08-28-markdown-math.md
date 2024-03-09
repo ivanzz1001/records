@@ -226,6 +226,8 @@ $$\begin{matrix}
 
 2. [如何插入公式](http://home.ustc.edu.cn/~zzx2002/new/2021/08/04/mathjax/)
 
+3. [如何优雅的在markdown中插入数学公式](https://www.cnblogs.com/syqwq/p/15190115.html)
+
 <br />
 <br />
 <br />
