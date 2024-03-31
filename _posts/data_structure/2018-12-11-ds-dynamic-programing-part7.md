@@ -62,7 +62,7 @@ description: 买卖股票最佳时机
   通过上面两种情况我们可以得到状态转移方程：
 
 $$
-buy[i][j]=max{buy[i−1][j],sell[i−1][j]−price[i]}
+buy[i][j]=max\{buy[i−1][j],sell[i−1][j]−price[i]\}
 $$
 
 
@@ -77,7 +77,7 @@ $$
 那么我们可以得到状态转移方程：
 
 $$
-sell[i][j]=max{sell[i−1][j],buy[i−1][j−1]+price[i]}
+sell[i][j]=max\{sell[i−1][j],buy[i−1][j−1]+price[i]\}
 $$
 
 
