@@ -20,28 +20,29 @@ CMake就是针对上面问题所设计的工具：它首先允许开发者编写
 
 CMake是一个开源、跨平台的工具集，主要用来构建(build)、测试(test)、以及打包(package)软件。在Linux平台下，使用CMake生成Makefile并编译的流程如下：
 
-   1) 编写CMake配置文件CMakeLists.txt 
+- 编写CMake配置文件CMakeLists.txt 
    
-   2) 执行命令```cmake PATH```或者```ccmake PATH```生成Makefile。(其中```PATH```是CMakeLists.txt所在的目录）
+- 执行命令```cmake PATH```或者```ccmake PATH```生成Makefile。(其中```PATH```是CMakeLists.txt所在的目录）
+> 注： ccmake和cmake的区别在于前者提供了一个交互式的界面。
    
-   >注： ccmake和cmake的区别在于前者提供了一个交互式的界面。
-   
-   3) 使用make命令进行编译
+- 使用make命令进行编译
    
 ### 1.1 cmake的主要特点
 cmake和autotools是不同的项目工具，有各自的特点和用户群。存在即为合理，因此我们不会对两者进行优劣比较，这里只给出cmake的一些主要特点：
 
-1） 开放源代码，使用类BSD许可发布；
+- 开放源代码，使用类BSD许可发布；
 
-2） 跨平台，并可生成native编译配置文件。在Linux/Unix平台，生成makefile；在macos平台，可以生成xcode；在windows平台可以生成MSVC的工程文件；
+- 跨平台，并可生成native编译配置文件。在Linux/Unix平台，生成makefile；在macos平台，可以生成xcode；在windows平台可以生成MSVC的工程文件；
 
-3） 能够管理大型项目，KDE4就是最好的证明。
+- 能够管理大型项目，KDE4就是最好的证明。
 
-4） 简化构建过程和编译过程。cmake的工具链非常简单：cmake + make 
+- 简化构建过程和编译过程。cmake的工具链非常简单：cmake + make 
 
-5） 高效率，按照KDE官方说法，CMake构建KDE4的kdelibs要比使用autotools来构建KDE3.5.6的kdelibs快40%，主要是因为cmake在工具链中没有libtool。
+- 高效率，按照KDE官方说法，CMake构建KDE4的kdelibs要比使用autotools来构建KDE3.5.6的kdelibs快40%，主要是因为cmake在工具链中没有libtool。
 
-6） 可扩展，可以为cmake编写特定功能的模块，扩充cmake功能。
+- 可扩展，可以为cmake编写特定功能的模块，扩充cmake功能。
+
+<br />
 
 ## 2. cmake的安装
 
@@ -142,6 +143,12 @@ cmake version 3.17.2
 
 CMake suite maintained and supported by Kitware (kitware.com/cmake).
 </pre>
+
+
+
+
+
+
 
 
 ## 3. cmake tutorial 
