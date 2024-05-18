@@ -689,6 +689,10 @@ $ ls
 {% endhighlight %}
 其中有```DbConnector```目录，不过是空的。你必须运行两个命令：```git submodule init```用来初始化本地配置文件，而```git submodule update```则从该项目中抓取所有数据并检出父项目中列出的合适提交。
 
+
+>ps: 当使用git clone下来的工程中带有submodule时，初始的时候，submodule的内容并不会自动下载下来的，此时，只需执行如下命令
+>git submodule update --init --recursive
+
 {% highlight string %}
 $ git submodule init
 Submodule 'DbConnector' (http://github.com/chaconinc/DbConnector) registered for path 'DbConnector'
@@ -719,6 +723,7 @@ Unpacking objects: 100% (11/11), done.
 Checking connectivity... done.
 Submodule path 'DbConnector': checked out 'c3f01dc8862123d317dd46284b05b6892c7b29bc'
 {% endhighlight %}
+
 
 * 删除submodule
 
