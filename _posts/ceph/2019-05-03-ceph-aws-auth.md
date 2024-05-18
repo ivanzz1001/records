@@ -47,7 +47,7 @@ rgw/rgw_rest_s3.cc        int RGW_Auth_S3::authorize()
 
 **[参看]**
 
-
+1. [goamz库](https://github.com/goamz/goamz)
 
 
 <br />
