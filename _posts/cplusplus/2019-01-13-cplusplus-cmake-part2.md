@@ -32,7 +32,7 @@ description: cmake的使用
 这里建议在参考[cmake官网文档](https://cmake.org/)的同时，最好从GitHub上下载一个其他人编写的CMake编译工程示例，以便我们交叉对照的学习。这里我们从GitHub上克隆`gflags`:
 
 ```
-# git clone https://github.com/gflags/gflags.git
+# git clone https://github.com/protocolbuffers/protobuf.git 
 
 ```
 
@@ -237,13 +237,202 @@ install(EXPORT <export-name> [...])
 install(RUNTIME_DEPENDENCY_SET <set-name> [...])
 ```
 
+## 8. 几个常用的命令介绍
+
+### 8.1 add_custom_command与add_custom_target
+在CMake构建系统中，add_custom_command和add_custom_target是两个强大的指令，它们允许我们添加自定义的构建规则。这两个指令在复杂的项目中特别有用，因为它们允许我们执行一些标准的构建步骤之外的操作。
+
+参看:
+
+- [CMake中的add_custom_command和add_custom_target指令详解](https://cloud.baidu.com/article/3282122)
+
+1) **add_custom_command**
+
+`add_custom_command`指令用于为生成的目标文件添加自定义构建规则。它通常用于在构建过程中生成源代码、头文件或其他文件。这个指令的基本语法如下：
+```
+add_custom_command(OUTPUT output1 [output2 ...]
+                   COMMAND command1 [ARGS] [args1...]
+                   [COMMAND command2 [ARGS] [args2...] ...]
+                   [MAIN_DEPENDENCY depend]
+                   [DEPENDS [depends...]]
+                   [BYPRODUCTS [files...]]
+                   [IMPLICIT_DEPENDS <lang1> depend1
+                                    [<lang2> depend2] ...]
+                   [WORKING_DIRECTORY dir]
+                   [COMMENT comment]
+                   [DEPFILE depfile]
+                   [JOB_POOL job_pool]
+                   [JOB_SERVER_AWARE <bool>]
+                   [VERBATIM] [APPEND] [USES_TERMINAL]
+                   [COMMAND_EXPAND_LISTS]
+                   [DEPENDS_EXPLICIT_ONLY])
+```
+
+>ps: 上面这是add_custom_command指令的一种较为常见的用法
+
+- OUTPUT：指定由命令生成的文件。这些文件将成为后续构建步骤的依赖项。
+
+- COMMAND：要执行的命令。这可以是任何可以在命令行中运行的命令。
+
+- MAIN_DEPENDENCY：可选参数，指定主要依赖项。这通常是一个源文件，当该文件更改时，将重新运行命令。
+
+- DEPENDS：其他依赖项列表。当这些文件更改时，也将重新运行命令。
+
+- IMPLICIT_DEPENDS：隐式依赖项。这允许你指定命令对哪些文件有隐式依赖。
+
+- VERBATIM：如果设置，命令将不会通过CMake的命令行解释器，而是直接传递给构建系统。
+
+- WORKING_DIRECTORY：指定命令的工作目录。
+
+- COMMENT：为构建系统提供的注释，通常用于描述命令的目的。
+
+- PREBUILDS或POSTBUILDS：指定命令是在目标构建之前还是之后运行。
+
+- BYPRODUCTS：指定命令生成的副产品文件。这些文件不会触发重新构建，但如果它们不存在，构建将被视为失败。
+
+2) **add_custom_target**
+
+`add_custom_target`指令用于添加不生成输出文件的自定义目标。这通常用于执行一些不需要生成文件的任务，如运行测试、清理工作区等。它的基本语法如下：
+```
+add_custom_target(Name [ALL] [command1 [args1...]]
+                  [COMMAND command2 [args2...] ...]
+                  [DEPENDS depend depend depend ... ]
+                  [BYPRODUCTS [files...]]
+                  [WORKING_DIRECTORY dir]
+                  [COMMENT comment]
+                  [JOB_POOL job_pool]
+                  [JOB_SERVER_AWARE <bool>]
+                  [VERBATIM] [USES_TERMINAL]
+                  [COMMAND_EXPAND_LISTS]
+                  [SOURCES src1 [src2...]])
+```
+- target_name：自定义目标的名称。
+
+- ALL：可选参数，如果设置，该目标将被添加到默认构建目标中，即执行make或cmake --build时会自动构建。
+
+- DEPENDS：其他依赖项列表。当这些目标或文件更改时，该目标将被重新构建。
+
+- WORKING_DIRECTORY、COMMAND、VERBATIM、IMPLICIT_DEPENDS和BYPRODUCTS的参数与add_custom_command中的相同。
+
+3) **实际应用**
+
+在实际项目中，add_custom_command和add_custom_target可以非常有用。例如，你可能需要：
+
+- 使用add_custom_command生成由源代码生成的头文件，如使用protobuf工具生成C++头文件。
+
+- 使用add_custom_target运行测试套件，确保代码质量。
+
+- 使用add_custom_target清理构建过程中生成的文件，以保持工作区的整洁。
+
+通过合理使用这两个指令，你可以极大地扩展CMake的构建能力，使其适应各种复杂的构建需求。
 
 
+4) **execute_process**
+
+`execute_process`指令用于执行一个或多个子进程。及基本语法规则如下：
+```
+execute_process(COMMAND <cmd1> [<arguments>]
+                [COMMAND <cmd2> [<arguments>]]...
+                [WORKING_DIRECTORY <directory>]
+                [TIMEOUT <seconds>]
+                [RESULT_VARIABLE <variable>]
+                [RESULTS_VARIABLE <variable>]
+                [OUTPUT_VARIABLE <variable>]
+                [ERROR_VARIABLE <variable>]
+                [INPUT_FILE <file>]
+                [OUTPUT_FILE <file>]
+                [ERROR_FILE <file>]
+                [OUTPUT_QUIET]
+                [ERROR_QUIET]
+                [COMMAND_ECHO <where>]
+                [OUTPUT_STRIP_TRAILING_WHITESPACE]
+                [ERROR_STRIP_TRAILING_WHITESPACE]
+                [ENCODING <name>]
+                [ECHO_OUTPUT_VARIABLE]
+                [ECHO_ERROR_VARIABLE]
+                [COMMAND_ERROR_IS_FATAL <ANY|LAST>])
+```
+
+cmake在```配置阶段```阶段使用该指令来执行命令；而add_custom_command与add_custom_target是在构建阶段执行相应命令。
+
+### 8.2 文件操作指令
+
+`file`指令用于操作文件或路径。基本语法规则如下：
+```
+Reading
+  file(READ <filename> <out-var> [...])
+  file(STRINGS <filename> <out-var> [...])
+  file(<HASH> <filename> <out-var>)
+  file(TIMESTAMP <filename> <out-var> [...])
+  file(GET_RUNTIME_DEPENDENCIES [...])
+
+Writing
+  file({WRITE | APPEND} <filename> <content>...)
+  file({TOUCH | TOUCH_NOCREATE} <file>...)
+  file(GENERATE OUTPUT <output-file> [...])
+  file(CONFIGURE OUTPUT <output-file> CONTENT <content> [...])
+
+Filesystem
+  file({GLOB | GLOB_RECURSE} <out-var> [...] <globbing-expr>...)
+  file(MAKE_DIRECTORY <directories>...)
+  file({REMOVE | REMOVE_RECURSE } <files>...)
+  file(RENAME <oldname> <newname> [...])
+  file(COPY_FILE <oldname> <newname> [...])
+  file({COPY | INSTALL} <file>... DESTINATION <dir> [...])
+  file(SIZE <filename> <out-var>)
+  file(READ_SYMLINK <linkname> <out-var>)
+  file(CREATE_LINK <original> <linkname> [...])
+  file(CHMOD <files>... <directories>... PERMISSIONS <permissions>... [...])
+  file(CHMOD_RECURSE <files>... <directories>... PERMISSIONS <permissions>... [...])
+
+Path Conversion
+  file(REAL_PATH <path> <out-var> [BASE_DIRECTORY <dir>] [EXPAND_TILDE])
+  file(RELATIVE_PATH <out-var> <directory> <file>)
+  file({TO_CMAKE_PATH | TO_NATIVE_PATH} <path> <out-var>)
+
+Transfer
+  file(DOWNLOAD <url> [<file>] [...])
+  file(UPLOAD <file> <url> [...])
+
+Locking
+  file(LOCK <path> [...])
+
+Archiving
+  file(ARCHIVE_CREATE OUTPUT <archive> PATHS <paths>... [...])
+  file(ARCHIVE_EXTRACT INPUT <archive> [...])
+```
+比如我们使用如下的命令来匹配出src目录下的所有cpp文件：
+
+```
+file(GLOB SOURCES "src/*.cpp")
+```
 
 
-
-
-
+如下给出一个示例，用于遍历目录下的所有.proto文件，使用protoc生成.cpp：
+```
+cmake_minimum_required(VERSION 3.10)
+project(protobuf_generation LANGUAGES CXX)
+ 
+find_package(Protobuf REQUIRED)
+ 
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+ 
+file(GLOB_RECURSE PROTO_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "*.proto")
+ 
+foreach(PROTO_FILE ${PROTO_FILES})
+    get_filename_component(PROTO_DIR ${PROTO_FILE} DIRECTORY)
+    set(PROTO_SRC_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PROTO_DIR}")
+ 
+    execute_process(
+        COMMAND ${PROTOBUF_PROTOC_EXECUTABLE}
+        --cpp_out=${PROTO_SRC_DIR}
+        -I ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/${PROTO_FILE})
+endforeach()
+ 
+add_executable(protobuf_example main.cpp)
+target_link_libraries(protobuf_example protobuf)
+```
 
 
 <br />
