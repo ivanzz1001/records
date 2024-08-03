@@ -1264,6 +1264,8 @@ Total Test time (real) =   0.02 sec
 
 5. [官方cmake命令](https://cmake.org/cmake/help/latest/manual/cmake-commands.7.html)
 
+6. [cmake-cookbook](https://www.kancloud.cn/csyangbinbin/cmake-cookbook1/2157923)
+
 <br />
 <br />
 <br />
