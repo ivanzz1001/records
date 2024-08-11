@@ -22,6 +22,12 @@ description: golang网站收集
 
 - [Golang TCPConn.SetNoDelay方法代码示例](https://vimsky.com/examples/detail/golang-ex-net-TCPConn-SetNoDelay-method.html)
 
+- [Golang性能分析工具从原理到实战](https://zhuanlan.zhihu.com/p/680397395)
+
+- [golang pprof 监控系列 go trace统计原理与使用解析](https://www.jb51.net/article/280208.htm)
+
+
+
 
 <br />
 <br />
