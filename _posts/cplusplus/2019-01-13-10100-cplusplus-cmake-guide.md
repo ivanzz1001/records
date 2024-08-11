@@ -22,6 +22,45 @@ description: cmake的使用
 - [cmake modules](https://cmake.org/cmake/help/latest/manual/cmake-modules.7.html)
 
 
+在学习cmake之前我们先大体了解一下主要包含哪些内容：
+
+- [cmake-buildsystem(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-buildsystem.7.html)
+
+- [cmake-commands(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-commands.7.html)
+
+- [cmake-compile-features(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-compile-features.7.html)
+
+- [cmake-developer(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-developer.7.html)
+
+- [cmake-env-variables(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-env-variables.7.html)
+
+- [cmake-file-api(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-file-api.7.html)
+
+- [cmake-generator-expressions(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-generator-expressions.7.html)
+
+- [cmake-generators(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-generators.7.html)
+
+- [cmake-language(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-language.7.html)
+
+- [cmake-modules(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-modules.7.html)
+
+- [cmake-packages(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-packages.7.html)
+
+- [cmake-policies(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-policies.7.html)
+
+- [cmake-presets(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-presets.7.html)
+
+- [cmake-properties(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-properties.7.html)
+
+- [cmake-qt(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-qt.7.html)
+
+- [cmake-server(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-server.7.html)
+
+- [cmake-toolchains(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-toolchains.7.html)
+
+- [cmake-variables(7)](https://cmake.org/cmake/help/v3.22/manual/cmake-variables.7.html)
+
+- [cpack-generators(7)](https://cmake.org/cmake/help/v3.22/manual/cpack-generators.7.html)
 
 
 <!-- more -->
