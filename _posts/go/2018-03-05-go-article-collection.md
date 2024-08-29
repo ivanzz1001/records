@@ -27,7 +27,9 @@ description: golang网站收集
 - [golang pprof 监控系列 go trace统计原理与使用解析](https://www.jb51.net/article/280208.htm)
 
 
+- [buffer pool的实现](https://github.com/brave/nitriding-daemon)
 
+- [golang为http客户端设置DSCP](https://blog.csdn.net/qq_35916454/article/details/124040210)
 
 <br />
 <br />
