@@ -31,6 +31,9 @@ description: golang网站收集
 
 - [golang为http客户端设置DSCP](https://blog.csdn.net/qq_35916454/article/details/124040210)
 
+
+- [只改一个参数让Golang GC耗时暴降到1/30！](https://cloud.tencent.com/developer/article/2356881)
+
 <br />
 <br />
 <br />
