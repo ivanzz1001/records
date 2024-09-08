@@ -34,6 +34,8 @@ description: golang网站收集
 
 - [只改一个参数让Golang GC耗时暴降到1/30！](https://cloud.tencent.com/developer/article/2356881)
 
+- [bufferpool](https://github.com/aporeto-inc/trireme-lib/blob/v11.0.0-rc9/controller/pkg/bufferpool/bufferpool.go)
+
 <br />
 <br />
 <br />
