@@ -735,6 +735,43 @@ abcdefg
 # chmod 0440 /etc/sudoers.d/ivan1001
 {% endhighlight %}
 
+**36) 获取当前的毫秒时间**
+{% highlight string %}
+# date +%s%3N
+# date +%3N; date +%4N; date +%5N; date +%6N;  date +%N
+379
+3805
+38185
+383502
+384754695
+{% endhighlight %}
+
+这个命令的含义是：date是一个用于显示或设置系统时间和日期的命令；```+%s%3N```是格式化输出的选项，其中```%s```表示从1970年1月1日00:00:00 UTC到现在的秒数，```%3N```表示纳秒（百万分之一秒）部分。
+
+**37) awk找出两个文件不同或相同的内容**
+
+在Linux 系统查找中要找出两个文件相同或不同的内容，可以借助awk 的命令来实现。
+
+- 找出文件2中不同的值
+{% highlight string %}
+# awk  'NR==FNR{a[$0]}NR>FNR{if(!($0 in a)) print $0}' file1 file2 
+{% endhighlight %}
+
+- 找出两文件中相同的值
+{% highlight string %}
+# awk  'NR==FNR{a[$0]}NR>FNR{ if($0 in a) print $0}' file1 file2 
+{% endhighlight %}
+
+以上命令可以结合awk 的其他参数一起使用比如```-F```等。 按分隔符分割之后，```$0```可以换成你想要的字段。
+
+*NR 和 FNR 的意义*：NR和FNR都表示打开文件所读取的行数，但是二者的区别是NR会一直向上累加，FNR 每打开一个新文件 该值就会从0开始重置。比如filename1、filename2文件中的数据行数分别为10行、20行，那么执行完命令后， NR值为30，而FNR为后打开的文件行数
+
+
+
+
+
+
+参看：[awk找出两个文件不同或相同的内容](https://blog.csdn.net/hanzhonghai2010/article/details/102957113)
 
 
 <br />
