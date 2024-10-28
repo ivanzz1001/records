@@ -1,6 +1,6 @@
 ---
 layout: post
-title: cmake的使用
+title: cmake-01 使用概览
 tags:
 - cplusplus
 categories: cplusplus
