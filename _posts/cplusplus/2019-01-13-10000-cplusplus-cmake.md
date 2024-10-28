@@ -1,6 +1,6 @@
 ---
 layout: post
-title: cmake的安装及使用
+title: cmake-00 程序安装及简单使用
 tags:
 - cplusplus
 categories: cplusplus
