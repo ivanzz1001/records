@@ -13,6 +13,7 @@ description: cmake的使用
 
 - [CMake 属性之目标属性 ](https://www.cnblogs.com/mengps/p/18452409)
 
+- [CMake Cache](https://cmake.org/cmake/help/book/mastering-cmake/chapter/CMake%20Cache.html)
 
 <!-- more -->
 
