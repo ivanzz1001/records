@@ -110,6 +110,8 @@ add_library(test_lib SHARED test.cpp)
 #生成静态库目标test_lib
 add_library(test_lib STATIC test.cpp)
 ```
+>ps: If no <type> is given the default is STATIC or SHARED based on the value of the BUILD_SHARED_LIBS variable.
+
 
 2) **定义目标属性**
 
