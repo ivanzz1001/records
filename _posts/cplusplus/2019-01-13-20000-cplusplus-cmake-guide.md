@@ -17,6 +17,8 @@ description: cmake的使用
 
 - [mastering cmake](https://cmake.org/cmake/help/book/mastering-cmake/chapter/Finding%20Packages.html)
 
+- [cmake find_package()命令](https://cmake.org/cmake/help/latest/command/find_package.html)
+
 
 本文先从一个find_package()的例子出发，然后逐渐引出对find_package()命令搜包过程的介绍，以便深入理解find_package()的具体操作原理，帮助大家理解和消化。
 
