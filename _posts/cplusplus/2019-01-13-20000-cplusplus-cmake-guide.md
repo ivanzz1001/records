@@ -320,9 +320,93 @@ Entry                                                        Convention
 
 
 
+## 5. 内置(Built in)Find Modules介绍
+
+我们可以在CMake的Modules子目录中(ps: 通常是cmake的默认安装目录/usr/share/cmake-<version>/Module)找到大量预定义好的modules。我们可以通过这些Modules查找到大量的通用软件包。参看[cmake-modules(7)](https://cmake.org/cmake/help/latest/manual/cmake-modules.7.html#manual:cmake-modules(7))手册以了解详细信息。
+
+在每一个`Find<XX>.cmake`文件中都定义了一系列的变量，在对应的package被找到后，就可以直接在工程中使用这些变量。所有的这些变量都以所查找的package的名称作为前缀。CMake也尝试建立一些准则来命名这些变量，但最好我们还是直接阅读对应的`Find<XX>.cmake`文件。下面我们简单介绍一下cmake准则所建议的一些变量名称：
+
+- `<XX>_INCLUDE_DIRS`: 用于包含对应package头文件的目录
+
+- `<XX>_LIBRARIES`: 指定要使用`<XX>`时需要链接哪些库。这些库包含完整的路径
+
+- `<XX>_FOUND`: 假如对应的package未找到的话，该变量会被设置为false，或未定义
 
 
+还有一些其他的cmake准则建议的变量我们未列出，请参考相应的文档。
 
+值得指出的是，`Find<XX>.cmake`中可能只定义了部分变量。然而，在大多数场景下`<XX>_FOUND`变量应该是存在的。假如`<XX>`是一个library，那么`<XX>_LIBRARIES`变量也应该被定义，`<XX>_INCLUDE_DIR`变量通常也要被定义。
+
+我们可以在一个工程中通过`include`命令或`find_package()`命令来将modules包含进来：
+```
+find_package(OpenGL)
+```
+与如下两个等价：
+
+`
+include(${CMAKE_ROOT}/Modules/FindOpenGL.cmake)
+`
+
+和
+```
+include(FindOpenGL)
+```
+
+## 6. 创建cmake package configuration文件
+
+如果要想外部的应用程序找到对应的package的话，那么对应的工程就得提供package配置文件。考虑一个最简单的工程`Gromit`，其提供一个可产生源代码的可执行文件，以及这些所产生的源代码所必须链接的库文件。对应的`CMakeLists.txt`文件内容如下：
+
+```
+cmake_minimum_required(VERSION 3.20)
+project(Gromit C)
+set(version 1.0)
+
+# Create library and executable.
+add_library(gromit STATIC gromit.c gromit.h)
+add_executable(gromit-gen gromit-gen.c)
+```
+
+为了安装`Gromit`并导出targets供外部工程使用，添加如下代码：
+
+```
+# Install and export the targets.
+install(FILES gromit.h DESTINATION include/gromit-${version})
+install(TARGETS gromit gromit-gen
+        DESTINATION lib/gromit-${version}
+        EXPORT gromit-targets)
+install(EXPORT gromit-targets
+        DESTINATION lib/gromit-${version})
+```
+最后`Gromit`必须在其安装目录树中提供一个package configuration文件，这样外部的工程才可通过find_package()来找到它：
+
+```
+# Create and install package configuration and version files.
+configure_file(
+   ${Gromit_SOURCE_DIR}/pkg/gromit-config.cmake.in
+   ${Gromit_BINARY_DIR}/pkg/gromit-config.cmake @ONLY)
+
+configure_file(
+   ${Gromit_SOURCE_DIR}/gromit-config-version.cmake.in
+   ${Gromit_BINARY_DIR}/gromit-config-version.cmake @ONLY)
+
+install(FILES ${Gromit_BINARY_DIR}/pkg/gromit-config.cmake
+         ${Gromit_BINARY_DIR}/gromit-config-version.cmake
+         DESTINATION lib/gromit-${version})
+```
+
+上面的命令用于配置并安装package configuration文件和package version文件。对应的配置输入文件`gromit-config.cmake.in`如下：
+
+```
+# Compute installation prefix relative to this file.
+get_filename_component(_dir "${CMAKE_CURRENT_LIST_FILE}" PATH)
+get_filename_component(_prefix "${_dir}/../.." ABSOLUTE)
+
+# Import the targets.
+include("${_prefix}/lib/gromit-@version@/gromit-targets.cmake")
+
+# Report other information.
+set(gromit_INCLUDE_DIRS "${_prefix}/include/gromit-@version@")
+```
 
 
 <br />
