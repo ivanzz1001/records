@@ -63,7 +63,7 @@ find_library (
 
 - HINTS, PATHS
 
-指定处默认查找目录外的其他查找目录
+指定除默认查找目录外的其他查找目录
 
 - PATH_SUFFIXES
 
