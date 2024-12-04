@@ -232,6 +232,13 @@ bazel-testlogs
 0 directories, 0 files
 ```
 
+通过前面的编译日志，我们了解到最终的编译输出放在`bazel-bin`目录。执行如下命令看看编译出来的可执行程序是否正常运行:
+<pre>
+# ./bazel-bin/main/hello-world
+Hello world
+Wed Dec  4 14:33:03 2024
+</pre>
+
 
 
 
