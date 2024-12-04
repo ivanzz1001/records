@@ -132,6 +132,104 @@ INFO: Build completed successfully, 6 total actions
 └── README.md
 
 5 directories, 5 files
+
+# tree bazel-bin
+bazel-bin
+└── main
+    ├── hello-world
+    ├── hello-world-0.params
+    ├── hello-world.repo_mapping
+    ├── hello-world.runfiles
+    │   ├── _main
+    │   │   └── main
+    │   │       └── hello-world -> /root/.cache/bazel/_bazel_root/63b5237301a1c80ee5b3af8a4d0a90e9/execroot/_main/bazel-out/k8-fastbuild/bin/main/hello-world
+    │   ├── MANIFEST -> /root/.cache/bazel/_bazel_root/63b5237301a1c80ee5b3af8a4d0a90e9/execroot/_main/bazel-out/k8-fastbuild/bin/main/hello-world.runfiles_manifest
+    │   └── _repo_mapping -> /root/.cache/bazel/_bazel_root/63b5237301a1c80ee5b3af8a4d0a90e9/execroot/_main/bazel-out/k8-fastbuild/bin/main/hello-world.repo_mapping
+    ├── hello-world.runfiles_manifest
+    └── _objs
+        └── hello-world
+            ├── hello-world.pic.d
+            └── hello-world.pic.o
+
+6 directories, 9 files
+
+# tree bazel-out
+bazel-out
+├── k8-fastbuild
+│   ├── bin
+│   │   └── main
+│   │       ├── hello-world
+│   │       ├── hello-world-0.params
+│   │       ├── hello-world.repo_mapping
+│   │       ├── hello-world.runfiles
+│   │       │   ├── _main
+│   │       │   │   └── main
+│   │       │   │       └── hello-world -> /root/.cache/bazel/_bazel_root/63b5237301a1c80ee5b3af8a4d0a90e9/execroot/_main/bazel-out/k8-fastbuild/bin/main/hello-world
+│   │       │   ├── MANIFEST -> /root/.cache/bazel/_bazel_root/63b5237301a1c80ee5b3af8a4d0a90e9/execroot/_main/bazel-out/k8-fastbuild/bin/main/hello-world.runfiles_manifest
+│   │       │   └── _repo_mapping -> /root/.cache/bazel/_bazel_root/63b5237301a1c80ee5b3af8a4d0a90e9/execroot/_main/bazel-out/k8-fastbuild/bin/main/hello-world.repo_mapping
+│   │       ├── hello-world.runfiles_manifest
+│   │       └── _objs
+│   │           └── hello-world
+│   │               ├── hello-world.pic.d
+│   │               └── hello-world.pic.o
+│   └── testlogs
+├── stable-status.txt
+├── _tmp
+│   └── actions
+│       ├── stderr-5
+│       ├── stderr-7
+│       ├── stdout-5
+│       └── stdout-7
+└── volatile-status.txt
+
+11 directories, 15 files
+
+# tree bazel-stage1
+bazel-stage1
+├── bazel-out
+│   ├── k8-fastbuild
+│   │   ├── bin
+│   │   │   └── main
+│   │   │       ├── hello-world
+│   │   │       ├── hello-world-0.params
+│   │   │       ├── hello-world.repo_mapping
+│   │   │       ├── hello-world.runfiles
+│   │   │       │   ├── _main
+│   │   │       │   │   └── main
+│   │   │       │   │       └── hello-world -> /root/.cache/bazel/_bazel_root/63b5237301a1c80ee5b3af8a4d0a90e9/execroot/_main/bazel-out/k8-fastbuild/bin/main/hello-world
+│   │   │       │   ├── MANIFEST -> /root/.cache/bazel/_bazel_root/63b5237301a1c80ee5b3af8a4d0a90e9/execroot/_main/bazel-out/k8-fastbuild/bin/main/hello-world.runfiles_manifest
+│   │   │       │   └── _repo_mapping -> /root/.cache/bazel/_bazel_root/63b5237301a1c80ee5b3af8a4d0a90e9/execroot/_main/bazel-out/k8-fastbuild/bin/main/hello-world.repo_mapping
+│   │   │       ├── hello-world.runfiles_manifest
+│   │   │       └── _objs
+│   │   │           └── hello-world
+│   │   │               ├── hello-world.pic.d
+│   │   │               └── hello-world.pic.o
+│   │   └── testlogs
+│   ├── stable-status.txt
+│   ├── _tmp
+│   │   └── actions
+│   │       ├── stderr-5
+│   │       ├── stderr-7
+│   │       ├── stdout-5
+│   │       └── stdout-7
+│   └── volatile-status.txt
+├── external
+│   ├── bazel_tools -> /root/.cache/bazel/_bazel_root/63b5237301a1c80ee5b3af8a4d0a90e9/external/bazel_tools
+│   ├── bazel_tools+xcode_configure_extension+local_config_xcode -> /root/.cache/bazel/_bazel_root/63b5237301a1c80ee5b3af8a4d0a90e9/external/bazel_tools+xcode_configure_extension+local_config_xcode
+│   ├── platforms -> /root/.cache/bazel/_bazel_root/63b5237301a1c80ee5b3af8a4d0a90e9/external/platforms
+│   ├── rules_cc+ -> /root/.cache/bazel/_bazel_root/63b5237301a1c80ee5b3af8a4d0a90e9/external/rules_cc+
+│   └── rules_cc++cc_configure_extension+local_config_cc -> /root/.cache/bazel/_bazel_root/63b5237301a1c80ee5b3af8a4d0a90e9/external/rules_cc++cc_configure_extension+local_config_cc
+├── main -> /workspace/cpp_proj/bazel-workspace/examples/cpp-tutorial/stage1/main
+├── MODULE.bazel -> /workspace/cpp_proj/bazel-workspace/examples/cpp-tutorial/stage1/MODULE.bazel
+├── MODULE.bazel.lock -> /workspace/cpp_proj/bazel-workspace/examples/cpp-tutorial/stage1/MODULE.bazel.lock
+└── README.md -> /workspace/cpp_proj/bazel-workspace/examples/cpp-tutorial/stage1/README.md
+
+19 directories, 18 files
+
+# tree bazel-testlogs
+bazel-testlogs
+
+0 directories, 0 files
 ```
 
 
