@@ -81,7 +81,26 @@ cc_binary(
     srcs = ["hello-world.cc"],
 )
 ```
+在我们的例子中，`hello-world`这个target实例化了bazel的内置[cc_binary rule](https://bazel.google.cn/reference/be/c-cpp#cc_binary)。通过该规则，bazel就知道了需要通过源文件`hello-world.cc`来构建一个自包含的可执行文件，并且构建时没有其他依赖。
 
+### 1.2 Stage 1: single target, single package
+
+接下来我们使用bazel来构建stage1这一工程，先来看看该工程的目录结构：
+
+```
+examples
+└── cpp-tutorial
+    └──stage1
+       ├── main
+       │   ├── BUILD
+       │   └── hello-world.cc
+       └── MODULE.bazel
+```
+进入到该目录执行如下命令:
+<pre>
+# cd cpp-tutorial/stage1
+# 
+</pre>
 
 
 
