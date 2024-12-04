@@ -69,7 +69,7 @@ examples
 
 - 一个或多个`BUILD`文件：用于告诉Bazel如何构建工程的不同部分。工程中包含`BUILD`文件的目录称为`package`。
 
-1)  **Understand BUILD file**
+1） **Understand BUILD file**
 
 一个BUILD文件中可以包含许多不同类型的Bazel指令。每个BUILD文件都至少需要设置一个rule，用于告诉bazel如何构建构建你想要的输出。BUILD文件中的每一个rule实例称为`target`，其指定了构建相应的输出所需要的源文件和依赖项。此外，一个target也可以指向多个其他的targets。
 
