@@ -213,6 +213,8 @@ description: C/C++标准版本及不同版本的新特性
 
 6. [c++ shell](https://cpp.sh)
 
+7. [详解C++左值、右值、左值引用、右值引用](https://blog.csdn.net/m0_59938453/article/details/125858335)
+
 
 <br />
 <br />
