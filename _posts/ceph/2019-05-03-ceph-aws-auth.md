@@ -49,6 +49,8 @@ rgw/rgw_rest_s3.cc        int RGW_Auth_S3::authorize()
 
 1. [goamz库](https://github.com/goamz/goamz)
 
+2. [s3 copy SSE](https://docs.aws.amazon.com/zh_cn/AmazonS3/latest/userguide/replication-config-for-kms-objects.html)
+
 
 <br />
 <br />
