@@ -44,6 +44,8 @@ description: github pages
 
 * [exchangerate](https://www.exchangerate-api.com/docs/java-currency-api)
 
+* [markdown mermaid](https://mermaid.js.org/)
+
 
 <br />
 <br />
