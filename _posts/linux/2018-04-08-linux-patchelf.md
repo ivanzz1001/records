@@ -166,11 +166,31 @@ description: patchelf用法
   -L/opt/glibc-2.38/lib
 ```
 
+# 4. 直接使用ld-linux-x86-64.so.2 运行程序
+
+我们也可以不使用上文介绍的`patchelf`来更换程序所链接的glibc，而是直接用ld-linux-x86-64.so.2来启动程序。例如：
+
+```text
+# pwd
+/package/lib/x86_64-linux-gnu
+# tree ./x86_64-linux-gnu/
+./x86_64-linux-gnu/
+├── ld-linux-x86-64.so.2
+├── libc.so.6
+├── libdl.so.2
+├── libm.so.6
+├── libpthread.so.0
+└── librt.so.1
+
+0 directories, 6 files
+# /package/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 --library-path /package/lib/x86_64-linux-gnu:<other-lib-path> my_binary
+```
+
+
 
 <br />
 <br />
 <br />
-
 
 
 
