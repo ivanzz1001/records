@@ -1,4 +1,3 @@
-
 ---
 layout: post
 title: 清除无service文件的unit
@@ -7,6 +6,7 @@ tags:
 categories: linuxOps
 description: 清除无service文件的unit
 ---
+
 
 如果`systemctl list-units --all`仍然列出了已经删除`.service`文件的unit(且LOAD=not-found)，说明systemd仍然缓存了该unit，但找不到对应的文件。
 
