@@ -766,8 +766,39 @@ abcdefg
 
 *NR 和 FNR 的意义*：NR和FNR都表示打开文件所读取的行数，但是二者的区别是NR会一直向上累加，FNR 每打开一个新文件 该值就会从0开始重置。比如filename1、filename2文件中的数据行数分别为10行、20行，那么执行完命令后， NR值为30，而FNR为后打开的文件行数
 
+**38) 扫描fdb中以指定前缀开头的key**
 
+```bash
+#!/bin/bash
+prefix="_Usage"
+startkey="_Usage"
+endkey="_Usage_\xff"
+outputfile="./fdb_export.txt"
 
+truncate -s 0 $outputfile
+
+lastline=""
+laststartkey=""
+nextstartkey=$startkey
+echo "lastline: $lastline laststartkey: $laststartkey nextstartkey: $nextstartkey"
+
+while [ -n "$nextstartkey" ] && [ "$nextstartkey" != "laststartkey" ]; do
+
+fdbcli --exec "getrange $nextstartkey $endkey 1000" >> $outputfile
+lastline=$(tail -n 2 $outputfile | grep $prefix)
+laststartkey=$nextstartkey
+nextstartkey=$(echo $lastline | awk -F '`' '{print $2}' | awk -F "'" '{print $1}')
+echo "lastline: $lastline laststartkey:$laststartkey  nextstartkey: $nextstartkey"
+sleep 0.1
+
+done
+```
+
+**39) 搜索压缩文件中的指定字符串**
+
+```bash
+# zcat ./*.tar.gz | grep "aaa"
+```
 
 
 
