@@ -745,6 +745,8 @@ Samples: 803  of event 'cpu-clock', Event count (approx.): 200750000
 
 7. [perf命令](https://www.cnblogs.com/xiaogongzi/p/8473821.html)
 
+8. [画火焰图](https://github.com/brendangregg/FlameGraph)
+
 <br />
 <br />
 <br />
