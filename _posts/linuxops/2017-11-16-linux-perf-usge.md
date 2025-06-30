@@ -739,13 +739,19 @@ Samples: 803  of event 'cpu-clock', Event count (approx.): 200750000
 
 4. [perf命令](https://www.cnblogs.com/xiaogongzi/p/8473821.html)
 
-5. [<<Linux Perf Master>>电子书](https://cloud.tencent.com/developer/article/1019745)
+5. [Linux Perf Master电子书](https://cloud.tencent.com/developer/article/1019745)
 
 6. [perf Examples](http://www.brendangregg.com/perf.html)
 
 7. [perf命令](https://www.cnblogs.com/xiaogongzi/p/8473821.html)
 
 8. [画火焰图](https://github.com/brendangregg/FlameGraph)
+
+    ```text
+    # /home/ivanzz101/FlameGraph/stackcollapse-perf.pl out.perf > out.folded
+    # /home/ivanzz1001/FlameGraph/flamegraph.pl out.folded > flamegraph.svg
+    ```
+
 
 <br />
 <br />
