@@ -748,6 +748,8 @@ Samples: 803  of event 'cpu-clock', Event count (approx.): 200750000
 8. [画火焰图](https://github.com/brendangregg/FlameGraph)
 
     ```text
+    # perf record -F 99 -g -p 11121 -- sleep 60
+    # perf script > out.perf
     # /home/ivanzz101/FlameGraph/stackcollapse-perf.pl out.perf > out.folded
     # /home/ivanzz1001/FlameGraph/flamegraph.pl out.folded > flamegraph.svg
     ```
