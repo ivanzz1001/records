@@ -460,101 +460,110 @@ git remote prune [-n | --dry-run] <name>…​
 git remote [-v | --verbose] update [-p | --prune] [(<group> | <remote>)…​]
 {% endhighlight %}
 
-1) **描述**
+
+### 9.1 描述
 
 ```git remote```命令管理一组跟踪的存储库。
 
-2） **示例**
+### 9.2 示例
 
 以下是一些示例：
 
-* 查看当前的远程库
+1. **查看当前远程库**
 
-要查看当前配置有哪些远程仓库，可以用```git remote```命令，它会列出每个远程库的简短名字。在克隆完某个项目后，至少可以看到一个名为```origin```的远程库，Git默认使用这个名字来标识你所克隆的原始仓库：
-<pre>
-$ git clone http://git.oschina.net/yiibai/sample.git
-$ cd sample
-</pre>
+    要查看当前配置有哪些远程仓库，可以用```git remote```命令，它会列出每个远程库的简短名字。在克隆完某个项目后，至少可以看到一个名为```origin```的远程库，Git默认使用这个名字来标识你所克隆的原始仓库：
 
-a） ```git remote```不带参数，列出已经存在的远程分支
-<pre>
-$ git remote
-origin
-</pre>
+    ```bash
+    $ git clone http://git.oschina.net/yiibai/sample.git
+    $ cd sample
+    ```
 
-b) ```git remote -v | --verbose```列出详细信息，在每一个名字后面列出其远程URL。此时，```-v```选项（译注： 此为```--verbose```的简写，取首字母），显示对应的克隆地址：
-{% highlight string %}
-$ git remote -v
-origin  http://git.oschina.net/yiibai/sample.git (fetch)
-origin  http://git.oschina.net/yiibai/sample.git (push)
+    - `git remote` 不带参数，列出已经存在的远程分支
 
-Administrator@MY-PC /D/worksp/sample (master)
-$ git remote --verbose
-origin  http://git.oschina.net/yiibai/sample.git (fetch)
-origin  http://git.oschina.net/yiibai/sample.git (push)
-{% endhighlight %}
+      ```bash
+      $ git remote
+      origin
+      ```
+      
+    - `git remote -v | --verbose`列出详细信息，在每一个名字后面列出其远程URL。此时，`-v`选项（译注： 此为`--verbose`的简写，取首字母），显示对应的克隆地址
 
-* 添加一个新的远程，抓取，并从它检出一个分支
-{% highlight string %}
-$ git remote
-origin
-$ git branch -r
-  origin/HEAD -> origin/master
-  origin/master
-$ git remote add staging git://git.kernel.org/.../gregkh/staging.git
-$ git remote
-origin
-staging
-$ git fetch staging
-...
-From git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/staging
- * [new branch]      master     -> staging/master
- * [new branch]      staging-linus -> staging/staging-linus
- * [new branch]      staging-next -> staging/staging-next
-$ git branch -r
-  origin/HEAD -> origin/master
-  origin/master
-  staging/master
-  staging/staging-linus
-  staging/staging-next
-$ git checkout -b staging staging/master
-...
-{% endhighlight %}
+       ```bash
+       $ git remote -v
+       origin  http://git.oschina.net/yiibai/sample.git (fetch)
+       origin  http://git.oschina.net/yiibai/sample.git (push)
+        
+       Administrator@MY-PC /D/worksp/sample (master)
+       $ git remote --verbose
+       origin  http://git.oschina.net/yiibai/sample.git (fetch)
+       origin  http://git.oschina.net/yiibai/sample.git (push)
+       ```
 
-* 添加远程仓库
+1. **添加一个新的远程，抓取，并从它检出一个分支**
 
-要添加一个新的远程仓库，可以指定一个简单的名字，以便将来引用，运行```git remote add [shortname] [url]```:
-{% highlight string %}
-$ git remote
-　　origin
-$ git remote add pb http://git.oschina.net/yiibai/sample.git
-$ git remote -v origin http://git.oschina.net/yiibai/sample.git
-　　pb http://git.oschina.net/yiibai/sample2.git 
+   ```bash
+   $ git remote
+    origin
+   $ git branch -r
+   origin/HEAD -> origin/master
+   origin/master
+   $ git remote add staging git://git.kernel.org/.../gregkh/staging.git
+   $ git remote
+   origin
+   staging
+   $ git fetch staging
+   ...
+   From git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/staging
+   * [new branch]      master     -> staging/master
+   * [new branch]      staging-linus -> staging/staging-linus
+   * [new branch]      staging-next -> staging/staging-next
 
-# 现在可以用字串 pb 指代对应的仓库地址了.比如说,要抓取所有 Paul 有的,但本地仓库没有的信息,可以运行 git fetch pb:
+   $ git branch -r
+   origin/HEAD -> origin/master
+   origin/master
+   staging/master
+   staging/staging-linus
+   staging/staging-next
+   $ git checkout -b staging staging/master
+   ...
+   ```
 
-$ git fetch pb
-　　remote: Counting objects: 58, done.
-　　remote: Compressing objects: 100% (41/41), done.
-　　remote: Total 44 (delta 24), reused 1 (delta 0)
-　　Unpacking objects: 100% (44/44), done.
-　　From http://git.oschina.net/yiibai/sample2.git
-　　* [new branch] master -> pb/master
-　　* [new branch] ticgit -> pb/ticgit
-{% endhighlight %}
+1. **添加远程仓库**
+  
+    要添加一个新的远程仓库，可以指定一个简单的名字，以便将来引用，运行```git remote add [shortname] [url]```:
+    ```bash
+    $ git remote
+    origin
+    $ git remote add pb http://git.oschina.net/yiibai/sample.git
+    $ git remote -v origin http://git.oschina.net/yiibai/sample.git
+    pb http://git.oschina.net/yiibai/sample2.git
 
+    # 现在可以用字串 pb 指代对应的仓库地址了.比如说,要抓取所有 Paul 有的,但本地仓库没有的信息,可以运行 git fetch pb:
 
-* 模仿git clone，但只跟踪选定的分支
+    $ git fetch pb
+    remote: Counting objects: 58, done.
+    remote: Compressing objects: 100% (41/41), done.
+    remote: Total 44 (delta 24), reused 1 (delta 0)
+    Unpacking objects: 100% (44/44), done.
+    From http://git.oschina.net/yiibai/sample2.git
+    * [new branch] master -> pb/master
+    * [new branch] ticgit -> pb/ticgit
+    ```
 
-{% highlight string %}
-$ mkdir project.git
-$ cd project.git
-$ git init
-$ git remote add -f -t master -m master origin git://example.com/git.git/
-$ git merge origin
+1. **模仿git clone，但只跟踪选定的分支**
 
-{% endhighlight %}
+   ```bash
+   $ mkdir project.git
+   $ cd project.git
+   $ git init
+   $ git remote add -f -t master -m master origin git://example.com/git.git/
+   $ git merge origin
+   ```
 
+1. **Git 仓库中名为 origin 的远程仓库地址**
+
+    ```bash
+    # git remote set-url origin <new-url>
+    ```
 
 ## 10. git submodule命令
 
