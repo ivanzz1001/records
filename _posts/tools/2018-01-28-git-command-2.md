@@ -128,135 +128,147 @@ git mergetool
 git log [<options>] [<revision range>] [[\--] <path>…]
 {% endhighlight %}
 
-1) **描述**
+### 3.1 描述
 
 ```git log```命令用于显示提交日志信息。该命令采用适用于```git rev-list```命令的选项来控制显示的内容以及如何适应于```git diff -*```命令的选项，以及控制如何更改每个提交引入的内容。
 
-2) **示例**
+### 3.2 示例
 
 以下是一些示例：
 
-* 显示整个提交历史记录，但跳过合并
-{% highlight string %}
-$ git log --no-merges
-commit c5f8a258babf5eec54edc794ff980d8340396592
-Author: maxsu <your_email@mail.com>
-Date:   Wed Jul 12 22:07:59 2017 +0800
+1. **显示整个提交历史记录，但跳过合并**
 
-    commit a new file: newfile.txt
-... ...
-{% endhighlight %}
+    ```bash
+    $ git log --no-merges
+    commit c5f8a258babf5eec54edc794ff980d8340396592
+    Author: maxsu <your_email@mail.com>
+    Date:   Wed Jul 12 22:07:59 2017 +0800
 
-* 显示自```v2.6.12```版本以来所有提交更改```include/scsi```或```drivers/scsi```子目录中的任何文件的所有提交
-<pre>
-$ git log master include/scsi drivers/scsi
-</pre>
+      commit a new file: newfile.txt
+      ...
+      ...
+    ```
 
-* 显示最近两周的更改文件```gitk```。```--```是必要的，以避免与名为```gitk```的分支混淆
-<pre>
-$ git log --since="2 weeks ago" --- gitk
-</pre>
+1. **显示自```v2.6.12```版本以来所有提交更改```include/scsi```或```drivers/scsi```子目录中的任何文件的所有提交**
+    ```bash
+    $ git log master include/scsi drivers/scsi
+    ```
 
-* 显示```test```分支中尚未在```release```分支中的提交，以及每个提交修改的路径列表
-<pre>
-$ git log --name-status release..test
-</pre>
+1. **显示最近两周的更改文件```gitk```。```--```是必要的，以避免与名为```gitk```的分支混淆**
 
-* 显示更改```builtin/rev-list.c```的提交，包括在文件被赋予其现有名称之前发生的提交
-<pre>
-$ git log --follow builtin/rev-list.c
-</pre>
-
-* 显示在任何本地分支中的所有提交，但不包括任何远程跟踪分支的起始点(```origin```不具有）
-<pre>
-$ git log --branches --not --remote=orgin
-</pre>
-
-* 显示本地主服务器中的所有提交，但不显示任何远程存储库主分支
-<pre>
-$ git log master --not --remote=*/master
-</pre>
-
-* 显示历史，包括变化差异、但仅从```主分支```的角度来看，忽略来自合并分支的提交，并显示合并引入的变化的完全差异。只有当遵守在一个整合分支上合并所有主题分支的严格策略时，这才有意义
-<pre>
-$ git log -p -m --first-parent
-</pre>
-
-* 显示文件```main.c```中函数```main()```随着时间的推移而演变
-<pre>
-$ git log -L '/int main/',/^}/:main.c
-</pre>
-
-* 显示最近3次提交
-<pre>
-$ git log -3
-</pre>
-
-* 根据提交ID查询日志
-<pre>
-#查询ID(如：6bab70a08afdbf3f7faffaff9f5252a2e4e2d552)之前的记录，包含commit
-$ git log commit_id  　　
-
-#查询commit1与commit2之间的记录，包括commit1和commit2
-$ git log commit1_id commit2_id 
-
-#同上，但是不包括commit1
-$ git log commit1_id..commit2_id 
-</pre>
-其中，```commit_id```可以是提交哈希值的简写模式，也可以使用```HEAD```代替。```HEAD```代表最后一次提交，```HEAD^```为最后一个提交的父提交，等同于```HEAD~1```。```HEAD~2```代表倒数第二次提交。
-
-```--pretty```按指定格式显示日志信息，可选项有：oneline、short、medium、full、fuller、email、raw以及format。默认为medium，可以通过修改配置文件来指定默认的方式。
-<pre>
-$ git log (--pretty=)oneline
-</pre>
-
-常见的```format```选项：
-<pre>
-#选项     #说明
-%H      提交对象(commit)的完整哈希字串
-%h      提交对象的简短哈希字串
-%T      树对象(tree)的完整哈希字串
-%t      树对象的简短哈希字串
-%P      父对象(parent)的完整哈希字串
-%p      父对象的简短哈希字串
-%an     作者(author)的名字
-%ae     作者的电子邮件地址
-%ad     作者修订日期(可以用 -date= 选项定制格式)
-%ar     作者修订日期，按多久以前的方式显示
-%cn     提交者(committer)的名字
-%ce     提交者的电子邮件地址
-%cd     提交日期
-%cr     提交日期，按多久以前的方式显示
-%s      提交说明
-</pre>
-注： ```作者```是指最后一次修改文件的人； 而```提交者```是指提交该文件的人
-
-<pre>
-git log --pretty=format:"%an %ae %ad %cn %ce %cd %cr %s" --graph
-</pre>
-
-git的其他选项有：
-{% highlight string %}
---mergs: 查看所有合并过的提交历史记录
-
---no-merges: 查看所有未被合并过的提交信息
-
---author=someonet: 查询指定作者的提交记录
-
---since，--affter: 仅显示指定时间之后的提交(不包含当前日期)
-
---until，--before:仅显示指定时间之前的提交(包含当前日期)
-{% endhighlight %}
-
-例如：
-<pre>
-$ git log --author=maxsu
-$ git log --before={3,weeks, ago} --after={2018-04-18}
-</pre>
+    ```bash
+    $ git log --since="2 weeks ago" --- gitk
+    ```
 
 
+1. **显示```test```分支中尚未在```release```分支中的提交，以及每个提交修改的路径列表**
+
+     ```bash
+     $ git log --name-status release..test
+     ```
+1. **显示更改```builtin/rev-list.c```的提交，包括在文件被赋予其现有名称之前发生的提交**
+
+    ```bash
+    $ git log --follow builtin/rev-list.c
+    ```
+
+1. **显示在任何本地分支中的所有提交，但不包括任何远程跟踪分支的起始点(```origin```不具有）**
+
+    ```bash
+    $ git log --branches --not --remote=orgin
+    ```
+
+1. **显示本地主服务器中的所有提交，但不显示任何远程存储库主分支**
+
+    ```bash
+    $ git log master --not --remote=*/master
+    ```
+
+1. **显示历史，包括变化差异、但仅从```主分支```的角度来看，忽略来自合并分支的提交，并显示合并引入的变化的完全差异。只有当遵守在一个整合分支上合并所有主题分支的严格策略时，这才有意义**
+    ```bash
+    $ git log -p -m --first-parent
+    ```
+
+1. **显示文件```main.c```中函数```main()```随着时间的推移而演变**
+
+    ```bash
+    $ git log -L '/int main/',/^}/:main.c
+    ```
+
+1. **显示最近3次提交**
+
+     ```bash
+     $ git log -3
+     ```
+
+1. **根据提交ID查询日志**
+
+     ```bash
+     #查询ID(如：6bab70a08afdbf3f7faffaff9f5252a2e4e2d552)之前的记录，包含commit
+     $ git log commit_id
+
+     #查询commit1与commit2之间的记录，包括commit1和commit2
+     $ git log commit1_id commit2_id
+
+     #同上，但是不包括commit1
+     $ git log commit1_id..commit2_id 
+     ```
+
+    其中，```commit_id```可以是提交哈希值的简写模式，也可以使用```HEAD```代替。```HEAD```代表最后一次提交，```HEAD^```为最后一个提交的父提交，等同于```HEAD~1```。```HEAD~2```代表倒数第二次提交。
 
 
+1. **`--pretty`按指定格式显示日志信息**
+
+    可选项有：oneline、short、medium、full、fuller、email、raw以及format。默认为medium，可以通过修改配置文件来指定默认的方式。
+    ```bash
+    $ git log (--pretty=)oneline
+    ```
+    
+   常见的```format```选项：
+
+     ```text
+      #选项     #说明
+      %H      提交对象(commit)的完整哈希字串
+      %h      提交对象的简短哈希字串
+      %T      树对象(tree)的完整哈希字串
+      %t      树对象的简短哈希字串
+      %P      父对象(parent)的完整哈希字串
+      %p      父对象的简短哈希字串
+      %an     作者(author)的名字
+      %ae     作者的电子邮件地址
+      %ad     作者修订日期(可以用 -date= 选项定制格式)
+      %ar     作者修订日期，按多久以前的方式显示
+      %cn     提交者(committer)的名字
+      %ce     提交者的电子邮件地址
+      %cd     提交日期
+      %cr     提交日期，按多久以前的方式显示
+      %s      提交说明
+     ```
+     
+      注： `作者`是指最后一次修改文件的人； 而`提交者`是指提交该文件的人
+
+    ```bash
+    $ git log --pretty=format:"%an %ae %ad %cn %ce %cd %cr %s" --graph
+    ```
+
+1. **git log其他选项**
+
+    git的其他选项有：
+   
+    ```text
+   --mergs: 查看所有合并过的提交历史记录
+   --no-merges: 查看所有未被合并过的提交信息
+   --author=someonet: 查询指定作者的提交记录
+   --since，--affter: 仅显示指定时间之后的提交(不包含当前日期)
+   --until，--before:仅显示指定时间之前的提交(包含当前日期)
+   ```
+
+    例如:
+    ```bash
+    $ git log --author=maxsu
+    $ git log --before={3,weeks, ago} --after={2018-04-18}
+    ```
+    
 ## 6. git fetch命令
 
 ```git fetch```命令用于从另一个存储库下载对象和引用。基本语法格式如下：
